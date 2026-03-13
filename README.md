@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# YAH Hope
 
-# Run and deploy your AI Studio app
+A modern ERP and healthcare management system designed for medical centers and patient tracking.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/123dd7bf-7cd0-49b9-b0ba-edae4d8b26fb
+- **Patient Management:** Detailed tracking of patient profiles, consultations, and history.
+- **Finance Area:** Robust financial management for ERP and administrative use.
+- **Home Visits:** Specialized tracking for medical home visits.
+- **Nutrition Module:** Advanced dashboards with interactive charts for nutrition tracking.
+- **Inventory Control:** Real-time inventory management.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend:** React with Vite
+- **Styling:** Vanilla CSS & TailwindCSS (custom components)
+- **Charts:** Recharts
+- **Icons:** Lucide React
+- **Animations:** Motion
 
+## Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Setup:**
+   Configure your Supabase and API keys in a `.env` file (see `.env.example`).
+
+3. **Run Development Server:**
+   ```bash
+   npm run dev
+   ```
+
+## Repository
+
+[https://github.com/devrengaw/yahhope.git](https://github.com/devrengaw/yahhope.git)
