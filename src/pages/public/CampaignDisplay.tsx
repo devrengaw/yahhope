@@ -8,8 +8,7 @@ export function CampaignDisplay() {
   const progressPercentage = Math.min((campaign.current_amount / campaign.target_amount) * 100, 100);
 
   // URL que o QR Code apontará (a página de doação oficial)
-  // URL temporária para testes no celular (no servidor final, usar window.location.origin)
-  const donationUrl = 'https://www.yahhope.org/campanha';
+  const donationUrl = 'https://yahhope.com/campanha';
   
   // Usando cor preta no QR Code para garantir a melhor leitura possível
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(donationUrl)}&color=000000&bgcolor=ffffff`;

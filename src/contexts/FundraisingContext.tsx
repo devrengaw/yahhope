@@ -48,18 +48,27 @@ const defaultCampaign: Campaign = {
   description: 'Ajude-nos a combater a desnutrição infantil e transformar vidas.',
   target_amount: 20000,
   current_amount: 0,
-  milestones: [
-    { id: 'm1', title: 'Aluguel do Mês Garantido', target_amount: 5000, description: 'Garante o espaço da clínica para atendimento.' },
-    { id: 'm2', title: 'Suplementos Essenciais', target_amount: 10000, description: 'Compra de suplementos para 50 crianças.' },
-    { id: 'm3', title: 'Cestas Básicas Familiares', target_amount: 15000, description: 'Alimentação para as famílias das crianças.' },
-    { id: 'm4', title: 'Equipamentos Médicos', target_amount: 20000, description: 'Renovação dos equipamentos da triagem.' }
-  ]
+  milestones: []
 };
 
 export function FundraisingProvider({ children }: { children: React.ReactNode }) {
   const [campaign, setCampaign] = useState<Campaign>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_CAMPAIGN);
-    return saved ? JSON.parse(saved) : defaultCampaign;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Remove placeholder milestones if they exist
+        if (parsed.milestones) {
+          parsed.milestones = parsed.milestones.filter(
+            (m: any) => !['m1', 'm2', 'm3', 'm4'].includes(m.id)
+          );
+        }
+        return parsed;
+      } catch (e) {
+        return defaultCampaign;
+      }
+    }
+    return defaultCampaign;
   });
 
   const [donations, setDonations] = useState<Donation[]>(() => {

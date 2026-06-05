@@ -26,16 +26,29 @@ export function CommEmailTemplates() {
 
   // Load from local storage for mock
   useEffect(() => {
-    const savedSettings = localStorage.getItem('yah_hope_email_settings');
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings);
-      setLogoUrl(parsed.logoUrl || logoUrl);
-      setPrimaryColor(parsed.primaryColor || primaryColor);
+    try {
+      const savedSettings = localStorage.getItem('yah_hope_email_settings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed) {
+          if (parsed.logoUrl) setLogoUrl(parsed.logoUrl);
+          if (parsed.primaryColor) setPrimaryColor(parsed.primaryColor);
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing email settings', e);
     }
 
-    const savedTemplates = localStorage.getItem('yah_hope_email_templates');
-    if (savedTemplates) {
-      setTemplates(JSON.parse(savedTemplates));
+    try {
+      const savedTemplates = localStorage.getItem('yah_hope_email_templates');
+      if (savedTemplates) {
+        const parsed = JSON.parse(savedTemplates);
+        if (parsed && typeof parsed === 'object' && parsed.donation_thank_you) {
+          setTemplates(parsed);
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing email templates', e);
     }
   }, []);
 
