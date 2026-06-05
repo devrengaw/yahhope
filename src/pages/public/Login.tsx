@@ -30,7 +30,18 @@ export function Login() {
     let permissions: string[] = ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
 
     if (activeTab === 'login') {
-      if (email.includes('admin') || email === 'gestor@yahope.org') {
+      if (email === 'contato@yahhope.com') {
+        const storedPassword = localStorage.getItem('yah_hope_admin_password');
+        if (!storedPassword) {
+          localStorage.setItem('yah_hope_admin_password', password);
+          alert('Senha de administrador registrada com sucesso para o primeiro acesso!');
+        } else if (password !== storedPassword) {
+          alert('Senha incorreta!');
+          return;
+        }
+        roleToLogin = 'ADMIN';
+        permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
+      } else if (email.includes('admin') || email === 'gestor@yahope.org') {
         roleToLogin = 'ADMIN';
         permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
       } else if (isSupporterMode || email.includes('apoiador')) {
@@ -150,15 +161,6 @@ export function Login() {
           </div>
         </form>
 
-        {/* Demo hints */}
-        <div className="mt-8 text-center bg-slate-50 border border-slate-100 rounded-2xl p-4 relative z-10">
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-2">Informação de Demonstração</p>
-          {isSupporterMode ? (
-            <p className="text-xs text-amber-600 font-bold">Qualquer email no modo apoiador acessará o Portal.</p>
-          ) : (
-            <p className="text-xs text-slate-600 font-medium">Use <span className="font-bold text-emerald-600">"admin"</span> no email para acesso total.</p>
-          )}
-        </div>
       </div>
     </div>
   );

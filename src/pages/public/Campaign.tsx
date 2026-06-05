@@ -48,8 +48,28 @@ export function Campaign() {
           setIsSubmitted(true);
         }, 1500);
       } else {
-        // Pagamento por Cartão (via Stripe + Supabase Edge Functions)
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`, {
+        // Pagamento por Cartão
+        if (!import.meta.env.VITE_SUPABASE_URL) {
+          // Simulate Stripe Checkout for demo/MVP without backend
+          setTimeout(() => {
+            setIsLoading(false);
+            alert('Integração com Cartão de Crédito (Stripe) em modo de demonstração.\nA doação será registrada como pendente simulando o retorno do webhook.');
+            
+            createDonation({
+              donor_name: name,
+              donor_email: email,
+              amount: finalAmount,
+              payment_method: paymentMethod
+            });
+            
+            setIsSubmitted(true);
+          }, 1500);
+          return;
+        }
+
+        // Real integration (via Stripe + Supabase Edge Functions)
+        const baseUrl = import.meta.env.VITE_SUPABASE_URL.replace(/\/$/, ''); // Remove trailing slash if present
+        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -59,7 +79,9 @@ export function Campaign() {
             amount: finalAmount,
             isMonthly,
             donorName: name,
-            donorEmail: email
+            donorEmail: email,
+            successUrl: `${window.location.origin}/campanha?status=success`,
+            cancelUrl: `${window.location.origin}/campanha?status=cancel`
           })
         });
 
@@ -73,9 +95,9 @@ export function Campaign() {
           setIsLoading(false);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Donation error:', error);
-      alert('Erro ao processar a doação. Tente novamente.');
+      alert(`Erro ao processar a doação: ${error.message || 'Falha na rede'}.\nVerifique se as variáveis do Supabase e do Stripe estão corretas.`);
       setIsLoading(false);
     }
   };
