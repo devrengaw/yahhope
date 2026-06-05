@@ -68,7 +68,11 @@ export function Campaign() {
         }
 
         // Real integration (via Stripe + Supabase Edge Functions)
-        const baseUrl = import.meta.env.VITE_SUPABASE_URL.replace(/\/$/, ''); // Remove trailing slash if present
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        if (!supabaseUrl) {
+          throw new Error('Variável VITE_SUPABASE_URL não configurada.');
+        }
+        const baseUrl = supabaseUrl.replace(/\/$/, ''); // Remove trailing slash if present
         const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
           method: 'POST',
           headers: {

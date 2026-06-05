@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate } from 'lucide-react';
+import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 type TemplateType = 'donation_thank_you' | 'accountability';
