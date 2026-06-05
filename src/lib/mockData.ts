@@ -1,4 +1,4 @@
-export type NutritionalStatus = 'Adequado' | 'DAM' | 'DAG' | 'Risco';
+export type NutritionalStatus = 'Adequado' | 'DAM' | 'DAG' | 'Risco' | 'Alta';
 
 export interface Patient {
   id: string;
@@ -17,6 +17,7 @@ export interface Patient {
 export interface Prescription {
   medication: string;
   treatment: string;
+  duration_days?: number;
 }
 
 export interface User {
@@ -56,6 +57,17 @@ export interface Kit {
   items: KitItem[];
 }
 
+export interface InventoryTransaction {
+  id: string;
+  item_id: string;
+  type: 'in' | 'out';
+  quantity: number;
+  date: string;
+  reason?: string;
+  price?: number;
+  patient_id?: string;
+}
+
 export interface ClinicalEvent {
   id: string;
   patient_id: string;
@@ -72,7 +84,9 @@ export interface ClinicalEvent {
   prescriptions?: Prescription[];
   professional: string;
   return_date?: string;
-  kit_delivered?: string;
+  kit_delivered?: string[];
+  hospital_referral?: boolean;
+  is_discharge?: boolean;
 }
 
 export interface HomeVisit {
@@ -88,6 +102,7 @@ export interface HomeVisit {
   };
   observations: string;
   next_visit_date?: string;
+  last_clinical_date?: string;
 }
 
 export type TransactionType = 'income' | 'expense';
@@ -112,7 +127,19 @@ export interface Transaction {
   recurrence?: 'monthly' | 'yearly' | 'none';
 }
 
-export type ProjectStatus = 'planning' | 'active' | 'completed' | 'on-hold';
+export type ColumnType = 'text' | 'number' | 'date' | 'status' | 'people' | 'file' | 'link' | 'phone' | 'location' | 'dropdown' | 'timeline' | 'notes' | 'value';
+export type ProjectStatus = 'active' | 'completed' | 'planning' | 'on-hold';
+
+export interface ColumnDefinition {
+  id: string;
+  name: string;
+  type: ColumnType;
+  options?: string[]; // For dropdown/status
+  width?: number;
+}
+
+export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
+export type Priority = 'low' | 'medium' | 'high';
 
 export interface SubTask {
   id: string;
@@ -120,10 +147,6 @@ export interface SubTask {
   completed: boolean;
   invitees: string[]; // User IDs
 }
-
-export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
-
-export type Priority = 'low' | 'medium' | 'high';
 
 export interface ProjectTask {
   id: string;
@@ -134,24 +157,45 @@ export interface ProjectTask {
   subtasks: SubTask[];
   invitees: string[]; // User IDs
   priority: Priority;
+  values?: Record<string, any>; // For dynamic boards
+}
+
+export interface PersonalActivity {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  isAllDay: boolean;
+  visibleTo: string[]; // User IDs
+  authorId: string;
 }
 
 export interface Project {
   id: string;
   name: string;
   description: string;
-  status: ProjectStatus;
+  status: 'active' | 'completed' | 'planning' | 'on-hold';
   progress: number;
   start_date: string;
   end_date: string;
   budget: number;
+  isPrivate: boolean;
+  category: string;
+  priority: 'low' | 'medium' | 'high';
+  invitees: string[];
+  columns?: ColumnDefinition[]; // For dynamic boards
   tasks: ProjectTask[];
   notes?: string;
-  isPrivate: boolean;
-  invitees: string[]; // User IDs
-  category: string;
-  priority: Priority;
+  enablePortalUpdates?: boolean;
 }
+
+export const mockUserCategories = [];
+
+export const mockInventoryCategories: InventoryCategory[] = [];
+
+export const mockTransactionCategories: TransactionCategory[] = [];
 
 export type TeamMemberRole = 'admin' | 'coordinator' | 'volunteer' | 'doctor' | 'nurse' | 'social_worker' | 'acs';
 export type TeamMemberStatus = 'active' | 'inactive' | 'on_leave';
@@ -196,36 +240,13 @@ export const mockKits: Kit[] = [];
 
 export const mockUsers: User[] = [];
 
-export const mockInventoryCategories: InventoryCategory[] = [
-  { id: '1', name: 'Medicamento', description: 'Remédios e fármacos em geral' },
-  { id: '2', name: 'Suplemento', description: 'Fórmulas nutricionais e vitaminas' },
-  { id: '3', name: 'Material', description: 'Materiais de uso médico e curativos' },
-];
-
 export const mockInventory: InventoryItem[] = [];
-
-export const mockTransactionCategories: TransactionCategory[] = [
-  { id: '1', name: 'Doações', type: 'income', color: 'bg-green-500' },
-  { id: '2', name: 'Patrocínios', type: 'income', color: 'bg-emerald-500' },
-  { id: '3', name: 'Salários', type: 'expense', color: 'bg-red-500' },
-  { id: '4', name: 'Equipamentos', type: 'expense', color: 'bg-orange-500' },
-  { id: '5', name: 'Alimentação', type: 'expense', color: 'bg-amber-500' },
-  { id: '6', name: 'Manutenção', type: 'expense', color: 'bg-rose-500' },
-];
 
 export const mockTransactions: Transaction[] = [];
 
 export const mockProjects: Project[] = [];
 
 export const mockTeamMembers: TeamMember[] = [];
-
-export const mockUserCategories: UserCategory[] = [
-  { id: '1', name: 'Gestão', description: 'Diretoria e coordenação', color: 'bg-blue-500' },
-  { id: '2', name: 'Saúde', description: 'Médicos e enfermeiros', color: 'bg-emerald-500' },
-  { id: '3', name: 'Social', description: 'Assistentes sociais e psicólogos', color: 'bg-purple-500' },
-  { id: '4', name: 'ACS', description: 'Agentes Comunitários de Saúde', color: 'bg-rose-500' },
-  { id: '5', name: 'Voluntário', description: 'Apoio geral não assalariado', color: 'bg-amber-500' },
-];
 
 export const mockCalendarEvents: CalendarEvent[] = [];
 

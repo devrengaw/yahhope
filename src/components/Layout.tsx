@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Shield, Tag, Bell, Globe } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { ChatWidget } from './ChatWidget';
+import { NotificationBell } from './NotificationBell';
 
 const nutritionNavItems = [
   { name: 'Dashboard', path: '/nutrition', icon: LayoutDashboard },
-  { name: 'Atendimento', path: '/nutrition/atendimento', icon: Stethoscope },
   { name: 'Crianças', path: '/nutrition/patients', icon: Users },
+  { name: 'Atendimento', path: '/nutrition/atendimento', icon: Stethoscope },
   { name: 'Fila de Espera', path: '/nutrition/waiting-list', icon: ClipboardList },
+  { name: 'Atualizações Apoiador', path: '/nutrition/updates', icon: Newspaper },
   { name: 'Estoque', path: '/nutrition/inventory', icon: Package },
   { name: 'Visitas', path: '/nutrition/visits', icon: Home },
   { name: 'Gestão', path: '/nutrition/management', icon: Settings },
@@ -23,84 +26,133 @@ const erpNavItems = [
 ];
 
 const adminNavItems = [
+  { name: 'Feed de Impacto', path: '/admin/impact-feed', icon: TrendingUp },
+  { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
+  { name: 'Captação', path: '/admin/fundraising', icon: Target },
   { name: 'Projetos', path: '/admin/projects', icon: Briefcase },
   { name: 'Usuários', path: '/admin/users', icon: Users },
   { name: 'Financeiro', path: '/admin/finance', icon: DollarSign },
+  { name: 'Presentes', path: '/admin/gifts', icon: Gift },
+  { name: 'Gestão da Loja', path: '/admin/store', icon: ShoppingBag },
   { name: 'Geral', path: '/admin/settings', icon: Globe },
 ];
 
-export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'erp' | 'admin' }) {
+const communicationNavItems = [
+  { name: 'Dashboard', path: '/communication', icon: LayoutDashboard },
+  { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
+  { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
+  { name: 'Blog', path: '/communication/blog', icon: Newspaper },
+  { name: 'Templates de E-mail', path: '/communication/email-templates', icon: Mail },
+  { name: 'Gestão', path: '/communication/management', icon: Settings },
+];
+
+const supporterNavItems = [
+  { name: 'Painel', path: '/portal/dashboard', icon: LayoutDashboard },
+  { name: 'Presentes', path: '/portal/gifts', icon: Gift },
+  { name: 'Apadrinhar', path: '/portal/sponsorship', icon: Heart },
+  { name: 'Loja Solidária', path: '/portal/shop', icon: ShoppingBag },
+  { name: 'Meu Impacto', path: '/portal/impact', icon: BarChart3 },
+];
+
+export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'erp' | 'admin' | 'communication' | 'supporter' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const initialNavItems = module === 'nutrition' ? nutritionNavItems : module === 'erp' ? erpNavItems : adminNavItems;
+  const initialNavItems = 
+    module === 'nutrition' ? nutritionNavItems : 
+    module === 'erp' ? erpNavItems : 
+    module === 'communication' ? communicationNavItems :
+    module === 'supporter' ? supporterNavItems :
+    adminNavItems;
   
   // Filter items by permission (simplified mapping)
   const navItems = initialNavItems.filter(item => {
-    if (user?.role === 'ADMIN') return true;
+    if (user?.role === 'ADMIN' || module === 'supporter') return true;
     
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
-    const isDashboard = item.path === '/nutrition' || item.path === '/erp' || item.path === '/admin';
-    const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : permissionKey)));
+    const isDashboard = item.path === '/nutrition' || item.path === '/erp' || item.path === '/admin' || item.path === '/communication';
+    const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : (permissionKey === 'blog' ? 'blog' : (permissionKey === 'chat' ? 'chat' : permissionKey)))));
     
     return user?.permissions.includes(finalKey);
   });
 
-  const moduleName = module === 'nutrition' ? 'Nutrição Infantil' : module === 'erp' ? 'Gestão de Projetos' : 'YAH Hope';
-  const themeColor = module === 'nutrition' ? 'emerald' : module === 'erp' ? 'blue' : 'slate';
+  const moduleName = 
+    module === 'nutrition' ? 'Nutrição Infantil' : 
+    module === 'erp' ? 'Gestão de Projetos' : 
+    module === 'communication' ? 'Comunicação' :
+    module === 'supporter' ? 'Portal do Apoiador' :
+    'YAH Hope';
+    
+  const themeColor = 
+    module === 'nutrition' ? 'emerald' : 
+    module === 'erp' ? 'blue' : 
+    module === 'communication' ? 'indigo' :
+    module === 'supporter' ? 'amber' :
+    'slate';
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const isLightSidebar = module === 'supporter';
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
-      <div className={`md:hidden bg-${themeColor}-700 text-white p-4 flex justify-between items-center shadow-md z-20`}>
-        <div className="font-bold text-xl tracking-tight">YAHope</div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+      <div className={cn(
+        "md:hidden p-4 flex justify-between items-center shadow-md z-20 transition-colors",
+        isLightSidebar ? "bg-white text-slate-900" : `bg-${themeColor}-700 text-white`
+      )}>
+        <div className="flex items-center">
+          <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
+        </div>
+        <div className="flex items-center gap-4">
+          <NotificationBell isLight={isLightSidebar} />
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}
       <aside
         className={cn(
-          `fixed inset-y-0 left-0 z-10 w-64 bg-${themeColor}-800 text-${themeColor}-50 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col`,
+          "fixed inset-y-0 left-0 z-10 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
+          isLightSidebar ? "bg-white border-slate-100 text-slate-600" : `bg-${themeColor}-800 border-transparent text-${themeColor}-50`,
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="p-6 hidden md:block shrink-0">
-          <div className="font-bold text-2xl tracking-tight text-white flex items-center gap-2">
-            <div className={`w-8 h-8 bg-${themeColor}-500 rounded-lg flex items-center justify-center`}>
-              <span className="text-white font-black">Y</span>
+          <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
+            <div className="flex items-center gap-2 w-full">
+              <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
             </div>
-            YAHope
+            <NotificationBell isLight={isLightSidebar} />
           </div>
-          <p className={`text-${themeColor}-300 text-xs mt-1 font-medium tracking-wider uppercase`}>{moduleName}</p>
+          <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)}>{moduleName}</p>
         </div>
 
         <nav className="mt-6 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
           <ul className="space-y-1 px-3">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : module === 'erp' ? '/erp' : '/admin') && location.pathname.startsWith(item.path));
+              const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : module === 'erp' ? '/erp' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
               return (
                 <li key={item.path}>
                   <Link
                     to={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors font-medium text-sm",
-                      isActive 
-                        ? `bg-${themeColor}-900/50 text-white shadow-inner` 
-                        : `text-${themeColor}-100 hover:bg-${themeColor}-700/50 hover:text-white`
-                    )}
-                  >
-                    <item.icon size={20} className={isActive ? `text-${themeColor}-400` : `text-${themeColor}-300`} />
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all duration-300 group",
+                        isActive 
+                          ? (isLightSidebar ? "bg-amber-50 text-amber-600 shadow-sm" : `bg-${themeColor}-900/40 text-slate-50 shadow-inner`)
+                          : (isLightSidebar ? "text-slate-500 hover:bg-slate-50 hover:text-slate-900" : `text-${themeColor}-200 hover:bg-${themeColor}-600/50 hover:text-white`)
+                      )}
+                    >
+                      <item.icon size={20} className={isActive ? (isLightSidebar ? "text-amber-500" : `text-${themeColor}-100`) : (isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)} />
                     {item.name}
                   </Link>
                 </li>
@@ -109,9 +161,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           </ul>
         </nav>
         
-        <div className={`shrink-0 p-4 border-t border-${themeColor}-700/50`}>
+        <div className={cn("shrink-0 p-4 border-t", isLightSidebar ? "border-slate-100" : `border-${themeColor}-700/50`)}>
           {user?.role === 'ADMIN' && (
-            <Link to="/admin" className={`flex items-center gap-2 text-sm font-medium text-${themeColor}-200 hover:text-white mb-4 px-2 transition-colors`}>
+            <Link to="/admin" className={cn("flex items-center gap-2 text-sm font-bold mb-4 px-2 transition-colors", isLightSidebar ? "text-slate-400 hover:text-slate-600" : `text-${themeColor}-200 hover:text-white`)}>
               <ArrowLeft size={16} /> Voltar aos Módulos
             </Link>
           )}
@@ -120,17 +172,17 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               to="/admin/profile" 
               className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
             >
-              <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white font-bold border-2 border-${themeColor}-500 shadow-sm group-hover:border-white transition-colors`}>
+              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold border-2 shadow-sm transition-colors", isLightSidebar ? "bg-amber-500 border-amber-400 group-hover:border-amber-600" : `bg-${themeColor}-600 border-${themeColor}-500 group-hover:border-white`)}>
                 {user?.avatar || (user?.name ? user.name.charAt(0) : 'U')}
               </div>
               <div className="overflow-hidden text-left">
-                <p className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</p>
-                <p className={`text-[10px] text-${themeColor}-300 uppercase tracking-wider font-bold`}>{user?.role || 'Visitante'}</p>
+                <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name || 'Usuário'}</p>
+                <p className={cn("text-[10px] uppercase tracking-wider font-black", isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)}>{user?.role || 'Visitante'}</p>
               </div>
             </Link>
             <button 
               onClick={handleLogout} 
-              className={`text-${themeColor}-300 hover:text-white p-2 rounded-lg hover:bg-${themeColor}-700/50 transition-colors tooltip-target`} 
+              className={cn("p-2 rounded-lg transition-colors tooltip-target", isLightSidebar ? "text-slate-400 hover:text-slate-600 hover:bg-slate-50" : `text-${themeColor}-300 hover:text-white hover:bg-${themeColor}-700/50`)} 
               title="Sair"
             >
               <LogOut size={18} />
@@ -144,6 +196,8 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
           {children}
         </div>
+        {/* Floating Chat for Supporters */}
+        {module === 'supporter' && <ChatWidget />}
       </main>
       
       {/* Mobile Overlay */}
@@ -156,3 +210,4 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     </div>
   );
 }
+

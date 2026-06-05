@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Package, Plus, Search, AlertCircle, Edit2, Trash2, X, ArrowDownToLine, ArrowUpFromLine, BriefcaseMedical } from 'lucide-react';
-import { InventoryItem, mockInventoryCategories, Kit } from '../lib/mockData';
+import { InventoryItem, Kit } from '../lib/mockData';
 import { useInventory } from '../contexts/InventoryContext';
 
 export function Inventory() {
-  const { items, setItems, kits, setKits } = useInventory();
-  const [activeTab, setActiveTab] = useState<'items' | 'kits'>('items');
+  const { items, setItems, kits, setKits, categories, transactions, addTransaction } = useInventory();
+  const [activeTab, setActiveTab] = useState<'items' | 'kits' | 'history'>('items');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Item Modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [name, setName] = useState('');
-  const [category, setCategory] = useState(mockInventoryCategories[0]?.name || '');
+  const [category, setCategory] = useState(categories[0]?.name || '');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
   const [minQuantity, setMinQuantity] = useState('');
@@ -54,7 +54,7 @@ export function Inventory() {
       setPurchasePrice(item.purchase_price?.toString() || '');
     } else {
       setEditingItem(null);
-      setName(''); setCategory(mockInventoryCategories[0]?.name || ''); setQuantity(''); setUnit(''); setMinQuantity(''); setExpirationDate(''); setPurchasePrice('');
+      setName(''); setCategory(categories[0]?.name || ''); setQuantity(''); setUnit(''); setMinQuantity(''); setExpirationDate(''); setPurchasePrice('');
     }
     setIsItemModalOpen(true);
   };
@@ -109,6 +109,15 @@ export function Inventory() {
       }
       return i;
     }));
+
+    addTransaction({
+      item_id: item.id,
+      type,
+      quantity: q,
+      price: type === 'in' && p !== undefined ? p : undefined,
+      reason: transNotes || (type === 'in' ? 'Entrada de estoque' : 'Saída manual')
+    });
+
     setTransactionModal({ isOpen: false, type: 'in', item: null });
   };
 
@@ -312,48 +321,105 @@ export function Inventory() {
 
       {/* Kits List */}
       {activeTab === 'kits' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
-          {filteredKits.map(kit => (
-            <div key={kit.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <BriefcaseMedical size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900">{kit.name}</h3>
-                    <p className="text-xs text-slate-500">{kit.items.length} itens no kit</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openKitModal(kit)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => handleDeleteKit(kit.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-4 flex-1">{kit.description}</p>
-              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Composição</p>
-                {kit.items.map((ki, idx) => {
-                  const invItem = items.find(i => i.id === ki.item_id);
-                  return (
-                    <div key={idx} className="flex justify-between items-center text-sm">
-                      <span className="text-slate-700">{invItem?.name || 'Item não encontrado'}</span>
-                      <span className="font-medium text-slate-900">{ki.quantity} {invItem?.unit}</span>
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <BriefcaseMedical className="text-emerald-600" size={20} />
+              Kits de Distribuição
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredKits.map(kit => (
+                <div key={kit.id} className="bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col group hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">{kit.name}</h3>
+                      {kit.description && <p className="text-sm text-slate-500 mt-1">{kit.description}</p>}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openKitModal(kit)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                        <Edit2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-3 mt-2 flex-grow">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Itens do Kit</h4>
+                    {kit.items.map(ki => {
+                      const item = items.find(i => i.id === ki.item_id);
+                      if (!item) return null;
+                      return (
+                        <div key={ki.item_id} className="flex justify-between items-center text-sm border-b border-slate-200/50 pb-2 last:border-0 last:pb-0">
+                          <span className="text-slate-700 font-medium">{item.name}</span>
+                          <span className="bg-white px-2 py-1 rounded-md text-slate-600 border border-slate-100 font-bold">
+                            {ki.quantity} {item.unit}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-          {filteredKits.length === 0 && (
-            <div className="col-span-full p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-100">
-              Nenhum kit cadastrado.
+          </div>
+        </div>
+      )}
+
+      {/* History List */}
+      {activeTab === 'history' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="p-4 font-medium text-slate-500 text-sm">Data</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Item</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Tipo</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm text-center">Quantidade</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {transactions.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => {
+                    const item = items.find(i => i.id === t.item_id);
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="p-4 text-slate-600 font-medium text-sm">
+                          {new Date(t.date).toLocaleDateString('pt-BR')} {new Date(t.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                        </td>
+                        <td className="p-4 text-slate-900 font-bold text-sm">
+                          {item ? item.name : 'Item Removido'}
+                        </td>
+                        <td className="p-4">
+                          {t.type === 'in' ? (
+                            <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-lg w-max">
+                              <ArrowDownToLine size={12} /> Entrada
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-amber-600 text-xs font-bold uppercase tracking-wider bg-amber-50 px-2 py-1 rounded-lg w-max">
+                              <ArrowUpFromLine size={12} /> Saída
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="font-bold text-slate-700">{t.quantity} {item?.unit}</span>
+                        </td>
+                        <td className="p-4 text-slate-600 text-sm">
+                          {t.reason || '--'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {transactions.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500">
+                        Nenhuma movimentação registrada no histórico.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -380,10 +446,9 @@ export function Inventory() {
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Categoria *</label>
-                  <select required value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none">
-                    <option value="">Selecione...</option>
-                    {mockInventoryCategories.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none">
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
                 </div>

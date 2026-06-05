@@ -21,13 +21,14 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
   const [invitees, setInvitees] = useState<string[]>(initialProject?.invitees || []);
   const [category, setCategory] = useState(initialProject?.category || '');
   const [priority, setPriority] = useState<Priority>(initialProject?.priority || 'medium');
+  const [enablePortalUpdates, setEnablePortalUpdates] = useState(initialProject?.enablePortalUpdates || false);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !description || !startDate || !budget) return;
+    if (!name || !startDate || !budget) return;
 
     onSave({
       id: initialProject?.id || Math.random().toString(36).substring(2, 9),
@@ -42,6 +43,7 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
       invitees,
       category,
       priority,
+      enablePortalUpdates,
       tasks: initialProject?.tasks || []
     });
     
@@ -102,7 +104,6 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
               placeholder="Descreva o propósito e escopo do projeto..."
               rows={3}
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
-              required
             />
           </div>
 
@@ -201,31 +202,23 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
             />
           </div>
 
-          <div className="pt-2">
-            <label className="block text-sm font-medium text-slate-700 mb-3">Privacidade do Projeto</label>
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => setIsPrivate(false)}
-                className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${!isPrivate ? 'border-blue-500 bg-blue-50/50 text-blue-600 shadow-sm' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}`}
-              >
-                <Globe size={24} />
-                <span className="text-xs font-bold uppercase tracking-wider">Público</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPrivate(true)}
-                className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${isPrivate ? 'border-slate-900 bg-slate-900 text-white shadow-md' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}`}
-              >
-                <Lock size={24} />
-                <span className="text-xs font-bold uppercase tracking-wider">Privado</span>
-              </button>
+          <div className="p-4 rounded-2xl border-2 border-amber-100 bg-amber-50/50 flex items-center justify-between transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                <Globe size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-900 tracking-tight">Habilitar Atualização no Portal</p>
+                <p className="text-[10px] text-slate-500 font-medium">Subir marcos e notícias deste projeto no Feed do Apoiador.</p>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2 italic px-1">
-              {isPrivate 
-                ? "Apenas pessoas convidadas poderão visualizar este projeto."
-                : "Qualquer membro da equipe poderá ver este projeto."}
-            </p>
+            <button 
+              type="button"
+              onClick={() => setEnablePortalUpdates(!enablePortalUpdates)}
+              className={`w-12 h-6 rounded-full relative transition-all duration-300 ${enablePortalUpdates ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${enablePortalUpdates ? 'translate-x-6' : ''}`}></div>
+            </button>
           </div>
 
           <div className="space-y-3">

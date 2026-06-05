@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Heart, Activity, Briefcase, Settings, ArrowRight, LogOut, Shield, DollarSign } from 'lucide-react';
+import { Heart, Activity, Briefcase, Settings, ArrowRight, LogOut, Shield, DollarSign, MessageSquare } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 // Define the same structure as in Settings.tsx
@@ -38,6 +38,17 @@ export function ModuleSelector() {
       hoverColor: 'hover:border-emerald-200',
       arrowColor: 'text-emerald-600',
       permission: ['patients', 'attendance', 'inventory', 'management']
+    },
+    {
+      id: 'communication',
+      path: '/communication',
+      name: 'Comunicação',
+      description: 'Gestão de projetos, comunicação interna e administração do blog.',
+      icon: MessageSquare,
+      color: 'bg-indigo-100 text-indigo-600',
+      hoverColor: 'hover:border-indigo-200',
+      arrowColor: 'text-indigo-600',
+      permission: ['projects', 'chat', 'blog']
     }
   ];
 

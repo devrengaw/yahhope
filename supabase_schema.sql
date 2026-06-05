@@ -310,3 +310,116 @@ CREATE TABLE kit_items (
 
 -- 23. Adicionar referência de kit entregue aos eventos clínicos
 ALTER TABLE clinical_events ADD COLUMN kit_delivered_id UUID REFERENCES kits(id);
+
+-- 24. sponsorships (Apadrinhamentos)
+CREATE TABLE sponsorships (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  sponsor_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  child_id UUID REFERENCES children(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'active', -- 'active', 'inactive'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(sponsor_id, child_id)
+);
+
+-- 25. notifications (Notificações in-app e push)
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT DEFAULT 'info', -- 'info', 'success', 'warning'
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Trigger ou Edge Function para push notifications devem ser configurados no painel do Supabase.
+
+-- 26. campaigns (Campanhas de Arrecadação)
+CREATE TABLE campaigns (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  description TEXT,
+  target_amount NUMERIC(10, 2) NOT NULL,
+  current_amount NUMERIC(10, 2) DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 27. campaign_milestones (Estágios da Campanha)
+CREATE TABLE campaign_milestones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  target_amount NUMERIC(10, 2) NOT NULL, -- Valor acumulado necessário para atingir este estágio
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 28. donations (Doações recebidas)
+CREATE TABLE donations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
+  donor_name TEXT NOT NULL,
+  donor_email TEXT,
+  donor_phone TEXT,
+  amount NUMERIC(10, 2) NOT NULL,
+  status TEXT DEFAULT 'pending', -- 'pending', 'paid', 'failed'
+  payment_method TEXT, -- 'pix', 'credit_card', 'boleto'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  paid_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 29. email_templates (Templates de E-mail para Automação)
+CREATE TABLE email_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL UNIQUE, -- e.g., 'donation_thank_you'
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 30. email_settings (Configurações Globais de E-mail)
+CREATE TABLE email_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  logo_url TEXT,
+  primary_color TEXT DEFAULT '#F49853',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 31. store_products (Catálogo do Marketplace)
+CREATE TABLE store_products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  cost_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  sale_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  stock_quantity INTEGER NOT NULL DEFAULT 0,
+  image_url TEXT,
+  category TEXT,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 32. store_orders (Pedidos do Marketplace)
+CREATE TABLE store_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  customer_phone TEXT,
+  shipping_address TEXT,
+  total_amount DECIMAL(10,2) NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'shipped', 'delivered', 'cancelled')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 33. store_order_items (Itens de cada pedido)
+CREATE TABLE store_order_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID REFERENCES store_orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES store_products(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL,
+  unit_price DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

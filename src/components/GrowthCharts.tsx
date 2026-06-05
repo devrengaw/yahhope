@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter } from 'recharts';
 import { differenceInMonths } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
-import { cn } from '../lib/utils';
+import { cn, parseLocalDate } from '../lib/utils';
 
 interface GrowthChartsProps {
   patient: Patient;
@@ -23,7 +23,7 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
       
       // Find patient measurement for this month
       const patientEvent = events.find(e => {
-        const ageMonths = differenceInMonths(new Date(e.date), new Date(dob));
+        const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
         return ageMonths === i && e.height;
       });
 
@@ -35,7 +35,7 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
         z_2: median - z2Offset,
         z_3: median - z3Offset,
         patientValue: patientEvent ? patientEvent.height : null,
-        patientDate: patientEvent ? new Date(patientEvent.date).toLocaleDateString() : null,
+        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
       });
     }
   } else if (type === 'weightForHeight') {
@@ -56,7 +56,7 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
         z_2: median - z2Offset,
         z_3: median - z3Offset,
         patientValue: patientEvent ? patientEvent.weight : null,
-        patientDate: patientEvent ? new Date(patientEvent.date).toLocaleDateString() : null,
+        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
       });
     }
   } else if (type === 'hcForAge') {
@@ -67,7 +67,7 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
       const z3Offset = 2.2 + i * 0.015;
 
       const patientEvent = events.find(e => {
-        const ageMonths = differenceInMonths(new Date(e.date), new Date(dob));
+        const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
         return ageMonths === i && e.head_circumference;
       });
 
@@ -79,7 +79,7 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
         z_2: median - z2Offset,
         z_3: median - z3Offset,
         patientValue: patientEvent ? patientEvent.head_circumference : null,
-        patientDate: patientEvent ? new Date(patientEvent.date).toLocaleDateString() : null,
+        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
       });
     }
   }
@@ -176,18 +176,25 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
         
         <div className={cn("p-4 h-[400px] w-full", themeClasses.lightBg)}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={activeChartData.data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+            <ComposedChart data={activeChartData.data} margin={{ top: 20, right: 30, left: 10, bottom: 25 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis 
                 dataKey="x" 
                 type="number" 
                 domain={['dataMin', 'dataMax']} 
-                tickCount={10}
-                label={{ value: activeChartData.xAxisLabel, position: 'insideBottom', offset: -10 }} 
+                tickCount={20}
+                stroke="#94a3b8"
+                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+                tickLine={{ stroke: '#cbd5e1' }}
+                label={{ value: activeChartData.xAxisLabel, position: 'insideBottom', offset: -15, fill: '#334155', fontWeight: 'bold', fontSize: 12 }} 
               />
               <YAxis 
                 domain={activeChartData.domain} 
-                label={{ value: activeChartData.yAxisLabel, angle: -90, position: 'insideLeft' }} 
+                tickCount={20}
+                stroke="#94a3b8"
+                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+                tickLine={{ stroke: '#cbd5e1' }}
+                label={{ value: activeChartData.yAxisLabel, angle: -90, position: 'insideLeft', offset: -5, fill: '#334155', fontWeight: 'bold', fontSize: 12 }} 
               />
               <Tooltip content={<CustomTooltip />} />
               

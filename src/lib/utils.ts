@@ -7,7 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function calculateAge(dob: string | Date): string {
-  const birthDate = new Date(dob);
+  if (!dob) return '--';
+  const birthDate = typeof dob === 'string' ? parseLocalDate(dob) : dob;
+  if (isNaN(birthDate.getTime())) return '--';
+  
   const today = new Date();
   
   const years = differenceInYears(today, birthDate);
@@ -24,5 +27,20 @@ export function calculateAge(dob: string | Date): string {
 }
 
 export function calculateAgeInMonths(dob: string | Date): number {
-  return differenceInMonths(new Date(), new Date(dob));
+  if (!dob) return 0;
+  const birthDate = typeof dob === 'string' ? parseLocalDate(dob) : dob;
+  if (isNaN(birthDate.getTime())) return 0;
+  return differenceInMonths(new Date(), birthDate);
+}
+
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0); // Midday to avoid DST issues
 }

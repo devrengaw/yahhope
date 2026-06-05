@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronRight, ChevronLeft, Save, User, Activity, FileText, Home, HeartPulse, Plus, Trash2, ClipboardList, Stethoscope, CheckSquare } from 'lucide-react';
-import { cn, calculateAge } from '../lib/utils';
+import { ArrowLeft, Check, ChevronRight, ChevronLeft, Save, User, Activity, FileText, Home, HeartPulse, Plus, Trash2, ClipboardList, Stethoscope, CheckSquare, Heart } from 'lucide-react';
+import { differenceInMonths } from 'date-fns';
+import { calculateAge, cn, parseLocalDate } from '../lib/utils';
+import { usePatients } from '../contexts/PatientContext';
 
 const STEPS = [
   { id: 1, title: 'Identificação', icon: User },
@@ -11,9 +13,38 @@ const STEPS = [
   { id: 5, title: 'História Clínica', icon: ClipboardList },
   { id: 6, title: 'Exame Físico', icon: Activity },
   { id: 7, title: 'Avaliação Nutricional', icon: Stethoscope },
-  { id: 8, title: 'Conduta', icon: FileText },
+  { id: 8, title: 'Complementar', icon: FileText },
   { id: 9, title: 'Conclusão', icon: CheckSquare },
 ];
+
+
+// Helper component for inputs
+const Input = ({ label, name, type = 'text', required = false, placeholder = '', formData, handleChange }: any) => (
+  <div className="space-y-1">
+    <label className="text-sm font-medium text-slate-700">{label} {required && '*'}</label>
+    <input 
+      required={required} type={type} name={name} value={formData[name] || ''} onChange={handleChange} placeholder={placeholder}
+      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+    />
+  </div>
+);
+
+const Select = ({ label, name, options, required = false, formData, handleChange }: any) => (
+  <div className="space-y-1">
+    <label className="text-sm font-medium text-slate-700">{label} {required && '*'}</label>
+    <select required={required} name={name} value={formData[name] || ''} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all">
+      <option value="">Selecione...</option>
+      {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+    </select>
+  </div>
+);
+
+const Textarea = ({ label, name, rows = 3, formData, handleChange }: any) => (
+  <div className="space-y-1">
+    <label className="text-sm font-medium text-slate-700">{label}</label>
+    <textarea name={name} value={formData[name] || ''} onChange={handleChange} rows={rows} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"></textarea>
+  </div>
+);
 
 export function NewPatient() {
   const navigate = useNavigate();
@@ -57,7 +88,17 @@ export function NewPatient() {
     exams_hiv: '', exams_other: '', treatment_medications: '',
     
     // Step 9: Conclusão
-    discharge: false, return_needed: false, referral: '', return_date: '', filled_by: ''
+    discharge: false,
+    in_treatment: true,
+    return_needed: false,
+    referral: '',
+    return_date: '',
+    filled_by: '',
+    
+    // Sponsorship
+    enable_sponsorship: false,
+    child_profile: '',
+    child_photo: ''
   });
 
   // Complex States
@@ -65,6 +106,8 @@ export function NewPatient() {
   const [clinicalSigns, setClinicalSigns] = useState<string[]>([]);
   const [nutritionalEval, setNutritionalEval] = useState<string[]>([]);
   const [educationalActions, setEducationalActions] = useState<string[]>([]);
+  const [examsList, setExamsList] = useState([{ id: 1, name: '', result: '' }]);
+  const [medicationsList, setMedicationsList] = useState([{ id: 1, name: '', dosage: '' }]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -84,45 +127,117 @@ export function NewPatient() {
   const addDependent = () => setDependents([...dependents, { id: Date.now(), name: '', dob: '', weight: '', height: '', muac: '' }]);
   const removeDependent = (id: number) => setDependents(dependents.filter(d => d.id !== id));
 
+  const handleExamChange = (id: number, field: string, value: string) => setExamsList(examsList.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const addExam = () => setExamsList([...examsList, { id: Date.now(), name: '', result: '' }]);
+  const removeExam = (id: number) => setExamsList(examsList.filter(e => e.id !== id));
+
+  const handleMedicationChange = (id: number, field: string, value: string) => setMedicationsList(medicationsList.map(m => m.id === id ? { ...m, [field]: value } : m));
+  const addMedication = () => setMedicationsList([...medicationsList, { id: Date.now(), name: '', dosage: '' }]);
+  const removeMedication = (id: number) => setMedicationsList(medicationsList.filter(m => m.id !== id));
+
   const handleNext = () => currentStep < STEPS.length && setCurrentStep(currentStep + 1);
   const handlePrev = () => currentStep > 1 && setCurrentStep(currentStep - 1);
 
+  // Auto-calculate Z-Scores and BMI
+  useEffect(() => {
+    const weight = parseFloat(formData.weight);
+    const height = parseFloat(formData.height);
+    const gender = formData.gender;
+    const dob = formData.dob;
+    const serviceDate = formData.service_date;
+
+    let updates: any = {};
+
+    if (serviceDate) {
+      const returnDateObj = parseLocalDate(serviceDate);
+      returnDateObj.setDate(returnDateObj.getDate() + 14);
+      const calculatedReturn = returnDateObj.toISOString().split('T')[0];
+      updates.return_date = calculatedReturn;
+    }
+
+    if (weight > 0 && height > 0) {
+      // IMC
+      const heightInMeters = height / 100;
+      const calcBmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
+      
+      // Z-Score Weight/Height (WHO approximation)
+      let zWHCalc = '';
+      if (height >= 45 && height <= 120) {
+        const baseWH = gender === 'M' ? 2.5 : 2.4;
+        const medianWH = baseWH + 0.15 * (height - 45) + 0.0015 * Math.pow(height - 45, 2);
+        const z2OffsetWH = 0.5 + (height - 45) * 0.03;
+        let zWH = 0;
+        if (weight < medianWH) {
+          zWH = -((medianWH - weight) / (z2OffsetWH / 2));
+        } else {
+          zWH = (weight - medianWH) / (z2OffsetWH / 2);
+        }
+        zWHCalc = zWH.toFixed(2);
+      }
+
+      updates.bmi = calcBmi;
+      updates.bmi_gestational = calcBmi; // Preenchendo com o mesmo cálculo conforme solicitado
+      updates.z_score_weight_height = zWHCalc;
+    } else {
+      if (formData.bmi !== '') updates.bmi = '';
+      if (formData.bmi_gestational !== '') updates.bmi_gestational = '';
+      if (formData.z_score_weight_height !== '') updates.z_score_weight_height = '';
+    }
+
+    if (height > 0 && dob) {
+      // Z-Score Height/Age (WHO approximation)
+      const ageM = differenceInMonths(new Date(), parseLocalDate(dob));
+      if (ageM >= 0 && ageM <= 60) {
+        const baseHA = gender === 'M' ? 50 : 49;
+        const medianHA = baseHA + 25 * Math.pow(ageM / 12, 0.6);
+        const z2OffsetHA = 4 + ageM * 0.05;
+        const zHA = (height - medianHA) / (z2OffsetHA / 2);
+        updates.z_score_height_age = zHA.toFixed(2);
+      } else {
+        if (formData.z_score_height_age !== '') updates.z_score_height_age = '';
+      }
+    } else {
+      if (formData.z_score_height_age !== '') updates.z_score_height_age = '';
+    }
+
+    setFormData(prev => {
+      let changed = false;
+      for (const key in updates) {
+        if (prev[key] !== updates[key]) {
+          changed = true;
+          break;
+        }
+      }
+      return changed ? { ...prev, ...updates } : prev;
+    });
+
+  }, [formData.weight, formData.height, formData.dob, formData.gender, formData.service_date]);
+
+  const { addPatient } = usePatients();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...formData, dependents, clinicalSigns, nutritionalEval, educationalActions };
-    console.log('Payload para o Supabase:', payload);
+    const payload = { ...formData, dependents, clinicalSigns, nutritionalEval, educationalActions, examsList, medicationsList };
+    
+    const newPatient = {
+      id: Math.random().toString(36).substring(2, 9),
+      registration_number: formData.registration_number || `YAH-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
+      name: formData.name,
+      dob: formData.dob,
+      gender: formData.gender as 'M' | 'F',
+      status: (nutritionalEval.length > 0 ? (nutritionalEval.includes('Desnutrição aguda grave com complicações') || nutritionalEval.includes('Desnutrição aguda grave sem complicações') ? 'DAG' : (nutritionalEval.includes('Desnutrição aguda moderada (DAM)') ? 'DAM' : 'Adequado')) : 'Adequado') as any,
+      community: formData.city || 'Boane',
+      created_at: new Date().toISOString().split('T')[0],
+      guardian_name: formData.caregiver_name,
+      housing_type: formData.housing_type,
+      sanitation: formData.sanitation
+    };
+
+    addPatient(newPatient);
     navigate('/nutrition/patients');
   };
 
-  // Helper component for inputs
-  const Input = ({ label, name, type = 'text', required = false, placeholder = '' }: any) => (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label} {required && '*'}</label>
-      <input 
-        required={required} type={type} name={name} value={formData[name] || ''} onChange={handleChange} placeholder={placeholder}
-        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-      />
-    </div>
-  );
-
-  const Select = ({ label, name, options, required = false }: any) => (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label} {required && '*'}</label>
-      <select required={required} name={name} value={formData[name] || ''} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all">
-        <option value="">Selecione...</option>
-        {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </div>
-  );
-
-  const Textarea = ({ label, name, rows = 3 }: any) => (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      <textarea name={name} value={formData[name] || ''} onChange={handleChange} rows={rows} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"></textarea>
-    </div>
-  );
-
-  return (
+    return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -183,28 +298,88 @@ export function NewPatient() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Input label="Data do Atendimento" name="service_date" type="date" required />
-                  <Input label="Número de Identificação" name="registration_number" required />
-                  <Input label="Nome da Criança" name="name" required />
-                  <Input label="Data de Nascimento" name="dob" type="date" required />
+                  <Input formData={formData} handleChange={handleChange} label="Data do Atendimento" name="service_date" type="date" required />
+                  <Input formData={formData} handleChange={handleChange} label="Número de Identificação" name="registration_number" required />
+                  <Input formData={formData} handleChange={handleChange} label="Nome da Criança" name="name" required />
+                  <Input formData={formData} handleChange={handleChange} label="Data de Nascimento" name="dob" type="date" required />
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-700">Idade Calculada</label>
                     <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-600">
                       {formData.dob ? calculateAge(formData.dob) : '--'}
                     </div>
                   </div>
-                  <Select label="Sexo" name="gender" options={['M', 'F']} required />
-                  <Input label="Cor" name="color" />
-                  <Input label="Naturalidade" name="birthplace" />
-                  <Input label="Província" name="province" />
-                  <Input label="Procedência" name="origin" />
-                  <Input label="Cidade" name="city" />
-                  <Input label="Informante" name="informant" />
+                  <Select formData={formData} handleChange={handleChange} label="Sexo" name="gender" options={['M', 'F']} required />
+                  <Input formData={formData} handleChange={handleChange} label="Cor" name="color" />
+                  <Input formData={formData} handleChange={handleChange} label="Naturalidade" name="birthplace" />
+                  <Input formData={formData} handleChange={handleChange} label="Província" name="province" />
+                  <Input formData={formData} handleChange={handleChange} label="Procedência" name="origin" />
+                  <Input formData={formData} handleChange={handleChange} label="Cidade" name="city" />
+                  <Input formData={formData} handleChange={handleChange} label="Informante" name="informant" />
                 </div>
-                <Input label="Endereço de Referência" name="address" />
-                <Textarea label="Queixa Principal" name="main_complaint" />
-                <Textarea label="História da Criança ou Gestante" name="history" />
-                <Textarea label="Medicamentos ou Tratamentos em Uso" name="current_medications" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-amber-50 rounded-[2rem] border border-amber-100">
+                  <div className="flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                        <Heart size={20} fill="currentColor" />
+                      </div>
+                      <h3 className="font-black text-slate-900 tracking-tight">Habilitar Apadrinhamento</h3>
+                    </div>
+                    <p className="text-slate-500 text-sm font-medium">Ao habilitar, esta criança ficará visível para apoiadores no portal externo.</p>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    <button 
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, enable_sponsorship: !prev.enable_sponsorship }))}
+                      className={cn(
+                        "w-16 h-8 rounded-full relative transition-all duration-300",
+                        formData.enable_sponsorship ? "bg-amber-500 shadow-lg shadow-amber-500/30" : "bg-slate-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-sm",
+                        formData.enable_sponsorship ? "translate-x-8" : ""
+                      )}></div>
+                    </button>
+                  </div>
+                  {formData.enable_sponsorship && (
+                    <div className="md:col-span-2 mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+                        <div className="md:col-span-1">
+                          <label className="text-sm font-medium text-slate-700 block mb-2">Foto da Criança</label>
+                          <div className="relative group cursor-pointer">
+                            <div className="aspect-square rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden hover:border-amber-500 transition-colors">
+                              {formData.child_photo ? (
+                                <img src={formData.child_photo} alt="Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <>
+                                  <Plus size={24} className="text-slate-400 group-hover:text-amber-500" />
+                                  <span className="text-[10px] font-bold text-slate-400 mt-2">Clique para Upload</span>
+                                </>
+                              )}
+                            </div>
+                            <input 
+                              type="file" 
+                              className="absolute inset-0 opacity-0 cursor-pointer" 
+                              onChange={(e) => {
+                                // Mock photo upload for demo
+                                const file = e.target.files?.[0];
+                                if (file) setFormData(prev => ({ ...prev, child_photo: URL.createObjectURL(file) }));
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="md:col-span-3">
+                          <Input formData={formData} handleChange={handleChange} 
+                            label="Perfil da Criança (Biografia para Apoiadores)" 
+                            name="child_profile" 
+                            rows={5} 
+                            placeholder="Conte um pouco sobre a história, sonhos e personalidade da criança para os futuros padrinhos..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -214,10 +389,10 @@ export function NewPatient() {
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Informações Básicas dos Pais/Responsáveis</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Input label="Nome dos Pais ou Responsáveis" name="caregiver_name" />
-                    <Select label="Estado Civil" name="marital_status" options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
-                    <Select label="Grau de Instrução" name="education" options={['Nenhum', 'Ensino Primário', 'Ensino Secundário', 'Ensino Superior']} />
-                    <Input label="Religião" name="religion" />
+                    <Input formData={formData} handleChange={handleChange} label="Nome dos Pais ou Responsáveis" name="caregiver_name" />
+                    <Select formData={formData} handleChange={handleChange} label="Estado Civil" name="marital_status" options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
+                    <Select formData={formData} handleChange={handleChange} label="Grau de Instrução" name="education" options={['Nenhum', 'Ensino Primário', 'Ensino Secundário', 'Ensino Superior']} />
+                    <Input formData={formData} handleChange={handleChange} label="Religião" name="religion" />
                   </div>
                 </div>
 
@@ -264,27 +439,27 @@ export function NewPatient() {
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Condições de Moradia</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Select label="Tipo de Casa" name="housing_type" options={['Própria', 'Alugada', 'Cedida', 'Outra']} />
-                    <Input label="Número de Cômodos" name="rooms" type="number" />
-                    <Input label="Tipo de Habitação" name="dwelling_type" />
-                    <Input label="Cobertura" name="roof" />
-                    <Select label="Saneamento Básico" name="sanitation" options={['Sim', 'Não']} />
-                    <Select label="Rede de Esgoto" name="sewage" options={['Sim', 'Não']} />
-                    <Select label="Destino do Lixo" name="garbage" options={['Coleta Pública', 'Queimado', 'Enterrado', 'Céu Aberto']} />
-                    <Select label="Presença de Animais" name="animals" options={['Sim', 'Não']} />
+                    <Select formData={formData} handleChange={handleChange} label="Tipo de Casa" name="housing_type" options={['Própria', 'Alugada', 'Cedida', 'Outra']} />
+                    <Input formData={formData} handleChange={handleChange} label="Número de Cômodos" name="rooms" type="number" />
+                    <Input formData={formData} handleChange={handleChange} label="Tipo de Habitação" name="dwelling_type" />
+                    <Input formData={formData} handleChange={handleChange} label="Cobertura" name="roof" />
+                    <Select formData={formData} handleChange={handleChange} label="Saneamento Básico" name="sanitation" options={['Sim', 'Não']} />
+                    <Select formData={formData} handleChange={handleChange} label="Rede de Esgoto" name="sewage" options={['Sim', 'Não']} />
+                    <Select formData={formData} handleChange={handleChange} label="Destino do Lixo" name="garbage" options={['Coleta Pública', 'Queimado', 'Enterrado', 'Céu Aberto']} />
+                    <Select formData={formData} handleChange={handleChange} label="Presença de Animais" name="animals" options={['Sim', 'Não']} />
                   </div>
                 </div>
 
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Condição Socioeconômica</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Input label="Renda Familiar Mensal" name="monthly_income" type="number" />
-                    <Input label="Trabalho do Pai" name="father_job" />
-                    <Input label="Trabalho da Mãe" name="mother_job" />
-                    <Input label="Trabalho do Responsável" name="caregiver_job" />
+                    <Input formData={formData} handleChange={handleChange} label="Renda Familiar Mensal" name="monthly_income" type="number" />
+                    <Input formData={formData} handleChange={handleChange} label="Trabalho do Pai" name="father_job" />
+                    <Input formData={formData} handleChange={handleChange} label="Trabalho da Mãe" name="mother_job" />
+                    <Input formData={formData} handleChange={handleChange} label="Trabalho do Responsável" name="caregiver_job" />
                   </div>
                   <div className="mt-6">
-                    <Textarea label="Observações Sociais" name="social_observations" />
+                    <Input formData={formData} handleChange={handleChange} label="Observações Sociais" name="social_observations" />
                   </div>
                 </div>
               </div>
@@ -294,18 +469,18 @@ export function NewPatient() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Input label="Problemas no Pré-natal" name="prenatal_problems" />
-                  <Input label="Nº Consultas Pré-natal" name="prenatal_consultations" type="number" />
-                  <Select label="Tipo de Parto" name="delivery_type" options={['Normal', 'Cesárea', 'Fórceps']} />
-                  <Input label="Idade Gestacional (semanas)" name="gestational_age" type="number" />
-                  <Input label="Apgar 1º Minuto" name="apgar_1" type="number" />
-                  <Input label="Apgar 5º Minuto" name="apgar_5" type="number" />
-                  <Input label="Peso ao Nascer (kg)" name="birth_weight" type="number" />
-                  <Input label="Altura ao Nascer (cm)" name="birth_height" type="number" />
-                  <Input label="Perímetro Cefálico (cm)" name="birth_hc" type="number" />
-                  <Input label="Perímetro Torácico (cm)" name="birth_tc" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Problemas no Pré-natal" name="prenatal_problems" />
+                  <Input formData={formData} handleChange={handleChange} label="Nº Consultas Pré-natal" name="prenatal_consultations" type="number" />
+                  <Select formData={formData} handleChange={handleChange} label="Tipo de Parto" name="delivery_type" options={['Normal', 'Cesárea', 'Fórceps']} />
+                  <Input formData={formData} handleChange={handleChange} label="Idade Gestacional (semanas)" name="gestational_age" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Apgar 1º Minuto" name="apgar_1" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Apgar 5º Minuto" name="apgar_5" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Peso ao Nascer (kg)" name="birth_weight" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Altura ao Nascer (cm)" name="birth_height" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Perímetro Cefálico (cm)" name="birth_hc" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Perímetro Torácico (cm)" name="birth_tc" type="number" />
                 </div>
-                <Textarea label="Problemas durante o nascimento" name="birth_problems" />
+                <Textarea formData={formData} handleChange={handleChange} label="Problemas durante o nascimento" name="birth_problems" />
               </div>
             )}
 
@@ -313,37 +488,37 @@ export function NewPatient() {
             {currentStep === 4 && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Select label="Leite Materno" name="breast_milk" options={['Sim', 'Não']} />
-                  <Input label="Exclusivo até quando (meses)" name="exclusive_breast_milk_until" />
-                  <Input label="Idade do Desmame (meses)" name="weaning_age" />
-                  <Input label="Intro. Água/Chá (meses)" name="water_tea_intro" />
-                  <Input label="Intro. Leite de Vaca (meses)" name="cow_milk_intro" />
-                  <Input label="Intro. Papas de Sal (meses)" name="salty_mush_intro" />
-                  <Input label="Intro. Sucos (meses)" name="juice_intro" />
-                  <Input label="Intro. Sopas (meses)" name="soup_intro" />
+                  <Select formData={formData} handleChange={handleChange} label="Leite Materno" name="breast_milk" options={['Sim', 'Não']} />
+                  <Input formData={formData} handleChange={handleChange} label="Exclusivo até quando (meses)" name="exclusive_breast_milk_until" />
+                  <Input formData={formData} handleChange={handleChange} label="Idade do Desmame (meses)" name="weaning_age" />
+                  <Input formData={formData} handleChange={handleChange} label="Intro. Água/Chá (meses)" name="water_tea_intro" />
+                  <Input formData={formData} handleChange={handleChange} label="Intro. Leite de Vaca (meses)" name="cow_milk_intro" />
+                  <Input formData={formData} handleChange={handleChange} label="Intro. Papas de Sal (meses)" name="salty_mush_intro" />
+                  <Input formData={formData} handleChange={handleChange} label="Intro. Sucos (meses)" name="juice_intro" />
+                  <Input formData={formData} handleChange={handleChange} label="Intro. Sopas (meses)" name="soup_intro" />
                 </div>
-                <Textarea label="Outros Alimentos" name="other_foods" />
-                <Textarea label="Alimentação Atual" name="current_feeding" />
+                <Textarea formData={formData} handleChange={handleChange} label="Outros Alimentos" name="other_foods" />
+                <Textarea formData={formData} handleChange={handleChange} label="Alimentação Atual" name="current_feeding" />
               </div>
             )}
 
             {/* STEP 5: História Clínica e Familiar */}
             {currentStep === 5 && (
               <div className="space-y-6">
-                <Textarea label="Suplementação Medicamentosa (Vitaminas/Sais)" name="supplements" />
-                <Textarea label="Doenças e Internações Anteriores" name="previous_diseases" />
+                <Textarea formData={formData} handleChange={handleChange} label="Suplementação Medicamentosa (Vitaminas/Sais)" name="supplements" />
+                <Textarea formData={formData} handleChange={handleChange} label="Doenças e Internações Anteriores" name="previous_diseases" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Textarea label="História Familiar da Mãe" name="mother_history" />
-                  <Textarea label="História Familiar do Pai" name="father_history" />
-                  <Textarea label="História de Outros Familiares (1º Grau)" name="other_relatives_history" />
-                  <Textarea label="História de Desnutrição na Família" name="family_malnutrition_history" />
+                  <Textarea formData={formData} handleChange={handleChange} label="História Familiar da Mãe" name="mother_history" />
+                  <Textarea formData={formData} handleChange={handleChange} label="História Familiar do Pai" name="father_history" />
+                  <Textarea formData={formData} handleChange={handleChange} label="História de Outros Familiares (1º Grau)" name="other_relatives_history" />
+                  <Textarea formData={formData} handleChange={handleChange} label="História de Desnutrição na Família" name="family_malnutrition_history" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Select label="Consanguinidade" name="consanguinity" options={['Sim', 'Não']} />
-                  <Input label="Doenças Hereditárias" name="hereditary_diseases" />
+                  <Select formData={formData} handleChange={handleChange} label="Consanguinidade" name="consanguinity" options={['Sim', 'Não']} />
+                  <Input formData={formData} handleChange={handleChange} label="Doenças Hereditárias" name="hereditary_diseases" />
                 </div>
-                <Textarea label="Dinâmica das Relações Familiares" name="family_dynamics" />
-                <Textarea label="Imunização (Vacinas)" name="immunization" />
+                <Textarea formData={formData} handleChange={handleChange} label="Dinâmica das Relações Familiares" name="family_dynamics" />
+                <Textarea formData={formData} handleChange={handleChange} label="Imunização (Vacinas)" name="immunization" />
               </div>
             )}
 
@@ -351,16 +526,16 @@ export function NewPatient() {
             {currentStep === 6 && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Input label="Peso (kg)" name="weight" type="number" required />
-                  <Input label="Estatura (cm)" name="height" type="number" required />
-                  <Input label="Escore Z Estatura/Idade" name="z_score_height_age" type="number" />
-                  <Input label="Escore Z Peso/Estatura" name="z_score_weight_height" type="number" />
-                  <Input label="Perímetro Cefálico (cm)" name="head_circumference" type="number" />
-                  <Input label="Perímetro Braquial (cm)" name="muac" type="number" />
-                  <Input label="IMC" name="bmi" type="number" />
-                  <Input label="IMC seg. Sem. Gestacional" name="bmi_gestational" type="number" />
-                  <Select label="Edema Bilateral" name="bilateral_edema" options={['Não', 'Sim (+)', 'Sim (++)', 'Sim (+++)']} />
-                  <Input label="Temperatura Axilar (°C)" name="axillary_temperature" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Peso (kg)" name="weight" type="number" required />
+                  <Input formData={formData} handleChange={handleChange} label="Estatura (cm)" name="height" type="number" required />
+                  <Input formData={formData} handleChange={handleChange} label="Escore Z Estatura/Idade" name="z_score_height_age" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Escore Z Peso/Estatura" name="z_score_weight_height" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Perímetro Cefálico (cm)" name="head_circumference" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="Perímetro Braquial (cm)" name="muac" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="IMC" name="bmi" type="number" />
+                  <Input formData={formData} handleChange={handleChange} label="IMC seg. Sem. Gestacional" name="bmi_gestational" type="number" />
+                  <Select formData={formData} handleChange={handleChange} label="Edema Bilateral" name="bilateral_edema" options={['Não', 'Sim (+)', 'Sim (++)', 'Sim (+++)']} />
+                  <Input formData={formData} handleChange={handleChange} label="Temperatura Axilar (°C)" name="axillary_temperature" type="number" />
                 </div>
 
                 <div>
@@ -376,8 +551,8 @@ export function NewPatient() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input label="Saúde Oral" name="oral_health" />
-                  <Input label="Outros Achados Clínicos" name="other_findings" />
+                  <Input formData={formData} handleChange={handleChange} label="Saúde Oral" name="oral_health" />
+                  <Input formData={formData} handleChange={handleChange} label="Outros Achados Clínicos" name="other_findings" />
                 </div>
               </div>
             )}
@@ -401,20 +576,62 @@ export function NewPatient() {
               </div>
             )}
 
-            {/* STEP 8: Conduta */}
+            {/* STEP 8: Complementar */}
             {currentStep === 8 && (
               <div className="space-y-8">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Exames Complementares</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="HIV" name="exams_hiv" />
-                    <Input label="Outros Exames" name="exams_other" />
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <h3 className="text-lg font-semibold text-slate-800">Exames Complementares</h3>
+                    <button type="button" onClick={addExam} className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-sm font-medium">
+                      <Plus size={16} /> Adicionar Exame
+                    </button>
+                  </div>
+                  <div className="mb-4">
+                    <Input formData={formData} handleChange={handleChange} label="HIV" name="exams_hiv" />
+                  </div>
+                  <div className="space-y-4">
+                    {examsList.map((exam) => (
+                      <div key={exam.id} className="flex gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="flex-1">
+                          <label className="text-xs font-medium text-slate-700 mb-1 block">Nome do Exame</label>
+                          <input type="text" value={exam.name} onChange={(e) => handleExamChange(exam.id, 'name', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-medium text-slate-700 mb-1 block">Resultado</label>
+                          <input type="text" value={exam.result} onChange={(e) => handleExamChange(exam.id, 'result', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                        </div>
+                        <button type="button" onClick={() => removeExam(exam.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg mb-1">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Tratamento</h3>
-                  <Textarea label="Medicamentos" name="treatment_medications" />
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <h3 className="text-lg font-semibold text-slate-800">Tratamento / Medicamentos</h3>
+                    <button type="button" onClick={addMedication} className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-sm font-medium">
+                      <Plus size={16} /> Adicionar Medicamento
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {medicationsList.map((med) => (
+                      <div key={med.id} className="flex gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="flex-1">
+                          <label className="text-xs font-medium text-slate-700 mb-1 block">Nome do Medicamento</label>
+                          <input type="text" value={med.name} onChange={(e) => handleMedicationChange(med.id, 'name', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs font-medium text-slate-700 mb-1 block">Posologia / Uso</label>
+                          <input type="text" value={med.dosage} onChange={(e) => handleMedicationChange(med.id, 'dosage', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                        </div>
+                        <button type="button" onClick={() => removeMedication(med.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg mb-1">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -437,19 +654,11 @@ export function NewPatient() {
             {/* STEP 9: Conclusão */}
             {currentStep === 9 && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="flex items-center gap-2 p-4 border border-slate-200 rounded-xl bg-slate-50">
-                    <input type="checkbox" name="discharge" checked={formData.discharge} onChange={handleChange} className="w-5 h-5 text-emerald-600 rounded" />
-                    <label className="font-medium text-slate-700">Alta</label>
-                  </div>
-                  <div className="flex items-center gap-2 p-4 border border-slate-200 rounded-xl bg-slate-50">
-                    <input type="checkbox" name="return_needed" checked={formData.return_needed} onChange={handleChange} className="w-5 h-5 text-emerald-600 rounded" />
-                    <label className="font-medium text-slate-700">Retorno</label>
-                  </div>
-                  <Input label="Data do Retorno" name="return_date" type="date" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Input formData={formData} handleChange={handleChange} label="Data do Retorno (Automático +14 dias)" name="return_date" type="date" />
                 </div>
-                <Textarea label="Encaminhamento" name="referral" />
-                <Input label="Responsável pelo Preenchimento" name="filled_by" required />
+                <Textarea formData={formData} handleChange={handleChange} label="Encaminhamento" name="referral" />
+                <Input formData={formData} handleChange={handleChange} label="Responsável pelo Preenchimento" name="filled_by" required />
               </div>
             )}
 

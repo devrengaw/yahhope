@@ -1,0 +1,10 @@
+src/components/admin/UserCategorySettings.tsx(2,24): error TS2305: Module '"../../lib/mockData"' has no exported member 'mockUserCategories'.
+src/components/erp/projects/ProjectModal.tsx(24,82): error TS2339: Property 'enablePortalUpdates' does not exist on type 'Project'.
+src/components/erp/projects/ProjectModal.tsx(46,7): error TS2353: Object literal may only specify known properties, and 'enablePortalUpdates' does not exist in type 'Project'.
+src/components/erp/team/TeamList.tsx(2,56): error TS2305: Module '"../../../lib/mockData"' has no exported member 'mockUserCategories'.
+src/components/erp/team/TeamMemberModal.tsx(3,56): error TS2305: Module '"../../../lib/mockData"' has no exported member 'mockUserCategories'.
+src/pages/admin/Finance.tsx(22,28): error TS2724: '"../../lib/mockData"' has no exported member named 'mockTransactionCategories'. Did you mean 'TransactionCategory'?
+src/pages/communication/CommBlogAdmin.tsx(85,9): error TS2322: Type 'string' is not assignable to type '"hidden" | "scheduled" | "published" | "draft"'.
+src/pages/erp/Finance.tsx(6,28): error TS2724: '"../../lib/mockData"' has no exported member named 'mockTransactionCategories'. Did you mean 'TransactionCategory'?
+src/pages/Inventory.tsx(3,25): error TS2724: '"../lib/mockData"' has no exported member named 'mockInventoryCategories'. Did you mean 'InventoryCategory'?
+src/pages/Management.tsx(3,10): error TS2724: '"../lib/mockData"' has no exported member named 'mockInventoryCategories'. Did you mean 'InventoryCategory'?

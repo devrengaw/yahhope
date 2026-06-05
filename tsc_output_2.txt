@@ -1,0 +1,4 @@
+src/components/erp/projects/ProjectDetails.tsx(19,46): error TS2339: Property 'notes' does not exist on type 'Project'.
+src/components/erp/projects/ProjectDetails.tsx(33,35): error TS2353: Object literal may only specify known properties, and 'notes' does not exist in type 'Project'.
+src/components/erp/team/TeamList.tsx(82,138): error TS2339: Property 'color' does not exist on type '{ id: string; name: string; }'.
+src/pages/communication/CommBlogAdmin.tsx(85,9): error TS2322: Type 'string' is not assignable to type '"hidden" | "scheduled" | "published" | "draft"'.

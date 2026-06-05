@@ -1,24 +1,20 @@
 import React, { useState } from 'react';
 import { CheckCircle, Activity, Plus, Edit2, Trash2, X, Tags, Shield } from 'lucide-react';
-import { mockInventoryCategories, InventoryCategory } from '../lib/mockData';
+import { InventoryCategory } from '../lib/mockData';
+import { useInventory } from '../contexts/InventoryContext';
 
 export function Management() {
   const [activeTab, setActiveTab] = useState<'visits_config' | 'categories'>('visits_config');
   
-  // Categories State
-  const [categories, setCategories] = useState<InventoryCategory[]>(mockInventoryCategories);
+  // Categories State from Context
+  const { categories, setCategories } = useInventory();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<InventoryCategory | null>(null);
   const [catName, setCatName] = useState('');
   const [catDesc, setCatDesc] = useState('');
 
   // Visits Config State
-  const [visitItems, setVisitItems] = useState([
-    { id: '1', label: 'Vitamina em dia', required: true },
-    { id: '2', label: 'Segue recomendações médicas', required: true },
-    { id: '3', label: 'Limpeza da casa adequada', required: false },
-    { id: '4', label: 'Armazenamento seguro de alimentos', required: false },
-  ]);
+  const [visitItems, setVisitItems] = useState<{id: string, label: string, required: boolean}[]>([]);
   const [newItemLabel, setNewItemLabel] = useState('');
 
   const addVisitItem = () => {

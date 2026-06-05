@@ -61,6 +61,7 @@ export function Settings() {
   const [projects, setProjects] = useState<Project[]>(
     [...mockProjects].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
   );
+  
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -75,7 +76,7 @@ export function Settings() {
   const handleOrgChange = (field: string, value: string) => {
     setOrgInfo(prev => ({ ...prev, [field]: value }));
   };
-
+  
   // Project Handlers
   const handleSaveProject = (newProject: Project) => {
     const updated = [newProject, ...projects].sort((a, b) => 

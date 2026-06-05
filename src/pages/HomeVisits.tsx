@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Home, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, User, MapPin, ClipboardCheck, MessageSquare, Star } from 'lucide-react';
-import { mockPatients, mockHomeVisits, HomeVisit, Patient } from '../lib/mockData';
-import { cn } from '../lib/utils';
+import { useVisits } from '../contexts/VisitContext';
+import { usePatients } from '../contexts/PatientContext';
+import { HomeVisit } from '../lib/mockData';
+import { cn, formatLocalDate } from '../lib/utils';
 
 export function HomeVisits() {
+  const { visits, concluirVisita } = useVisits();
+  const { patients } = usePatients();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVisit, setSelectedVisit] = useState<HomeVisit | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
 
   // Filter pending visits
-  const pendingVisits = mockHomeVisits.filter(v => v.status === 'pending');
-  const completedVisits = mockHomeVisits.filter(v => v.status === 'completed');
+  const pendingVisits = visits.filter(v => v.status === 'pending');
+  const completedVisits = visits.filter(v => v.status === 'completed');
 
-  const getPatient = (id: string) => mockPatients.find(p => p.id === id);
+  const getPatient = (id: string) => patients.find(p => p.id === id);
 
   const filteredVisits = (activeTab === 'pending' ? pendingVisits : completedVisits).filter(visit => {
     const patient = getPatient(visit.patient_id);
@@ -20,11 +24,32 @@ export function HomeVisits() {
            patient?.registration_number.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  const [houseCleanliness, setHouseCleanliness] = useState(0);
+  const [vitaminsFollowed, setVitaminsFollowed] = useState(false);
+  const [recommendationsFollowed, setRecommendationsFollowed] = useState(false);
+  const [observations, setObservations] = useState('');
+
+  // Update form state when selectedVisit changes
+  useEffect(() => {
+    if (selectedVisit) {
+      setHouseCleanliness(selectedVisit.checklist.house_cleanliness);
+      setVitaminsFollowed(selectedVisit.checklist.vitamins_followed);
+      setRecommendationsFollowed(selectedVisit.checklist.medical_recommendations_followed);
+      setObservations(selectedVisit.observations);
+    }
+  }, [selectedVisit]);
+
   const handleSaveVisit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic to save visit would go here
-    alert('Visita salva com sucesso! (Simulação)');
-    setSelectedVisit(null);
+    if (selectedVisit) {
+      concluirVisita(selectedVisit.id, observations, {
+        house_cleanliness: houseCleanliness,
+        vitamins_followed: vitaminsFollowed,
+        medical_recommendations_followed: recommendationsFollowed
+      });
+      alert('Visita concluída com sucesso!');
+      setSelectedVisit(null);
+    }
   };
 
   return (
@@ -110,6 +135,11 @@ export function HomeVisits() {
                       <MapPin size={12} />
                       {patient?.community}
                     </div>
+                    {visit.last_clinical_date && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase tracking-widest">Consulta: {new Date(visit.last_clinical_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
                   </button>
                 );
               })
@@ -168,11 +198,10 @@ export function HomeVisits() {
                   </h3>
                   
                   <div className="space-y-4">
-                    {/* Cleanliness */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-700 flex justify-between">
                         Limpeza da Casa (1-5)
-                        <span className="text-emerald-600 font-bold">{selectedVisit.checklist.house_cleanliness || 0}/5</span>
+                        <span className="text-emerald-600 font-bold">{houseCleanliness}/5</span>
                       </label>
                       <input 
                         type="range" 
@@ -180,7 +209,8 @@ export function HomeVisits() {
                         max="5" 
                         step="1"
                         disabled={selectedVisit.status === 'completed'}
-                        defaultValue={selectedVisit.checklist.house_cleanliness}
+                        value={houseCleanliness}
+                        onChange={(e) => setHouseCleanliness(parseInt(e.target.value))}
                         className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                       />
                       <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest px-1">
@@ -195,7 +225,8 @@ export function HomeVisits() {
                         <input 
                           type="checkbox" 
                           disabled={selectedVisit.status === 'completed'}
-                          defaultChecked={selectedVisit.checklist.vitamins_followed}
+                          checked={vitaminsFollowed}
+                          onChange={(e) => setVitaminsFollowed(e.target.checked)}
                           className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
                         />
                         <span className="text-sm font-medium text-slate-700">Vitamina em dia</span>
@@ -204,7 +235,8 @@ export function HomeVisits() {
                         <input 
                           type="checkbox" 
                           disabled={selectedVisit.status === 'completed'}
-                          defaultChecked={selectedVisit.checklist.medical_recommendations_followed}
+                          checked={recommendationsFollowed}
+                          onChange={(e) => setRecommendationsFollowed(e.target.checked)}
                           className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
                         />
                         <span className="text-sm font-medium text-slate-700">Segue Recomendações</span>
@@ -222,7 +254,8 @@ export function HomeVisits() {
                   <textarea
                     placeholder="Registrar comportamento, saúde aparente e diálogos com a família..."
                     disabled={selectedVisit.status === 'completed'}
-                    defaultValue={selectedVisit.observations}
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
                     rows={4}
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none"
                   />

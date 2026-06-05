@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical } from 'lucide-react';
-import { mockPatients, mockEvents, ClinicalEvent } from '../lib/mockData';
-import { calculateAge, cn } from '../lib/utils';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles } from 'lucide-react';
+import { usePatients } from '../contexts/PatientContext';
+import { ClinicalEvent } from '../lib/mockData';
+import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
 import { StatusBadge } from './Patients';
 import { GrowthCharts } from '../components/GrowthCharts';
-import { differenceInMonths } from 'date-fns';
+import { differenceInMonths, addDays, differenceInDays } from 'date-fns';
 import { useInventory } from '../contexts/InventoryContext';
+import { useAtendimento } from '../contexts/AtendimentoContext';
+import { useVisits } from '../contexts/VisitContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 // Helper to calculate Z-score approximation based on WHO simplified math
 const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F') => {
@@ -37,20 +41,70 @@ const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 
 
 export function PatientDetails() {
   const { id } = useParams();
-  const { kits, deductKitFromInventory } = useInventory();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { patients, events, addEvent, updateEvent, updatePatient } = usePatients();
+  const { kits, items: inventoryItems, deductKitFromInventory } = useInventory();
+  const { adicionarNaFila, agendarAtendimento, atendimentos, concluirAtendimento, iniciarAtendimento } = useAtendimento();
+  const { agendarVisita } = useVisits();
+  const { sendNotification } = useNotification();
+  
+  const searchParams = new URLSearchParams(location.search);
+  const action = searchParams.get('action');
+  const aptId = searchParams.get('aptId');
+
   const [activeTab, setActiveTab] = useState<'resumo' | 'triagem' | 'historico'>('resumo');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
-  const [localEvents, setLocalEvents] = useState<ClinicalEvent[]>(mockEvents);
+  
+  const patient = patients.find(p => p.id === id);
+  const patientEvents = events.filter(e => e.patient_id === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  useEffect(() => {
+    if (action === 'new-followup') {
+      setIsModalOpen(true);
+      if (aptId) {
+        iniciarAtendimento(aptId);
+        if (patient) {
+          sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
+        }
+      }
+    } else if (action === 'edit-last') {
+      const lastEvent = patientEvents[0];
+      if (lastEvent) {
+        setNewWeight(lastEvent.weight?.toString() || '');
+        setNewHeight(lastEvent.height?.toString() || '');
+        setNewMuac(lastEvent.muac?.toString() || '');
+        setNewHead(lastEvent.head_circumference?.toString() || '');
+        setNewNotes(lastEvent.notes || '');
+        setReturnDate(lastEvent.return_date || '');
+        setSelectedKits(lastEvent.kit_delivered || []);
+        setEventDate(lastEvent.date);
+        setIsModalOpen(true);
+      }
+    } else if (action === 'referral') {
+      setIsReferralModalOpen(true);
+    }
+  }, [action, aptId]); // Removing patientEvents from deps to avoid re-triggering modal on save
+
+  const [isImpactModalOpen, setIsImpactModalOpen] = useState(false);
+  const [impactMessage, setImpactMessage] = useState('');
+  const [showImpactSuccess, setShowImpactSuccess] = useState(false);
+  const [showQueueSuccess, setShowQueueSuccess] = useState(false);
+
+  const todayLocal = new Date();
+  const defaultReturnDate = formatLocalDate(addDays(todayLocal, 14));
 
   // Modal Form State
   const [newWeight, setNewWeight] = useState('');
   const [newHeight, setNewHeight] = useState('');
   const [newMuac, setNewMuac] = useState('');
+  const [newHead, setNewHead] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [selectedKit, setSelectedKit] = useState('');
-  const [prescriptions, setPrescriptions] = useState([{ id: Date.now(), medication: '', treatment: '' }]);
+  const [returnDate, setReturnDate] = useState(defaultReturnDate);
+  const [selectedKits, setSelectedKits] = useState<string[]>([]);
+  const [eventDate, setEventDate] = useState(formatLocalDate(todayLocal));
+  const [prescriptions, setPrescriptions] = useState([{ id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
 
   // Referral Modal State
   const [refWeight, setRefWeight] = useState('');
@@ -61,8 +115,15 @@ export function PatientDetails() {
   const [referralReason, setReferralReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
 
-  const patient = mockPatients.find(p => p.id === id);
-  const events = localEvents.filter(e => e.patient_id === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Find latest events with specific measurements
+  const latestWeightEvent = patientEvents.find(e => e.weight !== undefined);
+  const latestHeightEvent = patientEvents.find(e => e.height !== undefined);
+  const latestMuacEvent = patientEvents.find(e => e.muac !== undefined);
+  const latestHeadEvent = patientEvents.find(e => e.head_circumference !== undefined);
+  
+  // For the diagnosis/Z-score, we use the latest clinical visit (not ACS visit)
+  const latestClinicalEvent = patientEvents.find(e => e.event_type !== 'acs_visit') || patientEvents[0];
 
   if (!patient) return <div className="p-8 text-center">Paciente não encontrado</div>;
 
@@ -71,50 +132,129 @@ export function PatientDetails() {
   const bmi = (newWeight && newHeight) ? (parseFloat(newWeight) / Math.pow(parseFloat(newHeight) / 100, 2)).toFixed(2) : '--';
   const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender);
 
-  const handleSaveEvent = (e: React.FormEvent) => {
+  const handleSaveEvent = (e: React.FormEvent, isDischarge: boolean = false) => {
     e.preventDefault();
     
     // Filter out empty prescriptions
-    const validPrescriptions = prescriptions.filter(p => p.medication.trim() !== '' || p.treatment.trim() !== '');
+    const validPrescriptions = prescriptions.filter(p => p.medication.trim() !== '' || p.treatment.trim() !== '').map(p => ({
+      ...p,
+      medication: p.medication.trim(),
+      treatment: p.treatment.trim(),
+      duration_days: parseInt(p.duration_days) || undefined
+    }));
 
     const newEvent: ClinicalEvent = {
       id: `e${Date.now()}`,
       patient_id: patient.id,
       event_type: 'acompanhamento',
-      date: new Date().toISOString().split('T')[0],
-      weight: parseFloat(newWeight),
-      height: parseFloat(newHeight),
-      muac: parseFloat(newMuac),
-      bmi: parseFloat(bmi as string),
+      date: eventDate,
+      weight: parseFloat(newWeight) || undefined,
+      height: parseFloat(newHeight) || undefined,
+      muac: parseFloat(newMuac) || undefined,
+      head_circumference: parseFloat(newHead) || undefined,
+      bmi: parseFloat(bmi as string) || undefined,
       z_score_weight_height: zScore !== null ? zScore : undefined,
-      nutritional_status: calcStatus,
+      nutritional_status: isDischarge ? 'Alta' : calcStatus,
       prescriptions: validPrescriptions.length > 0 ? validPrescriptions : undefined,
       notes: newNotes,
       professional: 'Dra. Helena (Logada)', // Simulated logged-in user
-      return_date: returnDate || undefined,
-      kit_delivered: selectedKit || undefined,
+      return_date: isDischarge ? undefined : (returnDate || undefined),
+      kit_delivered: selectedKits.length > 0 ? selectedKits : undefined,
+      is_discharge: isDischarge,
     };
     
-    if (selectedKit) {
-      deductKitFromInventory(selectedKit);
+    if (selectedKits.length > 0) {
+      selectedKits.forEach(kitId => deductKitFromInventory(kitId, patient.id));
     }
 
-    setLocalEvents([newEvent, ...localEvents]);
+    if (action === 'edit-last' && patientEvents[0]) {
+      updateEvent(patientEvents[0].id, newEvent);
+    } else {
+      addEvent(newEvent);
+    }
+
+    // Update patient status if it's a discharge
+    if (isDischarge) {
+      updatePatient(patient.id, { status: 'Alta' });
+    } else if (calcStatus !== 'N/A') {
+      // Also update status based on latest measurement if not discharge
+      updatePatient(patient.id, { status: calcStatus as any });
+    }
+    
+    // Auto-schedule return if set and not discharge
+    if (returnDate && !isDischarge) {
+      agendarAtendimento(patient.id, patient.name, returnDate);
+    }
+
+    // Schedule ACS visit for next week
+    agendarVisita(patient.id, eventDate);
+
+    // If it was an appointment from the queue, mark it as completed
+    if (aptId) {
+      concluirAtendimento(aptId);
+      sendNotification(
+        'Evolução Atualizada',
+        `O atendimento de ${patient.name} foi finalizado. Peso registrado: ${newWeight || '--'}kg, Estatura: ${newHeight || '--'}cm. Acesso o portal para ver detalhes.`,
+        'success'
+      );
+    }
+
     setIsModalOpen(false);
-    setNewWeight(''); setNewHeight(''); setNewMuac(''); setNewNotes(''); setReturnDate(''); setSelectedKit('');
-    setPrescriptions([{ id: Date.now(), medication: '', treatment: '' }]);
+    // Remove query params
+    navigate(`/nutrition/patients/${patient.id}`, { replace: true });
+    
+    setNewWeight(''); setNewHeight(''); setNewMuac(''); setNewHead(''); setNewNotes(''); setReturnDate(formatLocalDate(addDays(new Date(), 14))); setSelectedKits([]); setEventDate(formatLocalDate(new Date()));
+    setPrescriptions([{ id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
     setActiveTab('historico');
   };
 
+  const handleToggleKit = (kitId: string) => {
+    const isSelected = selectedKits.includes(kitId);
+    let newSelectedKits: string[] = [];
+    
+    if (isSelected) {
+      newSelectedKits = selectedKits.filter(id => id !== kitId);
+    } else {
+      newSelectedKits = [...selectedKits, kitId];
+      
+      // Auto-add medications from this kit
+      const kit = kits.find(k => k.id === kitId);
+      if (kit) {
+        kit.items.forEach(kitItem => {
+          const invItem = inventoryItems.find(i => i.id === kitItem.item_id);
+          if (invItem && invItem.category === 'Medicamento') {
+            // Check if already in prescriptions to avoid duplicates
+            setPrescriptions(prev => {
+              const alreadyHas = prev.some(p => p.medication === invItem.name);
+              if (alreadyHas) return prev;
+              
+              // Remove first empty prescription if it exists
+              const cleaned = prev.filter(p => p.medication !== '' || p.treatment !== '');
+              return [...cleaned, { id: Date.now() + Math.random(), medication: invItem.name, treatment: '', duration_days: '' }];
+            });
+          }
+        });
+      }
+    }
+    setSelectedKits(newSelectedKits);
+  };
+  const handleAddToQueue = () => {
+    if (patient) {
+      adicionarNaFila(patient.id, patient.name);
+      setShowQueueSuccess(true);
+      setTimeout(() => setShowQueueSuccess(false), 3000);
+    }
+  };
+
   const addPrescription = () => {
-    setPrescriptions([...prescriptions, { id: Date.now(), medication: '', treatment: '' }]);
+    setPrescriptions([...prescriptions, { id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
   };
 
   const removePrescription = (id: number) => {
     setPrescriptions(prescriptions.filter(p => p.id !== id));
   };
 
-  const updatePrescription = (id: number, field: 'medication' | 'treatment', value: string) => {
+  const updatePrescription = (id: number, field: 'medication' | 'treatment' | 'duration_days', value: string) => {
     setPrescriptions(prescriptions.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
@@ -131,10 +271,74 @@ export function PatientDetails() {
 
   const handlePrintReferral = (e: React.FormEvent) => {
     e.preventDefault();
-    // Em um cenário real, aqui salvaríamos no Supabase
+    
+    // Save referral event
+    const newEvent: ClinicalEvent = {
+      id: `ref${Date.now()}`,
+      patient_id: patient.id,
+      event_type: 'referral',
+      date: formatLocalDate(new Date()),
+      notes: `Encaminhamento: ${referralReason}${otherReason ? ' - ' + otherReason : ''}. Edema: ${edema}${edemaLocation ? ' (' + edemaLocation + ')' : ''}`,
+      weight: parseFloat(refWeight) / 1000,
+      height: parseFloat(refHeight),
+      z_score_weight_height: parseFloat(refPE),
+      professional: 'Dra. Helena (Logada)',
+      hospital_referral: true,
+    };
+    
+    addEvent(newEvent);
+    
     window.print();
     setIsReferralModalOpen(false);
   };
+
+  const handleSendImpactUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!impactMessage.trim()) return;
+
+    // Em um cenário real, isso salvaria no banco com status 'pending'
+    console.log('Enviando atualização de impacto:', impactMessage);
+    
+    setIsImpactModalOpen(false);
+    setImpactMessage('');
+    setShowImpactSuccess(true);
+    setTimeout(() => setShowImpactSuccess(false), 3000);
+  };
+
+  const generateSuggestions = () => {
+    const suggestions = [];
+    const lastEvent = events[0];
+    const prevEvent = events[1];
+
+    if (lastEvent && prevEvent) {
+      // Weight progress
+      if (lastEvent.weight > prevEvent.weight) {
+        const gain = (lastEvent.weight - prevEvent.weight).toFixed(2);
+        suggestions.push({
+          label: 'Ganho de Peso',
+          text: `Vitória! ${patient.name} teve um ótimo progresso e ganhou ${gain}kg desde a última visita. Continua firme no tratamento!`
+        });
+      }
+
+      // Status improvement
+      if (lastEvent.nutritional_status === 'Adequado' && prevEvent.nutritional_status !== 'Adequado') {
+        suggestions.push({
+          label: 'Recuperação Total',
+          text: `Momento de celebração! ${patient.name} atingiu o estado nutricional Adequado hoje. Obrigado a todos que apoiam essa jornada!`
+        });
+      }
+    }
+
+    // General encouragement
+    suggestions.push({
+      label: 'Saúde Geral',
+      text: `${patient.name} passou por consulta hoje e está reagindo muito bem aos suplementos. A família agradece o apoio!`
+    });
+
+    return suggestions;
+  };
+
+  const suggestions = generateSuggestions();
 
   return (
     <>
@@ -147,7 +351,7 @@ export function PatientDetails() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{patient.name}</h1>
-            <StatusBadge status={events[0]?.nutritional_status || patient.status} />
+            <StatusBadge status={latestClinicalEvent?.nutritional_status || patient.status} />
           </div>
           <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm">
             <span>ID: {patient.registration_number}</span>
@@ -173,6 +377,40 @@ export function PatientDetails() {
           <FileText size={18} />
           Gerar Encaminhamento
         </button>
+        <button 
+          onClick={() => setIsImpactModalOpen(true)}
+          className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+        >
+          <Heart size={18} className="fill-amber-600" />
+          Enviar Atualização de Impacto
+        </button>
+        
+        {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed') ? (
+          <button 
+            onClick={handleAddToQueue}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+          >
+            <Clock size={18} className="text-emerald-600" />
+            Colocar na Fila
+          </button>
+        ) : (
+          <div className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm">
+            <CheckCircle2 size={18} className="text-slate-400" />
+            Já está na Fila
+          </div>
+        )}
+
+        {showImpactSuccess && (
+          <div className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
+            <CheckCircle2 size={16} /> Enviado para Aprovação!
+          </div>
+        )}
+
+        {showQueueSuccess && (
+          <div className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
+            <Clock size={16} /> Adicionado à Fila!
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -187,27 +425,183 @@ export function PatientDetails() {
           {activeTab === 'resumo' && (
             <div className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Weight size={16}/> Último Peso</p>
-                  <p className="text-2xl font-bold text-slate-900">{events[0]?.weight || '--'} kg</p>
-                  <p className="text-xs text-slate-400 mt-1">Medido em {new Date(events[0]?.date).toLocaleDateString()}</p>
+                <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Weight size={14} className="text-emerald-500"/> Último Peso
+                  </p>
+                  <p className="text-3xl font-black text-slate-900">
+                    {latestWeightEvent?.weight ? `${latestWeightEvent.weight} kg` : '--'}
+                  </p>
+                  {latestWeightEvent && (
+                    <p className="text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-0.5 rounded-lg">
+                      Medido em {new Date(latestWeightEvent.date).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Activity size={16}/> Última Estatura</p>
-                  <p className="text-2xl font-bold text-slate-900">{events[0]?.height || '--'} cm</p>
+
+                <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Activity size={14} className="text-blue-500"/> Última Estatura
+                  </p>
+                  <p className="text-3xl font-black text-slate-900">
+                    {latestHeightEvent?.height ? `${latestHeightEvent.height} cm` : '--'}
+                  </p>
+                  {latestHeightEvent && (
+                    <p className="text-[10px] font-bold text-blue-600 mt-2 bg-blue-50 inline-block px-2 py-0.5 rounded-lg">
+                      Em {new Date(latestHeightEvent.date).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Activity size={16}/> Perímetro Braquial</p>
-                  <p className="text-2xl font-bold text-slate-900">{events[0]?.muac || '--'} cm</p>
+
+                <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Activity size={14} className="text-amber-500"/> PB (Braquial)
+                  </p>
+                  <p className="text-3xl font-black text-slate-900">
+                    {latestMuacEvent?.muac ? `${latestMuacEvent.muac} cm` : '--'}
+                  </p>
+                  {latestMuacEvent?.muac && (
+                    <p className="text-[10px] font-bold text-amber-600 mt-2 bg-amber-50 inline-block px-2 py-0.5 rounded-lg">
+                      Zona: {latestMuacEvent.muac > 12.5 ? 'Verde' : latestMuacEvent.muac > 11.5 ? 'Amarela' : 'Vermelha'}
+                    </p>
+                  )}
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-sm text-slate-500 mb-1 flex items-center gap-2"><Activity size={16}/> P. Craniano</p>
-                  <p className="text-2xl font-bold text-slate-900">{events[0]?.head_circumference || '--'} cm</p>
+
+                <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Activity size={14} className="text-purple-500"/> P. Craniano
+                  </p>
+                  <p className="text-3xl font-black text-slate-900">
+                    {latestHeadEvent?.head_circumference ? `${latestHeadEvent.head_circumference} cm` : '--'}
+                  </p>
+                  {latestHeadEvent && (
+                    <p className="text-[10px] font-bold text-slate-400 mt-2">
+                      Medido em {new Date(latestHeadEvent.date).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <GrowthCharts patient={patient} events={events} />
+              {/* Active Medications Section */}
+              <div className="bg-emerald-50/30 rounded-[2.5rem] p-8 border border-emerald-100/50 shadow-sm">
+                <h3 className="text-sm font-black text-emerald-800 uppercase tracking-widest flex items-center gap-2 mb-6">
+                  <BriefcaseMedical size={18} className="text-emerald-600" />
+                  Medicamentos e Suplementos Ativos
+                </h3>
+                {latestClinicalEvent?.prescriptions && latestClinicalEvent.prescriptions.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {latestClinicalEvent.prescriptions.map((p, i) => (
+                      <div key={i} className="bg-white p-5 rounded-2xl border border-emerald-100 flex flex-col group hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">
+                            Prescrito em {parseLocalDate(latestClinicalEvent.date).toLocaleDateString('pt-BR')}
+                          </span>
+                          <Sparkles size={14} className="text-emerald-400" />
+                        </div>
+                        
+                        <p className="text-sm font-black text-slate-800 mb-1">{p.medication}</p>
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{p.treatment || 'Posologia não informada'}</p>
+                        
+                        {p.duration_days ? (() => {
+                          const prescribedDate = parseLocalDate(latestClinicalEvent.date);
+                          const today = new Date();
+                          const daysTaken = Math.max(0, differenceInDays(today, prescribedDate));
+                          const endDate = addDays(prescribedDate, p.duration_days);
+                          const isFinished = daysTaken >= p.duration_days;
+
+                          return (
+                            <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
+                              <div className="flex justify-between items-center text-[11px] uppercase tracking-wider">
+                                <span className="font-bold text-slate-500">Uso (Dias)</span>
+                                <span className={cn("font-black", isFinished ? "text-slate-400" : "text-emerald-600")}>
+                                  {Math.min(daysTaken, p.duration_days)} / {p.duration_days}
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className={cn("h-full rounded-full transition-all", isFinished ? "bg-slate-300" : "bg-emerald-500")}
+                                  style={{ width: `${Math.min((daysTaken / p.duration_days) * 100, 100)}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                <span>{isFinished ? 'TRATAMENTO CONCLUÍDO' : 'EM ANDAMENTO'}</span>
+                                <span>FIM: {endDate.toLocaleDateString('pt-BR')}</span>
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <div className="mt-auto space-y-2 border-t border-slate-100 pt-3">
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Uso Contínuo / Sem Prazo</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white/60 border border-emerald-100/50 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                    <BriefcaseMedical size={24} className="text-emerald-300/50 mb-3" />
+                    <p className="text-sm font-bold text-slate-500">Nenhum medicamento ativo</p>
+                    <p className="text-xs text-slate-400 mt-1">A criança não possui indicações de uso no momento.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <GrowthCharts patient={patient} events={patientEvents} />
+                
+                {/* Simplified Evolution Table beneath charts */}
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                    Dados das medições
+                  </h3>
+                  <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <th className="p-5">Data</th>
+                            <th className="p-5 text-center">Peso (kg)</th>
+                            <th className="p-5 text-center">Est. (cm)</th>
+                            <th className="p-5 text-center">PB (cm)</th>
+                            <th className="p-5 text-center">P/E (Z)</th>
+                            <th className="p-5">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {patientEvents.filter(e => e.event_type !== 'acs_visit').map((event) => (
+                            <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-5 text-xs font-bold text-slate-600">
+                                {parseLocalDate(event.date).toLocaleDateString()}
+                              </td>
+                              <td className="p-5 text-center text-sm font-black text-slate-900">
+                                {event.weight || '--'}
+                              </td>
+                              <td className="p-5 text-center text-sm font-bold text-slate-700">
+                                {event.height || '--'}
+                              </td>
+                              <td className="p-5 text-center text-sm font-bold text-slate-700">
+                                {event.muac || '--'}
+                              </td>
+                              <td className="p-5 text-center text-sm">
+                                 <span className={cn(
+                                   "font-black",
+                                   event.z_score_weight_height && event.z_score_weight_height < -2 ? "text-red-500" : 
+                                   event.z_score_weight_height && event.z_score_weight_height < -1 ? "text-amber-500" : "text-emerald-500"
+                                 )}>
+                                   {event.z_score_weight_height !== undefined ? event.z_score_weight_height : '--'}
+                                 </span>
+                              </td>
+                              <td className="p-5">
+                                {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -253,10 +647,10 @@ export function PatientDetails() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {events.filter(e => e.event_type !== 'acs_visit').map((event) => (
+                      {patientEvents.filter(e => e.event_type !== 'acs_visit').map((event) => (
                         <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-4 text-xs font-medium text-slate-600">
-                            {new Date(event.date).toLocaleDateString()}
+                            {parseLocalDate(event.date).toLocaleDateString()}
                           </td>
                           <td className="p-4 text-center text-sm font-bold text-slate-900">
                             {event.weight || '--'}
@@ -292,7 +686,7 @@ export function PatientDetails() {
                   Linha do Tempo Detalhada
                 </h3>
                 <div className="relative border-l-2 border-slate-100 ml-4 space-y-8 pb-4">
-                  {events.map((event, idx) => (
+                  {patientEvents.map((event, idx) => (
                     <div key={event.id} className="relative pl-8 group">
                       {/* Timeline Dot */}
                       <div className={cn(
@@ -313,7 +707,7 @@ export function PatientDetails() {
                             {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-                            <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {new Date(event.date).toLocaleDateString()}</span>
+                            <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {event.professional}</span>
                           </div>
                         </div>
@@ -341,7 +735,7 @@ export function PatientDetails() {
                         )}
 
                         {/* Measurements Grid - Refactored as a mini-table or clean grid */}
-                        {(event.weight || event.height || event.muac) && (
+                        {(event.weight || event.height || event.muac || event.head_circumference) && (
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50/30 rounded-xl border border-slate-50">
                             {event.weight && (
                               <div className="flex flex-col">
@@ -353,6 +747,18 @@ export function PatientDetails() {
                               <div className="flex flex-col">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estatura</span>
                                 <span className="text-base font-bold text-slate-900">{event.height} <small className="text-[10px] text-slate-400 font-normal">cm</small></span>
+                              </div>
+                            )}
+                            {event.muac && (
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">P. Braquial</span>
+                                <span className="text-base font-bold text-slate-900">{event.muac} <small className="text-[10px] text-slate-400 font-normal">cm</small></span>
+                              </div>
+                            )}
+                            {event.head_circumference && (
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">P. Cefálico</span>
+                                <span className="text-base font-bold text-slate-900">{event.head_circumference} <small className="text-[10px] text-slate-400 font-normal">cm</small></span>
                               </div>
                             )}
                             {event.bmi && (
@@ -419,7 +825,7 @@ export function PatientDetails() {
               <div>
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <Stethoscope size={24} className="text-emerald-600" />
-                  Novo Acompanhamento Clínico
+                  {action === 'edit-last' ? 'Editar Acompanhamento Clínico' : 'Novo Acompanhamento Clínico'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">Paciente: {patient.name}</p>
               </div>
@@ -448,7 +854,7 @@ export function PatientDetails() {
                 </div>
 
                 {/* Measurements */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-700">Peso (kg) *</label>
                     <input required type="number" step="0.01" value={newWeight} onChange={e => setNewWeight(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" placeholder="Ex: 8.5" />
@@ -458,8 +864,12 @@ export function PatientDetails() {
                     <input required type="number" step="0.1" value={newHeight} onChange={e => setNewHeight(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" placeholder="Ex: 72" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Perímetro Braquial (cm)</label>
+                    <label className="text-sm font-medium text-slate-700">P. Braquial (cm)</label>
                     <input type="number" step="0.1" value={newMuac} onChange={e => setNewMuac(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" placeholder="Ex: 12.5" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">P. Cefálico (cm)</label>
+                    <input type="number" step="0.1" value={newHead} onChange={e => setNewHead(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" placeholder="Ex: 42" />
                   </div>
                 </div>
 
@@ -492,14 +902,28 @@ export function PatientDetails() {
                     <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" />
                   </div>
                   
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Kit Entregue (opcional)</label>
-                    <select value={selectedKit} onChange={e => setSelectedKit(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all">
-                      <option value="">Nenhum kit entregue</option>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Kits Entregues (selecione múltiplos se necessário)</label>
+                    <div className="flex flex-wrap gap-2">
                       {kits.map(kit => (
-                        <option key={kit.id} value={kit.id}>{kit.name}</option>
+                        <button
+                          key={kit.id}
+                          type="button"
+                          onClick={() => handleToggleKit(kit.id)}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all",
+                            selectedKits.includes(kit.id) 
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200" 
+                              : "bg-white border-slate-200 text-slate-400 hover:border-emerald-200 hover:text-emerald-600"
+                          )}
+                        >
+                          {kit.name}
+                        </button>
                       ))}
-                    </select>
+                    </div>
+                    {selectedKits.length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic">Nenhum kit selecionado</p>
+                    )}
                   </div>
                 </div>
 
@@ -527,13 +951,23 @@ export function PatientDetails() {
                           placeholder="Ex: Plumpy'Nut" 
                         />
                       </div>
-                      <div className="sm:col-span-6 space-y-1">
+                      <div className="sm:col-span-4 space-y-1">
                         <input 
                           type="text" 
                           value={p.treatment} 
                           onChange={e => updatePrescription(p.id, 'treatment', e.target.value)} 
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
                           placeholder="Ex: 1 sachê 2x ao dia" 
+                        />
+                      </div>
+                      <div className="sm:col-span-2 space-y-1">
+                        <input 
+                          type="number" 
+                          value={p.duration_days} 
+                          onChange={e => updatePrescription(p.id, 'duration_days', e.target.value)} 
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+                          placeholder="Dias" 
+                          min="1"
                         />
                       </div>
                       <div className="sm:col-span-1 flex justify-end sm:justify-center pt-1">
@@ -553,13 +987,33 @@ export function PatientDetails() {
               </form>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors">
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-3">
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="px-6 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+              >
                 Cancelar
               </button>
-              <button type="submit" form="followup-form" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium transition-colors shadow-sm">
-                Salvar Acompanhamento
-              </button>
+              
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    handleSaveEvent(e as any, true);
+                  }}
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] border border-emerald-200 transition-all shadow-sm"
+                >
+                  Alta do Programa
+                </button>
+                
+                <button 
+                  type="submit" 
+                  form="followup-form"
+                  className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all shadow-xl shadow-slate-900/10"
+                >
+                  Concluir Atendimento
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -677,6 +1131,79 @@ export function PatientDetails() {
                 Salvar e Imprimir
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Enviar Atualização de Impacto */}
+      {isImpactModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Heart size={24} className="text-amber-600 fill-amber-600" />
+                Atualização de Impacto
+              </h3>
+              <button onClick={() => setIsImpactModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-full transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSendImpactUpdate} className="p-8 space-y-6">
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+                <p className="text-sm text-amber-900 font-medium leading-relaxed">
+                  Esta mensagem será enviada para o <strong>Gestor</strong> aprovar antes de aparecer no feed de notícias dos apoiadores.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                  <Sparkles size={12} className="text-amber-500" /> Sugestões Inteligentes
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((s, i) => (
+                    <button 
+                      key={i}
+                      type="button"
+                      onClick={() => setImpactMessage(s.text)}
+                      className="text-[10px] font-bold bg-white border border-slate-200 hover:border-amber-500 hover:text-amber-600 px-3 py-2 rounded-xl transition-all shadow-sm"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mensagem Final</label>
+                <textarea 
+                  value={impactMessage}
+                  onChange={(e) => setImpactMessage(e.target.value)}
+                  rows={4}
+                  required
+                  placeholder="Selecione uma sugestão acima ou escreva aqui..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none transition-all resize-none font-medium text-slate-700"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  type="button"
+                  onClick={() => setIsImpactModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!impactMessage.trim()}
+                  className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Send size={16} />
+                  Enviar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

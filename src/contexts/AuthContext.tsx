@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export type Role = 'ADMIN' | 'USER';
+export type Role = 'ADMIN' | 'USER' | 'SPONSOR';
 
 export interface User {
   id: string;
@@ -29,8 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings']
       : permissions || ['dashboard'];
 
+    const userId = role === 'ADMIN' ? '1' : Math.random().toString(36).substring(2, 9);
+    
     setUser({ 
-      id: Math.random().toString(36).substring(2, 9), 
+      id: userId, 
       name: email.split('@')[0], 
       email, 
       role, 
