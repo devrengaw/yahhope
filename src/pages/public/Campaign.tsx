@@ -196,7 +196,7 @@ export function Campaign() {
               <div className="flex justify-between items-end mb-4">
                 <div>
                   <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Arrecadado</p>
-                  <p className="text-3xl font-black text-emerald-600">R$ {campaign.current_amount.toLocaleString('pt-BR')}</p>
+                  <p className="text-3xl font-black text-emerald-600">{Math.round(progressPercentage)}%</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Objetivo</p>

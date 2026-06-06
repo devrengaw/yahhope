@@ -59,7 +59,7 @@ export function CampaignDisplay() {
               </div>
               <div className="text-right">
                 <p className="text-emerald-200/80 uppercase tracking-widest font-bold mb-2">Arrecadado</p>
-                <p className="text-5xl font-black text-brand-orange drop-shadow-lg">R$ {campaign.current_amount.toLocaleString('pt-BR')}</p>
+                <p className="text-5xl font-black text-brand-orange drop-shadow-lg">{Math.round(progressPercentage)}%</p>
               </div>
             </div>
 
