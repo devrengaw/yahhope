@@ -11,6 +11,7 @@ interface EmailTemplate {
   preheader: string;
   heading: string;
   body: string;
+  has_cta?: boolean;
   cta_text: string;
   cta_url: string;
 }
@@ -30,6 +31,7 @@ export function CommEmailTemplates() {
       preheader: 'Sua doação ajuda a transformar vidas.',
       heading: 'Obrigado pela sua doação!',
       body: `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua doação. O seu apoio é fundamental para continuarmos transformando vidas e levando esperança para quem mais precisa.</p><p><br></p><p>Com gratidão,<br>Equipe YAH Hope</p>`,
+      has_cta: true,
       cta_text: 'Acessar meu portal',
       cta_url: 'https://yahhope.com/login'
     },
@@ -38,6 +40,7 @@ export function CommEmailTemplates() {
       preheader: 'Relatório mensal de transparência.',
       heading: 'Nosso Impacto Mensal',
       body: `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>É com muita alegria que compartilhamos os resultados alcançados neste mês graças ao seu apoio contínuo.</p><p>Através da sua doação, conseguimos prover centenas de refeições e viabilizar atendimentos médicos essenciais para a nossa comunidade.</p><p><br></p><p>Obrigado por fazer a diferença!<br>Equipe YAH Hope</p>`,
+      has_cta: true,
       cta_text: 'Ver Relatório Completo',
       cta_url: 'https://yahhope.com/relatorio'
     }
@@ -67,6 +70,7 @@ export function CommEmailTemplates() {
                 preheader: t.preheader || prev[t.name].preheader,
                 heading: t.heading || prev[t.name].heading,
                 body: t.body || prev[t.name].body,
+                has_cta: t.has_cta ?? prev[t.name].has_cta ?? true,
                 cta_text: t.cta_text || prev[t.name].cta_text,
                 cta_url: t.cta_url || prev[t.name].cta_url,
               };
@@ -96,6 +100,7 @@ export function CommEmailTemplates() {
           preheader: templates.donation_thank_you.preheader,
           heading: templates.donation_thank_you.heading,
           body: templates.donation_thank_you.body,
+          has_cta: templates.donation_thank_you.has_cta,
           cta_text: templates.donation_thank_you.cta_text,
           cta_url: templates.donation_thank_you.cta_url,
           updated_at: new Date().toISOString()
@@ -106,6 +111,7 @@ export function CommEmailTemplates() {
           preheader: templates.accountability.preheader,
           heading: templates.accountability.heading,
           body: templates.accountability.body,
+          has_cta: templates.accountability.has_cta,
           cta_text: templates.accountability.cta_text,
           cta_url: templates.accountability.cta_url,
           updated_at: new Date().toISOString()
@@ -120,7 +126,7 @@ export function CommEmailTemplates() {
     }
   };
 
-  const updateTemplate = (type: TemplateType, field: keyof EmailTemplate, value: string) => {
+  const updateTemplate = (type: TemplateType, field: keyof EmailTemplate, value: string | boolean) => {
     setTemplates(prev => ({
       ...prev,
       [type]: {
@@ -128,6 +134,24 @@ export function CommEmailTemplates() {
         [field]: value
       }
     }));
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem da logo deve ter no máximo 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setLogoUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const currentTemplate = activeTab !== 'settings' ? templates[activeTab as TemplateType] : null;
@@ -223,15 +247,46 @@ export function CommEmailTemplates() {
                 <label className="block">
                   <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
                     <ImageIcon size={16} className="text-slate-400" />
-                    URL da Logomarca (PNG)
+                    Logomarca (Upload de Imagem)
                   </span>
-                  <input
-                    type="url"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="https://..."
-                  />
+                  
+                  <div className="flex items-center gap-4">
+                    {logoUrl ? (
+                      <div className="relative group shrink-0">
+                        <div className="w-20 h-20 rounded-2xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden p-2">
+                          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLogoUrl('')}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center shrink-0">
+                        <ImageIcon size={24} className="text-slate-400" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/svg+xml"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <label 
+                        htmlFor="logo-upload"
+                        className="inline-block px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm"
+                      >
+                        Escolher Nova Imagem
+                      </label>
+                      <p className="text-xs text-slate-400 mt-2 font-medium">Recomendado: PNG ou SVG com fundo transparente (Máx: 2MB).</p>
+                    </div>
+                  </div>
                 </label>
 
                 <label className="block">
@@ -321,25 +376,42 @@ export function CommEmailTemplates() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="block">
-                      <span className="block text-sm font-bold text-slate-700 mb-1.5">Texto do Botão CTA</span>
-                      <input
-                        type="text"
-                        value={currentTemplate.cta_text}
-                        onChange={(e) => updateTemplate(activeTab, 'cta_text', e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="block text-sm font-bold text-slate-700 mb-1.5">Link do Botão (URL)</span>
-                      <input
-                        type="text"
-                        value={currentTemplate.cta_url}
-                        onChange={(e) => updateTemplate(activeTab, 'cta_url', e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                      />
-                    </label>
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="block text-sm font-bold text-slate-700">Botão de Ação (CTA)</span>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={currentTemplate.has_cta ?? true}
+                          onChange={(e) => updateTemplate(activeTab, 'has_cta', e.target.checked)}
+                          className="w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm font-medium text-slate-600">Exibir Botão</span>
+                      </label>
+                    </div>
+
+                    {(currentTemplate.has_cta ?? true) && (
+                      <div className="grid grid-cols-2 gap-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="block">
+                          <span className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Texto do Botão</span>
+                          <input
+                            type="text"
+                            value={currentTemplate.cta_text}
+                            onChange={(e) => updateTemplate(activeTab, 'cta_text', e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Link de Destino</span>
+                          <input
+                            type="text"
+                            value={currentTemplate.cta_url}
+                            onChange={(e) => updateTemplate(activeTab, 'cta_url', e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -388,7 +460,7 @@ export function CommEmailTemplates() {
                   dangerouslySetInnerHTML={{ __html: currentTemplate?.body || '<p>O corpo do email aparecerá aqui...</p>' }}
                 />
 
-                {currentTemplate?.cta_text && (
+                {(currentTemplate?.has_cta ?? true) && currentTemplate?.cta_text && (
                   <div className="mt-8 text-center md:text-left">
                     <a
                       href={currentTemplate.cta_url || '#'}

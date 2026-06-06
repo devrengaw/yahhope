@@ -471,3 +471,4 @@ ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS preheader TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS heading TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_text TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_url TEXT;
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS has_cta BOOLEAN DEFAULT true;

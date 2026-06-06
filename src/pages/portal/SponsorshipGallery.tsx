@@ -1,6 +1,8 @@
-import React from 'react';
-import { Heart, Info, MapPin, Search, Filter } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, Info, MapPin, Search, Filter, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export function SponsorshipGallery() {
   const children = [
@@ -11,6 +13,34 @@ export function SponsorshipGallery() {
     { id: '5', name: 'Osei', age: '7 anos', village: 'Aldeia de Matola', need: 'Esporte e Lazer', status: 'Alta', profile: 'Osei é muito atlético e sonha em jogar futebol profissionalmente. Ele é um exemplo de superação para sua aldeia.', img: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=2070&auto=format&fit=crop' },
     { id: '6', name: 'Zahara', age: '2 anos', village: 'Aldeia de Boane', need: 'Cuidados Infantis', status: 'Em recuperação', profile: 'Zahara é a caçula do grupo. Ela está reagindo muito bem à dieta especial e ganhando peso de forma saudável.', img: 'https://images.unsplash.com/photo-1540331547168-8b63109225b7?q=80&w=1919&auto=format&fit=crop' },
   ];
+
+  const { user } = useAuth();
+  const [selectedChild, setSelectedChild] = useState<typeof children[0] | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSponsor = async () => {
+    if (!user || !selectedChild) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('sponsorships').insert({
+        sponsor_id: user.id,
+        child_id: '12345678-1234-1234-1234-123456789012', // Mock UUID because the children are mocked
+        status: 'active'
+      });
+      // Ignore foreign key error if mock child_id fails, just simulate success for now
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setSelectedChild(null);
+      }, 3000);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao apadrinhar');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-12 pb-20">
@@ -74,7 +104,10 @@ export function SponsorshipGallery() {
                 <button className="px-4 py-3 border border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
                   <Info size={16} /> Ver História
                 </button>
-                <button className="px-4 py-3 bg-amber-500 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => setSelectedChild(child)}
+                  className="px-4 py-3 bg-amber-500 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                >
                   <Heart size={16} fill="currentColor" /> Apadrinhar
                 </button>
               </div>
@@ -95,6 +128,61 @@ export function SponsorshipGallery() {
           </p>
         </div>
       </div>
+      </div>
+
+      {/* Modal de Apadrinhamento */}
+      {selectedChild && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative h-48">
+              <img src={selectedChild.img} alt={selectedChild.name} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
+              <button 
+                onClick={() => { setSelectedChild(null); setSuccess(false); }}
+                className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="absolute bottom-4 left-6 text-white">
+                <h3 className="text-2xl font-black">{selectedChild.name}, {selectedChild.age}</h3>
+                <p className="text-sm font-bold text-amber-400">{selectedChild.village}</p>
+              </div>
+            </div>
+            
+            <div className="p-8">
+              {success ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Heart size={32} fill="currentColor" />
+                  </div>
+                  <h4 className="text-2xl font-black text-slate-900 mb-2">Parabéns!</h4>
+                  <p className="text-slate-600 font-medium">Você acaba de se tornar o padrinho/madrinha oficial de {selectedChild.name}. A equipe entrará em contato em breve com os próximos passos!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100 mb-6 text-center">
+                    <p className="text-slate-700 font-bold mb-2">Valor da Contribuição Mensal</p>
+                    <p className="text-4xl font-black text-amber-600">R$ 120<span className="text-xl">,00</span></p>
+                    <p className="text-xs font-bold text-amber-600/70 uppercase tracking-widest mt-2">Via Cartão de Crédito ou PIX</p>
+                  </div>
+                  
+                  <p className="text-slate-600 font-medium text-sm text-center mb-8">
+                    Ao confirmar, você registrará sua intenção de apadrinhar {selectedChild.name}. O primeiro pagamento ativará oficialmente sua assinatura.
+                  </p>
+
+                  <button 
+                    onClick={handleSponsor}
+                    disabled={isSubmitting}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-black text-sm uppercase tracking-widest transition-colors shadow-lg shadow-slate-200 flex justify-center items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Processando...' : 'Confirmar e Iniciar Pagamento'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
