@@ -29,8 +29,10 @@ export function Login() {
     let roleToLogin: Role = 'USER';
     let permissions: string[] = ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     if (activeTab === 'login') {
-      if (email === 'contato@yahhope.com') {
+      if (normalizedEmail === 'contato@yahhope.com') {
         const storedPassword = localStorage.getItem('yah_hope_admin_password');
         if (!storedPassword) {
           localStorage.setItem('yah_hope_admin_password', password);
@@ -41,7 +43,7 @@ export function Login() {
         }
         roleToLogin = 'ADMIN';
         permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
-      } else if (isSupporterMode || email.includes('apoiador')) {
+      } else if (isSupporterMode || normalizedEmail.includes('apoiador')) {
         roleToLogin = 'SPONSOR';
         permissions = ['portal'];
       }
