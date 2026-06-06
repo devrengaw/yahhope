@@ -87,7 +87,7 @@ export function CommEmailTemplates() {
     const handleSave = async () => {
     try {
       const { error: settingsErr } = await supabase.from('email_settings').upsert({
-        id: '1',
+        id: '00000000-0000-0000-0000-000000000001',
         logo_url: logoUrl,
         primary_color: primaryColor,
         updated_at: new Date().toISOString()
