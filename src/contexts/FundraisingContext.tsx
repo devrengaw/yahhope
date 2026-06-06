@@ -118,19 +118,10 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
 
     // Set up Realtime subscriptions for the 24/7 display page
     const channels = supabase.channel('fundraising-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, (payload) => {
-        // Update campaign if current_amount or anything changed
-        if (payload.new && (payload.new as any).is_active !== false) {
-          setCampaign(prev => ({
-            ...prev,
-            current_amount: (payload.new as any).current_amount,
-            target_amount: (payload.new as any).target_amount,
-            title: (payload.new as any).title
-          }));
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, () => {
+        fetchCampaignData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'donations' }, (payload) => {
-        // Fetch new donations if anything changes in donations
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'donations' }, () => {
         fetchCampaignData();
       })
       .subscribe();
