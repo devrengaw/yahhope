@@ -15,7 +15,7 @@ export function CampaignDisplay() {
 
   return (
     <div 
-      className="h-screen w-screen flex flex-col items-center justify-between py-10 px-8 relative overflow-hidden bg-brand-green"
+      className="min-h-screen w-full flex flex-col items-center justify-between py-8 md:py-10 px-4 md:px-8 relative overflow-x-hidden bg-brand-green"
       style={{
         backgroundImage: `url('https://static.wixstatic.com/media/bd919d_bed3073991f74b9ebe78f14e8b11c13c~mv2.jpg/v1/fill/w_3000,h_1175,fp_0.50_0.49,q_90,enc_avif,quality_auto/IMG_6252.jpg')`,
         backgroundSize: 'cover',
@@ -25,15 +25,15 @@ export function CampaignDisplay() {
       {/* Background Elements */}
       <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-400 via-transparent to-transparent z-0" />
 
-      <div className="w-full max-w-7xl mx-auto z-10 flex flex-col items-center justify-center flex-shrink-0 mt-4 mb-16">
-        <h1 className="font-heading text-5xl md:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-110">
+      <div className="w-full max-w-7xl mx-auto z-10 flex flex-col items-center justify-center flex-shrink-0 mt-2 md:mt-4 mb-8 md:mb-16">
+        <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-110">
           Participe
         </h1>
       </div>
 
       <div className="w-full max-w-7xl mx-auto z-10 grid grid-cols-1 lg:grid-cols-3 gap-8 items-center flex-grow py-6">
         
-        <div className="lg:col-span-2 h-full flex flex-col justify-between bg-slate-950/70 backdrop-blur-2xl p-8 lg:p-10 rounded-[2.5rem] border border-white/10 shadow-2xl">
+        <div className="lg:col-span-2 h-full flex flex-col justify-between bg-slate-950/70 backdrop-blur-2xl p-6 md:p-8 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] border border-white/10 shadow-2xl">
           <div>
             <h2 className="text-3xl md:text-4xl font-heading font-black text-white mb-6 drop-shadow-md tracking-wide">
               Transforme esperança em dignidade
@@ -54,12 +54,12 @@ export function CampaignDisplay() {
           <div className="mt-8">
             <div className="flex justify-between items-end mb-6 text-white">
               <div>
-                <p className="text-emerald-200/80 uppercase tracking-widest font-bold mb-2">Objetivo</p>
-                <p className="text-3xl font-bold opacity-80">R$ {campaign.target_amount.toLocaleString('pt-BR')}</p>
+                <p className="text-emerald-200/80 uppercase tracking-widest font-bold mb-1 md:mb-2 text-sm md:text-base">Objetivo</p>
+                <p className="text-2xl md:text-3xl font-bold opacity-80">R$ {campaign.target_amount.toLocaleString('pt-BR')}</p>
               </div>
               <div className="text-right">
-                <p className="text-emerald-200/80 uppercase tracking-widest font-bold mb-2">Arrecadado</p>
-                <p className="text-5xl font-black text-brand-orange drop-shadow-lg">{Math.round(progressPercentage)}%</p>
+                <p className="text-emerald-200/80 uppercase tracking-widest font-bold mb-1 md:mb-2 text-sm md:text-base">Arrecadado</p>
+                <p className="text-4xl md:text-5xl font-black text-brand-orange drop-shadow-lg">{Math.round(progressPercentage)}%</p>
               </div>
             </div>
 
@@ -109,7 +109,7 @@ export function CampaignDisplay() {
         </div>
 
         {/* Right Side: QR Code Area */}
-        <div className="bg-slate-950/70 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 text-center shadow-2xl flex flex-col items-center justify-center transform lg:scale-105 relative z-20 self-stretch">
+        <div className="bg-slate-950/70 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[2.5rem] p-6 md:p-8 text-center shadow-2xl flex flex-col items-center justify-center transform lg:scale-105 relative z-20 self-stretch mt-4 lg:mt-0">
           <div className="absolute -top-5 bg-brand-orange text-white font-black uppercase tracking-widest px-6 py-1.5 rounded-full shadow-lg text-sm">
             Apoie Agora
           </div>
@@ -130,8 +130,8 @@ export function CampaignDisplay() {
       </div>
 
       {/* Large Logo at the Bottom */}
-      <div className="w-full z-10 flex justify-center flex-shrink-0">
-        <img src="/Logo+icone.png" alt="YAH Hope" className="h-24 md:h-28 object-contain drop-shadow-2xl" />
+      <div className="w-full z-10 flex justify-center flex-shrink-0 mt-8 md:mt-0">
+        <img src="/Logo+icone.png" alt="YAH Hope" className="h-16 md:h-24 lg:h-28 object-contain drop-shadow-2xl" />
       </div>
     </div>
   );

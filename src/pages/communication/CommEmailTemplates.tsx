@@ -248,47 +248,23 @@ export function CommEmailTemplates() {
               <div className="space-y-6">
                 <label className="block">
                   <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
-                    <ImageIcon size={16} className="text-slate-400" />
-                    Logomarca (Upload de Imagem)
+                    <ImageIcon size={16} className="text-slate-400" /> URL do Logo da Instituição
                   </span>
-                  
-                  <div className="flex items-center gap-4">
-                    {logoUrl ? (
-                      <div className="relative group shrink-0">
-                        <div className="w-20 h-20 rounded-2xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden p-2">
-                          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setLogoUrl('')}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center shrink-0">
-                        <ImageIcon size={24} className="text-slate-400" />
+                  <div className="flex gap-4 items-center">
+                    {logoUrl && (
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-200">
+                        <img src={logoUrl} alt="Logo" className="h-12 object-contain" />
                       </div>
                     )}
-                    
-                    <div className="flex-1">
-                      <input
-                        type="file"
-                        accept="image/png, image/jpeg, image/svg+xml"
-                        onChange={handleLogoUpload}
-                        className="hidden"
-                        id="logo-upload"
-                      />
-                      <label 
-                        htmlFor="logo-upload"
-                        className="inline-block px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm"
-                      >
-                        Escolher Nova Imagem
-                      </label>
-                      <p className="text-xs text-slate-400 mt-2 font-medium">Recomendado: PNG ou SVG com fundo transparente (Máx: 2MB).</p>
-                    </div>
+                    <input 
+                      type="text" 
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                      placeholder="Ex: https://yahhope.com/logo.png"
+                    />
                   </div>
+                  <p className="text-xs text-slate-500 mt-2">Cole o link da imagem (Evite upload direto para não pesar o email no Gmail).</p>
                 </label>
 
                 <label className="block">
