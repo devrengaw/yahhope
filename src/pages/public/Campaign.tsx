@@ -23,6 +23,14 @@ export function Campaign() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  React.useEffect(() => {
+    if (campaign.accept_pix === false && campaign.accept_card !== false) {
+      setPaymentMethod('credit_card');
+    } else if (campaign.accept_card === false && campaign.accept_pix !== false) {
+      setPaymentMethod('pix');
+    }
+  }, [campaign.accept_pix, campaign.accept_card]);
+
   const progressPercentage = Math.min((campaign.current_amount / campaign.target_amount) * 100, 100);
 
   const handleDonate = async (e: React.FormEvent) => {
@@ -145,7 +153,7 @@ export function Campaign() {
             textShadow: '0 4px 20px rgba(0,0,0,0.5)'
           }}
         >
-          Envolva-se
+          Participe
         </h1>
       </div>
 
@@ -294,9 +302,11 @@ export function Campaign() {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">R$</span>
                         <input 
                           type="number"
+                          step="0.01"
+                          min="1.00"
                           value={customAmount}
                           onChange={(e) => setCustomAmount(e.target.value)}
-                          placeholder="0,00"
+                          placeholder="0.00"
                           className="w-full pl-10 pr-4 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-lg font-black"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -336,37 +346,43 @@ export function Campaign() {
                   placeholder="seu@email.com"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Forma de Pagamento</label>
-                <div className="flex gap-4">
-                  <label className="flex-1 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="payment" 
-                      value="pix" 
-                      checked={paymentMethod === 'pix'} 
-                      onChange={() => setPaymentMethod('pix')}
-                      className="peer sr-only" 
-                    />
-                    <div className="p-3 text-center border border-slate-200 rounded-xl font-bold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors">
-                      PIX ou Boleto
-                    </div>
-                  </label>
-                  <label className="flex-1 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="payment" 
-                      value="credit_card" 
-                      checked={paymentMethod === 'credit_card'} 
-                      onChange={() => setPaymentMethod('credit_card')}
-                      className="peer sr-only" 
-                    />
-                    <div className="p-3 text-center border border-slate-200 rounded-xl font-bold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors">
-                      Cartão de Crédito
-                    </div>
-                  </label>
+              {(campaign.accept_pix !== false || campaign.accept_card !== false) && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Forma de Pagamento</label>
+                  <div className="flex gap-4">
+                    {campaign.accept_pix !== false && (
+                      <label className="flex-1 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="payment" 
+                          value="pix" 
+                          checked={paymentMethod === 'pix'} 
+                          onChange={() => setPaymentMethod('pix')}
+                          className="peer sr-only" 
+                        />
+                        <div className="p-3 text-center border border-slate-200 rounded-xl font-bold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors">
+                          PIX ou Boleto
+                        </div>
+                      </label>
+                    )}
+                    {campaign.accept_card !== false && (
+                      <label className="flex-1 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="payment" 
+                          value="credit_card" 
+                          checked={paymentMethod === 'credit_card'} 
+                          onChange={() => setPaymentMethod('credit_card')}
+                          className="peer sr-only" 
+                        />
+                        <div className="p-3 text-center border border-slate-200 rounded-xl font-bold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors">
+                          Cartão de Crédito
+                        </div>
+                      </label>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-3 pt-2">
                 <button

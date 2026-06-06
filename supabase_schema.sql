@@ -423,3 +423,51 @@ CREATE TABLE store_order_items (
   unit_price DECIMAL(10,2) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 34. finance_categories (Categorias Financeiras)
+CREATE TABLE finance_categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  color TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 35. finance_transactions (Extrato Financeiro)
+CREATE TABLE finance_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  description TEXT NOT NULL,
+  amount NUMERIC(10, 2) NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  category_id TEXT REFERENCES finance_categories(id) ON DELETE SET NULL,
+  date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed')),
+  account TEXT NOT NULL,
+  expense_type TEXT CHECK (expense_type IN ('fixed', 'variable')),
+  recurrence TEXT CHECK (recurrence IN ('monthly', 'yearly', 'none')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default categories
+INSERT INTO finance_categories (id, name, type, color, icon) VALUES
+('cat_donation', 'Doações da Campanha', 'income', 'bg-emerald-100 text-emerald-600', 'Heart'),
+('cat_sponsorship', 'Apadrinhamento', 'income', 'bg-teal-100 text-teal-600', 'Users'),
+('cat_store', 'Vendas da Loja', 'income', 'bg-indigo-100 text-indigo-600', 'ShoppingBag'),
+('cat_salary', 'Pagamento de Pessoal', 'expense', 'bg-rose-100 text-rose-600', 'Briefcase'),
+('cat_office', 'Material de Escritório', 'expense', 'bg-orange-100 text-orange-600', 'Paperclip'),
+('cat_marketing', 'Marketing e Eventos', 'expense', 'bg-blue-100 text-blue-600', 'Megaphone');
+
+-- Habilitar Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE finance_transactions;
+ALTER PUBLICATION supabase_realtime ADD TABLE finance_categories;
+
+-- Adicionar configurações de pagamento nas campanhas (NOVO)
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS accept_pix BOOLEAN DEFAULT true;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS accept_card BOOLEAN DEFAULT true;
+
+-- Adicionar novos campos para templates de e-mail (Meus Reis style)
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS preheader TEXT;
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS heading TEXT;
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_text TEXT;
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_url TEXT;

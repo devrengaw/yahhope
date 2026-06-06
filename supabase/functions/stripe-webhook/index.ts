@@ -88,6 +88,17 @@ serve(async (req) => {
             current_amount: Number(currentCamp.current_amount) + amount
           }).eq('id', campaignId)
         }
+        
+        // Registrar também no Módulo Financeiro
+        await supabase.from('finance_transactions').insert({
+          description: `Doação via Stripe - ${donorName}`,
+          amount: amount,
+          type: 'income',
+          category_id: 'cat_donation',
+          status: 'completed',
+          account: 'Stripe',
+          date: new Date().toISOString()
+        })
       }
 
       // Send Thank You Email via Resend if email is available
@@ -99,7 +110,7 @@ serve(async (req) => {
           let body = `Olá {{nome_doador}},\n\nNós da YAH Hope queremos agradecer de todo o coração pela sua doação.\nO seu apoio é fundamental para continuarmos transformando vidas e levando esperança para quem mais precisa.\n\nCom gratidão,\nEquipe YAH Hope`;
 
           // Fetch Global Settings
-          let logoUrl = 'https://yahhope.org/Logo+icone.png';
+          let logoUrl = 'https://yahhope.com/Logo+icone.png';
           let primaryColor = '#F49853';
           
           const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single();
@@ -145,7 +156,7 @@ serve(async (req) => {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                from: 'YAH Hope <contato@yahhope.org>', // Replace with verified domain if needed
+                from: 'YAH Hope <contato@yahhope.com>', // Replace with verified domain if needed
                 to: donorEmail,
                 subject: subject,
                 html: htmlBody,

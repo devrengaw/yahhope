@@ -19,17 +19,36 @@ import {
   Edit2,
   Trash2
 } from 'lucide-react';
-import { mockTransactions, mockTransactionCategories, Transaction, TransactionCategory } from '../../lib/mockData';
+import { supabase } from '../../lib/supabase';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
 import { CategoryModal } from '../../components/admin/finance/CategoryModal';
 import { cn } from '../../lib/utils';
 
+export interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category_id?: string;
+  date: string;
+  status: 'pending' | 'completed';
+  account: string;
+  expense_type?: 'fixed' | 'variable';
+  recurrence?: 'monthly' | 'yearly' | 'none';
+}
+
+export interface TransactionCategory {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  color: string;
+  icon: string;
+}
+
 export function Finance() {
   const [activeTab, setActiveTab] = useState<'transactions' | 'categories'>('transactions');
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    [...mockTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  );
-  const [categories, setCategories] = useState<TransactionCategory[]>(mockTransactionCategories);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>([]);
   
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -38,6 +57,32 @@ export function Finance() {
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterExpenseType, setFilterExpenseType] = useState<'all' | 'fixed' | 'variable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchData = async () => {
+    try {
+      const [txRes, catRes] = await Promise.all([
+        supabase.from('finance_transactions').select('*').order('date', { ascending: false }),
+        supabase.from('finance_categories').select('*').order('name', { ascending: true })
+      ]);
+      if (txRes.data) setTransactions(txRes.data);
+      if (catRes.data) setCategories(catRes.data);
+    } catch (e) {
+      console.error('Error fetching finance data:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+
+    const channels = supabase.channel('finance-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_transactions' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_categories' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channels);
+    };
+  }, []);
 
   const stats = useMemo(() => {
     const income = transactions
@@ -73,35 +118,30 @@ export function Finance() {
     });
   }, [transactions, filterType, filterExpenseType, searchTerm]);
 
-  const handleSaveTransaction = (newTx: Omit<Transaction, 'id'>) => {
-    const transaction: Transaction = {
-      ...newTx,
-      id: Math.random().toString(36).substring(2, 9),
-    };
-    
-    const updated = [transaction, ...transactions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    
-    setTransactions(updated);
+  const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
+    const { error } = await supabase.from('finance_transactions').insert([newTx]);
+    if (error) {
+      console.error('Error saving transaction:', error);
+      alert('Erro ao salvar transação');
+    }
   };
 
-  const handleSaveCategory = (cat: Omit<TransactionCategory, 'id'> & { id?: string }) => {
+  const handleSaveCategory = async (cat: Omit<TransactionCategory, 'id'> & { id?: string }) => {
     if (cat.id) {
-      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, ...cat } as TransactionCategory : c));
+      const { error } = await supabase.from('finance_categories').update(cat).eq('id', cat.id);
+      if (error) alert('Erro ao atualizar categoria');
     } else {
-      const newCategory: TransactionCategory = {
-        ...cat,
-        id: Math.random().toString(36).substring(2, 9)
-      } as TransactionCategory;
-      setCategories(prev => [...prev, newCategory]);
+      const id = 'cat_' + Math.random().toString(36).substring(2, 9);
+      const { error } = await supabase.from('finance_categories').insert([{ ...cat, id }]);
+      if (error) alert('Erro ao criar categoria');
     }
     setEditingCategory(null);
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta categoria? Transações vinculadas a ela não serão excluídas, mas perderão a referência.')) {
-      setCategories(prev => prev.filter(c => c.id !== id));
+      const { error } = await supabase.from('finance_categories').delete().eq('id', id);
+      if (error) alert('Erro ao excluir categoria');
     }
   };
 

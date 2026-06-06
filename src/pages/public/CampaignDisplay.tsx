@@ -27,7 +27,7 @@ export function CampaignDisplay() {
 
       <div className="w-full max-w-7xl mx-auto z-10 flex flex-col items-center justify-center flex-shrink-0 mt-4 mb-16">
         <h1 className="font-heading text-5xl md:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-110">
-          Envolva-se
+          Participe
         </h1>
       </div>
 

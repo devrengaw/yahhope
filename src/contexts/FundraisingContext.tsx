@@ -15,6 +15,8 @@ export interface Campaign {
   target_amount: number;
   current_amount: number;
   milestones: CampaignMilestone[];
+  accept_pix?: boolean;
+  accept_card?: boolean;
 }
 
 export interface Donation {
@@ -83,7 +85,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           description: campaignData.description || '',
           target_amount: campaignData.target_amount,
           current_amount: campaignData.current_amount || 0,
-          milestones: milestonesData || []
+          milestones: milestonesData || [],
+          accept_pix: campaignData.accept_pix ?? true,
+          accept_card: campaignData.accept_card ?? true
         });
 
         // Fetch recent donations for this campaign
@@ -139,7 +143,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           title: updates.title,
           description: updates.description,
           target_amount: updates.target_amount,
-          current_amount: updates.current_amount
+          current_amount: updates.current_amount,
+          accept_pix: updates.accept_pix,
+          accept_card: updates.accept_card
         })
         .eq('id', campaign.id);
         

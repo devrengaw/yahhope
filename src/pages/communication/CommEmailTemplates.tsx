@@ -1,27 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart } from 'lucide-react';
+import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart, Eye } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import { RichTextEditor } from '../../components/admin/communication/RichTextEditor';
 
 type TemplateType = 'donation_thank_you' | 'accountability';
+
+interface EmailTemplate {
+  subject: string;
+  preheader: string;
+  heading: string;
+  body: string;
+  cta_text: string;
+  cta_url: string;
+}
 
 export function CommEmailTemplates() {
   const [activeTab, setActiveTab] = useState<'settings' | TemplateType>('settings');
   const [isSaved, setIsSaved] = useState(false);
 
   // Global Settings State
-  const [logoUrl, setLogoUrl] = useState('https://yahhope.org/Logo+icone.png');
+  const [logoUrl, setLogoUrl] = useState('https://yahhope.com/Logo+icone.png');
   const [primaryColor, setPrimaryColor] = useState('#F49853');
 
   // Templates State
-  const [templates, setTemplates] = useState<Record<TemplateType, { subject: string, body: string }>>({
+  const [templates, setTemplates] = useState<Record<TemplateType, EmailTemplate>>({
     donation_thank_you: {
       subject: 'Obrigado pela sua doação! 🧡',
-      body: `Olá {{nome_doador}},\n\nNós da YAH Hope queremos agradecer de todo o coração pela sua doação. \nO seu apoio é fundamental para continuarmos transformando vidas e levando esperança para quem mais precisa.\n\nCom gratidão,\nEquipe YAH Hope`
+      preheader: 'Sua doação ajuda a transformar vidas.',
+      heading: 'Obrigado pela sua doação!',
+      body: `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua doação. O seu apoio é fundamental para continuarmos transformando vidas e levando esperança para quem mais precisa.</p><p><br></p><p>Com gratidão,<br>Equipe YAH Hope</p>`,
+      cta_text: 'Acessar meu portal',
+      cta_url: 'https://yahhope.com/login'
     },
     accountability: {
       subject: 'Prestação de Contas: Veja o impacto da sua doação!',
-      body: `Olá {{nome_doador}},\n\nÉ com muita alegria que compartilhamos os resultados alcançados neste mês graças ao seu apoio contínuo.\n\nAtravés da sua doação, conseguimos prover centenas de refeições e viabilizar atendimentos médicos essenciais para a nossa comunidade.\n\nAcesse o portal do apoiador para conferir o relatório completo de impacto.\n\nObrigado por fazer a diferença!\nEquipe YAH Hope`
+      preheader: 'Relatório mensal de transparência.',
+      heading: 'Nosso Impacto Mensal',
+      body: `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>É com muita alegria que compartilhamos os resultados alcançados neste mês graças ao seu apoio contínuo.</p><p>Através da sua doação, conseguimos prover centenas de refeições e viabilizar atendimentos médicos essenciais para a nossa comunidade.</p><p><br></p><p>Obrigado por fazer a diferença!<br>Equipe YAH Hope</p>`,
+      cta_text: 'Ver Relatório Completo',
+      cta_url: 'https://yahhope.com/relatorio'
     }
   });
 
@@ -45,8 +63,12 @@ export function CommEmailTemplates() {
           templatesData.forEach(t => {
             if (t.name === 'donation_thank_you' || t.name === 'accountability') {
               newTemplates[t.name] = {
-                subject: t.subject,
-                body: t.body
+                subject: t.subject || prev[t.name].subject,
+                preheader: t.preheader || prev[t.name].preheader,
+                heading: t.heading || prev[t.name].heading,
+                body: t.body || prev[t.name].body,
+                cta_text: t.cta_text || prev[t.name].cta_text,
+                cta_url: t.cta_url || prev[t.name].cta_url,
               };
             }
           });
@@ -60,7 +82,6 @@ export function CommEmailTemplates() {
 
   const handleSave = async () => {
     try {
-      // Upsert settings (assuming ID 1 for single row)
       await supabase.from('email_settings').upsert({
         id: '1',
         logo_url: logoUrl,
@@ -68,18 +89,25 @@ export function CommEmailTemplates() {
         updated_at: new Date().toISOString()
       });
 
-      // Upsert templates
       await supabase.from('email_templates').upsert([
         {
           name: 'donation_thank_you',
           subject: templates.donation_thank_you.subject,
+          preheader: templates.donation_thank_you.preheader,
+          heading: templates.donation_thank_you.heading,
           body: templates.donation_thank_you.body,
+          cta_text: templates.donation_thank_you.cta_text,
+          cta_url: templates.donation_thank_you.cta_url,
           updated_at: new Date().toISOString()
         },
         {
           name: 'accountability',
           subject: templates.accountability.subject,
+          preheader: templates.accountability.preheader,
+          heading: templates.accountability.heading,
           body: templates.accountability.body,
+          cta_text: templates.accountability.cta_text,
+          cta_url: templates.accountability.cta_url,
           updated_at: new Date().toISOString()
         }
       ], { onConflict: 'name' });
@@ -92,7 +120,7 @@ export function CommEmailTemplates() {
     }
   };
 
-  const updateTemplate = (type: TemplateType, field: 'subject' | 'body', value: string) => {
+  const updateTemplate = (type: TemplateType, field: keyof EmailTemplate, value: string) => {
     setTemplates(prev => ({
       ...prev,
       [type]: {
@@ -102,16 +130,18 @@ export function CommEmailTemplates() {
     }));
   };
 
+  const currentTemplate = activeTab !== 'settings' ? templates[activeTab as TemplateType] : null;
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20">
+    <div className="max-w-[1400px] mx-auto space-y-8 pb-20">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Mail className="text-indigo-500" size={32} />
-            E-mails Automatizados
+            Editor de E-mails
           </h1>
           <p className="text-slate-500 mt-2 font-medium">
-            Gerencie a identidade visual e os textos dos e-mails enviados pelo sistema.
+            Gerencie e personalize os e-mails enviados pelo sistema.
           </p>
         </div>
         <button
@@ -126,91 +156,88 @@ export function CommEmailTemplates() {
           {isSaved ? (
             <><CheckCircle2 size={20} /> Salvo com sucesso!</>
           ) : (
-            <><Save size={20} /> Salvar Alterações</>
+            <><Save size={20} /> Salvar Template de E-mail</>
           )}
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Menu */}
-        <div className="w-full lg:w-72 shrink-0 space-y-2">
-          <div className="text-xs font-black text-slate-400 uppercase tracking-widest px-4 mb-4">Configurações</div>
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+        
+        {/* COLUNA 1: Lista de Templates */}
+        <div className="w-full lg:w-64 shrink-0 bg-white rounded-3xl border border-slate-100 p-4 shadow-sm h-fit">
+          <div className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest px-2 mb-4">
+            <Settings size={14} /> Lista de Templates
+          </div>
+          
           <button
             onClick={() => setActiveTab('settings')}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left",
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left text-sm",
               activeTab === 'settings' 
                 ? "bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100" 
                 : "text-slate-600 hover:bg-slate-50 border border-transparent"
             )}
           >
-            <Settings size={20} className={activeTab === 'settings' ? "text-indigo-500" : "text-slate-400"} />
-            Identidade Visual
+            <Palette size={18} className={activeTab === 'settings' ? "text-indigo-500" : "text-slate-400"} />
+            Marca e Visual
           </button>
 
-          <div className="text-xs font-black text-slate-400 uppercase tracking-widest px-4 mb-4 mt-8">Modelos de E-mail</div>
+          <div className="my-4 border-t border-slate-100"></div>
+
           <button
             onClick={() => setActiveTab('donation_thank_you')}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left",
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left text-sm",
               activeTab === 'donation_thank_you' 
                 ? "bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100" 
                 : "text-slate-600 hover:bg-slate-50 border border-transparent"
             )}
           >
-            <Heart size={20} className={activeTab === 'donation_thank_you' ? "text-rose-500" : "text-slate-400"} />
+            <Heart size={18} className={activeTab === 'donation_thank_you' ? "text-rose-500" : "text-slate-400"} />
             Agradecimento de Doação
           </button>
           
           <button
             onClick={() => setActiveTab('accountability')}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left mt-2",
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left text-sm mt-1",
               activeTab === 'accountability' 
                 ? "bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100" 
                 : "text-slate-600 hover:bg-slate-50 border border-transparent"
             )}
           >
-            <LayoutTemplate size={20} className={activeTab === 'accountability' ? "text-blue-500" : "text-slate-400"} />
+            <LayoutTemplate size={18} className={activeTab === 'accountability' ? "text-blue-500" : "text-slate-400"} />
             Prestação de Contas
           </button>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden min-h-[500px]">
-          
-          {/* Settings Tab */}
-          {activeTab === 'settings' && (
+        {/* COLUNA 2: Campos do Template */}
+        <div className="flex-1 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+          {activeTab === 'settings' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="p-8 border-b border-slate-100 bg-slate-50/50">
-                <h2 className="text-xl font-black text-slate-900">Identidade Visual (Global)</h2>
-                <p className="text-sm text-slate-500 font-medium mt-1">Essas configurações serão aplicadas no cabeçalho de todos os e-mails enviados.</p>
+              <div className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest mb-6">
+                <Palette size={14} /> Identidade Visual
               </div>
-              <div className="p-8 space-y-8">
-                <label className="block max-w-2xl">
-                  <span className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-widest mb-2">
-                    <ImageIcon size={16} className="text-indigo-500" />
-                    URL da Logomarca
+              
+              <div className="space-y-6">
+                <label className="block">
+                  <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
+                    <ImageIcon size={16} className="text-slate-400" />
+                    URL da Logomarca (PNG)
                   </span>
                   <input
                     type="url"
                     value={logoUrl}
                     onChange={(e) => setLogoUrl(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                     placeholder="https://..."
                   />
-                  {logoUrl && (
-                    <div className="mt-4 p-4 border border-slate-200 rounded-xl bg-slate-50 inline-block">
-                      <p className="text-xs text-slate-400 font-bold mb-2 uppercase">Preview da Logo</p>
-                      <img src={logoUrl} alt="Logo Preview" className="h-12 object-contain" />
-                    </div>
-                  )}
                 </label>
 
-                <label className="block max-w-sm">
-                  <span className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-widest mb-2">
-                    <Palette size={16} className="text-indigo-500" />
-                    Cor Principal (Hex)
+                <label className="block">
+                  <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
+                    <Palette size={16} className="text-slate-400" />
+                    Cor da Marca
                   </span>
                   <div className="flex items-center gap-3">
                     <div 
@@ -221,66 +248,171 @@ export function CommEmailTemplates() {
                       type="text"
                       value={primaryColor}
                       onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all uppercase"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
                       placeholder="#F49853"
                     />
                   </div>
                 </label>
               </div>
             </div>
-          )}
-
-          {/* Template Tabs */}
-          {(activeTab === 'donation_thank_you' || activeTab === 'accountability') && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
-              <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
-                <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
-                  activeTab === 'donation_thank_you' ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
-                )}>
-                  {activeTab === 'donation_thank_you' ? <Heart size={24} /> : <FileText size={24} />}
+          ) : (
+            currentTemplate && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest mb-6">
+                  <LayoutTemplate size={14} /> Campos do Template
                 </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">
-                    {activeTab === 'donation_thank_you' ? 'Agradecimento de Doação' : 'Prestação de Contas Mensal'}
-                  </h2>
-                  <p className="text-sm text-slate-500 font-medium">
-                    {activeTab === 'donation_thank_you' 
-                      ? 'Enviado automaticamente após a confirmação de um pagamento no Stripe.' 
-                      : 'Enviado em lote pelo módulo Financeiro para atualizar os doadores.'}
-                  </p>
-                </div>
-              </div>
 
-              <div className="p-8 space-y-6 flex-1">
-                <label className="block">
-                  <span className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-2 block">Assunto do E-mail</span>
-                  <input
-                    type="text"
-                    value={templates[activeTab].subject}
-                    onChange={(e) => updateTemplate(activeTab, 'subject', e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                  />
-                </label>
+                <div className="space-y-5">
+                  <label className="block">
+                    <span className="block text-sm font-bold text-slate-700 mb-1.5">Assunto (Subject)</span>
+                    <input
+                      type="text"
+                      value={currentTemplate.subject}
+                      onChange={(e) => updateTemplate(activeTab, 'subject', e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                    />
+                  </label>
 
-                <label className="block flex-1">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-bold text-slate-700 uppercase tracking-widest">Corpo da Mensagem</span>
-                    <span className="text-xs text-slate-400 font-medium bg-slate-100 px-2 py-1 rounded-md">
-                      Use <strong className="text-indigo-500 font-bold">{'{{nome_doador}}'}</strong> para o nome
-                    </span>
+                  <label className="block">
+                    <span className="block text-sm font-bold text-slate-700 mb-1.5">Texto de Apoio (Preheader)</span>
+                    <input
+                      type="text"
+                      value={currentTemplate.preheader}
+                      onChange={(e) => updateTemplate(activeTab, 'preheader', e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm font-bold text-slate-700 mb-1.5">Título Interno (Heading)</span>
+                    <input
+                      type="text"
+                      value={currentTemplate.heading}
+                      onChange={(e) => updateTemplate(activeTab, 'heading', e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                    />
+                  </label>
+
+                  <div className="block">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="block text-sm font-bold text-slate-700">Corpo do Email</span>
+                    </div>
+                    <RichTextEditor 
+                      value={currentTemplate.body}
+                      onChange={(val) => updateTemplate(activeTab, 'body', val)}
+                    />
+                    
+                    <div className="mt-3">
+                      <p className="text-xs font-bold text-rose-500 flex items-center gap-1 mb-2">
+                        📌 Variáveis disponíveis (clique para copiar):
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {['{{nome_doador}}', '{{valor_doacao}}', '{{data}}'].map(v => (
+                          <button 
+                            key={v}
+                            onClick={() => navigator.clipboard.writeText(v)}
+                            className="text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full transition-colors border border-slate-200 cursor-pointer"
+                            title="Copiar variável"
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <textarea
-                    value={templates[activeTab].body}
-                    onChange={(e) => updateTemplate(activeTab, 'body', e.target.value)}
-                    rows={12}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
-                  />
-                </label>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="block text-sm font-bold text-slate-700 mb-1.5">Texto do Botão CTA</span>
+                      <input
+                        type="text"
+                        value={currentTemplate.cta_text}
+                        onChange={(e) => updateTemplate(activeTab, 'cta_text', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-bold text-slate-700 mb-1.5">Link do Botão (URL)</span>
+                      <input
+                        type="text"
+                        value={currentTemplate.cta_url}
+                        onChange={(e) => updateTemplate(activeTab, 'cta_url', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
+
+        {/* COLUNA 3: Visualização (Preview) */}
+        <div className="w-full lg:w-[450px] shrink-0 bg-slate-50/50 rounded-3xl border border-slate-100 p-6 shadow-inner flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
+              <Eye size={14} /> Visualização do Template
+            </div>
+            <div className="flex bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm">
+              <button className="px-3 py-1 text-xs font-bold bg-slate-100 text-slate-900 rounded-md">Visualização</button>
+              <button className="px-3 py-1 text-xs font-bold text-slate-400 hover:text-slate-600 rounded-md">Código</button>
+            </div>
+          </div>
+
+          <div className="flex-1 bg-slate-100 rounded-2xl p-4 md:p-8 flex items-start justify-center overflow-y-auto">
+            {/* Corpo do E-mail (Preview) */}
+            <div className="w-full max-w-sm bg-white rounded-xl shadow-md overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+              
+              {/* Header */}
+              <div className="px-8 py-10 flex justify-center border-b border-slate-100">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-10 object-contain" />
+                ) : (
+                  <div className="text-xl font-black text-slate-900 tracking-widest">LOGOTIPO</div>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="px-8 py-10 text-slate-600 text-sm leading-relaxed">
+                {currentTemplate?.heading && (
+                  <h1 
+                    className="text-xl font-extrabold mb-6"
+                    style={{ color: primaryColor }}
+                  >
+                    {currentTemplate.heading}
+                  </h1>
+                )}
+
+                <div 
+                  className="prose prose-sm prose-slate max-w-none"
+                  dangerouslySetInnerHTML={{ __html: currentTemplate?.body || '<p>O corpo do email aparecerá aqui...</p>' }}
+                />
+
+                {currentTemplate?.cta_text && (
+                  <div className="mt-8 text-center md:text-left">
+                    <a
+                      href={currentTemplate.cta_url || '#'}
+                      className="inline-block px-6 py-3 rounded-lg font-bold text-white text-sm transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {currentTemplate.cta_text}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-400">
+                  © {new Date().getFullYear()} YAH Hope. Todos os direitos reservados.
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </div>
   );
