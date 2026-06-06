@@ -1,4 +1,28 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "yahhope.org"
+        }
+      ],
+      "destination": "https://yahhope.com/campanha",
+      "permanent": false
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.yahhope.org"
+        }
+      ],
+      "destination": "https://yahhope.com/campanha",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
