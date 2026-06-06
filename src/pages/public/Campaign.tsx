@@ -23,6 +23,27 @@ export function Campaign() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  const handleCustomAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove tudo que não é número
+    const value = e.target.value.replace(/\D/g, '');
+    
+    if (!value) {
+      setCustomAmount('');
+      return;
+    }
+
+    // Divide por 100 para criar os centavos
+    const numericValue = parseInt(value, 10) / 100;
+    
+    // Formata no padrão brasileiro (1.000,00)
+    const formatted = numericValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    
+    setCustomAmount(formatted);
+  };
+
   React.useEffect(() => {
     if (campaign.accept_pix === false && campaign.accept_card !== false) {
       setPaymentMethod('credit_card');
@@ -35,7 +56,14 @@ export function Campaign() {
 
   const handleDonate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalAmount = isCustom ? parseFloat(customAmount) : selectedAmount;
+    
+    let finalAmount = selectedAmount;
+    if (isCustom) {
+      // Converte a string mascarada (ex: "1.234,50") de volta para número float (1234.50)
+      const numericString = customAmount.replace(/\./g, '').replace(',', '.');
+      finalAmount = parseFloat(numericString);
+    }
+
     if (!finalAmount || isNaN(finalAmount)) return;
 
     setIsLoading(true);
@@ -301,12 +329,11 @@ export function Campaign() {
                       <div className="mt-2 relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">R$</span>
                         <input 
-                          type="number"
-                          step="0.01"
-                          min="1.00"
+                          type="text"
+                          inputMode="numeric"
                           value={customAmount}
-                          onChange={(e) => setCustomAmount(e.target.value)}
-                          placeholder="0.00"
+                          onChange={handleCustomAmountChange}
+                          placeholder="0,00"
                           className="w-full pl-10 pr-4 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-lg font-black"
                           onClick={(e) => e.stopPropagation()}
                         />
