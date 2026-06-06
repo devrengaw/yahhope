@@ -22,6 +22,7 @@ export function CommEmailTemplates() {
 
   // Global Settings State
   const [logoUrl, setLogoUrl] = useState('https://yahhope.com/Logo+icone.png');
+  const [logoLinkUrl, setLogoLinkUrl] = useState('https://yahhope.com');
   const [primaryColor, setPrimaryColor] = useState('#F49853');
 
   // Templates State
@@ -56,6 +57,7 @@ export function CommEmailTemplates() {
       if (settingsData && settingsData.length > 0) {
         const set = settingsData[0];
         if (set.logo_url) setLogoUrl(set.logo_url);
+        if (set.logo_link_url) setLogoLinkUrl(set.logo_link_url);
         if (set.primary_color) setPrimaryColor(set.primary_color);
       }
 
@@ -89,6 +91,7 @@ export function CommEmailTemplates() {
       const { error: settingsErr } = await supabase.from('email_settings').upsert({
         id: '00000000-0000-0000-0000-000000000001',
         logo_url: logoUrl,
+        logo_link_url: logoLinkUrl,
         primary_color: primaryColor,
         updated_at: new Date().toISOString()
       });
@@ -261,10 +264,21 @@ export function CommEmailTemplates() {
                       value={logoUrl}
                       onChange={(e) => setLogoUrl(e.target.value)}
                       className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
-                      placeholder="Ex: https://yahhope.com/logo.png"
+                      placeholder="URL da Imagem (Ex: https://yahhope.com/logo.png)"
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-2">Cole o link da imagem (Evite upload direto para não pesar o email no Gmail).</p>
+                  <p className="text-xs text-slate-500 mt-2 mb-4">Cole o link da imagem (Evite upload direto para não pesar o email no Gmail).</p>
+
+                  <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2 mt-4">
+                    Link de Destino da Logo (Opcional)
+                  </span>
+                  <input 
+                    type="text" 
+                    value={logoLinkUrl}
+                    onChange={(e) => setLogoLinkUrl(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                    placeholder="Para onde o usuário vai ao clicar na logo? (Ex: https://yahhope.com)"
+                  />
                 </label>
 
                 <label className="block">

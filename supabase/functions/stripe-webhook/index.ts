@@ -111,11 +111,13 @@ serve(async (req) => {
 
           // Fetch Global Settings
           let logoUrl = 'https://yahhope.com/Logo+icone.png';
+          let logoLinkUrl = 'https://yahhope.com';
           let primaryColor = '#F49853';
           
           const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single();
           if (settings) {
             if (settings.logo_url) logoUrl = settings.logo_url;
+            if (settings.logo_link_url) logoLinkUrl = settings.logo_link_url;
             if (settings.primary_color) primaryColor = settings.primary_color;
           }
 
@@ -136,7 +138,9 @@ serve(async (req) => {
           const htmlBody = `
             <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; color: #333;">
               <div style="text-align: center; padding: 20px; border-bottom: 2px solid ${primaryColor};">
-                <img src="${logoUrl}" alt="YAH Hope Logo" style="max-height: 60px;" />
+                <a href="${logoLinkUrl}" target="_blank" style="text-decoration: none;">
+                  <img src="${logoUrl}" alt="YAH Hope Logo" style="max-height: 60px; border: none;" />
+                </a>
               </div>
               <div style="padding: 30px 20px; line-height: 1.6; white-space: pre-wrap;">
                 ${finalBody}
