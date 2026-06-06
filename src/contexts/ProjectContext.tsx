@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, mockProjects, ProjectTask, ColumnDefinition, ColumnType, PersonalActivity } from '../lib/mockData';
+import { supabase } from '../lib/supabase';
 
 interface ProjectContextType {
   projects: Project[];
@@ -26,45 +27,96 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_projects';
-const ACTIVITIES_KEY = 'yah_hope_activities';
-
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.length > 0 && !parsed[0].columns) {
-        return mockProjects;
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activities, setActivities] = useState<PersonalActivity[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const { data: projData } = await supabase.from('projects').select('*');
+      const { data: taskData } = await supabase.from('project_tasks').select('*');
+      
+      if (projData) {
+        const formattedProjects: Project[] = projData.map(p => {
+          const pTasks = taskData ? taskData.filter(t => t.project_id === p.id) : [];
+          
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description || '',
+            status: p.status as any,
+            progress: 0,
+            start_date: p.start_date || '',
+            end_date: p.end_date || '',
+            budget: p.budget || 0,
+            isPrivate: false,
+            category: 'Geral',
+            priority: 'medium',
+            invitees: [],
+            columns: [],
+            tasks: pTasks.map(t => ({
+              id: t.id,
+              title: t.title,
+              description: t.description || '',
+              status: t.status as any,
+              cost: t.cost || 0,
+              subtasks: [],
+              invitees: [],
+              priority: t.priority as any,
+              values: {}
+            }))
+          };
+        });
+        setProjects(formattedProjects);
       }
-      return parsed;
+      setIsLoaded(true);
+    } catch (e) {
+      console.error('Error fetching projects', e);
     }
-    return mockProjects;
-  });
-
-  const [activities, setActivities] = useState<PersonalActivity[]>(() => {
-    const saved = localStorage.getItem(ACTIVITIES_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
-  }, [activities]);
-
-  const addProject = (project: Project) => {
-    setProjects(prev => [...prev, project]);
   };
 
-  const updateProject = (id: string, updates: Partial<Project>) => {
+  const addProject = async (project: Project) => {
+    const tempId = project.id || Math.random().toString();
+    setProjects(prev => [...prev, { ...project, id: tempId }]);
+
+    const { data } = await supabase.from('projects').insert({
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      start_date: project.start_date || null,
+      end_date: project.end_date || null,
+      budget: project.budget
+    }).select().single();
+
+    if (data) {
+      setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p));
+    }
+  };
+
+  const updateProject = async (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    if (id.length > 10) {
+      await supabase.from('projects').update({
+        name: updates.name,
+        description: updates.description,
+        status: updates.status,
+        start_date: updates.start_date || null,
+        end_date: updates.end_date || null,
+        budget: updates.budget
+      }).eq('id', id);
+    }
   };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
+    if (id.length > 10) {
+      await supabase.from('projects').delete().eq('id', id);
+    }
   };
 
   const addActivity = (activity: PersonalActivity) => {
@@ -78,7 +130,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const addColumn = (projectId: string, column: ColumnDefinition) => {
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
-        return { ...p, columns: [...p.columns, column] };
+        return { ...p, columns: [...(p.columns || []), column] };
       }
       return p;
     }));
@@ -86,7 +138,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const updateColumn = (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => {
     setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
+      if (p.id === projectId && p.columns) {
         return {
           ...p,
           columns: p.columns.map(c => c.id === columnId ? { ...c, ...updates } : c)
@@ -98,14 +150,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const deleteColumn = (projectId: string, columnId: string) => {
     setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
+      if (p.id === projectId && p.columns) {
         return {
           ...p,
           columns: p.columns.filter(c => c.id !== columnId),
-          // Also clean up task values for this column
           tasks: p.tasks.map(t => {
-            const { [columnId]: removed, ...rest } = t.values;
-            return { ...t, values: rest };
+            const newValues = { ...t.values };
+            delete newValues[columnId];
+            return { ...t, values: newValues };
           })
         };
       }
@@ -113,16 +165,37 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const addTask = (projectId: string, task: ProjectTask) => {
+  const addTask = async (projectId: string, task: ProjectTask) => {
+    const tempId = task.id || Math.random().toString();
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
-        return { ...p, tasks: [...(p.tasks || []), task] };
+        return { ...p, tasks: [...(p.tasks || []), { ...task, id: tempId }] };
       }
       return p;
     }));
+
+    if (projectId.length > 10) {
+      const { data } = await supabase.from('project_tasks').insert({
+        project_id: projectId,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        cost: task.cost
+      }).select().single();
+
+      if (data) {
+        setProjects(prev => prev.map(p => {
+          if (p.id === projectId) {
+            return { ...p, tasks: p.tasks.map(t => t.id === tempId ? { ...t, id: data.id } : t) };
+          }
+          return p;
+        }));
+      }
+    }
   };
 
-  const updateTask = (projectId: string, taskId: string, updates: Partial<ProjectTask>) => {
+  const updateTask = async (projectId: string, taskId: string, updates: Partial<ProjectTask>) => {
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
         return {
@@ -132,6 +205,16 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       return p;
     }));
+
+    if (taskId.length > 10) {
+      await supabase.from('project_tasks').update({
+        title: updates.title,
+        description: updates.description,
+        status: updates.status,
+        priority: updates.priority,
+        cost: updates.cost
+      }).eq('id', taskId);
+    }
   };
 
   const updateTaskValue = (projectId: string, taskId: string, columnId: string, value: any) => {
@@ -149,7 +232,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const deleteTask = (projectId: string, taskId: string) => {
+  const deleteTask = async (projectId: string, taskId: string) => {
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
         return {
@@ -159,6 +242,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       return p;
     }));
+    
+    if (taskId.length > 10) {
+      await supabase.from('project_tasks').delete().eq('id', taskId);
+    }
   };
 
   return (

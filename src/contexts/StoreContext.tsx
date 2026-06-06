@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { StoreProduct } from '../pages/admin/AdminStoreManager';
+import { supabase } from '../lib/supabase';
 
 interface StoreContextType {
   products: StoreProduct[];
@@ -8,71 +9,73 @@ interface StoreContextType {
   deleteProduct: (id: string) => void;
 }
 
-const mockProducts: StoreProduct[] = [
-  {
-    id: '1',
-    name: 'Camiseta YAH Hope',
-    description: '100% Algodão, edição limitada da campanha de nutrição.',
-    cost_price: 25.00,
-    sale_price: 59.90,
-    stock_quantity: 50,
-    image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80',
-    category: 'Vestuário',
-    status: 'active'
-  },
-  {
-    id: '2',
-    name: 'Cesta Básica Completa',
-    description: 'Doe uma cesta básica que alimentará uma família por 1 mês.',
-    cost_price: 150.00,
-    sale_price: 150.00,
-    stock_quantity: 999,
-    image_url: 'https://images.unsplash.com/photo-1584285404535-717013fcbd38?w=800&q=80',
-    category: 'Doação Direta',
-    status: 'active'
-  },
-  {
-    id: '3',
-    name: 'Caderno YAH Hope',
-    description: 'Caderno de anotações exclusivo. Toda renda revertida para a escola.',
-    cost_price: 10.00,
-    sale_price: 35.00,
-    stock_quantity: 120,
-    image_url: 'https://images.unsplash.com/photo-1531346878377-a544e36049a5?w=800&q=80',
-    category: 'Papelaria',
-    status: 'active'
-  }
-];
-
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<StoreProduct[]>(() => {
-    const saved = localStorage.getItem('yah_store_products');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return mockProducts;
-      }
-    }
-    return mockProducts;
-  });
+  const [products, setProducts] = useState<StoreProduct[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('yah_store_products', JSON.stringify(products));
-  }, [products]);
+    fetchProducts();
+  }, []);
 
-  const addProduct = (product: StoreProduct) => {
-    setProducts(prev => [product, ...prev]);
+  const fetchProducts = async () => {
+    try {
+      const { data } = await supabase.from('store_products').select('*').order('created_at', { ascending: false });
+      if (data) {
+        setProducts(data as StoreProduct[]);
+      }
+    } catch (e) {
+      console.error('Error fetching store products', e);
+    }
   };
 
-  const updateProduct = (product: StoreProduct) => {
+  const addProduct = async (product: StoreProduct) => {
+    const tempId = product.id || Math.random().toString();
+    setProducts(prev => [{ ...product, id: tempId }, ...prev]);
+
+    try {
+      const { data } = await supabase.from('store_products').insert({
+        name: product.name,
+        description: product.description,
+        cost_price: product.cost_price,
+        sale_price: product.sale_price,
+        stock_quantity: product.stock_quantity,
+        image_url: product.image_url,
+        category: product.category,
+        status: product.status
+      }).select().single();
+
+      if (data) {
+        setProducts(prev => prev.map(p => p.id === tempId ? data : p));
+      }
+    } catch (e) {
+      console.error('Error adding product', e);
+      fetchProducts();
+    }
+  };
+
+  const updateProduct = async (product: StoreProduct) => {
     setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+
+    if (product.id.length > 10) {
+      await supabase.from('store_products').update({
+        name: product.name,
+        description: product.description,
+        cost_price: product.cost_price,
+        sale_price: product.sale_price,
+        stock_quantity: product.stock_quantity,
+        image_url: product.image_url,
+        category: product.category,
+        status: product.status
+      }).eq('id', product.id);
+    }
   };
 
-  const deleteProduct = (id: string) => {
+  const deleteProduct = async (id: string) => {
     setProducts(prev => prev.filter(p => p.id !== id));
+    if (id.length > 10) {
+      await supabase.from('store_products').delete().eq('id', id);
+    }
   };
 
   return (

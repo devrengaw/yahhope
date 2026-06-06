@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 type TemplateType = 'donation_thank_you' | 'accountability';
 
@@ -24,39 +25,71 @@ export function CommEmailTemplates() {
     }
   });
 
-  // Load from local storage for mock
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem('yah_hope_email_settings');
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        if (parsed) {
-          if (parsed.logoUrl) setLogoUrl(parsed.logoUrl);
-          if (parsed.primaryColor) setPrimaryColor(parsed.primaryColor);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing email settings', e);
-    }
-
-    try {
-      const savedTemplates = localStorage.getItem('yah_hope_email_templates');
-      if (savedTemplates) {
-        const parsed = JSON.parse(savedTemplates);
-        if (parsed && typeof parsed === 'object' && parsed.donation_thank_you) {
-          setTemplates(parsed);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing email templates', e);
-    }
+    fetchData();
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem('yah_hope_email_settings', JSON.stringify({ logoUrl, primaryColor }));
-    localStorage.setItem('yah_hope_email_templates', JSON.stringify(templates));
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  const fetchData = async () => {
+    try {
+      const { data: settingsData } = await supabase.from('email_settings').select('*');
+      if (settingsData && settingsData.length > 0) {
+        const set = settingsData[0];
+        if (set.logo_url) setLogoUrl(set.logo_url);
+        if (set.primary_color) setPrimaryColor(set.primary_color);
+      }
+
+      const { data: templatesData } = await supabase.from('email_templates').select('*');
+      if (templatesData && templatesData.length > 0) {
+        setTemplates(prev => {
+          const newTemplates = { ...prev };
+          templatesData.forEach(t => {
+            if (t.name === 'donation_thank_you' || t.name === 'accountability') {
+              newTemplates[t.name] = {
+                subject: t.subject,
+                body: t.body
+              };
+            }
+          });
+          return newTemplates;
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching email settings', e);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      // Upsert settings (assuming ID 1 for single row)
+      await supabase.from('email_settings').upsert({
+        id: '1',
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+        updated_at: new Date().toISOString()
+      });
+
+      // Upsert templates
+      await supabase.from('email_templates').upsert([
+        {
+          name: 'donation_thank_you',
+          subject: templates.donation_thank_you.subject,
+          body: templates.donation_thank_you.body,
+          updated_at: new Date().toISOString()
+        },
+        {
+          name: 'accountability',
+          subject: templates.accountability.subject,
+          body: templates.accountability.body,
+          updated_at: new Date().toISOString()
+        }
+      ], { onConflict: 'name' });
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (e) {
+      console.error('Error saving email settings', e);
+      alert('Erro ao salvar as configurações.');
+    }
   };
 
   const updateTemplate = (type: TemplateType, field: 'subject' | 'body', value: string) => {

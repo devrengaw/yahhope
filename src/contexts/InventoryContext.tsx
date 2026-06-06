@@ -1,71 +1,233 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { mockInventory, InventoryItem, mockKits, Kit, InventoryCategory, mockInventoryCategories, InventoryTransaction } from '../lib/mockData';
+import { InventoryItem, Kit, InventoryCategory, InventoryTransaction } from '../lib/mockData';
+import { supabase } from '../lib/supabase';
 
 interface InventoryContextType {
   items: InventoryItem[];
   kits: Kit[];
   categories: InventoryCategory[];
   transactions: InventoryTransaction[];
+  
+  // Expose these for backwards compatibility with UI that hasn't been migrated yet,
+  // but ideally UI should use the explicit CRUD below.
   setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
   setKits: React.Dispatch<React.SetStateAction<Kit[]>>;
   setCategories: React.Dispatch<React.SetStateAction<InventoryCategory[]>>;
   setTransactions: React.Dispatch<React.SetStateAction<InventoryTransaction[]>>;
+  
+  addItem: (item: InventoryItem) => void;
+  updateItem: (id: string, updates: Partial<InventoryItem>) => void;
+  deleteItem: (id: string) => void;
+  
+  addKit: (kit: Kit) => void;
+  updateKit: (id: string, updates: Partial<Kit>) => void;
+  deleteKit: (id: string) => void;
+
   deductKitFromInventory: (kitId: string, patientId?: string) => void;
   addTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const STORAGE_KEY_ITEMS = 'yah_hope_inventory_items';
-const STORAGE_KEY_KITS = 'yah_hope_inventory_kits';
-
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_ITEMS);
-    return saved ? JSON.parse(saved) : mockInventory;
-  });
-
-  const [kits, setKits] = useState<Kit[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_KITS);
-    return saved ? JSON.parse(saved) : mockKits;
-  });
-
-  const STORAGE_KEY_CATEGORIES = 'yah_hope_inventory_categories';
-  const [categories, setCategories] = useState<InventoryCategory[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_CATEGORIES);
-    return saved ? JSON.parse(saved) : mockInventoryCategories;
-  });
-
-  const STORAGE_KEY_TRANSACTIONS = 'yah_hope_inventory_transactions';
-  const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
-  }, [items]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [kits, setKits] = useState<Kit[]>([]);
+  const [categories, setCategories] = useState<InventoryCategory[]>([]);
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_KITS, JSON.stringify(kits));
-  }, [kits]);
+    fetchData();
+  }, []);
 
+  const fetchData = async () => {
+    try {
+      const [itemsRes, kitsRes, catsRes, transRes, kitItemsRes] = await Promise.all([
+        supabase.from('inventory').select('*'),
+        supabase.from('kits').select('*'),
+        supabase.from('inventory_categories').select('*'),
+        supabase.from('inventory_transactions').select('*'),
+        supabase.from('kit_items').select('*')
+      ]);
+
+      if (catsRes.data) {
+        setCategories(catsRes.data.map(c => ({ id: c.id, name: c.name, description: c.description || '' })));
+      }
+
+      if (itemsRes.data) {
+        setItems(itemsRes.data.map(i => ({
+          id: i.id,
+          name: i.name,
+          category: i.category,
+          quantity: i.quantity,
+          unit: i.unit,
+          min_quantity: i.min_quantity || 0,
+          expiration_date: i.expiration_date,
+          purchase_price: i.purchase_price
+        })));
+      }
+
+      if (transRes.data) {
+        setTransactions(transRes.data.map(t => ({
+          id: t.id,
+          item_id: t.item_id,
+          type: t.transaction_type as any,
+          quantity: t.quantity,
+          date: t.created_at,
+          reason: t.notes || '',
+          price: t.unit_price
+        })));
+      }
+
+      if (kitsRes.data) {
+        const kData = kitsRes.data.map(k => ({
+          id: k.id,
+          name: k.name,
+          description: k.description || '',
+          items: kitItemsRes.data ? kitItemsRes.data.filter(ki => ki.kit_id === k.id).map(ki => ({
+            item_id: ki.item_id,
+            quantity: ki.quantity
+          })) : []
+        }));
+        setKits(kData);
+      }
+      
+      setIsLoaded(true);
+    } catch (e) {
+      console.error('Error fetching inventory', e);
+    }
+  };
+
+  // Keep these useEffects to sync legacy setState calls to DB! 
+  // It's a quick patch to make the UI work with DB instantly without full rewrite.
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(categories));
-  }, [categories]);
+    if (!isLoaded) return;
+    const syncItems = async () => {
+      for (const item of items) {
+        if (item.id.length < 10) continue; // Skip temporary IDs
+        await supabase.from('inventory').upsert({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
+          min_quantity: item.min_quantity,
+          expiration_date: item.expiration_date,
+          purchase_price: item.purchase_price
+        });
+      }
+    };
+    syncItems();
+  }, [items, isLoaded]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
-  }, [transactions]);
+  // CRUD for items
+  const addItem = async (item: InventoryItem) => {
+    const tempId = item.id || Math.random().toString();
+    setItems(prev => [{ ...item, id: tempId }, ...prev]);
+    const { data } = await supabase.from('inventory').insert({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      min_quantity: item.min_quantity,
+      expiration_date: item.expiration_date,
+      purchase_price: item.purchase_price
+    }).select().single();
+    if (data) {
+      setItems(prev => prev.map(i => i.id === tempId ? { ...i, id: data.id } : i));
+    }
+  };
 
-  const addTransaction = (t: Omit<InventoryTransaction, 'id' | 'date'>) => {
+  const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+    if (id.length > 10) {
+      await supabase.from('inventory').update({
+        name: updates.name,
+        category: updates.category,
+        quantity: updates.quantity,
+        unit: updates.unit,
+        min_quantity: updates.min_quantity,
+        expiration_date: updates.expiration_date,
+        purchase_price: updates.purchase_price
+      }).eq('id', id);
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+    if (id.length > 10) {
+      await supabase.from('inventory').delete().eq('id', id);
+    }
+  };
+
+  // CRUD for kits
+  const addKit = async (kit: Kit) => {
+    const tempId = kit.id || Math.random().toString();
+    setKits(prev => [{ ...kit, id: tempId }, ...prev]);
+    const { data } = await supabase.from('kits').insert({
+      name: kit.name,
+      description: kit.description
+    }).select().single();
+    if (data) {
+      if (kit.items.length > 0) {
+        await supabase.from('kit_items').insert(kit.items.map(ki => ({
+          kit_id: data.id,
+          item_id: ki.item_id,
+          quantity: ki.quantity
+        })));
+      }
+      setKits(prev => prev.map(k => k.id === tempId ? { ...k, id: data.id } : k));
+    }
+  };
+
+  const updateKit = async (id: string, updates: Partial<Kit>) => {
+    setKits(prev => prev.map(k => k.id === id ? { ...k, ...updates } : k));
+    if (id.length > 10) {
+      await supabase.from('kits').update({
+        name: updates.name,
+        description: updates.description
+      }).eq('id', id);
+      
+      if (updates.items) {
+        await supabase.from('kit_items').delete().eq('kit_id', id);
+        if (updates.items.length > 0) {
+          await supabase.from('kit_items').insert(updates.items.map(ki => ({
+            kit_id: id,
+            item_id: ki.item_id,
+            quantity: ki.quantity
+          })));
+        }
+      }
+    }
+  };
+
+  const deleteKit = async (id: string) => {
+    setKits(prev => prev.filter(k => k.id !== id));
+    if (id.length > 10) {
+      await supabase.from('kits').delete().eq('id', id);
+    }
+  };
+
+  const addTransaction = async (t: Omit<InventoryTransaction, 'id' | 'date'>) => {
     const newTrans: InventoryTransaction = {
       ...t,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+      id: Math.random().toString(),
       date: new Date().toISOString()
     };
     setTransactions(prev => [newTrans, ...prev]);
+
+    if (t.item_id.length > 10) {
+      const { data } = await supabase.from('inventory_transactions').insert({
+        item_id: t.item_id,
+        transaction_type: t.type,
+        quantity: t.quantity,
+        unit_price: t.price,
+        notes: t.reason
+      }).select().single();
+      if (data) {
+        setTransactions(prev => prev.map(tr => tr.id === newTrans.id ? { ...tr, id: data.id } : tr));
+      }
+    }
   };
 
   const deductKitFromInventory = (kitId: string, patientId?: string) => {
@@ -98,7 +260,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <InventoryContext.Provider value={{ items, kits, categories, transactions, setItems, setKits, setCategories, setTransactions, deductKitFromInventory, addTransaction }}>
+    <InventoryContext.Provider value={{ 
+      items, kits, categories, transactions, 
+      setItems, setKits, setCategories, setTransactions, 
+      addItem, updateItem, deleteItem,
+      addKit, updateKit, deleteKit,
+      deductKitFromInventory, addTransaction 
+    }}>
       {children}
     </InventoryContext.Provider>
   );
