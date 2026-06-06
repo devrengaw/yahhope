@@ -35,7 +35,7 @@ serve(async (req) => {
     
     try {
       if (webhookSecret) {
-        event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+        event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
       } else {
         // Fallback for local testing if no webhook secret is provided
         event = JSON.parse(body)
