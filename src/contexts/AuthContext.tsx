@@ -21,7 +21,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('yah_hope_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const login = (email: string, role: Role, permissions?: string[]) => {
     // Simulated login logic
@@ -31,18 +38,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const userId = role === 'ADMIN' ? '1' : Math.random().toString(36).substring(2, 9);
     
-    setUser({ 
+    const newUser = { 
       id: userId, 
       name: email.split('@')[0], 
       email, 
       role, 
       permissions: defaultPermissions,
       avatar: email[0].toUpperCase() 
-    });
+    };
+    
+    setUser(newUser);
+    localStorage.setItem('yah_hope_user', JSON.stringify(newUser));
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('yah_hope_user');
   };
 
   return (

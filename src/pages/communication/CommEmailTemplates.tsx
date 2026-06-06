@@ -84,16 +84,17 @@ export function CommEmailTemplates() {
     }
   };
 
-  const handleSave = async () => {
+    const handleSave = async () => {
     try {
-      await supabase.from('email_settings').upsert({
+      const { error: settingsErr } = await supabase.from('email_settings').upsert({
         id: '1',
         logo_url: logoUrl,
         primary_color: primaryColor,
         updated_at: new Date().toISOString()
       });
+      if (settingsErr) throw settingsErr;
 
-      await supabase.from('email_templates').upsert([
+      const { error: templatesErr } = await supabase.from('email_templates').upsert([
         {
           name: 'donation_thank_you',
           subject: templates.donation_thank_you.subject,
@@ -117,12 +118,13 @@ export function CommEmailTemplates() {
           updated_at: new Date().toISOString()
         }
       ], { onConflict: 'name' });
+      if (templatesErr) throw templatesErr;
 
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error saving email settings', e);
-      alert('Erro ao salvar as configurações.');
+      alert('Erro ao salvar no banco (Verifique Permissões/RLS): ' + e.message);
     }
   };
 
