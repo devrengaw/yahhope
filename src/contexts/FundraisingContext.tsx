@@ -35,7 +35,6 @@ interface FundraisingContextType {
   updateCampaign: (updates: Partial<Campaign>) => void;
   addMilestone: (milestone: Omit<CampaignMilestone, 'id'>) => void;
   updateMilestone: (id: string, updates: Partial<CampaignMilestone>) => void;
-  removeMilestone: (id: string) => void;
   createDonation: (donation: Omit<Donation, 'id' | 'status' | 'date'>) => void;
   approveDonation: (id: string) => void;
 }
@@ -143,7 +142,6 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           title: updates.title,
           description: updates.description,
           target_amount: updates.target_amount,
-          current_amount: updates.current_amount,
           accept_pix: updates.accept_pix,
           accept_card: updates.accept_card
         })
@@ -151,9 +149,14 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         
       if (!error) {
         setCampaign(prev => ({ ...prev, ...updates }));
+        return { success: true };
+      } else {
+        console.error('Error updating campaign:', error);
+        return { success: false, error };
       }
     } else {
       setCampaign(prev => ({ ...prev, ...updates }));
+      return { success: true };
     }
   };
 

@@ -19,15 +19,20 @@ export function FundraisingManager() {
   const [acceptPix, setAcceptPix] = useState(campaign.accept_pix ?? true);
   const [acceptCard, setAcceptCard] = useState(campaign.accept_card ?? true);
 
-  const handleSaveCampaign = () => {
-    updateCampaign({
+  const handleSaveCampaign = async () => {
+    const result = await updateCampaign({
       title: campaignTitle,
       description: campaignDesc,
       target_amount: parseFloat(campaignGoal),
       accept_pix: acceptPix,
       accept_card: acceptCard
-    });
-    alert('Configurações da campanha salvas!');
+    }) as any;
+    
+    if (result && result.error) {
+      alert('Erro ao salvar no banco (Verifique as Permissões): ' + result.error.message);
+    } else {
+      alert('Configurações da campanha salvas com sucesso!');
+    }
   };
 
   const handleAddOrEditMilestone = (e: React.FormEvent) => {

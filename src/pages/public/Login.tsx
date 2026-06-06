@@ -41,9 +41,6 @@ export function Login() {
         }
         roleToLogin = 'ADMIN';
         permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
-      } else if (email.includes('admin') || email === 'gestor@yahope.org') {
-        roleToLogin = 'ADMIN';
-        permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
       } else if (isSupporterMode || email.includes('apoiador')) {
         roleToLogin = 'SPONSOR';
         permissions = ['portal'];
