@@ -145,15 +145,45 @@ export function CommEmailTemplates() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.size > 2 * 1024 * 1024) {
-      alert('A imagem da logo deve ter no máximo 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem da logo deve ter no máximo 5MB antes de comprimir.');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
-        setLogoUrl(event.target.result as string);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Comprimir redimensionando para no máximo 120px de altura
+          const MAX_HEIGHT = 120;
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/png');
+            
+            // Alerta se ainda ficar grande
+            const sizeInBytes = Math.round((compressedDataUrl.length * 3) / 4);
+            if (sizeInBytes > 70000) {
+              alert('Aviso: Mesmo após comprimida, a imagem ficou pesada para e-mails. Recomendamos colar o Link da imagem em vez de fazer o upload.');
+            }
+            
+            setLogoUrl(compressedDataUrl);
+          }
+        };
+        img.src = event.target.result as string;
       }
     };
     reader.readAsDataURL(file);
@@ -259,15 +289,21 @@ export function CommEmailTemplates() {
                         <img src={logoUrl} alt="Logo" className="h-12 object-contain" />
                       </div>
                     )}
-                    <input 
-                      type="text" 
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
-                      placeholder="URL da Imagem (Ex: https://yahhope.com/logo.png)"
-                    />
+                    <div className="flex-1 flex gap-2">
+                      <input 
+                        type="text" 
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm"
+                        placeholder="Cole a URL ou faça Upload"
+                      />
+                      <label className="cursor-pointer bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-50 transition-colors text-sm whitespace-nowrap">
+                        Upload
+                        <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                      </label>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-2 mb-4">Cole o link da imagem (Evite upload direto para não pesar o email no Gmail).</p>
+                  <p className="text-xs text-slate-500 mt-2 mb-4">A imagem será comprimida automaticamente caso você faça o upload.</p>
 
                   <span className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2 mt-4">
                     Link de Destino da Logo (Opcional)
