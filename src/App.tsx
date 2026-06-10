@@ -22,6 +22,7 @@ import { SupporterStore } from './pages/portal/SupporterStore';
 import { PortalMessages } from './pages/portal/PortalMessages';
 import { PortalGifts } from './pages/portal/PortalGifts';
 import { SupporterLanding } from './pages/public/SupporterLanding';
+import { LocalProjects } from './pages/public/LocalProjects';
 import { ErpDashboard } from './pages/erp/ErpDashboard';
 import { Blog } from './pages/public/Blog';
 import { Ecommerce } from './pages/public/Ecommerce';
@@ -98,6 +99,7 @@ export default function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/blog" element={<Blog />} />
                   <Route path="/loja" element={<Ecommerce />} />
+                  <Route path="/projetos-locais" element={<LocalProjects />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/apoiador" element={<SupporterLanding />} />
                   <Route path="/campanha" element={<Campaign />} />
@@ -120,6 +122,7 @@ export default function App() {
                         <Route path="/gifts" element={<GiftManager />} />
                         <Route path="/fundraising" element={<FundraisingManager />} />
                         <Route path="/projects" element={<Settings />} />
+                        <Route path="/local-projects" element={<Settings />} />
                         <Route path="/users" element={<Settings />} />
                         <Route path="/finance" element={<AdminFinance />} />
                         <Route path="/store" element={<AdminStoreManager />} />

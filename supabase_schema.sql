@@ -472,3 +472,13 @@ ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS heading TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_text TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cta_url TEXT;
 ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS has_cta BOOLEAN DEFAULT true;
+
+-- 36. yah_hope_projects (Projetos Locais)
+CREATE TABLE yah_hope_projects (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT DEFAULT 'planned' CHECK (status IN ('active', 'planned', 'completed')),
+  image_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

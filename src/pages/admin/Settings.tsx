@@ -12,9 +12,11 @@ import {
   Mail,
   Camera,
   Link as LinkIcon,
-  ExternalLink
+  ExternalLink,
+  MapPin
 } from 'lucide-react';
 import { UserCategorySettings } from '../../components/admin/UserCategorySettings';
+import { LocalProjectsSettings } from '../../components/admin/LocalProjectsSettings';
 import { ProjectSummary } from '../../components/erp/projects/ProjectSummary';
 import { ProjectList } from '../../components/erp/projects/ProjectList';
 import { ProjectKanban } from '../../components/erp/projects/ProjectKanban';
@@ -27,7 +29,7 @@ import { TeamMemberModal } from '../../components/erp/team/TeamMemberModal';
 import { mockProjects, Project, mockTeamMembers, TeamMember } from '../../lib/mockData';
 import { useLocation } from 'react-router-dom';
 
-type SettingsTab = 'general' | 'projects' | 'users' | 'user-categories';
+type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
 
 const CURRENT_USER_ID = '1';
 
@@ -37,6 +39,7 @@ export function Settings() {
   // Determine active tab based on URL path
   const getActiveTab = (): SettingsTab => {
     const path = location.pathname;
+    if (path.includes('/local-projects')) return 'local-projects';
     if (path.includes('/projects')) return 'projects';
     if (path.includes('/users')) return 'users';
     if (path.includes('/categories')) return 'user-categories';
@@ -202,6 +205,12 @@ export function Settings() {
           {activeTab === 'user-categories' && (
             <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">
               <UserCategorySettings />
+            </div>
+          )}
+
+          {activeTab === 'local-projects' && (
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">
+              <LocalProjectsSettings />
             </div>
           )}
 

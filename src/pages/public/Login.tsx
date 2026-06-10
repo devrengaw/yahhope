@@ -72,11 +72,10 @@ export function Login() {
 
       {/* Centered Login Box */}
       <div className="w-full max-w-md space-y-8 bg-white/95 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl border border-white/20 relative z-10 overflow-hidden">
-        {/* Decorative elements */}
-        <div className={`absolute top-0 right-0 w-32 h-32 bg-${themeColor}-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl`}></div>
+        <div className={'absolute top-0 right-0 w-32 h-32 bg-' + themeColor + '-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl'}></div>
         
         <div className="relative z-10 text-center flex flex-col items-center">
-          <div className={`w-16 h-16 bg-${themeColor}-50 text-${themeColor}-600 rounded-2xl flex items-center justify-center shadow-sm border border-${themeColor}-100 transition-all duration-500 mb-6`}>
+          <div className={'w-16 h-16 bg-' + themeColor + '-50 text-' + themeColor + '-600 rounded-2xl flex items-center justify-center shadow-sm border border-' + themeColor + '-100 transition-all duration-500 mb-6'}>
             <Heart size={32} fill="currentColor" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
@@ -91,13 +90,13 @@ export function Login() {
           <div className="flex w-full mt-8 p-1.5 bg-slate-100/80 rounded-2xl">
             <button 
               onClick={() => setActiveTab('login')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'login' ? 'bg-white text-' + themeColor + '-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+              className={'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ' + (activeTab === 'login' ? 'bg-white text-' + themeColor + '-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700')}
             >
               <LogIn size={18} /> Login
             </button>
             <button 
               onClick={() => setActiveTab('register')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'register' ? 'bg-white text-' + themeColor + '-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+              className={'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ' + (activeTab === 'register' ? 'bg-white text-' + themeColor + '-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700')}
             >
               <UserPlus size={18} /> Cadastrar
             </button>
@@ -114,7 +113,7 @@ export function Login() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className={`block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
+                    className={'block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-' + themeColor + '-500/20 focus:border-' + themeColor + '-500 sm:text-sm transition-all'}
                     placeholder="João Silva"
                   />
                 </div>
@@ -131,7 +130,7 @@ export function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
+                  className={'block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-' + themeColor + '-500/20 focus:border-' + themeColor + '-500 sm:text-sm transition-all'}
                   placeholder="seu@email.com"
                 />
               </div>
@@ -140,7 +139,7 @@ export function Login() {
               <div className="flex justify-between items-center mb-1.5 px-1">
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">Senha</label>
                 {activeTab === 'login' && (
-                  <a href="#" className={`text-xs font-bold text-${themeColor}-600 hover:text-${themeColor}-700`}>Esqueceu?</a>
+                  <a href="#" className={'text-xs font-bold text-' + themeColor + '-600 hover:text-' + themeColor + '-700'}>Esqueceu?</a>
                 )}
               </div>
               <div className="relative">
@@ -152,7 +151,7 @@ export function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
+                  className={'block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-' + themeColor + '-500/20 focus:border-' + themeColor + '-500 sm:text-sm transition-all'}
                   placeholder="••••••••"
                 />
               </div>
@@ -162,7 +161,7 @@ export function Login() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-500 hover:bg-${themeColor}-600 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70`}
+                className={'group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-' + themeColor + '-500 hover:bg-' + themeColor + '-600 focus:outline-none focus:ring-4 focus:ring-' + themeColor + '-500/20 transition-all shadow-lg shadow-' + themeColor + '-500/20 active:scale-[0.98] disabled:opacity-70'}
               >
                 {isLoading ? 'Aguarde...' : (activeTab === 'login' ? 'Entrar na Plataforma' : 'Criar minha conta')}
               </button>
@@ -201,7 +200,6 @@ export function Login() {
 
           </form>
 
-        </div>
       </div>
     </div>
   );
