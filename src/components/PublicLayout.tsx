@@ -18,7 +18,7 @@ export function PublicLayout() {
             <nav className="hidden md:flex items-center gap-8">
               <Link to="/" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Início</Link>
               <Link to="/campanha" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Participe</Link>
-              <Link to="/projetos-locais" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Projetos</Link>
+              <Link to="/projetos" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Conhecer Projetos</Link>
               {localStorage.getItem('yah_blog_closed') !== 'true' && (
                 <Link to="/blog" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Blog</Link>
               )}

@@ -18,7 +18,7 @@ export function Home() {
             <Link to="/login?mode=supporter" className="bg-emerald-500 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-emerald-400 transition-colors shadow-lg flex items-center gap-2">
               Apadrinhar uma Criança <Heart size={20} />
             </Link>
-            <Link to="/apoiador" className="bg-white/10 backdrop-blur-sm text-white border border-white/20 px-8 py-4 rounded-full font-bold text-lg hover:bg-white/20 transition-colors">
+            <Link to="/projetos" className="bg-white/10 backdrop-blur-sm text-white border border-white/20 px-8 py-4 rounded-full font-bold text-lg hover:bg-white/20 transition-colors">
               Conhecer Projetos
             </Link>
           </div>

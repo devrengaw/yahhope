@@ -95,12 +95,13 @@ export default function App() {
                 {/* Dedicated full-screen Display Route */}
                 <Route path="/campanha-display" element={<CampaignDisplay />} />
 
+                <Route path="/login" element={<Login />} />
+
                 <Route element={<PublicLayout />}>
                   <Route path="/" element={<Home />} />
                   <Route path="/blog" element={<Blog />} />
                   <Route path="/loja" element={<Ecommerce />} />
-                  <Route path="/projetos-locais" element={<LocalProjects />} />
-                  <Route path="/login" element={<Login />} />
+                  <Route path="/projetos" element={<LocalProjects />} />
                   <Route path="/apoiador" element={<SupporterLanding />} />
                   <Route path="/campanha" element={<Campaign />} />
                 </Route>
