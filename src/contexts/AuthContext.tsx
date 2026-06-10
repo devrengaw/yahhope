@@ -60,13 +60,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (email: string, password?: string): User | null => {
     const normalizedEmail = email.trim().toLowerCase();
     
+    // Check if there is a legacy password for admin
+    const legacyAdminPassword = localStorage.getItem('yah_hope_admin_password');
+    
     // Find user in mock DB
-    const foundUser = allUsers.find(u => u.email.toLowerCase() === normalizedEmail);
+    const foundUserIndex = allUsers.findIndex(u => u.email.toLowerCase() === normalizedEmail);
+    const foundUser = foundUserIndex >= 0 ? allUsers[foundUserIndex] : null;
     
     if (!foundUser) return null;
     
-    // Check password (ignoring case for this simple mock, but password should match exactly normally)
-    if (foundUser.password && foundUser.password !== password) {
+    let isPasswordValid = false;
+    
+    if (foundUser.password === password) {
+      isPasswordValid = true;
+    } else if (normalizedEmail === 'contato@yahhope.com' && legacyAdminPassword && legacyAdminPassword === password) {
+      // Migrate old password
+      isPasswordValid = true;
+      const updatedUsers = [...allUsers];
+      updatedUsers[foundUserIndex].password = password;
+      setAllUsers(updatedUsers);
+      localStorage.setItem('yah_hope_all_users', JSON.stringify(updatedUsers));
+    }
+    
+    if (!isPasswordValid) {
       return null;
     }
 
