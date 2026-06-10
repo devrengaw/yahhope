@@ -44,16 +44,41 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
     }
   }, [editingMember, isOpen]);
 
-  const availableModules = [
-    { id: 'dashboard', label: 'Painel Geral' },
-    { id: 'patients', label: 'Pacientes/Beneficiários' },
-    { id: 'attendance', label: 'Atendimentos' },
-    { id: 'inventory', label: 'Estoque/Suprimentos' },
-    { id: 'finance', label: 'Financeiro' },
-    { id: 'projects', label: 'Projetos' },
-    { id: 'team', label: 'Equipe' },
-    { id: 'calendar', label: 'Agenda' },
-    { id: 'settings', label: 'Configurações' },
+  const moduleGroups = [
+    {
+      name: 'Gestão YAH Hope',
+      modules: [
+        { id: 'yah_projetos', label: 'Autorização para a área de projetos' },
+        { id: 'yah_mensagens', label: 'Mensagens' },
+        { id: 'yah_financeiro', label: 'Financeiro (Captação)' },
+        { id: 'yah_presentes', label: 'Presentes' },
+        { id: 'yah_loja', label: 'Gestão da Loja' },
+        { id: 'yah_geral', label: 'Geral' },
+      ]
+    },
+    {
+      name: 'Comunicação',
+      modules: [
+        { id: 'com_projetos', label: 'Projetos' },
+        { id: 'com_chat', label: 'Chat' },
+        { id: 'com_blog', label: 'Blog' },
+        { id: 'com_templates', label: 'Templates de email' },
+        { id: 'com_gestao', label: 'Gestão' },
+      ]
+    },
+    {
+      name: 'Nutrição Infantil',
+      modules: [
+        { id: 'nutri_dashboard', label: 'Dashboard' },
+        { id: 'nutri_criancas', label: 'Crianças' },
+        { id: 'nutri_atendimento', label: 'Atendimento' },
+        { id: 'nutri_fila', label: 'Fila de Espera' },
+        { id: 'nutri_atualizacoes', label: 'Atualizações apoiador' },
+        { id: 'nutri_estoque', label: 'Estoque' },
+        { id: 'nutri_visitas', label: 'Visitas' },
+        { id: 'nutri_gestao', label: 'Gestão' },
+      ]
+    }
   ];
 
   if (!isOpen) return null;
@@ -212,32 +237,41 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
             <p className="text-[10px] text-slate-500 mt-1">As categorias são gerenciadas em Configurações Globais.</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Acessos Permitidos (Módulos)</label>
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              {availableModules.map(module => (
-                <label key={module.id} className="flex items-center gap-2 cursor-pointer group">
-                  <div className="relative flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedPermissions.includes(module.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedPermissions([...selectedPermissions, module.id]);
-                        } else {
-                          setSelectedPermissions(selectedPermissions.filter(p => p !== module.id));
-                        }
-                      }}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20"
-                    />
+            
+            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {moduleGroups.map((group) => (
+                <div key={group.name} className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                  <h4 className="font-semibold text-slate-800 text-sm">{group.name}</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {group.modules.map(module => (
+                      <label key={module.id} className="flex items-center gap-2 cursor-pointer group">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedPermissions.includes(module.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedPermissions([...selectedPermissions, module.id]);
+                              } else {
+                                setSelectedPermissions(selectedPermissions.filter(p => p !== module.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20"
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
+                          {module.label}
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                  <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
-                    {module.label}
-                  </span>
-                </label>
+                </div>
               ))}
             </div>
-            <p className="text-[10px] text-slate-500 italic">Usuários verão apenas os módulos selecionados acima.</p>
+            
+            <p className="text-[10px] text-slate-500 italic mt-2">Usuários verão apenas os módulos selecionados acima.</p>
           </div>
           
           <div className="pt-4 flex gap-3">

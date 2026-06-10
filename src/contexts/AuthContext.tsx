@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 export type Role = 'ADMIN' | 'USER' | 'SPONSOR';
 
@@ -10,124 +10,170 @@ export interface User {
   role: Role;
   permissions: string[];
   avatar?: string;
-  password?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password?: string) => User | null;
-  logout: () => void;
-  registerUser: (name: string, email: string, password?: string, role?: Role, permissions?: string[]) => boolean;
+  loading: boolean;
+  loginWithEmail: (email: string, password?: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<void>;
+  registerWithEmail: (name: string, email: string, password?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getPermissionsForRole = (role: Role) => {
+  if (role === 'ADMIN') {
+    return ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
+  }
+  if (role === 'SPONSOR') {
+    return ['portal'];
+  }
+  return ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('yah_hope_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load or initialize users DB
-  const [allUsers, setAllUsers] = useState<User[]>(() => {
-    try {
-      const savedUsers = localStorage.getItem('yah_hope_all_users');
-      if (savedUsers) {
-        return JSON.parse(savedUsers);
+  useEffect(() => {
+    // Check active session on load
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await handleSessionUser(session.user);
       } else {
-        // Initialize with default admin if none exists
-        const defaultAdmin: User = {
-          id: '1',
-          name: 'Super Admin',
-          email: 'contato@yahhope.com',
-          role: 'ADMIN',
-          password: 'admin',
-          permissions: ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'],
-          avatar: 'S'
-        };
-        localStorage.setItem('yah_hope_all_users', JSON.stringify([defaultAdmin]));
-        return [defaultAdmin];
+        setLoading(false);
       }
-    } catch {
-      return [];
-    }
-  });
-
-  const login = (email: string, password?: string): User | null => {
-    const normalizedEmail = email.trim().toLowerCase();
-    
-    // Check if there is a legacy password for admin
-    const legacyAdminPassword = localStorage.getItem('yah_hope_admin_password');
-    
-    // Find user in mock DB
-    const foundUserIndex = allUsers.findIndex(u => u.email.toLowerCase() === normalizedEmail);
-    const foundUser = foundUserIndex >= 0 ? allUsers[foundUserIndex] : null;
-    
-    if (!foundUser) return null;
-    
-    let isPasswordValid = false;
-    
-    if (foundUser.password === password) {
-      isPasswordValid = true;
-    } else if (normalizedEmail === 'contato@yahhope.com' && legacyAdminPassword && legacyAdminPassword === password) {
-      // Migrate old password
-      isPasswordValid = true;
-      const updatedUsers = [...allUsers];
-      updatedUsers[foundUserIndex].password = password;
-      setAllUsers(updatedUsers);
-      localStorage.setItem('yah_hope_all_users', JSON.stringify(updatedUsers));
-    }
-    
-    if (!isPasswordValid) {
-      return null;
-    }
-
-    const { password: _, ...userWithoutPassword } = foundUser;
-    const userToReturn = userWithoutPassword as User;
-    setUser(userToReturn);
-    localStorage.setItem('yah_hope_user', JSON.stringify(userToReturn));
-    return userToReturn;
-  };
-
-  const registerUser = (name: string, email: string, password?: string, role: Role = 'USER', customPermissions?: string[]): boolean => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (allUsers.some(u => u.email.toLowerCase() === normalizedEmail)) {
-      return false; // Email already exists
-    }
-
-    const defaultPermissions = role === 'ADMIN' 
-      ? ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts']
-      : role === 'SPONSOR' 
-        ? ['portal'] 
-        : ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
-
-    const newUser: User = {
-      id: Math.random().toString(36).substring(2, 9),
-      name,
-      email: normalizedEmail,
-      password,
-      role,
-      permissions: customPermissions || defaultPermissions,
-      avatar: name[0].toUpperCase()
     };
 
-    const updatedUsers = [...allUsers, newUser];
-    setAllUsers(updatedUsers);
-    localStorage.setItem('yah_hope_all_users', JSON.stringify(updatedUsers));
+    initializeAuth();
+
+    // Listen for auth changes (e.g. login, logout, Google OAuth callback)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        await handleSessionUser(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSessionUser = async (authUser: any) => {
+    try {
+      // 1. Fetch user from our public.users table
+      const { data: publicUser, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', authUser.email)
+        .maybeSingle();
+
+      let finalUser = publicUser;
+
+      // 2. If it doesn't exist, they probably logged in via Google for the first time. We auto-register them as SPONSOR.
+      if (!publicUser) {
+        const newUser = {
+          id: authUser.id,
+          name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+          email: authUser.email,
+          role: 'SPONSOR'
+        };
+
+        const { data: insertedUser, error: insertError } = await supabase
+          .from('users')
+          .insert(newUser)
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error creating public user:", insertError);
+          setLoading(false);
+          return;
+        }
+        finalUser = insertedUser;
+      }
+
+      // 3. Build the User object for context
+      const contextUser: User = {
+        id: finalUser.id,
+        name: finalUser.name,
+        email: finalUser.email,
+        role: finalUser.role as Role,
+        permissions: getPermissionsForRole(finalUser.role as Role),
+        avatar: finalUser.name[0].toUpperCase()
+      };
+
+      setUser(contextUser);
+    } catch (err) {
+      console.error("Error handling session user:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithEmail = async (email: string, password?: string): Promise<boolean> => {
+    if (!password) return false;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return !error;
+  };
+
+  const loginWithGoogle = async (): Promise<void> => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      }
+    });
+  };
+
+  const registerWithEmail = async (name: string, email: string, password?: string): Promise<boolean> => {
+    if (!password) return false;
+    
+    // Create the user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name
+        }
+      }
+    });
+
+    if (authError || !authData.user) {
+      console.error("Error signing up:", authError);
+      return false;
+    }
+
+    // Immediately insert into public.users as SPONSOR.
+    // Auth Listener might also try to do this, but doing it here guarantees it before redirect.
+    const { error: dbError } = await supabase.from('users').insert({
+      id: authData.user.id,
+      name,
+      email,
+      role: 'SPONSOR'
+    });
+
+    if (dbError) {
+      console.error("Error inserting public user on register:", dbError);
+    }
+
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('yah_hope_user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, registerUser }}>
+    <AuthContext.Provider value={{ user, loading, loginWithEmail, loginWithGoogle, registerWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );
