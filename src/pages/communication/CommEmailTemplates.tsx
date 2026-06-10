@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 import { RichTextEditor } from '../../components/admin/communication/RichTextEditor';
 
-type TemplateType = 'donation_thank_you' | 'accountability';
+type TemplateType = 'donation_thank_you' | 'accountability' | 'new_admin_user' | 'new_sponsor';
 
 interface EmailTemplate {
   subject: string;
@@ -44,6 +44,24 @@ export function CommEmailTemplates() {
       has_cta: true,
       cta_text: 'Ver Relatório Completo',
       cta_url: 'https://yahhope.com/relatorio'
+    },
+    new_admin_user: {
+      subject: 'Bem-vindo ao sistema YAH Hope',
+      preheader: 'Seu cadastro foi realizado pelo administrador.',
+      heading: 'Bem-vindo à equipe!',
+      body: `<p>Olá,</p><p><br></p><p>Sua conta no sistema YAH Hope foi criada com sucesso pelo administrador.</p><p>Você já pode acessar o sistema e começar a utilizar as ferramentas disponíveis para a sua função.</p><p><br></p><p>Equipe YAH Hope</p>`,
+      has_cta: true,
+      cta_text: 'Acessar o Sistema',
+      cta_url: 'https://yahhope.com/login'
+    },
+    new_sponsor: {
+      subject: 'Bem-vindo à família YAH Hope!',
+      preheader: 'Seu cadastro como apadrinhador foi concluído.',
+      heading: 'Obrigado por se tornar um apadrinhador!',
+      body: `<p>Olá,</p><p><br></p><p>Estamos muito felizes em receber você como apadrinhador! Seu apoio será fundamental para continuarmos nossa missão.</p><p>Através do nosso portal, você poderá acompanhar o impacto da sua doação e receber atualizações sobre os nossos projetos.</p><p><br></p><p>Com gratidão,<br>Equipe YAH Hope</p>`,
+      has_cta: true,
+      cta_text: 'Acessar o Portal do Apoiador',
+      cta_url: 'https://yahhope.com/login?mode=supporter'
     }
   });
 
@@ -66,7 +84,7 @@ export function CommEmailTemplates() {
         setTemplates(prev => {
           const newTemplates = { ...prev };
           templatesData.forEach(t => {
-            if (t.name === 'donation_thank_you' || t.name === 'accountability') {
+            if (t.name === 'donation_thank_you' || t.name === 'accountability' || t.name === 'new_admin_user' || t.name === 'new_sponsor') {
               newTemplates[t.name] = {
                 subject: t.subject || prev[t.name].subject,
                 preheader: t.preheader || prev[t.name].preheader,
@@ -118,6 +136,28 @@ export function CommEmailTemplates() {
           has_cta: templates.accountability.has_cta,
           cta_text: templates.accountability.cta_text,
           cta_url: templates.accountability.cta_url,
+          updated_at: new Date().toISOString()
+        },
+        {
+          name: 'new_admin_user',
+          subject: templates.new_admin_user.subject,
+          preheader: templates.new_admin_user.preheader,
+          heading: templates.new_admin_user.heading,
+          body: templates.new_admin_user.body,
+          has_cta: templates.new_admin_user.has_cta,
+          cta_text: templates.new_admin_user.cta_text,
+          cta_url: templates.new_admin_user.cta_url,
+          updated_at: new Date().toISOString()
+        },
+        {
+          name: 'new_sponsor',
+          subject: templates.new_sponsor.subject,
+          preheader: templates.new_sponsor.preheader,
+          heading: templates.new_sponsor.heading,
+          body: templates.new_sponsor.body,
+          has_cta: templates.new_sponsor.has_cta,
+          cta_text: templates.new_sponsor.cta_text,
+          cta_url: templates.new_sponsor.cta_url,
           updated_at: new Date().toISOString()
         }
       ], { onConflict: 'name' });
@@ -267,6 +307,32 @@ export function CommEmailTemplates() {
           >
             <LayoutTemplate size={18} className={activeTab === 'accountability' ? "text-blue-500" : "text-slate-400"} />
             Prestação de Contas
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('new_admin_user')}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left text-sm mt-1",
+              activeTab === 'new_admin_user' 
+                ? "bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100" 
+                : "text-slate-600 hover:bg-slate-50 border border-transparent"
+            )}
+          >
+            <LayoutTemplate size={18} className={activeTab === 'new_admin_user' ? "text-emerald-500" : "text-slate-400"} />
+            Novo Usuário Interno
+          </button>
+
+          <button
+            onClick={() => setActiveTab('new_sponsor')}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left text-sm mt-1",
+              activeTab === 'new_sponsor' 
+                ? "bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100" 
+                : "text-slate-600 hover:bg-slate-50 border border-transparent"
+            )}
+          >
+            <Heart size={18} className={activeTab === 'new_sponsor' ? "text-amber-500" : "text-slate-400"} />
+            Novo Apadrinhador
           </button>
         </div>
 

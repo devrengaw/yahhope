@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, Lock, Mail, UserPlus, LogIn, ShieldCheck, ShoppingBag } from 'lucide-react';
 
 export function Login() {
-  const { login } = useAuth();
+  const { login, registerUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
@@ -26,41 +26,42 @@ export function Login() {
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     
-    let roleToLogin: Role = 'USER';
-    let permissions: string[] = ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
-
-    const normalizedEmail = email.trim().toLowerCase();
-
     if (activeTab === 'login') {
-      if (normalizedEmail === 'contato@yahhope.com') {
-        const storedPassword = localStorage.getItem('yah_hope_admin_password');
-        if (!storedPassword) {
-          localStorage.setItem('yah_hope_admin_password', password);
-          alert('Senha de administrador registrada com sucesso para o primeiro acesso!');
-        } else if (password !== storedPassword) {
-          alert('Senha incorreta!');
-          return;
-        }
-        roleToLogin = 'ADMIN';
-        permissions = ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
-      } else if (isSupporterMode || normalizedEmail.includes('apoiador')) {
-        roleToLogin = 'SPONSOR';
-        permissions = ['portal'];
+      const loggedUser = login(email, password);
+      
+      if (!loggedUser) {
+        alert('Credenciais inválidas! Verifique seu e-mail e senha.');
+        return;
+      }
+
+      if (loggedUser.role === 'SPONSOR') {
+        navigate('/portal/dashboard');
+      } else if (loggedUser.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate('/nutrition/patients');
       }
     } else {
       // Registration logic
-      roleToLogin = isSupporterMode ? 'SPONSOR' : 'USER';
-      permissions = roleToLogin === 'SPONSOR' ? ['portal'] : ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
-    }
-
-    login(email || 'usuario@teste.com', roleToLogin, permissions);
-
-    if (roleToLogin === 'SPONSOR') {
-      navigate('/portal/dashboard');
-    } else if (roleToLogin === 'ADMIN') {
-      navigate('/admin');
-    } else {
-      navigate('/nutrition/patients');
+      const roleToLogin = isSupporterMode ? 'SPONSOR' : 'USER';
+      const success = registerUser(name, email || 'usuario@teste.com', password, roleToLogin);
+      
+      if (!success) {
+        alert('Este e-mail já está cadastrado!');
+        return;
+      }
+      
+      // Auto-login after register
+      const loggedUser = login(email || 'usuario@teste.com', password);
+      if (loggedUser) {
+        if (loggedUser.role === 'SPONSOR') {
+          navigate('/portal/dashboard');
+        } else if (loggedUser.role === 'ADMIN') {
+          navigate('/admin');
+        } else {
+          navigate('/nutrition/patients');
+        }
+      }
     }
   };
 
