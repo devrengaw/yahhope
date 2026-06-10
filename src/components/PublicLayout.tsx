@@ -54,7 +54,7 @@ export function PublicLayout() {
               <div className="flex justify-center md:justify-start items-center mb-4">
                 <img src="/logo.png" alt="YAH Hope" className="h-10 object-contain" />
               </div>
-              <p className="text-sm max-w-md">Transformando vidas através da nutrição, educação e comunidade em Moçambique.</p>
+              <p className="text-sm max-w-md">Nosso manifesto: Transformar a realidade através da esperança, amor e dedicação.</p>
             </div>
             
             <div className="flex flex-col items-center md:items-end gap-4">

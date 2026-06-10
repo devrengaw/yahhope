@@ -67,22 +67,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSessionUser = async (authUser: any) => {
     try {
-      // 1. Fetch user from our public.users table
+      // 1. Fetch user from our public.users table (case insensitive)
       const { data: publicUser, error } = await supabase
         .from('users')
         .select('*')
-        .eq('email', authUser.email)
+        .ilike('email', authUser.email)
         .maybeSingle();
 
       let finalUser = publicUser;
 
-      // 2. If it doesn't exist, they probably logged in via Google for the first time. We auto-register them as SPONSOR.
+      // 2. If it doesn't exist, auto-register them
       if (!publicUser) {
+        // Special case: if the email is the admin email, give them ADMIN role automatically
+        const isMasterAdmin = authUser.email.toLowerCase() === 'contato@yahhope.com';
+        
         const newUser = {
           id: authUser.id,
           name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
           email: authUser.email,
-          role: 'SPONSOR'
+          role: isMasterAdmin ? 'ADMIN' : 'SPONSOR'
         };
 
         const { data: insertedUser, error: insertError } = await supabase
@@ -93,10 +96,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (insertError) {
           console.error("Error creating public user:", insertError);
+          alert(`Erro ao vincular perfil de usuário: ${insertError.message}`);
           setLoading(false);
           return;
         }
         finalUser = insertedUser;
+      } else if (publicUser.id !== authUser.id) {
+        // If the email exists but the ID is different (e.g. they deleted and recreated auth user)
+        // We should update the public.users record with the new auth ID
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({ id: authUser.id })
+          .eq('email', publicUser.email)
+          .select()
+          .single();
+          
+        if (updateError) {
+          console.error("Error updating public user ID:", updateError);
+          // If we can't update, we just continue with publicUser to at least allow login
+        } else {
+          finalUser = updatedUser;
+        }
       }
 
       // 3. Build the User object for context
@@ -112,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(contextUser);
     } catch (err) {
       console.error("Error handling session user:", err);
+      alert('Erro interno ao carregar perfil do usuário.');
     } finally {
       setLoading(false);
     }
