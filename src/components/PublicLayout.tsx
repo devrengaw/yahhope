@@ -28,7 +28,7 @@ export function PublicLayout() {
 
             <div className="flex items-center gap-4">
               <Link 
-                to="/login?mode=supporter"
+                to="/login"
                 className="text-sm font-bold text-slate-600 hover:text-amber-600 transition-colors"
               >
                 Entrar
@@ -58,10 +58,7 @@ export function PublicLayout() {
             </div>
             
             <div className="flex flex-col items-center md:items-end gap-4">
-              <Link to="/login?mode=admin" className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-emerald-500 transition-colors flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                Área Administrativa
-              </Link>
+
               <div className="text-xs">
                 &copy; {new Date().getFullYear()} YAHope. Todos os direitos reservados.
               </div>
