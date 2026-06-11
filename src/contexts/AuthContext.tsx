@@ -120,13 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 3. Build the User object for context
+      const roleStr = (finalUser.role || 'SPONSOR').toUpperCase() as Role;
       const contextUser: User = {
         id: finalUser.id,
         name: finalUser.name,
         email: finalUser.email,
-        role: finalUser.role as Role,
-        permissions: getPermissionsForRole(finalUser.role as Role),
-        avatar: finalUser.name[0].toUpperCase()
+        role: roleStr,
+        permissions: getPermissionsForRole(roleStr),
+        avatar: finalUser.name ? finalUser.name[0].toUpperCase() : 'U'
       };
 
       setUser(contextUser);
