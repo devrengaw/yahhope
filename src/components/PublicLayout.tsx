@@ -8,7 +8,6 @@ export function PublicLayout() {
 
   return (
     <div className={`min-h-screen flex flex-col ${isLoginPage ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      {!isLoginPage && (
       <header className="bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 md:h-24">
@@ -43,7 +42,6 @@ export function PublicLayout() {
           </div>
         </div>
       </header>
-      )}
 
       <main className="flex-1 flex flex-col">
         <Outlet />
