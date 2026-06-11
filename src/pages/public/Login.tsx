@@ -75,12 +75,12 @@ export function Login() {
         <div className={`absolute top-0 right-0 w-32 h-32 bg-${themeColor}-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl`}></div>
         
         <div className="relative z-10 text-center flex flex-col items-center">
-          <div className={`w-16 h-16 bg-${themeColor}-50 text-${themeColor}-600 rounded-2xl flex items-center justify-center shadow-sm border border-${themeColor}-100 transition-all duration-500 mb-6`}>
-            <Heart size={32} fill="currentColor" />
-          </div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-            {activeTab === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight">
+            Ihale!
           </h2>
+          <h3 className="text-xl font-bold text-slate-700 mt-1">
+            {activeTab === 'login' ? 'Bem-Vindo' : 'Crie sua conta'}
+          </h3>
           <p className="mt-2 text-sm text-slate-500 font-medium">
             {activeTab === 'login' 
               ? 'Insira suas credenciais para acessar a plataforma.'
