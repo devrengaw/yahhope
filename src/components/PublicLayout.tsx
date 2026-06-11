@@ -4,10 +4,12 @@ import { Heart } from 'lucide-react';
 export function PublicLayout() {
   const location = useLocation();
   const isCampaignPage = location.pathname === '/campanha';
+  const isLoginPage = location.pathname === '/login';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div className={`min-h-screen flex flex-col ${isLoginPage ? 'bg-slate-900' : 'bg-slate-50'}`}>
+      {!isLoginPage && (
+      <header className="bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 md:h-24">
             <Link to="/" className="flex items-center">
@@ -41,11 +43,13 @@ export function PublicLayout() {
           </div>
         </div>
       </header>
+      )}
 
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col">
         <Outlet />
       </main>
 
+      {!isLoginPage && (
       <footer className="bg-slate-900 text-slate-400 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
@@ -65,6 +69,7 @@ export function PublicLayout() {
           </div>
         </div>
       </footer>
+      )}
     </div>
   );
 }
