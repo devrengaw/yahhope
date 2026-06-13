@@ -1,14 +1,15 @@
 import React from 'react';
 import { TeamMember, TeamMemberRole, TeamMemberStatus, mockUserCategories } from '../../../lib/mockData';
-import { Mail, Phone, Edit2, Trash2 } from 'lucide-react';
+import { Mail, Phone, Edit2, Trash2, Send } from 'lucide-react';
 
 interface TeamListProps {
   members: TeamMember[];
   onEdit?: (member: TeamMember) => void;
   onDelete?: (id: string) => void;
+  onResendInvite?: (member: TeamMember) => void;
 }
 
-export function TeamList({ members, onEdit, onDelete }: TeamListProps) {
+export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamListProps) {
   
   const getRoleBadge = (role: TeamMemberRole) => {
     switch (role) {
@@ -114,6 +115,13 @@ export function TeamList({ members, onEdit, onDelete }: TeamListProps) {
                       <div className="flex items-center justify-between gap-4">
                         {getStatusBadge(member.status)}
                         <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => onResendInvite?.(member)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-95"
+                            title="Reenviar E-mail de Convite"
+                          >
+                            <Send size={16} />
+                          </button>
                           <button 
                             onClick={() => onEdit?.(member)}
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all active:scale-95"

@@ -51,6 +51,9 @@ import { FundraisingProvider } from './contexts/FundraisingContext';
 import { StoreProvider } from './contexts/StoreContext';
 import { CommDashboard } from './pages/communication/CommDashboard';
 import { CommProjects } from './pages/communication/CommProjects';
+import { CommGestao } from './pages/communication/CommGestao';
+import { SetPassword } from './pages/public/SetPassword';
+import { SponsorSetup } from './pages/public/SponsorSetup';
 import { CommChat } from './pages/communication/CommChat';
 import { CommBlogAdmin } from './pages/communication/CommBlogAdmin';
 import { CommEmailTemplates } from './pages/communication/CommEmailTemplates';
@@ -101,6 +104,8 @@ export default function App() {
                   <Route path="/loja" element={<Ecommerce />} />
                   <Route path="/projetos" element={<LocalProjects />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/set-password" element={<SetPassword />} />
+                  <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
                   <Route path="/apoiador" element={<SupporterLanding />} />
                   <Route path="/campanha" element={<Campaign />} />
                 </Route>

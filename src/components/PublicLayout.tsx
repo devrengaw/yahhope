@@ -4,7 +4,7 @@ import { Heart } from 'lucide-react';
 export function PublicLayout() {
   const location = useLocation();
   const isCampaignPage = location.pathname === '/campanha';
-  const isLoginPage = location.pathname === '/login';
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/set-password' || location.pathname === '/cadastro-apadrinhador';
 
   return (
     <div className={`min-h-screen flex flex-col ${isLoginPage ? 'bg-slate-900' : 'bg-slate-50'}`}>

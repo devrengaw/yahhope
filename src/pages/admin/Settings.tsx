@@ -115,6 +115,9 @@ export function Settings() {
         new Date(b.join_date).getTime() - new Date(a.join_date).getTime()
       );
       setMembers(updated);
+      
+      // Simulate sending the invite email based on our CommEmailTemplates config
+      alert(`Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
     }
     setIsUserModalOpen(false);
   };
@@ -130,6 +133,13 @@ export function Settings() {
   const handleEditMember = (member: TeamMember) => {
     setSelectedMember(member);
     setIsUserModalOpen(true);
+  };
+
+  const handleResendInvite = (member: TeamMember) => {
+    if (confirm(`Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`)) {
+      // Simulate sending the invite email based on our CommEmailTemplates config
+      alert(`Um e-mail de convite foi reenviado com sucesso para ${member.email}!`);
+    }
   };
 
   return (
@@ -197,6 +207,7 @@ export function Settings() {
                   members={members} 
                   onEdit={handleEditMember}
                   onDelete={handleDeleteMember}
+                  onResendInvite={handleResendInvite}
                 />
               </div>
             </div>

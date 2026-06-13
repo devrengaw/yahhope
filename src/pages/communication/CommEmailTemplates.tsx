@@ -51,8 +51,8 @@ export function CommEmailTemplates() {
       heading: 'Bem-vindo à equipe!',
       body: `<p>Olá,</p><p><br></p><p>Sua conta no sistema YAH Hope foi criada com sucesso pelo administrador.</p><p>Você já pode acessar o sistema e começar a utilizar as ferramentas disponíveis para a sua função.</p><p><br></p><p>Equipe YAH Hope</p>`,
       has_cta: true,
-      cta_text: 'Acessar o Sistema',
-      cta_url: 'https://yahhope.com/login'
+      cta_text: 'Definir Minha Senha',
+      cta_url: 'https://yahhope.com/set-password'
     },
     new_sponsor: {
       subject: 'Bem-vindo à família YAH Hope!',
@@ -60,8 +60,8 @@ export function CommEmailTemplates() {
       heading: 'Obrigado por se tornar um apadrinhador!',
       body: `<p>Olá,</p><p><br></p><p>Estamos muito felizes em receber você como apadrinhador! Seu apoio será fundamental para continuarmos nossa missão.</p><p>Através do nosso portal, você poderá acompanhar o impacto da sua doação e receber atualizações sobre os nossos projetos.</p><p><br></p><p>Com gratidão,<br>Equipe YAH Hope</p>`,
       has_cta: true,
-      cta_text: 'Acessar o Portal do Apoiador',
-      cta_url: 'https://yahhope.com/login?mode=supporter'
+      cta_text: 'Entrar na Família YAH Hope',
+      cta_url: 'https://yahhope.com/cadastro-apadrinhador'
     }
   });
 

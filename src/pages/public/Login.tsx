@@ -17,10 +17,29 @@ export function Login() {
     if (user) {
       if (user.role === 'SPONSOR') {
         navigate('/portal/dashboard');
-      } else if (user.role === 'ADMIN') {
+        return;
+      }
+
+      if (user.role === 'ADMIN') {
         navigate('/admin');
-      } else {
+        return;
+      }
+
+      // Calculate accessible modules for USER role
+      const hasNutrition = user.permissions?.some(p => ['patients', 'attendance', 'inventory', 'management', 'waiting-list', 'atendimento', 'updates', 'visits'].includes(p));
+      const hasCommunication = user.permissions?.some(p => ['projects', 'chat', 'blog'].includes(p));
+      const hasSettings = user.permissions?.includes('settings');
+
+      const accessibleCount = [hasNutrition, hasCommunication, hasSettings].filter(Boolean).length;
+
+      if (accessibleCount > 1 || accessibleCount === 0) {
+        navigate('/admin');
+      } else if (hasNutrition) {
         navigate('/nutrition/patients');
+      } else if (hasCommunication) {
+        navigate('/communication/projects');
+      } else if (hasSettings) {
+        navigate('/admin/settings');
       }
     }
   }, [user, navigate]);
@@ -79,46 +98,15 @@ export function Login() {
             Ihale!
           </h2>
           <h3 className="text-xl font-bold text-slate-700 mt-1">
-            {activeTab === 'login' ? 'Bem-Vindo' : 'Crie sua conta'}
+            Bem-Vindo
           </h3>
           <p className="mt-2 text-sm text-slate-500 font-medium">
-            {activeTab === 'login' 
-              ? 'Insira suas credenciais para acessar a plataforma.'
-              : 'Preencha seus dados para se tornar um apadrinhador.'}
+            Insira suas credenciais para acessar a plataforma.
           </p>
 
-          <div className="flex w-full mt-8 p-1.5 bg-slate-100/80 rounded-2xl">
-            <button 
-              onClick={() => setActiveTab('login')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'login' ? `bg-white text-${themeColor}-600 shadow-sm border border-slate-200/50` : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <LogIn size={18} /> Login
-            </button>
-            <button 
-              onClick={() => setActiveTab('register')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'register' ? `bg-white text-${themeColor}-600 shadow-sm border border-slate-200/50` : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <UserPlus size={18} /> Cadastrar
-            </button>
-          </div>
         </div>
         
         <form className="mt-8 space-y-5 relative z-10" onSubmit={handleAuth}>
-            {activeTab === 'register' && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Nome Completo</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={`block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                    placeholder="João Silva"
-                  />
-                </div>
-              </div>
-            )}
             <div>
               <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Email</label>
               <div className="relative">
@@ -138,9 +126,7 @@ export function Login() {
             <div>
               <div className="flex justify-between items-center mb-1.5 px-1">
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">Senha</label>
-                {activeTab === 'login' && (
-                  <a href="#" className={`text-xs font-bold text-${themeColor}-600 hover:text-${themeColor}-700`}>Esqueceu?</a>
-                )}
+                <a href="#" className={`text-xs font-bold text-${themeColor}-600 hover:text-${themeColor}-700`}>Esqueceu?</a>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -163,7 +149,7 @@ export function Login() {
                 disabled={isLoading}
                 className={`group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-500 hover:bg-${themeColor}-600 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70`}
               >
-                {isLoading ? 'Aguarde...' : (activeTab === 'login' ? 'Entrar na Plataforma' : 'Criar minha conta')}
+                {isLoading ? 'Aguarde...' : 'Entrar na Plataforma'}
               </button>
             </div>
 
