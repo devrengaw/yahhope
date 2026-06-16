@@ -43,6 +43,19 @@ serve(async (req) => {
 
     const actionLink = linkData.properties.action_link;
 
+    // Insert into public.users table
+    if (linkData?.user?.id) {
+      const { error: dbError } = await supabase.from('users').upsert({
+        id: linkData.user.id,
+        name: name,
+        email: email,
+        role: role || 'USER'
+      });
+      if (dbError) {
+        console.error('Erro ao salvar em public.users:', dbError);
+      }
+    }
+
     // 2. Fetch Global Settings & Templates
     let logoUrl = 'https://yahhope.org/Logo+icone.png';
     let primaryColor = '#F49853';

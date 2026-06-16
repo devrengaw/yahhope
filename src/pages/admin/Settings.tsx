@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
   Settings as SettingsIcon, 
@@ -71,10 +71,36 @@ export function Settings() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // User/Team State
-  const [members, setMembers] = useState<TeamMember[]>(
-    [...mockTeamMembers].sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime())
-  );
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      if (data) {
+        const mappedMembers = data.map(u => ({
+          id: u.id,
+          name: u.name || 'Sem Nome',
+          email: u.email || '',
+          role: u.role || 'USER',
+          phone: u.phone || '-', 
+          department: u.department || '-',
+          join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          status: u.status || 'active',
+          category_id: u.category_id || undefined
+        })) as TeamMember[];
+        
+        setMembers(mappedMembers.sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime()));
+      }
+    } catch (e) {
+      console.error('Error fetching users:', e);
+    }
+  };
 
   // Handlers
   const handleOrgChange = (field: string, value: string) => {
@@ -103,12 +129,25 @@ export function Settings() {
   const handleSaveMember = async (newMember: Omit<TeamMember, 'id'>) => {
     if (selectedMember) {
       // Update existing
-      const updated = members.map(m => m.id === selectedMember.id ? { ...newMember, id: selectedMember.id } : m);
-      setMembers(updated);
-      setSelectedMember(null);
-      setIsUserModalOpen(false);
+      try {
+        const { error } = await supabase.from('users').update({
+          name: newMember.name,
+          email: newMember.email,
+          role: newMember.role,
+        }).eq('id', selectedMember.id);
+        
+        if (error) throw error;
+        
+        const updated = members.map(m => m.id === selectedMember.id ? { ...newMember, id: selectedMember.id } : m);
+        setMembers(updated);
+        setSelectedMember(null);
+        setIsUserModalOpen(false);
+      } catch (err: any) {
+        console.error('Error updating user:', err);
+        alert('Erro ao atualizar usuário: ' + err.message);
+      }
     } else {
-      // Create new
+      // Create new - Let Edge Function handle creation in Auth & public.users
       const member: TeamMember = {
         ...newMember,
         id: Math.random().toString(36).substring(2, 9),
@@ -118,6 +157,9 @@ export function Settings() {
       );
       setMembers(updated);
       setIsUserModalOpen(false);
+      
+      // Asynchronously refetch to get the true ID from the DB eventually
+      setTimeout(() => fetchUsers(), 3000);
       
       try {
         const { error } = await supabase.functions.invoke('invite-user', {
@@ -133,9 +175,16 @@ export function Settings() {
     }
   };
 
-  const handleDeleteMember = (id: string) => {
+  const handleDeleteMember = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
-      setMembers(members.filter(m => m.id !== id));
+      try {
+        const { error } = await supabase.from('users').delete().eq('id', id);
+        if (error) throw error;
+        setMembers(members.filter(m => m.id !== id));
+      } catch (err: any) {
+        console.error('Error deleting user:', err);
+        alert('Erro ao excluir usuário: ' + err.message);
+      }
     }
   };
 
