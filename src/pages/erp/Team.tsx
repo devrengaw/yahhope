@@ -1,17 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Plus } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { TeamSummary } from '../../components/erp/team/TeamSummary';
 import { TeamList } from '../../components/erp/team/TeamList';
 import { TeamMemberModal } from '../../components/erp/team/TeamMemberModal';
-import { mockTeamMembers, TeamMember } from '../../lib/mockData';
+import { TeamMember } from '../../lib/mockData'; // still using type
 
 export function Team() {
-  const [members, setMembers] = useState<TeamMember[]>(
-    [...mockTeamMembers].sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime())
-  );
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleSaveMember = (newMember: Omit<TeamMember, 'id'>) => {
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      if (data) {
+        const mappedMembers = data.map(u => ({
+          id: u.id,
+          name: u.name || 'Sem Nome',
+          email: u.email || '',
+          role: u.role || 'USER',
+          phone: u.phone || '-', 
+          department: u.department || '-',
+          join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          status: u.status || 'active',
+          category_id: u.category_id || undefined
+        })) as TeamMember[];
+        
+        setMembers(mappedMembers.sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime()));
+      }
+    } catch (e) {
+      console.error('Error fetching users:', e);
+    }
+  };
+
+  const handleSaveMember = async (newMember: Omit<TeamMember, 'id'>) => {
     const member: TeamMember = {
       ...newMember,
       id: Math.random().toString(36).substring(2, 9),
@@ -23,6 +50,19 @@ export function Team() {
     );
     
     setMembers(updated);
+    setIsModalOpen(false);
+
+    try {
+      const { error } = await supabase.functions.invoke('invite-user', {
+        body: { email: member.email, name: member.name, role: member.role }
+      });
+      if (error) throw error;
+      alert(`Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error('Error sending invite:', err);
+      alert(`O usuário foi salvo localmente, mas houve um erro ao enviar o e-mail: ${err.message}`);
+    }
   };
 
   return (

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Lock, Mail, UserPlus, LogIn } from 'lucide-react';
 
 export function Login() {
-  const { loginWithEmail, loginWithGoogle, registerWithEmail, user } = useAuth();
+  const { loginWithEmail, loginWithGoogle, registerWithEmail, user, loading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -12,9 +12,9 @@ export function Login() {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // If user is already logged in, redirect them (handled by the protected routes, but good to have here too)
+  // If user is already logged in, redirect them
   React.useEffect(() => {
-    if (user) {
+    if (!loading && user) {
       if (user.role === 'SPONSOR') {
         navigate('/portal/dashboard');
         return;
@@ -42,7 +42,15 @@ export function Login() {
         navigate('/admin/settings');
       }
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#F49853]"></div>
+      </div>
+    );
+  }
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

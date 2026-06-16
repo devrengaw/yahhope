@@ -16,8 +16,9 @@ import { useProjects } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAnnouncements } from '../../contexts/AnnouncementContext';
 import { cn } from '../../lib/utils';
-import { mockUsers, PersonalActivity } from '../../lib/mockData';
+import { PersonalActivity } from '../../lib/mockData';
 import { Announcement } from '../../contexts/AnnouncementContext';
+import { supabase } from '../../lib/supabase';
 
 export function CommDashboard() {
   const { user } = useAuth();
@@ -32,6 +33,15 @@ export function CommDashboard() {
   // Calendar State
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [users, setUsers] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchUsers = async () => {
+      const { data } = await supabase.from('users').select('id, name');
+      if (data) setUsers(data);
+    };
+    fetchUsers();
+  }, []);
 
   const stats = [
     { name: 'Projetos Ativos', value: projects.length.toString(), icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -372,8 +382,8 @@ export function CommDashboard() {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Visibilidade</label>
                 <div className="flex flex-wrap gap-2">
-                  {mockUsers.map(u => (
-                    <button key={u.id} type="button" onClick={() => setSelectedVisibleUsers(prev => prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id])} className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all", selectedVisibleUsers.includes(u.id) ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" : "bg-slate-50 border-slate-100 text-slate-400")}>{u.name}</button>
+                  {users.map(u => (
+                    <button key={u.id} type="button" onClick={() => setSelectedVisibleUsers(prev => prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id])} className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all", selectedVisibleUsers.includes(u.id) ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" : "bg-slate-50 border-slate-100 text-slate-400")}>{u.name || 'Usuário'}</button>
                   ))}
                 </div>
               </div>

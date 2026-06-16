@@ -6,34 +6,30 @@ import { ProjectKanban } from '../../components/erp/projects/ProjectKanban';
 import { ProjectTableView } from '../../components/erp/projects/ProjectTableView';
 import { ProjectModal } from '../../components/erp/projects/ProjectModal';
 import { ProjectDetails } from '../../components/erp/projects/ProjectDetails';
-import { mockProjects, Project } from '../../lib/mockData';
-
-const CURRENT_USER_ID = '1';
+import { Project } from '../../lib/mockData';
+import { useProjects } from '../../contexts/ProjectContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function Projects() {
-  const [projects, setProjects] = useState<Project[]>(
-    [...mockProjects].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-  );
+  const { projects, addProject, updateProject } = useProjects();
+  const { user } = useAuth();
+  
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const handleSaveProject = (newProject: Project) => {
-    const updated = [newProject, ...projects].sort((a, b) => 
-      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-    );
-    setProjects(updated);
+    addProject(newProject);
   };
 
   const handleUpdateProject = (updatedProject: Project) => {
-    const updated = projects.map(p => p.id === updatedProject.id ? updatedProject : p);
-    setProjects(updated);
+    updateProject(updatedProject.id, updatedProject);
     if (selectedProject?.id === updatedProject.id) {
       setSelectedProject(updatedProject);
     }
   };
 
-  const visibleProjects = projects.filter(p => !p.isPrivate || p.invitees.includes(CURRENT_USER_ID));
+  const visibleProjects = projects.filter(p => !p.isPrivate || p.invitees.includes(user?.id || ''));
 
   return (
     <div className="space-y-6">

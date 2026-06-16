@@ -66,7 +66,16 @@ import { FundraisingManager } from './pages/admin/FundraisingManager';
 import { AdminStoreManager } from './pages/admin/AdminStoreManager';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#F49853]"></div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" />;
   
   // Admin has access to everything
@@ -78,6 +87,21 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
   }
   
   return <>{children}</>;
+}
+
+function RootRedirect() {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#F49853]"></div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" />;
+  return user.role === 'SPONSOR' ? <Navigate to="/portal" /> : <Navigate to="/admin" />;
 }
 
 export default function App() {
