@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../../lib/supabase';
 import { 
   Settings as SettingsIcon, 
   Save, 
@@ -99,12 +100,13 @@ export function Settings() {
   const visibleProjects = projects.filter(p => !p.isPrivate || p.invitees.includes(CURRENT_USER_ID));
 
   // User Handlers
-  const handleSaveMember = (newMember: Omit<TeamMember, 'id'>) => {
+  const handleSaveMember = async (newMember: Omit<TeamMember, 'id'>) => {
     if (selectedMember) {
       // Update existing
       const updated = members.map(m => m.id === selectedMember.id ? { ...newMember, id: selectedMember.id } : m);
       setMembers(updated);
       setSelectedMember(null);
+      setIsUserModalOpen(false);
     } else {
       // Create new
       const member: TeamMember = {
@@ -115,11 +117,20 @@ export function Settings() {
         new Date(b.join_date).getTime() - new Date(a.join_date).getTime()
       );
       setMembers(updated);
+      setIsUserModalOpen(false);
       
-      // Simulate sending the invite email based on our CommEmailTemplates config
-      alert(`Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
+      try {
+        const { error } = await supabase.functions.invoke('invite-user', {
+          body: { email: member.email, name: member.name, role: member.role }
+        });
+        
+        if (error) throw error;
+        alert(`Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
+      } catch (err: any) {
+        console.error('Error sending invite:', err);
+        alert(`O usuário foi salvo localmente, mas houve um erro ao enviar o e-mail: ${err.message}`);
+      }
     }
-    setIsUserModalOpen(false);
   };
 
   const handleDeleteMember = (id: string) => {
@@ -135,10 +146,19 @@ export function Settings() {
     setIsUserModalOpen(true);
   };
 
-  const handleResendInvite = (member: TeamMember) => {
+  const handleResendInvite = async (member: TeamMember) => {
     if (confirm(`Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`)) {
-      // Simulate sending the invite email based on our CommEmailTemplates config
-      alert(`Um e-mail de convite foi reenviado com sucesso para ${member.email}!`);
+      try {
+        const { error } = await supabase.functions.invoke('invite-user', {
+          body: { email: member.email, name: member.name, role: member.role }
+        });
+        
+        if (error) throw error;
+        alert(`Um e-mail de convite foi reenviado com sucesso para ${member.email}!`);
+      } catch (err: any) {
+        console.error('Error resending invite:', err);
+        alert(`Erro ao reenviar o e-mail: ${err.message}`);
+      }
     }
   };
 
