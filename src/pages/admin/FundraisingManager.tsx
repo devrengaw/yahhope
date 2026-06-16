@@ -4,7 +4,7 @@ import { useFundraising, CampaignMilestone } from '../../contexts/FundraisingCon
 import { cn } from '../../lib/utils';
 
 export function FundraisingManager() {
-  const { campaign, donations, updateCampaign, addMilestone, removeMilestone, approveDonation } = useFundraising();
+  const { campaign, donations, updateCampaign, addMilestone, updateMilestone, removeMilestone, approveDonation } = useFundraising();
   const [activeTab, setActiveTab] = useState<'config' | 'donations'>('config');
 
   // Milestone Form State

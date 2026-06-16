@@ -51,7 +51,7 @@ import { FundraisingProvider } from './contexts/FundraisingContext';
 import { StoreProvider } from './contexts/StoreContext';
 import { CommDashboard } from './pages/communication/CommDashboard';
 import { CommProjects } from './pages/communication/CommProjects';
-import { CommGestao } from './pages/communication/CommGestao';
+
 import { SetPassword } from './pages/public/SetPassword';
 import { SponsorSetup } from './pages/public/SponsorSetup';
 import { CommChat } from './pages/communication/CommChat';

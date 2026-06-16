@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { UserCategory, mockUserCategories } from '../../lib/mockData';
+import React, { useState, useEffect } from 'react';
+import { UserCategory } from '../../lib/mockData';
 import { Plus, Trash2, Edit3, Save, X, Tag } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export function UserCategorySettings() {
-  const [categories, setCategories] = useState<UserCategory[]>(mockUserCategories);
+  const [categories, setCategories] = useState<UserCategory[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -11,6 +12,15 @@ export function UserCategorySettings() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('bg-blue-500');
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('user_categories').select('*').order('name');
+    if (data) setCategories(data as UserCategory[]);
+  };
 
   const colors = [
     { name: 'Azul', value: 'bg-blue-500' },
@@ -22,16 +32,14 @@ export function UserCategorySettings() {
     { name: 'Grafite', value: 'bg-slate-500' },
   ];
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name) return;
-    const newCategory: UserCategory = {
-      id: Math.random().toString(36).substring(2, 9),
-      name,
-      description,
-      color,
-    };
-    setCategories([...categories, newCategory]);
-    resetForm();
+    const newCategory = { name, description, color };
+    const { data, error } = await supabase.from('user_categories').insert([newCategory]).select().single();
+    if (data) {
+      setCategories([...categories, data as UserCategory]);
+      resetForm();
+    }
   };
 
   const handleEdit = (cat: UserCategory) => {
@@ -42,16 +50,23 @@ export function UserCategorySettings() {
     setIsAdding(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editingId || !name) return;
-    setCategories(categories.map(c => 
-      c.id === editingId ? { ...c, name, description, color } : c
-    ));
-    resetForm();
+    const updates = { name, description, color };
+    const { error } = await supabase.from('user_categories').update(updates).eq('id', editingId);
+    if (!error) {
+      setCategories(categories.map(c => 
+        c.id === editingId ? { ...c, ...updates } : c
+      ));
+      resetForm();
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setCategories(categories.filter(c => c.id !== id));
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from('user_categories').delete().eq('id', id);
+    if (!error) {
+      setCategories(categories.filter(c => c.id !== id));
+    }
   };
 
   const resetForm = () => {

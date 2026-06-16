@@ -21,7 +21,7 @@ serve(async (req) => {
     if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured.");
 
     // Fetch Global Settings
-    let logoUrl = 'https://yahhope.org/Logo+icone.png';
+    let logoUrl = 'https://yahhope.com/Logo+icone.png';
     let primaryColor = '#F49853';
 
     const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single();
@@ -80,7 +80,7 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'YAH Hope <contato@yahhope.org>', // Ensure this domain is verified in Resend!
+          from: 'YAH Hope <contato@yahhope.com>', // Ensure this domain is verified in Resend!
           to: email,
           subject: subject,
           html: htmlBody,

@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Mail } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { FinanceSummary } from '../../components/erp/finance/FinanceSummary';
 import { TransactionList } from '../../components/erp/finance/TransactionList';
 import { TransactionModal } from '../../components/erp/finance/TransactionModal';
-import { mockTransactions, mockTransactionCategories, Transaction } from '../../lib/mockData';
+import { Transaction } from '../../lib/mockData'; // keeping type
 
 export function Finance() {
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    [...mockTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  );
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: txs } = await supabase.from('finance_transactions').select('*').order('date', { ascending: false });
+      const { data: cats } = await supabase.from('finance_categories').select('*');
+      if (txs) setTransactions(txs as Transaction[]);
+      if (cats) setCategories(cats);
+    };
+    fetchData();
+  }, []);
 
   const handleSendAccountability = async () => {
     if (!window.confirm('Deseja enviar o e-mail de prestação de contas deste mês para todos os apoiadores ativos?')) return;
@@ -36,18 +46,21 @@ export function Finance() {
     }
   };
 
-  const handleSaveTransaction = (newTx: Omit<Transaction, 'id'>) => {
-    const transaction: Transaction = {
-      ...newTx,
-      id: Math.random().toString(36).substring(2, 9),
-    };
-    
-    // sorting transactions by date descending
-    const updated = [transaction, ...transactions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    
-    setTransactions(updated);
+  const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
+    try {
+      const { data, error } = await supabase.from('finance_transactions').insert([newTx]).select().single();
+      if (error) throw error;
+      if (data) {
+        const updated = [data, ...transactions].sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        setTransactions(updated);
+        setIsModalOpen(false);
+      }
+    } catch (e) {
+      console.error('Error saving transaction:', e);
+      alert('Erro ao salvar transação');
+    }
   };
 
   return (
@@ -85,7 +98,7 @@ export function Finance() {
         <h2 className="text-lg font-semibold text-slate-900 px-1">Últimas Transações</h2>
         <TransactionList 
           transactions={transactions} 
-          categories={mockTransactionCategories} 
+          categories={categories} 
         />
       </div>
 
@@ -93,7 +106,7 @@ export function Finance() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveTransaction}
-        categories={mockTransactionCategories}
+        categories={categories}
       />
     </div>
   );

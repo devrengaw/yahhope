@@ -1,21 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { CalendarSummary } from '../../components/erp/calendar/CalendarSummary';
 import { CalendarView } from '../../components/erp/calendar/CalendarView';
 import { CalendarEventModal } from '../../components/erp/calendar/CalendarEventModal';
-import { mockCalendarEvents, CalendarEvent } from '../../lib/mockData';
+import { CalendarEvent } from '../../lib/mockData';
 
 export function Calendar() {
-  const [events, setEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleSaveEvent = (newEvent: Omit<CalendarEvent, 'id'>) => {
-    const event: CalendarEvent = {
-      ...newEvent,
-      id: Math.random().toString(36).substring(2, 9),
-    };
-    
-    setEvents([event, ...events]);
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    const { data } = await supabase.from('calendar_events').select('*');
+    if (data) setEvents(data as CalendarEvent[]);
+  };
+
+  const handleSaveEvent = async (newEvent: Omit<CalendarEvent, 'id'>) => {
+    const { data, error } = await supabase.from('calendar_events').insert([newEvent]).select().single();
+    if (data) {
+      setEvents([data, ...events]);
+    } else if (error) {
+      console.error(error);
+      alert('Erro ao salvar evento');
+    }
+    setIsModalOpen(false);
   };
 
   return (

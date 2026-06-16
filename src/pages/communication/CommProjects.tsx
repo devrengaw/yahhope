@@ -10,7 +10,8 @@ import {
   PlusCircle, Download, Share2, User
 } from 'lucide-react';
 import { useProjects } from '../../contexts/ProjectContext';
-import { Project, ProjectTask, ColumnDefinition, ColumnType, mockUsers } from '../../lib/mockData';
+import { Project, ProjectTask, ColumnDefinition, ColumnType } from '../../lib/mockData';
+import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 
 export function CommProjects() {
@@ -25,6 +26,15 @@ export function CommProjects() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data } = await supabase.from('users').select('id, name, role');
+      if (data) setUsers(data);
+    };
+    fetchUsers();
+  }, []);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -115,6 +125,7 @@ export function CommProjects() {
             deleteColumn={deleteColumn}
             addTask={addTask}
             deleteTask={deleteTask}
+            users={users}
           />
         ) : (
           <ProjectKanbanView 
@@ -122,6 +133,7 @@ export function CommProjects() {
             updateTaskValue={updateTaskValue}
             addTask={addTask}
             deleteTask={deleteTask}
+            users={users}
           />
         )}
       </div>
@@ -261,14 +273,15 @@ export function CommProjects() {
   );
 }
 
-function ProjectTableView({ project, updateTaskValue, addColumn, updateColumn, deleteColumn, addTask, deleteTask }: { 
+function ProjectTableView({ project, updateTaskValue, addColumn, updateColumn, deleteColumn, addTask, deleteTask, users }: { 
   project: Project, 
   updateTaskValue: any,
   addColumn: any,
   updateColumn: any,
   deleteColumn: any,
   addTask: any,
-  deleteTask: any
+  deleteTask: any,
+  users: any[]
 }) {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
@@ -429,6 +442,7 @@ function ProjectTableView({ project, updateTaskValue, addColumn, updateColumn, d
                             column={col}
                             value={task.values?.[col.id]}
                             onUpdate={(val: any) => updateTaskValue(project.id, task.id, col.id, val)}
+                            users={users}
                           />
                         </td>
                       ))}
@@ -513,7 +527,7 @@ function ProjectTableView({ project, updateTaskValue, addColumn, updateColumn, d
   );
 }
 
-function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask }: any) {
+function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask, users }: any) {
   const statusColumn = (project.columns || []).find((c: any) => c.type === 'status');
   const columns = statusColumn?.options || ['Todo'];
   const statusColumnId = statusColumn?.id;
@@ -589,9 +603,9 @@ function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask }: an
                     <div className="flex -space-x-2">
                       {/* People indicator */}
                       {(project.columns || []).filter((c: any) => c.type === 'people').map((pc: any) => {
-                        const users = task.values?.[pc.id] || [];
-                        return users.map((uid: string) => {
-                          const user = mockUsers.find(u => u.id === uid);
+                        const taskUsers = task.values?.[pc.id] || [];
+                        return taskUsers.map((uid: string) => {
+                          const user = users.find((u: any) => u.id === uid);
                           return (
                             <div key={uid} className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] font-black">
                               {user?.name.charAt(0)}
@@ -631,7 +645,7 @@ function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask }: an
   );
 }
 
-function CellEditor({ projectId, taskId, column, value, onUpdate }: any) {
+function CellEditor({ projectId, taskId, column, value, onUpdate, users }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -670,7 +684,7 @@ function CellEditor({ projectId, taskId, column, value, onUpdate }: any) {
       <div className="relative group/people flex items-center justify-center gap-1 p-2 h-full min-h-[50px]">
         <div className="flex -space-x-2">
           {selectedUsers.length > 0 ? selectedUsers.map((uid: string) => {
-            const user = mockUsers.find(u => u.id === uid);
+            const user = users.find((u: any) => u.id === uid);
             return (
               <div 
                 key={uid} 
@@ -691,7 +705,7 @@ function CellEditor({ projectId, taskId, column, value, onUpdate }: any) {
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden group-hover/people:block z-[101] bg-white rounded-2xl border border-slate-100 shadow-2xl p-3 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">Atribuir Responsável</p>
           <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
-            {mockUsers.map(user => (
+            {users.map((user: any) => (
               <button
                 key={user.id}
                 onClick={() => toggleUser(user.id)}

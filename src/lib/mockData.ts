@@ -261,21 +261,4 @@ export interface YAHHopeProject {
   created_at: string;
 }
 
-export const mockYAHHopeProjects: YAHHopeProject[] = [
-  {
-    id: 'p1',
-    title: 'Desnutrição Infantil',
-    description: 'Acompanhamento nutricional e fornecimento de suplementos para crianças em situação de vulnerabilidade.',
-    status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'p2',
-    title: 'Infraestrutura Comunitária',
-    description: 'Melhoria das condições habitacionais e de saneamento básico nas comunidades atendidas.',
-    status: 'planned',
-    image_url: 'https://images.unsplash.com/photo-1541888086925-eb38890db313?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80',
-    created_at: new Date().toISOString()
-  }
-];
+export const mockYAHHopeProjects: YAHHopeProject[] = [];

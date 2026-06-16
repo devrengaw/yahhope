@@ -1,23 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Globe, CheckCircle, Clock } from 'lucide-react';
-import { YAHHopeProject, mockYAHHopeProjects } from '../../lib/mockData';
+import { supabase } from '../../lib/supabase';
+import { YAHHopeProject } from '../../lib/mockData';
 import { LocalProjectModal } from './LocalProjectModal';
 
 export function LocalProjectsSettings() {
-  const [projects, setProjects] = useState<YAHHopeProject[]>(mockYAHHopeProjects);
+  const [projects, setProjects] = useState<YAHHopeProject[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<YAHHopeProject | null>(null);
 
-  const handleSave = (newProjectData: Omit<YAHHopeProject, 'id' | 'created_at'>) => {
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    const { data } = await supabase.from('website_projects').select('*').order('created_at', { ascending: false });
+    if (data) setProjects(data as YAHHopeProject[]);
+  };
+
+  const handleSave = async (newProjectData: Omit<YAHHopeProject, 'id' | 'created_at'>) => {
     if (editingProject) {
-      setProjects(projects.map(p => p.id === editingProject.id ? { ...p, ...newProjectData } : p));
+      const { error } = await supabase.from('website_projects').update(newProjectData).eq('id', editingProject.id);
+      if (!error) {
+        setProjects(projects.map(p => p.id === editingProject.id ? { ...p, ...newProjectData } : p));
+      }
     } else {
-      const newProject: YAHHopeProject = {
-        ...newProjectData,
-        id: Math.random().toString(36).substring(2, 9),
-        created_at: new Date().toISOString()
-      };
-      setProjects([newProject, ...projects]);
+      const { data, error } = await supabase.from('website_projects').insert([newProjectData]).select().single();
+      if (data && !error) {
+        setProjects([data, ...projects]);
+      }
     }
     setIsModalOpen(false);
     setEditingProject(null);
@@ -28,9 +39,12 @@ export function LocalProjectsSettings() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este projeto local?')) {
-      setProjects(projects.filter(p => p.id !== id));
+      const { error } = await supabase.from('website_projects').delete().eq('id', id);
+      if (!error) {
+        setProjects(projects.filter(p => p.id !== id));
+      }
     }
   };
 

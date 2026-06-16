@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { HomeVisit, mockHomeVisits } from '../lib/mockData';
+import { HomeVisit } from '../lib/mockData';
 import { formatLocalDate } from '../lib/utils';
 import { addDays } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
 interface VisitContextType {
   visits: HomeVisit[];
@@ -11,29 +12,26 @@ interface VisitContextType {
 
 const VisitContext = createContext<VisitContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_visits';
-
 export function VisitProvider({ children }: { children: React.ReactNode }) {
-  const [visits, setVisits] = useState<HomeVisit[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : mockHomeVisits;
-  });
+  const [visits, setVisits] = useState<HomeVisit[]>([]);
 
-  // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
-  }, [visits]);
+    fetchVisits();
+  }, []);
 
-  const agendarVisita = (patientId: string, clinicalDate: string) => {
-    // Check if there is already a pending visit for this patient
+  const fetchVisits = async () => {
+    const { data } = await supabase.from('home_visits').select('*').order('date', { ascending: false });
+    if (data) setVisits(data as HomeVisit[]);
+  };
+
+  const agendarVisita = async (patientId: string, clinicalDate: string) => {
     const exists = visits.find(v => v.patient_id === patientId && v.status === 'pending');
     if (exists) return;
 
-    const newVisit: HomeVisit = {
-      id: `v${Date.now()}`,
+    const newVisit = {
       patient_id: patientId,
-      acs_id: 'acs-1', // Default ACS
-      date: formatLocalDate(addDays(new Date(), 7)), // Suggested for 7 days after
+      acs_id: 'acs-1', 
+      date: formatLocalDate(addDays(new Date(), 7)),
       status: 'pending',
       checklist: {
         house_cleanliness: 0,
@@ -44,17 +42,24 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       last_clinical_date: clinicalDate
     };
 
-    setVisits(prev => [newVisit, ...prev]);
+    const { data, error } = await supabase.from('home_visits').insert([newVisit]).select().single();
+    if (data) {
+      setVisits(prev => [data as HomeVisit, ...prev]);
+    }
   };
 
-  const concluirVisita = (visitId: string, observations: string, checklist: any) => {
-    setVisits(prev => prev.map(v => v.id === visitId ? { 
-      ...v, 
+  const concluirVisita = async (visitId: string, observations: string, checklist: any) => {
+    const updates = { 
       status: 'completed', 
       observations, 
       checklist,
       date: formatLocalDate(new Date()) 
-    } : v));
+    };
+
+    const { error } = await supabase.from('home_visits').update(updates).eq('id', visitId);
+    if (!error) {
+      setVisits(prev => prev.map(v => v.id === visitId ? { ...v, ...updates } : v));
+    }
   };
 
   return (

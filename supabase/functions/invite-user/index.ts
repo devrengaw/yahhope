@@ -57,7 +57,7 @@ serve(async (req) => {
     }
 
     // 2. Fetch Global Settings & Templates
-    let logoUrl = 'https://yahhope.org/Logo+icone.png';
+    let logoUrl = 'https://yahhope.com/Logo+icone.png';
     let primaryColor = '#F49853';
 
     const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single();
@@ -134,7 +134,7 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'YAH Hope <contato@yahhope.org>', // Must be verified in Resend
+        from: 'YAH Hope <contato@yahhope.com>', // Usando o dominio verificado
         to: email,
         subject: subject,
         html: htmlBody

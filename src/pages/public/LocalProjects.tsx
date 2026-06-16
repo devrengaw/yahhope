@@ -1,13 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, ArrowRight, MapPin, CheckCircle, Clock } from 'lucide-react';
-import { mockYAHHopeProjects } from '../../lib/mockData';
+import { supabase } from '../../lib/supabase';
+import { YAHHopeProject } from '../../lib/mockData';
 
 export function LocalProjects() {
-  const activeProjects = mockYAHHopeProjects.filter(p => p.status === 'active');
-  const plannedProjects = mockYAHHopeProjects.filter(p => p.status === 'planned');
-  const completedProjects = mockYAHHopeProjects.filter(p => p.status === 'completed');
+  const [projects, setProjects] = useState<YAHHopeProject[]>([]);
 
-  const ProjectCard = ({ project }: { project: typeof mockYAHHopeProjects[0] }) => (
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const { data } = await supabase.from('website_projects').select('*').order('created_at', { ascending: false });
+      if (data) setProjects(data as YAHHopeProject[]);
+    };
+    fetchProjects();
+  }, []);
+
+  const activeProjects = projects.filter(p => p.status === 'active');
+  const plannedProjects = projects.filter(p => p.status === 'planned');
+  const completedProjects = projects.filter(p => p.status === 'completed');
+
+  const ProjectCard: React.FC<{ project: YAHHopeProject }> = ({ project }) => (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 group flex flex-col h-full">
       <div className="h-64 overflow-hidden relative">
         <img 
@@ -101,7 +112,7 @@ export function LocalProjects() {
         </section>
       )}
 
-      {mockYAHHopeProjects.length === 0 && (
+      {projects.length === 0 && (
         <div className="max-w-3xl mx-auto text-center py-20">
           <div className="w-24 h-24 bg-slate-100 rounded-[2rem] mx-auto flex items-center justify-center mb-6">
             <MapPin className="text-slate-300" size={40} />
