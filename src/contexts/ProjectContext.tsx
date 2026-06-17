@@ -73,18 +73,18 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             isPrivate: false,
             category: 'Geral',
             priority: 'medium',
-            invitees: [],
-            columns: [],
+            invitees: Array.isArray(p.invitees) ? p.invitees : [],
+            columns: Array.isArray(p.columns) ? p.columns : [],
             tasks: pTasks.map(t => ({
               id: t.id,
               title: t.title,
               description: t.description || '',
               status: t.status as any,
               cost: t.cost || 0,
-              subtasks: [],
-              invitees: [],
+              subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+              invitees: Array.isArray(t.invitees) ? t.invitees : [],
               priority: t.priority as any,
-              values: {}
+              values: t.values || {}
             }))
           };
         });
@@ -136,7 +136,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         status: updates.status,
         start_date: updates.start_date || null,
         end_date: updates.end_date || null,
-        budget: updates.budget
+        budget: updates.budget,
+        invitees: updates.invitees,
+        columns: updates.columns
       }).eq('id', id);
     }
   };
@@ -156,33 +158,42 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setActivities(prev => prev.filter(a => a.id !== id));
   };
 
-  const addColumn = (projectId: string, column: ColumnDefinition) => {
+  const addColumn = async (projectId: string, column: ColumnDefinition) => {
+    let updatedColumns: ColumnDefinition[] = [];
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
-        return { ...p, columns: [...(p.columns || []), column] };
+        updatedColumns = [...(p.columns || []), column];
+        return { ...p, columns: updatedColumns };
       }
       return p;
     }));
+    if (projectId.length > 10) {
+      await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    }
   };
 
-  const updateColumn = (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => {
+  const updateColumn = async (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => {
+    let updatedColumns: ColumnDefinition[] = [];
     setProjects(prev => prev.map(p => {
       if (p.id === projectId && p.columns) {
-        return {
-          ...p,
-          columns: p.columns.map(c => c.id === columnId ? { ...c, ...updates } : c)
-        };
+        updatedColumns = p.columns.map(c => c.id === columnId ? { ...c, ...updates } : c);
+        return { ...p, columns: updatedColumns };
       }
       return p;
     }));
+    if (projectId.length > 10 && updatedColumns.length > 0) {
+      await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    }
   };
 
-  const deleteColumn = (projectId: string, columnId: string) => {
+  const deleteColumn = async (projectId: string, columnId: string) => {
+    let updatedColumns: ColumnDefinition[] = [];
     setProjects(prev => prev.map(p => {
       if (p.id === projectId && p.columns) {
+        updatedColumns = p.columns.filter(c => c.id !== columnId);
         return {
           ...p,
-          columns: p.columns.filter(c => c.id !== columnId),
+          columns: updatedColumns,
           tasks: p.tasks.map(t => {
             const newValues = { ...t.values };
             delete newValues[columnId];
@@ -192,6 +203,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       return p;
     }));
+    if (projectId.length > 10) {
+      await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    }
   };
 
   const addTask = async (projectId: string, task: ProjectTask) => {
@@ -210,7 +224,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         description: task.description,
         status: task.status,
         priority: task.priority,
-        cost: task.cost
+        cost: task.cost,
+        subtasks: task.subtasks || [],
+        invitees: task.invitees || [],
+        values: task.values || {}
       }).select().single();
 
       if (data) {
@@ -241,24 +258,35 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         description: updates.description,
         status: updates.status,
         priority: updates.priority,
-        cost: updates.cost
+        cost: updates.cost,
+        subtasks: updates.subtasks,
+        invitees: updates.invitees,
+        values: updates.values
       }).eq('id', taskId);
     }
   };
 
-  const updateTaskValue = (projectId: string, taskId: string, columnId: string, value: any) => {
+  const updateTaskValue = async (projectId: string, taskId: string, columnId: string, value: any) => {
+    let updatedValues = {};
     setProjects(prev => prev.map(p => {
       if (p.id === projectId) {
         return {
           ...p,
-          tasks: p.tasks.map(t => t.id === taskId ? { 
-            ...t, 
-            values: { ...t.values, [columnId]: value } 
-          } : t)
+          tasks: p.tasks.map(t => {
+            if (t.id === taskId) {
+              updatedValues = { ...t.values, [columnId]: value };
+              return { ...t, values: updatedValues };
+            }
+            return t;
+          })
         };
       }
       return p;
     }));
+    
+    if (taskId.length > 10) {
+      await supabase.from('project_tasks').update({ values: updatedValues }).eq('id', taskId);
+    }
   };
 
   const deleteTask = async (projectId: string, taskId: string) => {

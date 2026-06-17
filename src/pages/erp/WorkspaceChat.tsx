@@ -98,9 +98,9 @@ export function WorkspaceChat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-9rem)] md:h-[calc(100vh-12rem)] bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="h-16 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-white">
+      <div className="h-auto min-h-[4rem] py-2 border-b border-slate-200 px-4 md:px-6 flex flex-wrap items-center justify-between shrink-0 bg-white gap-2">
         <div className="flex items-center gap-3">
           {isDirectMessage ? (
             <div className="relative">
@@ -137,7 +137,7 @@ export function WorkspaceChat() {
       </div>
 
       {/* Message Area */}
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-6 relative">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 space-y-6 relative">
         <div className="text-center my-6">
           <span className="bg-white border border-slate-200 text-slate-500 text-xs px-3 py-1 rounded-full font-medium shadow-sm">
             Hoje
@@ -240,16 +240,18 @@ export function WorkspaceChat() {
         )}
 
         <form onSubmit={handleSend} className="border border-slate-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 overflow-hidden bg-white">
-          <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-slate-500">
+          <div className="px-2 md:px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1 md:gap-2 text-slate-500 overflow-x-auto">
             <input type="file" ref={fileInputRef} hidden onChange={(e) => handleFileChange(e, 'file')} multiple />
             <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'image')} multiple />
             
             <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors"><Paperclip size={18} /></button>
             <button type="button" onClick={() => imageInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors"><ImageIcon size={18} /></button>
             <div className="w-px h-4 bg-slate-300 mx-1"></div>
-            <button type="button" onClick={() => insertFormatting('**')} className="text-sm font-bold p-1 hover:bg-slate-200 rounded transition-colors tooltip-target" data-tooltip="Negrito">B</button>
-            <button type="button" onClick={() => insertFormatting('*')} className="text-sm italic p-1 hover:bg-slate-200 rounded transition-colors tooltip-target" data-tooltip="Itálico">I</button>
-            <button type="button" onClick={() => insertFormatting('__')} className="text-sm underline p-1 hover:bg-slate-200 rounded transition-colors tooltip-target" data-tooltip="Sublinhado">U</button>
+            <button type="button" onClick={() => insertFormatting('**')} className="text-sm font-bold p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Negrito">B</button>
+            <button type="button" onClick={() => insertFormatting('*')} className="text-sm italic p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Itálico">I</button>
+            <button type="button" onClick={() => insertFormatting('__')} className="text-sm underline p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Sublinhado">U</button>
+            <div className="w-px h-4 bg-slate-300 mx-1 hidden sm:block"></div>
+            <button type="button" onClick={() => setShowEmojis(!showEmojis)} className="p-1 hover:bg-slate-200 rounded transition-colors"><Smile size={18} /></button>
           </div>
           <div className="flex items-end">
             <textarea

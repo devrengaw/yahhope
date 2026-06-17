@@ -216,7 +216,7 @@ export function Dashboard() {
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Crianças</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 mt-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
               {statusData.map((item, i) => (
                 <div key={i} className="bg-slate-50/50 p-3 rounded-2xl border border-slate-50 flex items-center justify-between">
                   <div className="flex items-center gap-2">

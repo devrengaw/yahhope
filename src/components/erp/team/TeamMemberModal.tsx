@@ -156,7 +156,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
               <input
@@ -181,7 +181,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Cargo / Função</label>
               <select
@@ -211,7 +211,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Data de Entrada</label>
               <input
@@ -259,7 +259,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
               {moduleGroups.map((group) => (
                 <div key={group.name} className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
                   <h4 className="font-semibold text-slate-800 text-sm">{group.name}</h4>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {group.modules.map(module => (
                       <label key={module.id} className="flex items-center gap-2 cursor-pointer group">
                         <div className="relative flex items-center">
