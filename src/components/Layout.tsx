@@ -197,21 +197,21 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       
       {/* Primary Sidebar - Workspaces */}
       {module !== 'supporter' && (
-        <div className="w-16 sm:w-[72px] bg-slate-900 flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
+        <div className="w-16 sm:w-[72px] bg-[#F49853] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
           <Link 
             to="/workspace" 
-            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all mb-4 group relative", module === 'workspace' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white')}
+            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
           >
             <Home size={22} className={module === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
           </Link>
           
-          <div className="w-8 h-px bg-white/10 my-2" />
+          <div className="w-8 h-px bg-white/20 my-4 rounded-full" />
           
           <div className="flex flex-col gap-3 mt-2">
             {hasNutrition && (
               <Link 
                 to="/nutrition" 
-                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'nutrition' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'nutrition' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <Activity size={22} className={module === 'nutrition' ? '' : 'group-hover:scale-110 transition-transform'} />
               </Link>
@@ -220,7 +220,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             {hasCommunication && (
               <Link 
                 to="/communication" 
-                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'communication' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'communication' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <MessageSquare size={22} className={module === 'communication' ? '' : 'group-hover:scale-110 transition-transform'} />
               </Link>
@@ -229,7 +229,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             {hasAdmin && (
               <Link 
                 to="/admin" 
-                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'admin' ? 'bg-slate-700 text-white shadow-lg shadow-slate-700/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'admin' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <Settings size={22} className={module === 'admin' ? '' : 'group-hover:scale-110 transition-transform'} />
               </Link>
