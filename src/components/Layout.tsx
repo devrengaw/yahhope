@@ -87,12 +87,91 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     module === 'supporter' ? 'Portal do Apoiador' :
     'YAH Hope Admin';
     
-  const themeColor = 
-    module === 'nutrition' ? 'emerald' : 
-    module === 'workspace' ? 'blue' : 
-    module === 'communication' ? 'indigo' :
-    module === 'supporter' ? 'amber' :
-    'slate';
+  
+  const getThemeClasses = () => {
+    if (isLightSidebar) {
+      return {
+        mobileHeader: "bg-white text-slate-900",
+        sidebarBg: "bg-white border-slate-100 text-slate-600",
+        moduleName: "text-slate-400",
+        itemActiveBg: "bg-amber-50 text-amber-600 shadow-sm",
+        itemInactiveBg: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+        iconActive: "text-amber-500",
+        iconInactive: "text-slate-400",
+        borderTop: "border-slate-100",
+        backLink: "text-slate-400 hover:text-slate-600",
+        avatarBg: "bg-amber-500 border-amber-400 group-hover:border-amber-600",
+        roleText: "text-slate-400",
+        logoutBtn: "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+      };
+    }
+    switch (module) {
+      case 'nutrition':
+        return {
+          mobileHeader: "bg-emerald-700 text-white",
+          sidebarBg: "bg-emerald-800 border-transparent text-emerald-50",
+          moduleName: "text-emerald-300",
+          itemActiveBg: "bg-emerald-900/40 text-slate-50 shadow-inner",
+          itemInactiveBg: "text-emerald-200 hover:bg-emerald-600/50 hover:text-white",
+          iconActive: "text-emerald-100",
+          iconInactive: "text-emerald-300",
+          borderTop: "border-emerald-700/50",
+          backLink: "text-emerald-200 hover:text-white",
+          avatarBg: "bg-emerald-600 border-emerald-500 group-hover:border-white",
+          roleText: "text-emerald-300",
+          logoutBtn: "text-emerald-300 hover:text-white hover:bg-emerald-700/50"
+        };
+      case 'workspace':
+        return {
+          mobileHeader: "bg-[#1E1F21] text-white",
+          sidebarBg: "bg-[#2b092a] border-transparent text-slate-300",
+          moduleName: "text-slate-400",
+          itemActiveBg: "bg-[#1164A3] text-white shadow-inner",
+          itemInactiveBg: "text-slate-300 hover:bg-white/5 hover:text-white",
+          iconActive: "text-white",
+          iconInactive: "text-slate-400",
+          borderTop: "border-white/10",
+          backLink: "text-slate-400 hover:text-white",
+          avatarBg: "bg-[#1164A3] border-[#1164A3] group-hover:border-white",
+          roleText: "text-slate-400",
+          logoutBtn: "text-slate-400 hover:text-white hover:bg-white/10"
+        };
+      case 'communication':
+        return {
+          mobileHeader: "bg-indigo-700 text-white",
+          sidebarBg: "bg-indigo-800 border-transparent text-indigo-50",
+          moduleName: "text-indigo-300",
+          itemActiveBg: "bg-indigo-900/40 text-slate-50 shadow-inner",
+          itemInactiveBg: "text-indigo-200 hover:bg-indigo-600/50 hover:text-white",
+          iconActive: "text-indigo-100",
+          iconInactive: "text-indigo-300",
+          borderTop: "border-indigo-700/50",
+          backLink: "text-indigo-200 hover:text-white",
+          avatarBg: "bg-indigo-600 border-indigo-500 group-hover:border-white",
+          roleText: "text-indigo-300",
+          logoutBtn: "text-indigo-300 hover:text-white hover:bg-indigo-700/50"
+        };
+      case 'admin':
+      default:
+        return {
+          mobileHeader: "bg-slate-700 text-white",
+          sidebarBg: "bg-slate-800 border-transparent text-slate-50",
+          moduleName: "text-slate-300",
+          itemActiveBg: "bg-slate-900/40 text-slate-50 shadow-inner",
+          itemInactiveBg: "text-slate-200 hover:bg-slate-600/50 hover:text-white",
+          iconActive: "text-slate-100",
+          iconInactive: "text-slate-300",
+          borderTop: "border-slate-700/50",
+          backLink: "text-slate-200 hover:text-white",
+          avatarBg: "bg-slate-600 border-slate-500 group-hover:border-white",
+          roleText: "text-slate-300",
+          logoutBtn: "text-slate-300 hover:text-white hover:bg-slate-700/50"
+        };
+    }
+  };
+
+  const theme = getThemeClasses();
+
 
   const handleLogout = () => {
     logout();
@@ -156,7 +235,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {/* Mobile Header */}
         <div className={cn(
           "md:hidden p-4 flex justify-between items-center shadow-md z-20 transition-colors shrink-0",
-          isLightSidebar ? "bg-white text-slate-900" : `bg-${themeColor}-700 text-white`
+          theme.mobileHeader
         )}>
           <div className="flex items-center">
             <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
@@ -173,7 +252,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         <aside
           className={cn(
             "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
-          isLightSidebar ? "bg-white border-slate-100 text-slate-600" : `bg-${themeColor}-800 border-transparent text-${themeColor}-50`,
+          theme.sidebarBg,
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -184,37 +263,170 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             </div>
             <NotificationBell isLight={isLightSidebar} />
           </div>
-          <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)}>{moduleName}</p>
+          <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
         </div>
 
+        
         <nav className="mt-6 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
-          <ul className="space-y-1 px-3">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : module === 'erp' ? '/erp' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    onClick={() => setIsMobileMenuOpen(false)}
+          {module === 'workspace' ? (
+            <div className="px-3 pb-4">
+              <div className="mb-6">
+                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Canais</p>
+                <ul className="space-y-1">
+                  <li>
+                    <Link
+                      to="/workspace/chat/geral"
+                      onClick={() => setIsMobileMenuOpen(false)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all duration-300 group",
-                        isActive 
-                          ? (isLightSidebar ? "bg-amber-50 text-amber-600 shadow-sm" : `bg-${themeColor}-900/40 text-slate-50 shadow-inner`)
-                          : (isLightSidebar ? "text-slate-500 hover:bg-slate-50 hover:text-slate-900" : `text-${themeColor}-200 hover:bg-${themeColor}-600/50 hover:text-white`)
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname === '/workspace/chat/geral' || location.pathname === '/workspace' 
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
                       )}
                     >
-                      <item.icon size={20} className={isActive ? (isLightSidebar ? "text-amber-500" : `text-${themeColor}-100`) : (isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)} />
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className="font-light text-lg opacity-70">#</span>
+                      <span className={cn(location.pathname === '/workspace/chat/geral' || location.pathname === '/workspace' ? "font-bold" : "")}>geral</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/workspace/chat/projetos"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname === '/workspace/chat/projetos' 
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <span className="font-light text-lg opacity-70">#</span>
+                      <span className={cn(location.pathname === '/workspace/chat/projetos' ? "font-bold" : "")}>projetos</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/workspace/chat/anuncios"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname === '/workspace/chat/anuncios' 
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <span className="font-light text-lg opacity-70">#</span>
+                      <span className={cn(location.pathname === '/workspace/chat/anuncios' ? "font-bold" : "")}>anúncios</span>
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mb-6">
+                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Mensagens Diretas</p>
+                <ul className="space-y-1">
+                  <li>
+                    <Link
+                      to="/workspace/dm/1"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname === '/workspace/dm/1' 
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <div className="relative">
+                        <img src="https://i.pravatar.cc/150?u=1" alt="Ana" className="w-5 h-5 rounded" />
+                        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                      </div>
+                      <span className={cn(location.pathname === '/workspace/dm/1' ? "font-bold" : "")}>Ana Júlia</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/workspace/dm/2"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname === '/workspace/dm/2' 
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <div className="relative">
+                        <img src="https://i.pravatar.cc/150?u=2" alt="Carlos" className="w-5 h-5 rounded" />
+                        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-transparent border-2 border-slate-400 rounded-full"></div>
+                      </div>
+                      <span className={cn(location.pathname === '/workspace/dm/2' ? "font-bold" : "")}>Carlos S.</span>
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Organização</p>
+                <ul className="space-y-1">
+                  <li>
+                    <Link
+                      to="/workspace/projects"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname.startsWith('/workspace/projects')
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <Briefcase size={16} className={location.pathname.startsWith('/workspace/projects') ? theme.iconActive : theme.iconInactive} />
+                      <span className={cn(location.pathname.startsWith('/workspace/projects') ? "font-bold" : "")}>Projetos</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/workspace/calendar"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                        location.pathname.startsWith('/workspace/calendar')
+                          ? theme.itemActiveBg
+                          : theme.itemInactiveBg
+                      )}
+                    >
+                      <Calendar size={16} className={location.pathname.startsWith('/workspace/calendar') ? theme.iconActive : theme.iconInactive} />
+                      <span className={cn(location.pathname.startsWith('/workspace/calendar') ? "font-bold" : "")}>Agenda</span>
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <ul className="space-y-1 px-3">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : module === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all duration-300 group",
+                          isActive ? theme.itemActiveBg : theme.itemInactiveBg
+                        )}
+                      >
+                        <item.icon size={20} className={isActive ? theme.iconActive : theme.moduleName} />
+                      {item.name}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </nav>
+  
         
-        <div className={cn("shrink-0 p-4 border-t", isLightSidebar ? "border-slate-100" : `border-${themeColor}-700/50`)}>
+        <div className={cn("shrink-0 p-4 border-t", theme.borderTop)}>
           {user?.role === 'ADMIN' && (
-            <Link to="/admin" className={cn("flex items-center gap-2 text-sm font-bold mb-4 px-2 transition-colors", isLightSidebar ? "text-slate-400 hover:text-slate-600" : `text-${themeColor}-200 hover:text-white`)}>
+            <Link to="/admin" className={cn("flex items-center gap-2 text-sm font-bold mb-4 px-2 transition-colors", theme.backLink)}>
               <ArrowLeft size={16} /> Voltar aos Módulos
             </Link>
           )}
@@ -223,17 +435,17 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               to="/admin/profile" 
               className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
             >
-              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold border-2 shadow-sm transition-colors", isLightSidebar ? "bg-amber-500 border-amber-400 group-hover:border-amber-600" : `bg-${themeColor}-600 border-${themeColor}-500 group-hover:border-white`)}>
+              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold border-2 shadow-sm transition-colors", theme.avatarBg)}>
                 {user?.avatar || (user?.name ? user.name.charAt(0) : 'U')}
               </div>
               <div className="overflow-hidden text-left">
                 <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name || 'Usuário'}</p>
-                <p className={cn("text-[10px] uppercase tracking-wider font-black", isLightSidebar ? "text-slate-400" : `text-${themeColor}-300`)}>{user?.role || 'Visitante'}</p>
+                <p className={cn("text-[10px] uppercase tracking-wider font-black", theme.moduleName)}>{user?.role || 'Visitante'}</p>
               </div>
             </Link>
             <button 
               onClick={handleLogout} 
-              className={cn("p-2 rounded-lg transition-colors tooltip-target", isLightSidebar ? "text-slate-400 hover:text-slate-600 hover:bg-slate-50" : `text-${themeColor}-300 hover:text-white hover:bg-${themeColor}-700/50`)} 
+              className={cn("p-2 rounded-lg transition-colors tooltip-target", theme.logoutBtn)} 
               title="Sair"
             >
               <LogOut size={18} />

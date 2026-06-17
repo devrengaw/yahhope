@@ -23,12 +23,11 @@ import { PortalMessages } from './pages/portal/PortalMessages';
 import { PortalGifts } from './pages/portal/PortalGifts';
 import { SupporterLanding } from './pages/public/SupporterLanding';
 import { LocalProjects } from './pages/public/LocalProjects';
-import { ErpDashboard } from './pages/erp/ErpDashboard';
 import { Blog } from './pages/public/Blog';
 import { Ecommerce } from './pages/public/Ecommerce';
 import { Projects } from './pages/erp/Projects';
 import { Finance } from './pages/erp/Finance';
-import { Team } from './pages/erp/Team';
+import { WorkspaceChat } from './pages/erp/WorkspaceChat';
 import { Calendar } from './pages/erp/Calendar';
 import { Dashboard } from './pages/Dashboard';
 import { Patients } from './pages/Patients';
@@ -180,10 +179,11 @@ export default function App() {
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
                     <Layout module="workspace">
                       <Routes>
-                        <Route path="/" element={<ErpDashboard />} />
-                        <Route path="/projects" element={<Navigate to="/admin/settings" replace />} />
+                        <Route path="/" element={<Navigate to="/workspace/chat/geral" replace />} />
+                        <Route path="/chat/:id" element={<WorkspaceChat />} />
+                        <Route path="/dm/:id" element={<WorkspaceChat />} />
+                        <Route path="/projects" element={<Projects />} />
                         <Route path="/finance" element={<Finance />} />
-                        <Route path="/team" element={<Team />} />
                         <Route path="/calendar" element={<Calendar />} />
                         <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
                       </Routes>
