@@ -149,9 +149,6 @@ export default function App() {
                   <Route path="/campanha" element={<Campaign />} />
                 </Route>
 
-                {/* Redirect /admin to /workspace as the new root */}
-                <Route path="/admin" element={<Navigate to="/workspace" replace />} />
-
                 <Route path="/admin/*" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
                     <Layout module="admin">
