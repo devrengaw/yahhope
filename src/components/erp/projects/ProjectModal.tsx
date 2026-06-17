@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabase';
 import { Project, ProjectStatus, mockTeamMembers, Priority } from '../../../lib/mockData';
 import { X, Lock, Globe, UserPlus, Trash2, Plus } from 'lucide-react';
 
@@ -22,6 +23,15 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
   const [category, setCategory] = useState(initialProject?.category || '');
   const [priority, setPriority] = useState<Priority>(initialProject?.priority || 'medium');
   const [enablePortalUpdates, setEnablePortalUpdates] = useState(initialProject?.enablePortalUpdates || false);
+  const [availableMembers, setAvailableMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from('users').select('id, name, department').then(({ data }) => {
+        if (data) setAvailableMembers(data);
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -223,7 +233,7 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
           <div className="space-y-3">
             <label className="block text-sm font-medium text-slate-700">Convidar Membros da Equipe</label>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 max-h-48 overflow-y-auto space-y-2">
-              {mockTeamMembers.map(member => (
+              {availableMembers.map(member => (
                 <div 
                   key={member.id} 
                   onClick={() => toggleInvitee(member.id)}

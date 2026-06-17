@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { Send, Hash, Paperclip, Smile, Image as ImageIcon, MoreVertical, Phone, Video, UserPlus, X, File as FileIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 
 export function WorkspaceChat() {
@@ -21,7 +22,16 @@ export function WorkspaceChat() {
   const [attachments, setAttachments] = useState<{ type: 'image' | 'file'; file: File; url: string }[]>([]);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [showEmojis, setShowEmojis] = useState(false);
+
+  useEffect(() => {
+    if (isAddMemberModalOpen) {
+      supabase.from('users').select('id, name, email').then(({ data }) => {
+        if (data) setAvailableUsers(data);
+      });
+    }
+  }, [isAddMemberModalOpen]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -295,14 +305,17 @@ export function WorkspaceChat() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome ou e-mail</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-slate-700 mb-1">Selecionar Usuário</label>
+                <select
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="ex: Carlos Silva"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">Selecione um usuário...</option>
+                  {availableUsers.map(u => (
+                    <option key={u.id} value={u.name}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button

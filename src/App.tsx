@@ -117,7 +117,9 @@ function RootRedirect() {
   }
 
   if (!user) return <Navigate to="/login" />;
-  return user.role === 'SPONSOR' ? <Navigate to="/portal" /> : <Navigate to="/admin" />;
+  if (user.role === 'SPONSOR') return <Navigate to="/portal" />;
+  if (user.role === 'ADMIN') return <Navigate to="/admin" />;
+  return <Navigate to="/workspace" />;
 }
 
 export default function App() {
@@ -175,7 +177,7 @@ export default function App() {
 
                 {/* Workspace (Personal Workspace) */}
                 <Route path="/workspace/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
                     <Layout module="workspace">
                       <Routes>
                         <Route path="/" element={<Navigate to="/workspace/chat/geral" replace />} />
@@ -192,7 +194,7 @@ export default function App() {
 
                 {/* Communication Module */}
                 <Route path="/communication/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
                     <Layout module="communication">
                       <Routes>
                         <Route path="/" element={<CommDashboard />} />
@@ -208,7 +210,7 @@ export default function App() {
 
                 {/* Nutrition Module */}
                 <Route path="/nutrition/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
                     <Layout module="nutrition">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />

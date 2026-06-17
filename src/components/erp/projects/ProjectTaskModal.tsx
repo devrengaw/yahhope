@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabase';
 import { X, Plus, Trash2, CheckCircle2, Circle, Lock, Globe, UserPlus, Users, AlertCircle } from 'lucide-react';
 import { ProjectTask, TaskStatus, SubTask, mockTeamMembers, Priority } from '../../../lib/mockData';
 
@@ -18,6 +19,15 @@ export function ProjectTaskModal({ isOpen, onClose, onSave, initialTask }: Proje
   const [subtasks, setSubtasks] = useState<SubTask[]>(initialTask?.subtasks || []);
   const [invitees, setInvitees] = useState<string[]>(initialTask?.invitees || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [availableMembers, setAvailableMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from('users').select('id, name, department').then(({ data }) => {
+        if (data) setAvailableMembers(data);
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -196,7 +206,7 @@ export function ProjectTaskModal({ isOpen, onClose, onSave, initialTask }: Proje
               Integrantes da Tarefa
             </label>
             <div className="flex flex-wrap gap-2">
-              {mockTeamMembers.map(member => (
+              {availableMembers.map(member => (
                 <button
                   key={member.id}
                   type="button"
