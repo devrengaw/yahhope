@@ -148,24 +148,24 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         };
       case 'communication':
         return {
-          mobileHeader: "bg-indigo-700 text-white",
-          sidebarBg: "bg-indigo-800 border-transparent text-indigo-50",
-          moduleName: "text-indigo-300",
-          itemActiveBg: "bg-indigo-900/40 text-slate-50 shadow-inner",
-          itemInactiveBg: "text-indigo-200 hover:bg-indigo-600/50 hover:text-white",
-          iconActive: "text-indigo-100",
-          iconInactive: "text-indigo-300",
-          borderTop: "border-indigo-700/50",
-          backLink: "text-indigo-200 hover:text-white",
-          avatarBg: "bg-indigo-600 border-indigo-500 group-hover:border-white",
-          roleText: "text-indigo-300",
-          logoutBtn: "text-indigo-300 hover:text-white hover:bg-indigo-700/50"
+          mobileHeader: "bg-[#92BF78] text-white",
+          sidebarBg: "bg-[#92BF78] border-transparent text-white",
+          moduleName: "text-white/80",
+          itemActiveBg: "bg-black/20 text-white shadow-inner",
+          itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
+          iconActive: "text-white",
+          iconInactive: "text-white/80",
+          borderTop: "border-white/20",
+          backLink: "text-white/80 hover:text-white",
+          avatarBg: "bg-black/20 border-transparent group-hover:border-white",
+          roleText: "text-white/80",
+          logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
         };
       case 'admin':
       default:
         return {
-          mobileHeader: "bg-[#F49853] text-white",
-          sidebarBg: "bg-[#F49853] border-transparent text-white",
+          mobileHeader: "bg-[#88A1F2] text-white",
+          sidebarBg: "bg-[#88A1F2] border-transparent text-white",
           moduleName: "text-white/80",
           itemActiveBg: "bg-black/20 text-white shadow-inner",
           itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
