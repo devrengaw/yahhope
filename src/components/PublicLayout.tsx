@@ -12,25 +12,25 @@ export function PublicLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 md:h-24">
             <Link to="/" className="flex items-center">
-              <img src="/logo.png" alt="YAH Hope" className="h-12 md:h-16 object-contain brightness-0" />
+              <img src="/logo.png" alt="YAH Hope" className={isLoginPage ? "h-12 md:h-16 object-contain brightness-0 invert opacity-90" : "h-12 md:h-16 object-contain brightness-0"} />
             </Link>
             
             <nav className="hidden md:flex items-center gap-8">
-              <Link to="/" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Início</Link>
-              <Link to="/campanha" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Participe</Link>
-              <Link to="/projetos" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Conhecer Projetos</Link>
+              <Link to="/" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Início</Link>
+              <Link to="/campanha" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Participe</Link>
+              <Link to="/projetos" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Conhecer Projetos</Link>
               {localStorage.getItem('yah_blog_closed') !== 'true' && (
-                <Link to="/blog" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Blog</Link>
+                <Link to="/blog" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Blog</Link>
               )}
               {localStorage.getItem('yah_store_closed') !== 'true' && (
-                <Link to="/loja" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Loja</Link>
+                <Link to="/loja" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Loja</Link>
               )}
             </nav>
 
             <div className="flex items-center gap-4">
               <Link 
                 to="/login"
-                className="text-sm font-bold text-slate-600 hover:text-amber-600 transition-colors"
+                className={`text-sm font-bold transition-colors ${isLoginPage ? 'text-white hover:text-white/80 drop-shadow' : 'text-slate-600 hover:text-amber-600'}`}
               >
                 Entrar
               </Link>
