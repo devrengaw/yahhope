@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -17,12 +17,12 @@ const nutritionNavItems = [
   { name: 'Gestão', path: '/nutrition/management', icon: Settings },
 ];
 
-const erpNavItems = [
-  { name: 'Dashboard', path: '/erp', icon: LayoutDashboard },
-  { name: 'Projetos', path: '/erp/projects', icon: Briefcase },
-  { name: 'Financeiro', path: '/erp/finance', icon: DollarSign },
-  { name: 'Equipe', path: '/erp/team', icon: Users },
-  { name: 'Agenda', path: '/erp/calendar', icon: Calendar },
+const workspaceNavItems = [
+  { name: 'Dashboard Pessoal', path: '/workspace', icon: LayoutDashboard },
+  { name: 'Projetos', path: '/workspace/projects', icon: Briefcase },
+  { name: 'Financeiro', path: '/workspace/finance', icon: DollarSign },
+  { name: 'Equipe', path: '/workspace/team', icon: Users },
+  { name: 'Agenda', path: '/workspace/calendar', icon: Calendar },
 ];
 
 const adminNavItems = [
@@ -55,7 +55,7 @@ const supporterNavItems = [
   { name: 'Meu Impacto', path: '/portal/impact', icon: BarChart3 },
 ];
 
-export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'erp' | 'admin' | 'communication' | 'supporter' }) {
+export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'workspace' | 'admin' | 'communication' | 'supporter' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -63,18 +63,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
-    module === 'erp' ? erpNavItems : 
+    module === 'workspace' ? workspaceNavItems : 
     module === 'communication' ? communicationNavItems :
     module === 'supporter' ? supporterNavItems :
     adminNavItems;
   
   // Filter items by permission (simplified mapping)
   const navItems = initialNavItems.filter(item => {
-    if (user?.role === 'ADMIN' || module === 'supporter') return true;
+    if (module === 'supporter' || module === 'workspace') return true; // Workspace is open to all who log in
     
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
-    const isDashboard = item.path === '/nutrition' || item.path === '/erp' || item.path === '/admin' || item.path === '/communication';
+    const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication';
     const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : (permissionKey === 'blog' ? 'blog' : (permissionKey === 'chat' ? 'chat' : permissionKey)))));
     
     return user?.permissions.includes(finalKey);
@@ -82,14 +82,14 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
   const moduleName = 
     module === 'nutrition' ? 'Nutrição Infantil' : 
-    module === 'erp' ? 'Gestão de Projetos' : 
+    module === 'workspace' ? 'Meu Workspace' : 
     module === 'communication' ? 'Comunicação' :
     module === 'supporter' ? 'Portal do Apoiador' :
-    'YAH Hope';
+    'YAH Hope Admin';
     
   const themeColor = 
     module === 'nutrition' ? 'emerald' : 
-    module === 'erp' ? 'blue' : 
+    module === 'workspace' ? 'blue' : 
     module === 'communication' ? 'indigo' :
     module === 'supporter' ? 'amber' :
     'slate';
@@ -101,28 +101,78 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
   const isLightSidebar = module === 'supporter';
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className={cn(
-        "md:hidden p-4 flex justify-between items-center shadow-md z-20 transition-colors",
-        isLightSidebar ? "bg-white text-slate-900" : `bg-${themeColor}-700 text-white`
-      )}>
-        <div className="flex items-center">
-          <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
-        </div>
-        <div className="flex items-center gap-4">
-          <NotificationBell isLight={isLightSidebar} />
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </div>
+  const hasNutrition = user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits'].includes(p));
+  const hasCommunication = user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'email-templates'].includes(p));
+  const hasAdmin = user?.permissions && user.permissions.some(p => ['settings', 'impact-feed', 'messages', 'gifts', 'fundraising', 'store', 'local-projects', 'users'].includes(p));
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-10 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
+      
+      {/* Primary Sidebar - Workspaces */}
+      {module !== 'supporter' && (
+        <div className="w-16 sm:w-[72px] bg-slate-900 flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
+          <Link 
+            to="/workspace" 
+            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all mb-4 group relative", module === 'workspace' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white')}
+          >
+            <Home size={22} className={module === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
+          </Link>
+          
+          <div className="w-8 h-px bg-white/10 my-2" />
+          
+          <div className="flex flex-col gap-3 mt-2">
+            {hasNutrition && (
+              <Link 
+                to="/nutrition" 
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'nutrition' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+              >
+                <Activity size={22} className={module === 'nutrition' ? '' : 'group-hover:scale-110 transition-transform'} />
+              </Link>
+            )}
+            
+            {hasCommunication && (
+              <Link 
+                to="/communication" 
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'communication' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+              >
+                <MessageSquare size={22} className={module === 'communication' ? '' : 'group-hover:scale-110 transition-transform'} />
+              </Link>
+            )}
+            
+            {hasAdmin && (
+              <Link 
+                to="/admin" 
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'admin' ? 'bg-slate-700 text-white shadow-lg shadow-slate-700/20' : 'text-slate-400 hover:bg-white/10 hover:text-white')}
+              >
+                <Settings size={22} className={module === 'admin' ? '' : 'group-hover:scale-110 transition-transform'} />
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area containing Secondary Sidebar and Page */}
+      <div className="flex-1 flex flex-col md:flex-row relative">
+        {/* Mobile Header */}
+        <div className={cn(
+          "md:hidden p-4 flex justify-between items-center shadow-md z-20 transition-colors shrink-0",
+          isLightSidebar ? "bg-white text-slate-900" : `bg-${themeColor}-700 text-white`
+        )}>
+          <div className="flex items-center">
+            <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell isLight={isLightSidebar} />
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary Sidebar */}
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
           isLightSidebar ? "bg-white border-slate-100 text-slate-600" : `bg-${themeColor}-800 border-transparent text-${themeColor}-50`,
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
@@ -208,6 +258,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
+      </div> {/* Closes Main Content Area */}
     </div>
   );
 }

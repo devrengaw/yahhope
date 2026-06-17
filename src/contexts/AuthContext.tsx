@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getPermissionsForRole = (role: Role) => {
   if (role === 'ADMIN') {
-    return ['dashboard', 'patients', 'attendance', 'inventory', 'management', 'finance', 'projects', 'team', 'calendar', 'settings', 'impact-feed', 'messages', 'gifts'];
+    return ['dashboard', 'patients', 'attendance', 'waiting-list', 'updates', 'inventory', 'visits', 'management', 'projects', 'finance', 'team', 'calendar', 'chat', 'blog', 'email-templates', 'impact-feed', 'messages', 'fundraising', 'local-projects', 'users', 'gifts', 'store', 'settings'];
   }
   if (role === 'SPONSOR') {
     return ['portal'];
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: finalUser.name,
         email: finalUser.email,
         role: roleStr,
-        permissions: getPermissionsForRole(roleStr),
+        permissions: (finalUser.permissions && Array.isArray(finalUser.permissions)) ? finalUser.permissions : getPermissionsForRole(roleStr),
         avatar: finalUser.name ? finalUser.name[0].toUpperCase() : 'U'
       };
 

@@ -11,8 +11,8 @@ export function ErpDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Gestão de Projetos</h1>
-          <p className="text-slate-500 mt-1">Visão geral do ERP YAHope</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Dashboard Pessoal</h1>
+          <p className="text-slate-500 mt-1">Bem-vindo ao seu workspace</p>
         </div>
         <button className="bg-blue-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm">
           + Novo Projeto

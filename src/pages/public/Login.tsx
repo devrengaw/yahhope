@@ -21,7 +21,7 @@ export function Login() {
       }
 
       if (user.role === 'ADMIN') {
-        navigate('/admin');
+        navigate('/workspace');
         return;
       }
 
@@ -33,7 +33,7 @@ export function Login() {
       const accessibleCount = [hasNutrition, hasCommunication, hasSettings].filter(Boolean).length;
 
       if (accessibleCount > 1 || accessibleCount === 0) {
-        navigate('/admin');
+        navigate('/workspace');
       } else if (hasNutrition) {
         navigate('/nutrition/patients');
       } else if (hasCommunication) {

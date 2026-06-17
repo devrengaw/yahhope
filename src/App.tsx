@@ -11,7 +11,7 @@ import { Home } from './pages/public/Home';
 import { Login } from './pages/public/Login';
 import { Campaign } from './pages/public/Campaign';
 import { CampaignDisplay } from './pages/public/CampaignDisplay';
-import { ModuleSelector } from './pages/admin/ModuleSelector';
+
 import { Settings } from './pages/admin/Settings';
 import { Profile } from './pages/admin/Profile';
 import { Finance as AdminFinance } from './pages/admin/Finance';
@@ -134,12 +134,8 @@ export default function App() {
                   <Route path="/campanha" element={<Campaign />} />
                 </Route>
 
-                {/* Internal / Admin Module Selector */}
-                <Route path="/admin" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
-                    <ModuleSelector />
-                  </ProtectedRoute>
-                } />
+                {/* Redirect /admin to /workspace as the new root */}
+                <Route path="/admin" element={<Navigate to="/workspace" replace />} />
 
                 <Route path="/admin/*" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
@@ -163,10 +159,10 @@ export default function App() {
                   </ProtectedRoute>
                 } />
 
-                {/* ERP Module */}
-                <Route path="/erp/*" element={
+                {/* Workspace (Personal Workspace) */}
+                <Route path="/workspace/*" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
-                    <Layout module="erp">
+                    <Layout module="workspace">
                       <Routes>
                         <Route path="/" element={<ErpDashboard />} />
                         <Route path="/projects" element={<Navigate to="/admin/settings" replace />} />

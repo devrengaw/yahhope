@@ -46,37 +46,52 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
 
   const moduleGroups = [
     {
-      name: 'Gestão YAH Hope',
+      name: 'Gestão YAH Hope (Admin)',
       modules: [
-        { id: 'yah_projetos', label: 'Autorização para a área de projetos' },
-        { id: 'yah_mensagens', label: 'Mensagens' },
-        { id: 'yah_financeiro', label: 'Financeiro (Captação)' },
-        { id: 'yah_presentes', label: 'Presentes' },
-        { id: 'yah_loja', label: 'Gestão da Loja' },
-        { id: 'yah_geral', label: 'Geral' },
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'impact-feed', label: 'Feed de Impacto' },
+        { id: 'messages', label: 'Mensagens' },
+        { id: 'fundraising', label: 'Financeiro (Captação)' },
+        { id: 'projects', label: 'Projetos Globais' },
+        { id: 'local-projects', label: 'Projetos Locais' },
+        { id: 'users', label: 'Usuários' },
+        { id: 'finance', label: 'Financeiro' },
+        { id: 'gifts', label: 'Presentes' },
+        { id: 'store', label: 'Gestão da Loja' },
+        { id: 'settings', label: 'Configurações' },
       ]
     },
     {
       name: 'Comunicação',
       modules: [
-        { id: 'com_projetos', label: 'Projetos' },
-        { id: 'com_chat', label: 'Chat' },
-        { id: 'com_blog', label: 'Blog' },
-        { id: 'com_templates', label: 'Templates de email' },
-        { id: 'com_gestao', label: 'Gestão' },
+        { id: 'projects', label: 'Projetos' },
+        { id: 'chat', label: 'Chat' },
+        { id: 'blog', label: 'Blog' },
+        { id: 'email-templates', label: 'Templates de email' },
+        { id: 'management', label: 'Gestão' },
       ]
     },
     {
       name: 'Nutrição Infantil',
       modules: [
-        { id: 'nutri_dashboard', label: 'Dashboard' },
-        { id: 'nutri_criancas', label: 'Crianças' },
-        { id: 'nutri_atendimento', label: 'Atendimento' },
-        { id: 'nutri_fila', label: 'Fila de Espera' },
-        { id: 'nutri_atualizacoes', label: 'Atualizações apoiador' },
-        { id: 'nutri_estoque', label: 'Estoque' },
-        { id: 'nutri_visitas', label: 'Visitas' },
-        { id: 'nutri_gestao', label: 'Gestão' },
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'patients', label: 'Crianças' },
+        { id: 'attendance', label: 'Atendimento' },
+        { id: 'waiting-list', label: 'Fila de Espera' },
+        { id: 'updates', label: 'Atualizações apoiador' },
+        { id: 'inventory', label: 'Estoque' },
+        { id: 'visits', label: 'Visitas' },
+        { id: 'management', label: 'Gestão' },
+      ]
+    },
+    {
+      name: 'Gestão de Projetos (ERP)',
+      modules: [
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'projects', label: 'Projetos' },
+        { id: 'finance', label: 'Financeiro' },
+        { id: 'team', label: 'Equipe' },
+        { id: 'calendar', label: 'Agenda' },
       ]
     }
   ];
