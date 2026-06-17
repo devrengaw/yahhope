@@ -274,8 +274,31 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
         </div>
 
+        {/* Mobile Module Switcher */}
+        {module !== 'supporter' && (
+          <div className={cn("md:hidden flex items-center justify-around p-3 border-b shrink-0", theme.borderTop)}>
+            <Link to="/workspace" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'workspace' ? theme.itemActiveBg : theme.itemInactiveBg)}>
+              <Home size={22} className={module === 'workspace' ? theme.iconActive : theme.moduleName} />
+            </Link>
+            {hasNutrition && (
+              <Link to="/nutrition" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'nutrition' ? theme.itemActiveBg : theme.itemInactiveBg)}>
+                <Activity size={22} className={module === 'nutrition' ? theme.iconActive : theme.moduleName} />
+              </Link>
+            )}
+            {hasCommunication && (
+              <Link to="/communication" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'communication' ? theme.itemActiveBg : theme.itemInactiveBg)}>
+                <MessageSquare size={22} className={module === 'communication' ? theme.iconActive : theme.moduleName} />
+              </Link>
+            )}
+            {hasAdmin && (
+              <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'admin' ? theme.itemActiveBg : theme.itemInactiveBg)}>
+                <Settings size={22} className={module === 'admin' ? theme.iconActive : theme.moduleName} />
+              </Link>
+            )}
+          </div>
+        )}
         
-        <nav className="mt-6 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
+        <nav className="mt-4 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
           {module === 'workspace' ? (
             <div className="px-3 pb-4">
               <div className="mb-6">
