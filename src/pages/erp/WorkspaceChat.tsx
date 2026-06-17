@@ -88,7 +88,7 @@ export function WorkspaceChat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 40px)' }}>
+    <div className="flex flex-col h-[calc(100vh-12rem)] bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
       {/* Header */}
       <div className="h-16 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-white">
         <div className="flex items-center gap-3">
