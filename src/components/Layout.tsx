@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
 import { NotificationBell } from './NotificationBell';
+
+import { useWorkspace } from '../contexts/WorkspaceContext';
 
 const nutritionNavItems = [
   { name: 'Dashboard', path: '/nutrition', icon: LayoutDashboard },
@@ -59,7 +61,13 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  
+  const workspaceData = useWorkspace();
+  const { channels, addChannel } = workspaceData || {};
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
@@ -126,17 +134,17 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       case 'workspace':
         return {
           mobileHeader: "bg-[#1E1F21] text-white",
-          sidebarBg: "bg-[#2b092a] border-transparent text-slate-300",
-          moduleName: "text-slate-400",
-          itemActiveBg: "bg-[#1164A3] text-white shadow-inner",
-          itemInactiveBg: "text-slate-300 hover:bg-white/5 hover:text-white",
+          sidebarBg: "bg-[#878787] border-transparent text-white",
+          moduleName: "text-slate-200",
+          itemActiveBg: "bg-black/20 text-white shadow-inner",
+          itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
           iconActive: "text-white",
-          iconInactive: "text-slate-400",
-          borderTop: "border-white/10",
-          backLink: "text-slate-400 hover:text-white",
-          avatarBg: "bg-[#1164A3] border-[#1164A3] group-hover:border-white",
-          roleText: "text-slate-400",
-          logoutBtn: "text-slate-400 hover:text-white hover:bg-white/10"
+          iconInactive: "text-white/70",
+          borderTop: "border-white/20",
+          backLink: "text-white/80 hover:text-white",
+          avatarBg: "bg-black/20 border-transparent group-hover:border-white",
+          roleText: "text-white/70",
+          logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
         };
       case 'communication':
         return {
@@ -271,53 +279,37 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           {module === 'workspace' ? (
             <div className="px-3 pb-4">
               <div className="mb-6">
-                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Canais</p>
+                <div className="flex items-center justify-between px-4 mb-2">
+                  <p className={cn("text-xs font-bold uppercase tracking-wider", theme.roleText)}>Canais</p>
+                  {user?.role === 'ADMIN' && (
+                    <button 
+                      onClick={() => setIsChannelModalOpen(true)}
+                      className="text-slate-400 hover:text-white transition-colors"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
+                </div>
                 <ul className="space-y-1">
-                  <li>
-                    <Link
-                      to="/workspace/chat/geral"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname === '/workspace/chat/geral' || location.pathname === '/workspace' 
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <span className="font-light text-lg opacity-70">#</span>
-                      <span className={cn(location.pathname === '/workspace/chat/geral' || location.pathname === '/workspace' ? "font-bold" : "")}>geral</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/workspace/chat/projetos"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname === '/workspace/chat/projetos' 
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <span className="font-light text-lg opacity-70">#</span>
-                      <span className={cn(location.pathname === '/workspace/chat/projetos' ? "font-bold" : "")}>projetos</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/workspace/chat/anuncios"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname === '/workspace/chat/anuncios' 
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <span className="font-light text-lg opacity-70">#</span>
-                      <span className={cn(location.pathname === '/workspace/chat/anuncios' ? "font-bold" : "")}>anúncios</span>
-                    </Link>
-                  </li>
+                  {channels?.map(channel => (
+                    <li key={channel.id}>
+                      <Link
+                        to={`/workspace/chat/${channel.id}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
+                          location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace')
+                            ? theme.itemActiveBg
+                            : theme.itemInactiveBg
+                        )}
+                      >
+                        <span className="font-light text-lg opacity-70">#</span>
+                        <span className={cn(location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace') ? "font-bold" : "")}>
+                          {channel.name}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -471,6 +463,60 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         />
       )}
       </div> {/* Closes Main Content Area */}
+
+      {/* New Channel Modal */}
+      {isChannelModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Criar Novo Canal</h3>
+              <button onClick={() => setIsChannelModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome do canal</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-slate-400">#</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                    placeholder="ex: marketing"
+                    className="w-full pl-8 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Nomes devem conter letras minúsculas, números e hifens.</p>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setIsChannelModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (newChannelName.trim() && addChannel) {
+                      addChannel({ name: newChannelName, description: '', isPrivate: false, members: [user?.name || 'User'] });
+                      setIsChannelModalOpen(false);
+                      setNewChannelName('');
+                      navigate(`/workspace/chat/${newChannelName}`);
+                    }
+                  }}
+                  disabled={!newChannelName.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Criar Canal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

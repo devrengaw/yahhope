@@ -63,6 +63,7 @@ import { NutritionMessages } from './pages/nutrition/NutritionMessages';
 import { GiftManager } from './pages/admin/GiftManager';
 import { FundraisingManager } from './pages/admin/FundraisingManager';
 import { AdminStoreManager } from './pages/admin/AdminStoreManager';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -132,6 +133,7 @@ export default function App() {
               <VisitProvider>
             <InventoryProvider>
               <StoreProvider>
+                <WorkspaceProvider>
               <Router>
               <Routes>
                 {/* Dedicated full-screen Display Route */}
@@ -245,6 +247,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Router>
+                </WorkspaceProvider>
               </StoreProvider>
             </InventoryProvider>
               </VisitProvider>
