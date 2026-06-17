@@ -18,21 +18,9 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, StoreProduct } from '../../contexts/StoreContext';
 
 type TabType = 'dashboard' | 'products' | 'orders' | 'settings';
-
-export interface StoreProduct {
-  id: string;
-  name: string;
-  description: string;
-  cost_price: number;
-  sale_price: number;
-  stock_quantity: number;
-  image_url: string;
-  category: string;
-  status: 'active' | 'inactive';
-}
 
 export function AdminStoreManager() {
   const { products, addProduct, updateProduct, deleteProduct } = useStore();

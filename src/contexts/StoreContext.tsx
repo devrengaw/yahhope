@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { StoreProduct } from '../pages/admin/AdminStoreManager';
 import { supabase } from '../lib/supabase';
+
+export interface StoreProduct {
+  id: string;
+  name: string;
+  description: string;
+  cost_price: number;
+  sale_price: number;
+  stock_quantity: number;
+  image_url: string;
+  category: string;
+  status: 'active' | 'inactive';
+}
 
 interface StoreContextType {
   products: StoreProduct[];
