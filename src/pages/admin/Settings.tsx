@@ -73,6 +73,28 @@ export function Settings() {
   // User/Team State
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'alert'
+  });
+
+  const closeDialog = () => setDialogConfig(prev => ({ ...prev, isOpen: false }));
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setDialogConfig({ isOpen: true, title, message, type: 'confirm', onConfirm });
+  };
+
+  const showAlert = (title: string, message: string) => {
+    setDialogConfig({ isOpen: true, title, message, type: 'alert' });
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -167,25 +189,25 @@ export function Settings() {
         });
         
         if (error) throw error;
-        alert(`Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
+        showAlert('Convite Enviado', `Um e-mail de convite foi enviado para ${member.email} com as instruções para o primeiro acesso e definição de senha.`);
       } catch (err: any) {
         console.error('Error sending invite:', err);
-        alert(`O usuário foi salvo localmente, mas houve um erro ao enviar o e-mail: ${err.message}`);
+        showAlert('Erro de Envio', `O usuário foi salvo localmente, mas houve um erro ao enviar o e-mail: ${err.message}`);
       }
     }
   };
 
   const handleDeleteMember = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
+    showConfirm('Excluir Usuário', 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.', async () => {
       try {
         const { error } = await supabase.from('users').delete().eq('id', id);
         if (error) throw error;
         setMembers(members.filter(m => m.id !== id));
       } catch (err: any) {
         console.error('Error deleting user:', err);
-        alert('Erro ao excluir usuário: ' + err.message);
+        showAlert('Erro', 'Erro ao excluir usuário: ' + err.message);
       }
-    }
+    });
   };
 
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -196,19 +218,19 @@ export function Settings() {
   };
 
   const handleResendInvite = async (member: TeamMember) => {
-    if (confirm(`Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`)) {
+    showConfirm('Reenviar Convite', `Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`, async () => {
       try {
         const { error } = await supabase.functions.invoke('invite-user', {
           body: { email: member.email, name: member.name, role: member.role }
         });
         
         if (error) throw error;
-        alert(`Um e-mail de convite foi reenviado com sucesso para ${member.email}!`);
+        showAlert('Sucesso', `Um e-mail de convite foi reenviado com sucesso para ${member.email}!`);
       } catch (err: any) {
         console.error('Error resending invite:', err);
-        alert(`Erro ao reenviar o e-mail: ${err.message}`);
+        showAlert('Erro', `Erro ao reenviar o e-mail: ${err.message}`);
       }
-    }
+    });
   };
 
   return (
@@ -387,6 +409,38 @@ export function Settings() {
         onSave={handleSaveMember}
         editingMember={selectedMember}
       />
+
+      {dialogConfig.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <h3 className="text-xl font-black text-slate-900 mb-2 tracking-tight">{dialogConfig.title}</h3>
+              <p className="text-slate-600 mb-8 font-medium">{dialogConfig.message}</p>
+              <div className="flex justify-end gap-3">
+                {dialogConfig.type === 'confirm' && (
+                  <button 
+                    onClick={closeDialog}
+                    className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    if (dialogConfig.type === 'confirm' && dialogConfig.onConfirm) {
+                      dialogConfig.onConfirm();
+                    }
+                    closeDialog();
+                  }}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-md"
+                >
+                  {dialogConfig.type === 'confirm' ? 'Confirmar' : 'OK'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

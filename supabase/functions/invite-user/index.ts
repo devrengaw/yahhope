@@ -111,6 +111,10 @@ serve(async (req) => {
             <a href="${actionLink}" style="display: inline-block; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: bold; font-size: 16px;">
               ${ctaText}
             </a>
+            <p style="margin-top: 24px; font-size: 12px; color: #94a3b8;">
+              Se o botão não funcionar, clique no link seguro abaixo:<br>
+              <a href="${actionLink}" style="color: ${primaryColor}; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 8px;">https://yahhope.com/acesso-seguro</a>
+            </p>
           </div>
           
         </div>
