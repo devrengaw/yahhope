@@ -93,11 +93,22 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamList
                     <td className="p-4 text-slate-500 text-sm space-y-1">
                       <div className="flex items-center gap-1.5">
                         <Mail size={14} className="text-slate-400" />
-                        {member.email}
+                        <a href={`mailto:${member.email}`} className="hover:text-blue-600 hover:underline transition-colors">{member.email}</a>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Phone size={14} className="text-slate-400" />
-                        {member.phone}
+                        {member.phone && member.phone !== '-' ? (
+                          <a 
+                            href={`https://wa.me/${member.phone.replace(/\\D/g, '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="hover:text-emerald-600 hover:underline transition-colors"
+                          >
+                            {member.phone}
+                          </a>
+                        ) : (
+                          <span>-</span>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">

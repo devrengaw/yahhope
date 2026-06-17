@@ -114,7 +114,8 @@ export function Settings() {
           department: u.department || '-',
           join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
           status: u.status || 'active',
-          category_id: u.category_id || undefined
+          category_id: u.category_id || undefined,
+          permissions: u.permissions || []
         })) as TeamMember[];
         
         setMembers(mappedMembers.sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime()));
@@ -156,6 +157,7 @@ export function Settings() {
           name: newMember.name,
           email: newMember.email,
           role: newMember.role,
+          permissions: newMember.permissions,
         }).eq('id', selectedMember.id);
         
         if (error) throw error;
@@ -200,7 +202,11 @@ export function Settings() {
   const handleDeleteMember = async (id: string) => {
     showConfirm('Excluir Usuário', 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.', async () => {
       try {
-        const { error } = await supabase.from('users').delete().eq('id', id);
+        // Usa a Edge Function para deletar do Supabase Auth e também da tabela public.users
+        const { error } = await supabase.functions.invoke('delete-user', {
+          body: { id }
+        });
+        
         if (error) throw error;
         setMembers(members.filter(m => m.id !== id));
       } catch (err: any) {
