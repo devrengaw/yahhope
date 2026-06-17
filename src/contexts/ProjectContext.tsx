@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, mockProjects, ProjectTask, ColumnDefinition, ColumnType, PersonalActivity } from '../lib/mockData';
 import { supabase } from '../lib/supabase';
 
+import { useAuth } from './AuthContext';
+
 interface ProjectContextType {
   projects: Project[];
   activities: PersonalActivity[];
@@ -31,18 +33,32 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<PersonalActivity[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) {
+      fetchProjects();
+    }
+  }, [user]);
 
   const fetchProjects = async () => {
     try {
       const { data: projData } = await supabase.from('projects').select('*');
       const { data: taskData } = await supabase.from('project_tasks').select('*');
       
+      const hasAdminPerm = user?.role === 'ADMIN' || user?.permissions.includes('management');
+      
       if (projData) {
-        const formattedProjects: Project[] = projData.map(p => {
+        let filteredProjData = projData;
+        if (!hasAdminPerm && user) {
+          // Filtrar projetos: só vê se for não-privado (opcional) ou se estiver na lista de invitees
+          filteredProjData = projData.filter(p => {
+            const invitees = Array.isArray(p.invitees) ? p.invitees : [];
+            return !p.is_private || invitees.includes(user.name) || invitees.includes(user.id);
+          });
+        }
+
+        const formattedProjects: Project[] = filteredProjData.map(p => {
           const pTasks = taskData ? taskData.filter(t => t.project_id === p.id) : [];
           
           return {
@@ -95,6 +111,19 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     if (data) {
       setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p));
+      
+      // Integração com Finanças: se tiver orçamento, cria um lançamento de despesa pendente
+      if (project.budget && project.budget > 0) {
+        await supabase.from('finance_transactions').insert({
+          description: `Orçamento: ${project.name}`,
+          amount: project.budget,
+          type: 'expense',
+          date: project.start_date || new Date().toISOString(),
+          status: 'pending',
+          account: 'Banco YAH Hope',
+          expense_type: 'variable'
+        });
+      }
     }
   };
 

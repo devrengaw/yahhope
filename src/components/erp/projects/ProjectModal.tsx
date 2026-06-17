@@ -28,7 +28,7 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !startDate || !budget) return;
+    if (!name || !startDate) return;
 
     onSave({
       id: initialProject?.id || Math.random().toString(36).substring(2, 9),
@@ -38,7 +38,7 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
       progress: parseInt(progress),
       start_date: startDate,
       end_date: endDate,
-      budget: parseFloat(budget),
+      budget: budget ? parseFloat(budget) : 0,
       isPrivate,
       invitees,
       category,
@@ -198,7 +198,6 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
               onChange={e => setBudget(e.target.value)}
               placeholder="0.00"
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-emerald-600 font-medium"
-              required
             />
           </div>
 

@@ -45,10 +45,13 @@ export interface TransactionCategory {
   icon: string;
 }
 
+import { Project } from '../../lib/mockData';
+
 export function Finance() {
-  const [activeTab, setActiveTab] = useState<'transactions' | 'categories'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -60,12 +63,14 @@ export function Finance() {
 
   const fetchData = async () => {
     try {
-      const [txRes, catRes] = await Promise.all([
+      const [txRes, catRes, projRes] = await Promise.all([
         supabase.from('finance_transactions').select('*').order('date', { ascending: false }),
-        supabase.from('finance_categories').select('*').order('name', { ascending: true })
+        supabase.from('finance_categories').select('*').order('name', { ascending: true }),
+        supabase.from('projects').select('*').order('created_at', { ascending: false })
       ]);
       if (txRes.data) setTransactions(txRes.data);
       if (catRes.data) setCategories(catRes.data);
+      if (projRes.data) setProjects(projRes.data);
     } catch (e) {
       console.error('Error fetching finance data:', e);
     }
@@ -107,6 +112,27 @@ export function Finance() {
       fixedPercentage: expense > 0 ? (fixedExpense / expense) * 100 : 0
     };
   }, [transactions]);
+
+  const projectStats = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+
+    const monthlyIncome = transactions
+      .filter(t => {
+        if (t.type !== 'income') return false;
+        const d = new Date(t.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const activeProjectsCost = projects
+      .filter(p => p.status === 'active' || p.status === 'planning')
+      .reduce((acc, p) => acc + (p.budget || 0), 0);
+
+    const coveragePercentage = activeProjectsCost > 0 ? Math.min((monthlyIncome / activeProjectsCost) * 100, 100) : 100;
+    
+    return { monthlyIncome, activeProjectsCost, coveragePercentage };
+  }, [transactions, projects]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -270,6 +296,16 @@ export function Finance() {
           >
             Categorias
             {activeTab === 'categories' && <div className="absolute bottom-0 left-6 right-6 h-1 bg-slate-900 rounded-t-full"></div>}
+          </button>
+          <button 
+            onClick={() => setActiveTab('projects')}
+            className={cn(
+              "px-6 py-4 font-bold text-sm transition-all relative",
+              activeTab === 'projects' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Projetos
+            {activeTab === 'projects' && <div className="absolute bottom-0 left-6 right-6 h-1 bg-slate-900 rounded-t-full"></div>}
           </button>
         </div>
 
@@ -439,7 +475,7 @@ export function Finance() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'categories' ? (
           <div className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {categories.map((cat) => (
@@ -500,9 +536,87 @@ export function Finance() {
               </button>
             </div>
           </div>
-        )}
+        ) : activeTab === 'projects' ? (
+          <div className="p-8 space-y-8 bg-slate-50">
+            {/* Dashboard: Projeção Mensal */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-center">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Projeção de Cobertura</h3>
+                <p className="text-sm text-slate-500">Receita do mês vs Custo de projetos ativos</p>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-900">
+                    {projectStats.coveragePercentage.toFixed(1)}%
+                  </span>
+                  <span className="text-sm font-bold text-slate-400">coberto</span>
+                </div>
+              </div>
+              <div className="flex-1 w-full space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm font-bold mb-1">
+                    <span className="text-emerald-600">Receita Mês Atual</span>
+                    <span className="text-slate-900">R$ {projectStats.monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm font-bold mb-1">
+                    <span className="text-amber-600">Custo Projetos Ativos</span>
+                    <span className="text-slate-900">R$ {projectStats.activeProjectsCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-amber-500 h-full rounded-full" style={{ width: `${Math.min((projectStats.activeProjectsCost / (projectStats.monthlyIncome || 1)) * 100, 100)}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        {/* Pagination Footer */}
+            {/* Listagem de Projetos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map(p => (
+                <div key={p.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                      <Layers size={20} />
+                    </div>
+                    <span className={cn(
+                      "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                      p.status === 'active' ? "bg-emerald-100 text-emerald-700" :
+                      p.status === 'planning' ? "bg-amber-100 text-amber-700" :
+                      "bg-slate-100 text-slate-700"
+                    )}>
+                      {p.status === 'active' ? 'Em Andamento' : p.status === 'planning' ? 'Planejamento' : p.status}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 mb-1">{p.name}</h4>
+                  <p className="text-sm text-slate-500 line-clamp-2 mb-4">{p.description || 'Sem descrição'}</p>
+                  
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Custo Estimado</p>
+                      <p className="text-lg font-black text-slate-900">
+                        R$ {(p.budget || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    {p.start_date && (
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Início</p>
+                        <p className="text-xs font-bold text-slate-700">{new Date(p.start_date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {projects.length === 0 && (
+                <div className="col-span-full p-12 text-center text-slate-500 font-medium">
+                  Nenhum projeto encontrado.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
         <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex justify-between items-center px-10">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
             {activeTab === 'transactions' 

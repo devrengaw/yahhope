@@ -192,7 +192,7 @@ export default function App() {
 
                 {/* Communication Module */}
                 <Route path="/communication/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
                     <Layout module="communication">
                       <Routes>
                         <Route path="/" element={<CommDashboard />} />
@@ -208,7 +208,7 @@ export default function App() {
 
                 {/* Nutrition Module */}
                 <Route path="/nutrition/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
                     <Layout module="nutrition">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />

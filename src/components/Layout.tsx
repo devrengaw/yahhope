@@ -133,18 +133,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         };
       case 'workspace':
         return {
-          mobileHeader: "bg-[#1E1F21] text-white",
-          sidebarBg: "bg-[#878787] border-transparent text-white",
-          moduleName: "text-slate-200",
-          itemActiveBg: "bg-black/20 text-white shadow-inner",
-          itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
-          iconActive: "text-white",
-          iconInactive: "text-white/70",
-          borderTop: "border-white/20",
-          backLink: "text-white/80 hover:text-white",
-          avatarBg: "bg-black/20 border-transparent group-hover:border-white",
-          roleText: "text-white/70",
-          logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
+          mobileHeader: "bg-[#EBC878] text-slate-900",
+          sidebarBg: "bg-[#EBC878] border-transparent text-slate-900",
+          moduleName: "text-slate-700",
+          itemActiveBg: "bg-black/10 text-slate-900 shadow-inner",
+          itemInactiveBg: "text-slate-800 hover:bg-black/5 hover:text-slate-900",
+          iconActive: "text-slate-900",
+          iconInactive: "text-slate-700",
+          borderTop: "border-black/10",
+          backLink: "text-slate-700 hover:text-slate-900",
+          avatarBg: "bg-black/10 border-transparent group-hover:border-slate-900",
+          roleText: "text-slate-700",
+          logoutBtn: "text-slate-700 hover:text-slate-900 hover:bg-black/5"
         };
       case 'communication':
         return {
@@ -197,7 +197,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       
       {/* Primary Sidebar - Workspaces */}
       {module !== 'supporter' && (
-        <div className="w-16 sm:w-[72px] bg-[#F49853] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
+        <div className="w-16 sm:w-[72px] bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
           <Link 
             to="/workspace" 
             className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
@@ -382,11 +382,6 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   
         
         <div className={cn("shrink-0 p-4 border-t", theme.borderTop)}>
-          {user?.role === 'ADMIN' && (
-            <Link to="/admin" className={cn("flex items-center gap-2 text-sm font-bold mb-4 px-2 transition-colors", theme.backLink)}>
-              <ArrowLeft size={16} /> Voltar aos Módulos
-            </Link>
-          )}
           <div className="flex items-center justify-between px-2">
             <Link 
               to="/admin/profile" 
