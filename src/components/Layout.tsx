@@ -88,6 +88,8 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     'YAH Hope Admin';
     
   
+  const isLightSidebar = module === 'supporter';
+
   const getThemeClasses = () => {
     if (isLightSidebar) {
       return {
@@ -177,8 +179,6 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     logout();
     navigate('/login');
   };
-
-  const isLightSidebar = module === 'supporter';
 
   const hasNutrition = user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits'].includes(p));
   const hasCommunication = user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'email-templates'].includes(p));
