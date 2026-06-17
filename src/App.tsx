@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { PublicLayout } from './components/PublicLayout';
 import { Home } from './pages/public/Home';
@@ -67,6 +67,7 @@ import { AdminStoreManager } from './pages/admin/AdminStoreManager';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -83,7 +84,22 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
   // Check if role is allowed
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/admin" />;
+    const fallback = user.role === 'SPONSOR' ? '/portal' : '/workspace';
+    
+    // Prevent infinite loop if already at fallback
+    if (location.pathname.startsWith(fallback)) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <div className="p-8 text-center bg-white rounded-2xl shadow-sm border border-slate-100 max-w-md">
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Acesso Restrito</h2>
+            <p className="text-slate-500 mb-6">Seu perfil ({user.role}) não possui permissão para acessar esta área.</p>
+            <button onClick={() => window.location.href = '/login'} className="text-blue-600 hover:underline">Voltar para o Login</button>
+          </div>
+        </div>
+      );
+    }
+    
+    return <Navigate to={fallback} />;
   }
   
   return <>{children}</>;
@@ -161,7 +177,7 @@ export default function App() {
 
                 {/* Workspace (Personal Workspace) */}
                 <Route path="/workspace/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF']}>
                     <Layout module="workspace">
                       <Routes>
                         <Route path="/" element={<ErpDashboard />} />
