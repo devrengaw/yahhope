@@ -164,18 +164,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       case 'admin':
       default:
         return {
-          mobileHeader: "bg-slate-700 text-white",
-          sidebarBg: "bg-slate-800 border-transparent text-slate-50",
-          moduleName: "text-slate-300",
-          itemActiveBg: "bg-slate-900/40 text-slate-50 shadow-inner",
-          itemInactiveBg: "text-slate-200 hover:bg-slate-600/50 hover:text-white",
-          iconActive: "text-slate-100",
-          iconInactive: "text-slate-300",
-          borderTop: "border-slate-700/50",
-          backLink: "text-slate-200 hover:text-white",
-          avatarBg: "bg-slate-600 border-slate-500 group-hover:border-white",
-          roleText: "text-slate-300",
-          logoutBtn: "text-slate-300 hover:text-white hover:bg-slate-700/50"
+          mobileHeader: "bg-[#F49853] text-white",
+          sidebarBg: "bg-[#F49853] border-transparent text-white",
+          moduleName: "text-white/80",
+          itemActiveBg: "bg-black/20 text-white shadow-inner",
+          itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
+          iconActive: "text-white",
+          iconInactive: "text-white/80",
+          borderTop: "border-white/20",
+          backLink: "text-white/80 hover:text-white",
+          avatarBg: "bg-black/20 border-transparent group-hover:border-white",
+          roleText: "text-white/80",
+          logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
         };
     }
   };
@@ -315,44 +315,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
               <div className="mb-6">
                 <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Mensagens Diretas</p>
-                <ul className="space-y-1">
-                  <li>
-                    <Link
-                      to="/workspace/dm/1"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname === '/workspace/dm/1' 
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <div className="relative">
-                        <img src="https://i.pravatar.cc/150?u=1" alt="Ana" className="w-5 h-5 rounded" />
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
-                      </div>
-                      <span className={cn(location.pathname === '/workspace/dm/1' ? "font-bold" : "")}>Ana Júlia</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/workspace/dm/2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname === '/workspace/dm/2' 
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <div className="relative">
-                        <img src="https://i.pravatar.cc/150?u=2" alt="Carlos" className="w-5 h-5 rounded" />
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-transparent border-2 border-slate-400 rounded-full"></div>
-                      </div>
-                      <span className={cn(location.pathname === '/workspace/dm/2' ? "font-bold" : "")}>Carlos S.</span>
-                    </Link>
-                  </li>
-                </ul>
+                <div className="px-4 text-sm text-slate-500 italic opacity-70">
+                  Nenhuma conversa ativa
+                </div>
               </div>
 
               <div>
