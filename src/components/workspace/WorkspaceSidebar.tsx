@@ -9,7 +9,7 @@ import {
 import { cn } from '../../lib/utils';
 
 export function WorkspaceSidebar() {
-  const { spaces, lists, activeSpace, activeList, setActiveSpace, setActiveList } = useClickUp();
+  const { spaces, lists, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, addList } = useClickUp();
   const [expandedSpaces, setExpandedSpaces] = React.useState<Record<string, boolean>>({ 's1': true });
   const location = useLocation();
 
@@ -144,7 +144,15 @@ export function WorkspaceSidebar() {
                       </div>
                       <span className={cn("text-sm truncate", activeSpace === space.id && !activeList && location.pathname === '/workspace' ? "font-bold text-white" : "font-medium text-white/90")}>{space.name}</span>
                     </div>
-                    <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-white/70">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Tem certeza que deseja excluir o espaço "${space.name}"?`)) {
+                          deleteSpace(space.id);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-white/70"
+                    >
                       <MoreHorizontal size={14} />
                     </button>
                   </div>
@@ -170,7 +178,14 @@ export function WorkspaceSidebar() {
                           </span>
                         </div>
                       ))}
-                      <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/10 text-white/60">
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const name = window.prompt('Nome da nova Lista:');
+                          if (name) addList(space.id, name);
+                        }}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/10 text-white/60"
+                      >
                         <Plus size={14} />
                         <span className="text-xs font-medium">Adicionar Lista</span>
                       </div>
@@ -181,7 +196,13 @@ export function WorkspaceSidebar() {
             })}
           </div>
 
-          <button className="w-full mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-medium">
+          <button 
+            onClick={() => {
+              const name = window.prompt('Nome do novo Espaço:');
+              if (name) addSpace(name, '#3b82f6', 'layout');
+            }}
+            className="w-full mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-medium"
+          >
             <Plus size={14} /> Novo Espaço
           </button>
         </div>

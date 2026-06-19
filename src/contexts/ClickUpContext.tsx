@@ -62,7 +62,13 @@ interface ClickUpContextType {
   setActiveList: (id: string | null) => void;
 
   addSpace: (name: string, color: string, icon: string) => Promise<void>;
+  updateSpace: (id: string, updates: Partial<CU_Space>) => Promise<void>;
+  deleteSpace: (id: string) => Promise<void>;
+  
   addList: (space_id: string, name: string) => Promise<void>;
+  updateList: (id: string, updates: Partial<CU_List>) => Promise<void>;
+  deleteList: (id: string) => Promise<void>;
+  
   addTask: (list_id: string, name: string, status_id: string) => Promise<void>;
   updateTaskStatus: (task_id: string, status_id: string) => Promise<void>;
   updateTaskField: (task_id: string, field_id: string, value: string) => Promise<void>;
@@ -218,8 +224,33 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
     fetchWorkspaceData();
   };
 
+  const updateSpace = async (id: string, updates: Partial<CU_Space>) => {
+    await supabase.from('clickup_spaces').update(updates).eq('id', id);
+    fetchWorkspaceData();
+  };
+
+  const deleteSpace = async (id: string) => {
+    await supabase.from('clickup_spaces').delete().eq('id', id);
+    if (activeSpace === id) {
+      setActiveSpace(null);
+      setActiveList(null);
+    }
+    fetchWorkspaceData();
+  };
+
   const addList = async (space_id: string, name: string) => {
     await supabase.from('clickup_lists').insert([{ space_id, name, color: '#94a3b8' }]);
+    fetchWorkspaceData();
+  };
+
+  const updateList = async (id: string, updates: Partial<CU_List>) => {
+    await supabase.from('clickup_lists').update(updates).eq('id', id);
+    fetchWorkspaceData();
+  };
+
+  const deleteList = async (id: string) => {
+    await supabase.from('clickup_lists').delete().eq('id', id);
+    if (activeList === id) setActiveList(null);
     fetchWorkspaceData();
   };
 
@@ -259,7 +290,13 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
     <ClickUpContext.Provider value={{
       spaces, folders, lists, statuses, fields, tasks,
       activeSpace, activeList, setActiveSpace, setActiveList,
-      addSpace, addList, addTask, updateTaskStatus, updateTaskField, addField, loading
+      addSpace,
+      updateSpace,
+      deleteSpace,
+      addList,
+      updateList,
+      deleteList,
+      addTask, updateTaskStatus, updateTaskField, addField, loading
     }}>
       {children}
     </ClickUpContext.Provider>

@@ -435,10 +435,14 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto w-full">
-        <div className="p-4 md:p-8 max-w-7xl mx-auto">
-          {children}
-        </div>
+      <main className={cn("flex-1 w-full", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
+        {module === 'workspace' ? (
+          children
+        ) : (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            {children}
+          </div>
+        )}
         {/* Floating Chat for Supporters */}
         {module === 'supporter' && <ChatWidget />}
       </main>
