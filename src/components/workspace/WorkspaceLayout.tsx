@@ -6,7 +6,7 @@ import { ClickUpProvider } from '../../contexts/ClickUpContext';
 export function WorkspaceLayout() {
   return (
     <ClickUpProvider>
-      <div className="flex h-screen bg-white overflow-hidden text-slate-800 antialiased font-sans">
+      <div className="flex h-full w-full bg-white overflow-hidden text-slate-800 antialiased font-sans">
         <WorkspaceSidebar />
         <main className="flex-1 flex flex-col min-w-0 bg-white">
           <Outlet />

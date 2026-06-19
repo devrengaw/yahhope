@@ -178,9 +178,11 @@ export default function App() {
                 } />
 
                 {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
-                <Route path="/workspace" element={
+                <Route path="/workspace/*" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                    <WorkspaceLayout />
+                    <Layout module="workspace">
+                      <WorkspaceLayout />
+                    </Layout>
                   </ProtectedRoute>
                 }>
                   <Route index element={<WorkspaceViewContainer />} />

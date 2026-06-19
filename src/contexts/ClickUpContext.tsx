@@ -72,6 +72,51 @@ interface ClickUpContextType {
 
 const ClickUpContext = createContext<ClickUpContextType | undefined>(undefined);
 
+// Initial Mock Data
+const MOCK_SPACES: CU_Space[] = [
+  { id: 's1', name: 'LEADS', color: '#f59e0b', icon: 'User' },
+  { id: 's2', name: 'Projetos Globais', color: '#3b82f6', icon: 'Globe' }
+];
+
+const MOCK_LISTS: CU_List[] = [
+  { id: 'l1', space_id: 's1', name: 'Vendas', color: '#10b981' },
+  { id: 'l2', space_id: 's1', name: 'Pós Venda', color: '#8b5cf6' },
+  { id: 'l3', space_id: 's1', name: 'Feedback', color: '#ec4899' },
+  { id: 'l4', space_id: 's2', name: 'Desenvolvimento', color: '#3b82f6' }
+];
+
+const MOCK_STATUSES: CU_Status[] = [
+  { id: 'st1', list_id: 'l2', name: 'AGUARDANDO VIAGEM', color: '#ef4444', order_index: 1 },
+  { id: 'st2', list_id: 'l2', name: 'CHECK IN', color: '#eab308', order_index: 2 },
+  { id: 'st3', list_id: 'l2', name: 'EM VIAGEM', color: '#3b82f6', order_index: 3 },
+  { id: 'st4', list_id: 'l2', name: 'FINALIZADO', color: '#10b981', order_index: 4 }
+];
+
+const MOCK_FIELDS: CU_CustomField[] = [
+  { id: 'f1', list_id: 'l2', name: 'CPF', type: 'text' },
+  { id: 'f2', list_id: 'l2', name: 'E-mail', type: 'email' },
+  { id: 'f3', list_id: 'l2', name: 'Celular', type: 'phone' },
+  { id: 'f4', list_id: 'l2', name: 'Origem', type: 'text' },
+  { id: 'f5', list_id: 'l2', name: 'Destino', type: 'text' },
+  { id: 'f6', list_id: 'l2', name: 'Ida', type: 'date' },
+  { id: 'f7', list_id: 'l2', name: 'Volta', type: 'date' }
+];
+
+const MOCK_TASKS: CU_Task[] = [
+  { 
+    id: 't1', list_id: 'l2', name: 'Herta Witzke', status_id: 'st1',
+    custom_values: { 'f1': '-', 'f2': '-', 'f3': '-', 'f4': '-', 'f5': '-', 'f6': '-', 'f7': '-' }
+  },
+  { 
+    id: 't2', list_id: 'l2', name: 'Celma Rodrigues do Nascimento', status_id: 'st2',
+    custom_values: { 'f1': '84882775620', 'f2': 'celminhamanga@...', 'f3': '(31) 99319-7898', 'f4': 'CWB', 'f5': 'SAO', 'f6': '12/11/24', 'f7': '28/11/24' }
+  },
+  { 
+    id: 't3', list_id: 'l2', name: 'Celma Rodrigues do Nascimento', status_id: 'st3',
+    custom_values: { 'f1': '84882775620', 'f2': 'celminhamanga@...', 'f3': '(31) 99319-7898', 'f4': 'SAO', 'f5': 'LIS', 'f6': '12/11/24', 'f7': '27/11/24' }
+  }
+];
+
 export function ClickUpProvider({ children }: { children: ReactNode }) {
   const [spaces, setSpaces] = useState<CU_Space[]>([]);
   const [folders, setFolders] = useState<CU_Folder[]>([]);
@@ -113,33 +158,56 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         supabase.from('clickup_task_custom_fields').select('*')
       ]);
 
-      if (resSpaces.data) setSpaces(resSpaces.data);
-      if (resFolders.data) setFolders(resFolders.data);
-      if (resLists.data) setLists(resLists.data);
-      if (resStatuses.data) setStatuses(resStatuses.data);
-      if (resFields.data) setFields(resFields.data);
-      
-      if (resTasks.data) {
-        // Map custom fields to tasks
-        const mappedTasks = resTasks.data.map(task => {
-          const tFields = resTaskFields.data?.filter(tf => tf.task_id === task.id) || [];
-          const customValues: Record<string, string> = {};
-          tFields.forEach(tf => {
-            customValues[tf.field_id] = tf.value;
+      if (!resSpaces.data || resSpaces.data.length === 0) {
+        // Fallback to MOCK data if DB is empty or table missing
+        setSpaces(MOCK_SPACES);
+        setFolders([]);
+        setLists(MOCK_LISTS);
+        setStatuses(MOCK_STATUSES);
+        setFields(MOCK_FIELDS);
+        setTasks(MOCK_TASKS);
+        
+        if (!activeSpace) {
+          setActiveSpace(MOCK_SPACES[0].id);
+          setActiveList(MOCK_LISTS.find(l => l.space_id === MOCK_SPACES[0].id)?.id || null);
+        }
+      } else {
+        if (resSpaces.data) setSpaces(resSpaces.data);
+        if (resFolders.data) setFolders(resFolders.data);
+        if (resLists.data) setLists(resLists.data);
+        if (resStatuses.data) setStatuses(resStatuses.data);
+        if (resFields.data) setFields(resFields.data);
+        
+        if (resTasks.data) {
+          // Map custom fields to tasks
+          const mappedTasks = resTasks.data.map(task => {
+            const tFields = resTaskFields.data?.filter(tf => tf.task_id === task.id) || [];
+            const customValues: Record<string, string> = {};
+            tFields.forEach(tf => {
+              customValues[tf.field_id] = tf.value;
+            });
+            return { ...task, custom_values: customValues };
           });
-          return { ...task, custom_values: customValues };
-        });
-        setTasks(mappedTasks);
-      }
-      
-      // Auto-select first available space and list if nothing selected
-      if (!activeSpace && resSpaces.data?.[0]) {
-        setActiveSpace(resSpaces.data[0].id);
-        const firstList = resLists.data?.find(l => l.space_id === resSpaces.data[0].id);
-        if (firstList) setActiveList(firstList.id);
+          setTasks(mappedTasks);
+        }
+        
+        // Auto-select first available space and list if nothing selected
+        if (!activeSpace && resSpaces.data?.[0]) {
+          setActiveSpace(resSpaces.data[0].id);
+          const firstList = resLists.data?.find(l => l.space_id === resSpaces.data[0].id);
+          if (firstList) setActiveList(firstList.id);
+        }
       }
     } catch (e) {
       console.error('Error fetching workspace:', e);
+      // Fallback on error
+      setSpaces(MOCK_SPACES);
+      setLists(MOCK_LISTS);
+      setStatuses(MOCK_STATUSES);
+      setFields(MOCK_FIELDS);
+      setTasks(MOCK_TASKS);
+      if (!activeSpace) setActiveSpace(MOCK_SPACES[0].id);
+      if (!activeList) setActiveList(MOCK_LISTS[0].id);
     } finally {
       setLoading(false);
     }
