@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter } from 'recharts';
-import { differenceInMonths } from 'date-fns';
+import { differenceInMonths, differenceInDays } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { cn, parseLocalDate } from '../lib/utils';
 
