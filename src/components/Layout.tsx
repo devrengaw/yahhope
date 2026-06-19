@@ -403,16 +403,6 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             </ul>
           )}
         </nav>
-  
-        
-        <div className={cn("shrink-0 p-4 border-t", theme.borderTop)}>
-                        {item.name}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
 
             <div className="p-4 border-t border-white/20 shrink-0">
               <Link to="/profile" className={cn("flex items-center gap-3 w-full p-2 rounded-xl transition-colors group", theme.avatarBg)}>
