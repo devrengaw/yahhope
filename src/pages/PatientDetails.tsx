@@ -6,6 +6,7 @@ import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
 import { StatusBadge } from './Patients';
 import { GrowthCharts } from '../components/GrowthCharts';
+import { PatientProfile } from '../components/PatientProfile';
 import { differenceInMonths, addDays, differenceInDays } from 'date-fns';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAtendimento } from '../contexts/AtendimentoContext';
@@ -53,7 +54,7 @@ export function PatientDetails() {
   const action = searchParams.get('action');
   const aptId = searchParams.get('aptId');
 
-  const [activeTab, setActiveTab] = useState<'resumo' | 'triagem' | 'historico'>('resumo');
+  const [activeTab, setActiveTab] = useState<'resumo' | 'ficha' | 'historico'>('resumo');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   
@@ -418,7 +419,7 @@ export function PatientDetails() {
         <div className="flex border-b border-slate-100 overflow-x-auto hide-scrollbar">
           <TabButton active={activeTab === 'resumo'} onClick={() => setActiveTab('resumo')} icon={Activity}>Resumo & Gráficos</TabButton>
           <TabButton active={activeTab === 'historico'} onClick={() => setActiveTab('historico')} icon={Calendar}>Histórico Clínico</TabButton>
-          <TabButton active={activeTab === 'triagem'} onClick={() => setActiveTab('triagem')} icon={Home}>Triagem Social</TabButton>
+          <TabButton active={activeTab === 'ficha'} onClick={() => setActiveTab('ficha')} icon={User}>Ficha da Criança</TabButton>
         </div>
 
         <div className="p-6">
@@ -606,24 +607,8 @@ export function PatientDetails() {
             </div>
           )}
 
-          {activeTab === 'triagem' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><User size={20} className="text-emerald-600"/> Dados Familiares</h3>
-                <div className="space-y-4">
-                  <InfoRow label="Responsável" value={patient.guardian_name} />
-                  <InfoRow label="Comunidade" value={patient.community} />
-                  <InfoRow label="Data de Cadastro" value={new Date(patient.created_at).toLocaleDateString()} />
-                </div>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><Home size={20} className="text-emerald-600"/> Condições de Moradia</h3>
-                <div className="space-y-4">
-                  <InfoRow label="Tipo de Habitação" value={patient.housing_type} />
-                  <InfoRow label="Saneamento" value={patient.sanitation} />
-                </div>
-              </div>
-            </div>
+          {activeTab === 'ficha' && (
+            <PatientProfile patientId={patient.id} />
           )}
 
           {activeTab === 'historico' && (

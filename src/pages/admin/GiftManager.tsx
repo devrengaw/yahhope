@@ -1,9 +1,49 @@
-import React, { useState } from 'react';
-import { Gift, Plus, Search, Filter, Edit2, Trash2, Check, X, Image as ImageIcon, DollarSign, Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Filter, Edit2, Trash2, Check, X, Image as ImageIcon, DollarSign, Heart } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 export function GiftManager() {
   const [gifts, setGifts] = useState<{ id: string, name: string, price: string, impact: string, active: boolean, category: string, img: string }[]>([]);
+
+  useEffect(() => {
+    fetchGifts();
+    const channel = supabase.channel('gifts-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products' }, () => fetchGifts())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const fetchGifts = async () => {
+    // We treat store_products with category = 'Presente' as gifts.
+    const { data } = await supabase.from('store_products').select('*').eq('category', 'Presente');
+    if (data) {
+      const formatted = data.map(d => ({
+        id: d.id,
+        name: d.name,
+        price: d.sale_price.toString(),
+        impact: d.description || 'Gera impacto positivo direto.',
+        active: d.status === 'active',
+        category: d.category,
+        img: d.image_url || ''
+      }));
+      setGifts(formatted);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
+    // optimistic
+    setGifts(prev => prev.map(g => g.id === id ? { ...g, active: !currentActive } : g));
+    await supabase.from('store_products').update({ status: !currentActive ? 'active' : 'inactive' }).eq('id', id);
+  };
+
+  const handleDelete = async (id: string) => {
+    if(confirm('Tem certeza que deseja remover este presente?')) {
+      setGifts(prev => prev.filter(g => g.id !== id));
+      await supabase.from('store_products').delete().eq('id', id);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-20">
@@ -37,8 +77,12 @@ export function GiftManager() {
         {gifts.map(gift => (
           <div key={gift.id} className="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
             <div className="flex gap-6">
-              <div className="w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 relative">
-                <img src={gift.img} alt={gift.name} className="w-full h-full object-cover" />
+              <div className="w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 relative bg-slate-100 flex items-center justify-center">
+                {gift.img ? (
+                  <img src={gift.img} alt={gift.name} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="text-slate-400" size={32} />
+                )}
                 {!gift.active && (
                   <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
                     <span className="text-[10px] font-black text-white uppercase tracking-widest">Inativo</span>
@@ -56,7 +100,7 @@ export function GiftManager() {
                     <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all">
                       <Edit2 size={18} />
                     </button>
-                    <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                    <button onClick={() => handleDelete(gift.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -75,7 +119,7 @@ export function GiftManager() {
 
                 <div className="pt-4 flex items-center justify-between">
                   <button 
-                    onClick={() => setGifts(prev => prev.map(g => g.id === gift.id ? { ...g, active: !g.active } : g))}
+                    onClick={() => handleToggleActive(gift.id, gift.active)}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
                       gift.active 
@@ -108,7 +152,7 @@ export function GiftManager() {
           <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <Plus size={32} />
           </div>
-          <p className="font-black text-sm uppercase tracking-widest">Adicionar Categoria</p>
+          <p className="font-black text-sm uppercase tracking-widest">Adicionar Presente</p>
         </button>
       </div>
     </div>

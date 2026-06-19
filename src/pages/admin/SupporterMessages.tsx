@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Filter, Send, User, MessageSquare, Clock, CheckCircle2, MoreHorizontal, Paperclip, Smile } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 export function SupporterMessages() {
-  const [selectedChat, setSelectedChat] = useState<number | null>(1);
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [attachmentsEnabled, setAttachmentsEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [chats, setChats] = useState<{ id: number, name: string, role: string, lastMsg: string, time: string, unread: boolean, avatar: string }[]>([]);
-
-  const [chatMessages, setChatMessages] = useState<Record<number, any[]>>({});
+  const [chats, setChats] = useState<{ id: string, name: string, role: string, lastMsg: string, time: string, unread: boolean, avatar: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<Record<string, any[]>>({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,37 +20,89 @@ export function SupporterMessages() {
     scrollToBottom();
   }, [chatMessages, selectedChat]);
 
-  const handleSendMessage = (e?: React.FormEvent) => {
+  useEffect(() => {
+    fetchChats();
+    
+    const channel = supabase.channel('supporter-messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'supporter_chats' }, () => fetchChats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'supporter_messages' }, () => {
+        if (selectedChat) fetchMessages(selectedChat);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedChat) {
+      fetchMessages(selectedChat);
+      // Mark as read
+      supabase.from('supporter_chats').update({ unread: false }).eq('id', selectedChat).then(() => {
+        setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, unread: false } : c));
+      });
+    }
+  }, [selectedChat]);
+
+  const fetchChats = async () => {
+    const { data } = await supabase.from('supporter_chats').select('*').order('created_at', { ascending: false });
+    if (data) {
+      // In a real scenario we'd query the latest message, but for simplicity we rely on lastMsg being updated on send.
+      const formatted = data.map(d => ({
+        id: d.id,
+        name: d.supporter_name,
+        role: d.supporter_role,
+        lastMsg: 'Mensagem atualizada...', // Simplification
+        time: new Date(d.created_at).toLocaleDateString(),
+        unread: d.unread,
+        avatar: d.avatar_url || d.supporter_name.charAt(0)
+      }));
+      setChats(formatted);
+    }
+  };
+
+  const fetchMessages = async (chatId: string) => {
+    const { data } = await supabase.from('supporter_messages').select('*').eq('chat_id', chatId).order('created_at', { ascending: true });
+    if (data) {
+      const formatted = data.map(d => ({
+        id: d.id,
+        sender: d.sender_name,
+        text: d.text,
+        time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isMe: d.is_me
+      }));
+      setChatMessages(prev => ({ ...prev, [chatId]: formatted }));
+    }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!replyText.trim() || !selectedChat) return;
 
+    const msgText = replyText;
+    setReplyText(''); // clear immediately for UX
+
+    // Optimistic UI
+    const tempId = Date.now().toString();
     const newMessage = {
-      id: Date.now(),
+      id: tempId,
       sender: 'Equipe YAHope',
-      text: replyText,
+      text: msgText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMe: true
     };
+    setChatMessages(prev => ({ ...prev, [selectedChat]: [...(prev[selectedChat] || []), newMessage] }));
 
-    setChatMessages(prev => ({
-      ...prev,
-      [selectedChat]: [...(prev[selectedChat] || []), newMessage]
-    }));
-
-    setChats(prev => prev.map(chat => 
-      chat.id === selectedChat 
-        ? { ...chat, lastMsg: replyText, time: 'Agora', unread: false }
-        : chat
-    ));
-
-    setReplyText('');
-  };
-
-  const handleSelectChat = (id: number) => {
-    setSelectedChat(id);
-    setChats(prev => prev.map(chat => 
-      chat.id === id ? { ...chat, unread: false } : chat
-    ));
+    await supabase.from('supporter_messages').insert({
+      chat_id: selectedChat,
+      sender_name: 'Equipe YAHope',
+      text: msgText,
+      is_me: true
+    });
+    
+    // Trigger chat list update or let Realtime handle it
+    fetchMessages(selectedChat);
   };
 
   const currentMessages = selectedChat ? chatMessages[selectedChat] || [] : [];
@@ -75,13 +127,13 @@ export function SupporterMessages() {
           {chats.map(chat => (
             <div 
               key={chat.id}
-              onClick={() => handleSelectChat(chat.id)}
+              onClick={() => setSelectedChat(chat.id)}
               className={cn(
                 "p-4 flex items-center gap-4 cursor-pointer transition-all border-l-4",
                 selectedChat === chat.id ? "bg-slate-50 border-emerald-500" : "border-transparent hover:bg-slate-50/50"
               )}
             >
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 shrink-0">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 shrink-0 uppercase">
                 {chat.avatar}
               </div>
               <div className="flex-1 min-w-0">
@@ -96,6 +148,9 @@ export function SupporterMessages() {
               </div>
             </div>
           ))}
+          {chats.length === 0 && (
+            <div className="p-8 text-center text-slate-400 text-sm">Nenhuma conversa encontrada.</div>
+          )}
         </div>
       </div>
 
@@ -106,7 +161,7 @@ export function SupporterMessages() {
             {/* Header */}
             <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold uppercase">
                   {chats.find(c => c.id === selectedChat)?.avatar}
                 </div>
                 <div>
@@ -145,7 +200,7 @@ export function SupporterMessages() {
                 <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest">Início da conversa</span>
               </div>
               
-              {currentMessages.map(msg => (
+              {currentMessages.map((msg: any) => (
                 <div key={msg.id} className={cn("flex flex-col", msg.isMe ? "items-end" : "items-start")}>
                   <div className={cn(
                     "max-w-[70%] p-4 rounded-3xl text-sm font-medium leading-relaxed shadow-sm",

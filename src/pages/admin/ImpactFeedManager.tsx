@@ -7,20 +7,20 @@ import { useImpact, ImpactFeedStatus } from '../../contexts/ImpactContext';
 export function ImpactFeedManager() {
   const { feedItems, updateFeedItem } = useImpact();
   const [activeTab, setActiveTab] = useState<'pending' | 'published'>('pending');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
-  const startEdit = (id: number, content: string) => {
+  const startEdit = (id: string, content: string) => {
     setEditingId(id);
     setEditContent(content);
   };
 
-  const saveEdit = (id: number) => {
+  const saveEdit = (id: string) => {
     updateFeedItem(id, { content: editContent });
     setEditingId(null);
   };
 
-  const handleStatusChange = (id: number, newStatus: ImpactFeedStatus) => {
+  const handleStatusChange = (id: string, newStatus: ImpactFeedStatus) => {
     updateFeedItem(id, { status: newStatus });
   };
 

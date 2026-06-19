@@ -64,6 +64,8 @@ import { GiftManager } from './pages/admin/GiftManager';
 import { FundraisingManager } from './pages/admin/FundraisingManager';
 import { AdminStoreManager } from './pages/admin/AdminStoreManager';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
+import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
+import { WorkspaceViewContainer } from './pages/erp/WorkspaceViewContainer';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -175,22 +177,15 @@ export default function App() {
                   </ProtectedRoute>
                 } />
 
-                {/* Workspace (Personal Workspace) */}
-                <Route path="/workspace/*" element={
+                {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
+                <Route path="/workspace" element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                    <Layout module="workspace">
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/workspace/chat/geral" replace />} />
-                        <Route path="/chat/:id" element={<WorkspaceChat />} />
-                        <Route path="/dm/:id" element={<WorkspaceChat />} />
-                        <Route path="/projects" element={<Projects />} />
-                        <Route path="/finance" element={<Finance />} />
-                        <Route path="/calendar" element={<Calendar />} />
-                        <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
-                      </Routes>
-                    </Layout>
+                    <WorkspaceLayout />
                   </ProtectedRoute>
-                } />
+                }>
+                  <Route index element={<WorkspaceViewContainer />} />
+                  <Route path="*" element={<WorkspaceViewContainer />} />
+                </Route>
 
                 {/* Communication Module */}
                 <Route path="/communication/*" element={
