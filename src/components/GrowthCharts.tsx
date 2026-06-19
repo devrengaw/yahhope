@@ -10,79 +10,90 @@ interface GrowthChartsProps {
   events: ClinicalEvent[];
 }
 
-// Helper to generate mock WHO curves
-const generateWHOCurves = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F') => {
-  const data = [];
-  
-  if (type === 'heightForAge') {
-    for (let i = 0; i <= 60; i++) {
-      const base = gender === 'M' ? 50 : 49;
-      const median = base + 25 * Math.pow(i / 12, 0.6);
-      const z2Offset = 4 + i * 0.05;
-      const z3Offset = 6 + i * 0.08;
-      
-      data.push({
-        x: i,
-        z3: median + z3Offset,
-        z2: median + z2Offset,
-        z0: median,
-        z_2: median - z2Offset,
-        z_3: median - z3Offset
-      });
-    }
+// Helper to generate combined data
+const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F', events: ClinicalEvent[], dob: string) => {
+  const dataMap = new Map<number, any>();
+
+  // 1. Add WHO base X values
+  if (type === 'heightForAge' || type === 'hcForAge') {
+    for (let i = 0; i <= 60; i++) dataMap.set(i, { x: i });
   } else if (type === 'weightForHeight') {
-    for (let x = 45; x <= 120; x += 1) {
-      const base = gender === 'M' ? 2.5 : 2.4;
-      const median = base + 0.15 * (x - 45) + 0.0015 * Math.pow(x - 45, 2);
-      const z2Offset = 0.5 + (x - 45) * 0.03;
-      const z3Offset = 0.8 + (x - 45) * 0.04;
-
-      data.push({
-        x: x,
-        z3: median + z3Offset,
-        z2: median + z2Offset,
-        z0: median,
-        z_2: median - z2Offset,
-        z_3: median - z3Offset
-      });
-    }
-  } else if (type === 'hcForAge') {
-    for (let i = 0; i <= 60; i++) {
-      const base = gender === 'M' ? 34.5 : 33.5;
-      const median = base + 12 * Math.pow(i / 12, 0.3);
-      const z2Offset = 1.5 + i * 0.01;
-      const z3Offset = 2.2 + i * 0.015;
-
-      data.push({
-        x: i,
-        z3: median + z3Offset,
-        z2: median + z2Offset,
-        z0: median,
-        z_2: median - z2Offset,
-        z_3: median - z3Offset
-      });
-    }
+    for (let x = 45; x <= 120; x++) dataMap.set(x, { x: x });
   }
-  
-  return data;
-};
 
-// Extract patient data correctly for each chart type
-const getPatientData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', events: ClinicalEvent[], dob: string) => {
-  const data: any[] = [];
+  // 2. Add Patient X values and Data
   events.forEach(e => {
     if (type === 'heightForAge' && e.height) {
-      const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
-      data.push({ x: ageMonths, y: e.height, date: parseLocalDate(e.date).toLocaleDateString() });
-    } else if (type === 'weightForHeight' && e.height && e.weight) {
-      data.push({ x: e.height, y: e.weight, date: parseLocalDate(e.date).toLocaleDateString() });
-    } else if (type === 'hcForAge' && e.head_circumference) {
-      const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
-      data.push({ x: ageMonths, y: e.head_circumference, date: parseLocalDate(e.date).toLocaleDateString() });
+      let ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+      if (ageMonths < 0) ageMonths = 0;
+      
+      const existing = dataMap.get(ageMonths) || { x: ageMonths };
+      existing.patientValue = e.height;
+      existing.date = parseLocalDate(e.date).toLocaleDateString();
+      dataMap.set(ageMonths, existing);
+    } 
+    else if (type === 'weightForHeight' && e.height && e.weight) {
+      const h = Math.round(e.height * 10) / 10;
+      const existing = dataMap.get(h) || { x: h };
+      existing.patientValue = e.weight;
+      existing.date = parseLocalDate(e.date).toLocaleDateString();
+      dataMap.set(h, existing);
+    }
+    else if (type === 'hcForAge' && e.head_circumference) {
+      let ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+      if (ageMonths < 0) ageMonths = 0;
+      
+      const existing = dataMap.get(ageMonths) || { x: ageMonths };
+      existing.patientValue = e.head_circumference;
+      existing.date = parseLocalDate(e.date).toLocaleDateString();
+      dataMap.set(ageMonths, existing);
     }
   });
-  // Sort by x
-  return data.sort((a, b) => a.x - b.x);
+
+  // 3. Convert Map to Array and Sort by X
+  const data = Array.from(dataMap.values()).sort((a, b) => a.x - b.x);
+
+  // 4. Calculate WHO curves for ALL X values
+  data.forEach(point => {
+    const x = point.x;
+    if (type === 'heightForAge') {
+      const base = gender === 'M' ? 50 : 49;
+      const median = base + 25 * Math.pow(x / 12, 0.6);
+      const z2Offset = 4 + x * 0.05;
+      const z3Offset = 6 + x * 0.08;
+      
+      point.z3 = median + z3Offset;
+      point.z2 = median + z2Offset;
+      point.z0 = median;
+      point.z_2 = median - z2Offset;
+      point.z_3 = median - z3Offset;
+    } else if (type === 'weightForHeight') {
+      const base = gender === 'M' ? 2.5 : 2.4;
+      const calcX = Math.max(45, Math.min(120, x));
+      const median = base + 0.15 * (calcX - 45) + 0.0015 * Math.pow(calcX - 45, 2);
+      const z2Offset = 0.5 + (calcX - 45) * 0.03;
+      const z3Offset = 0.8 + (calcX - 45) * 0.04;
+
+      point.z3 = median + z3Offset;
+      point.z2 = median + z2Offset;
+      point.z0 = median;
+      point.z_2 = median - z2Offset;
+      point.z_3 = median - z3Offset;
+    } else if (type === 'hcForAge') {
+      const base = gender === 'M' ? 34.5 : 33.5;
+      const median = base + 12 * Math.pow(x / 12, 0.3);
+      const z2Offset = 1.5 + x * 0.01;
+      const z3Offset = 2.2 + x * 0.015;
+
+      point.z3 = median + z3Offset;
+      point.z2 = median + z2Offset;
+      point.z0 = median;
+      point.z_2 = median - z2Offset;
+      point.z_3 = median - z3Offset;
+    }
+  });
+
+  return data;
 };
 
 export function GrowthCharts({ patient, events }: GrowthChartsProps) {
@@ -100,27 +111,24 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
       title: `Estatura por Idade - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Estatura (cm)',
-      data: useMemo(() => generateWHOCurves('heightForAge', patient.gender), [patient.gender]),
-      patientData: useMemo(() => getPatientData('heightForAge', events, patient.dob), [events, patient.dob]),
-      domain: ['auto', 'auto'],
+      data: useMemo(() => generateCombinedChartData('heightForAge', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
+      domain: [45, 125],
     },
     {
       id: 'weightForHeight',
       title: `Peso por Estatura - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Estatura (cm)',
       yAxisLabel: 'Peso (kg)',
-      data: useMemo(() => generateWHOCurves('weightForHeight', patient.gender), [patient.gender]),
-      patientData: useMemo(() => getPatientData('weightForHeight', events, patient.dob), [events, patient.dob]),
-      domain: ['auto', 'auto'],
+      data: useMemo(() => generateCombinedChartData('weightForHeight', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
+      domain: [2, 30],
     },
     {
       id: 'hcForAge',
       title: `Perímetro Craniano - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Perímetro Craniano (cm)',
-      data: useMemo(() => generateWHOCurves('hcForAge', patient.gender), [patient.gender]),
-      patientData: useMemo(() => getPatientData('hcForAge', events, patient.dob), [events, patient.dob]),
-      domain: ['auto', 'auto'],
+      data: useMemo(() => generateCombinedChartData('hcForAge', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
+      domain: [32, 54],
     }
   ];
 
@@ -131,8 +139,7 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      // Find patient data from the payload
-      const patientData = payload.find((p: any) => p.dataKey === 'y' || p.name === 'Paciente');
+      const patientData = payload.find((p: any) => p.dataKey === 'patientValue' || p.name === 'Paciente');
       
       return (
         <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-sm">
@@ -210,14 +217,14 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
               {/* Patient Data Points */}
               <Line 
-                data={activeChartData.patientData}
                 type="monotone"
-                dataKey="y" 
+                dataKey="patientValue" 
                 name="Paciente"
-                stroke={isBoy ? '#1e3a8a' : '#831843'} 
-                strokeWidth={3} 
-                dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
-                activeDot={{ r: 8 }} 
+                stroke={isBoy ? '#3b82f6' : '#ec4899'} 
+                strokeWidth={2} 
+                connectNulls
+                dot={{ r: 5, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
+                activeDot={{ r: 7 }} 
                 isAnimationActive={true}
               />
             </ComposedChart>
