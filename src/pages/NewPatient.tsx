@@ -213,28 +213,25 @@ export function NewPatient() {
 
   }, [formData.weight, formData.height, formData.dob, formData.gender, formData.service_date]);
 
-  const { addPatient } = usePatients();
+  const { addFullPatientRecord } = usePatients();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { ...formData, dependents, clinicalSigns, nutritionalEval, educationalActions, examsList, medicationsList };
     
-    const newPatient = {
-      id: Math.random().toString(36).substring(2, 9),
-      registration_number: formData.registration_number || `YAH-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
-      name: formData.name,
-      dob: formData.dob,
-      gender: formData.gender as 'M' | 'F',
-      status: (nutritionalEval.length > 0 ? (nutritionalEval.includes('Desnutrição aguda grave com complicações') || nutritionalEval.includes('Desnutrição aguda grave sem complicações') ? 'DAG' : (nutritionalEval.includes('Desnutrição aguda moderada (DAM)') ? 'DAM' : 'Adequado')) : 'Adequado') as any,
-      community: formData.city || 'Boane',
-      created_at: new Date().toISOString().split('T')[0],
-      guardian_name: formData.caregiver_name,
-      housing_type: formData.housing_type,
-      sanitation: formData.sanitation
-    };
-
-    addPatient(newPatient);
-    navigate('/nutrition/patients');
+    setIsSubmitting(true);
+    try {
+      await addFullPatientRecord(payload);
+      alert('Cadastro realizado com sucesso!');
+      navigate('/nutrition/patients');
+    } catch (error: any) {
+      console.error('Failed to register patient:', error);
+      alert(`Erro ao salvar paciente: ${error?.message || 'Verifique sua conexão ou dados obrigatórios.'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
     return (
@@ -689,10 +686,11 @@ export function NewPatient() {
               ) : (
                 <button
                   type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm"
+                  disabled={isSubmitting}
+                  className={cn("bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm", isSubmitting ? "opacity-50 cursor-not-allowed" : "")}
                 >
                   <Save size={20} />
-                  Salvar Cadastro Completo
+                  {isSubmitting ? 'Salvando...' : 'Salvar Cadastro Completo'}
                 </button>
               )}
             </div>

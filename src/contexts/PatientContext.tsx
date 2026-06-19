@@ -10,6 +10,7 @@ interface PatientContextType {
   addEvent: (event: ClinicalEvent) => void;
   updateEvent: (id: string, updates: Partial<ClinicalEvent>) => void;
   deletePatient: (id: string) => void;
+  addFullPatientRecord: (payload: any) => Promise<void>;
 }
 
 const PatientContext = createContext<PatientContextType | undefined>(undefined);
@@ -121,7 +122,190 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error('Add patient error', e);
       fetchData(); // rollback
+      throw e;
     }
+  };
+
+  const addFullPatientRecord = async (payload: any) => {
+    // 1. Insert child
+    const { data: newChild, error: childError } = await supabase.from('children').insert({
+      registration_number: payload.registration_number,
+      name: payload.name,
+      birthplace: payload.birthplace,
+      province: payload.province,
+      origin: payload.origin,
+      address: payload.address || payload.city,
+      city: payload.city,
+      dob: payload.dob,
+      gender: payload.gender,
+      color: payload.color
+    }).select().single();
+
+    if (childError) throw childError;
+    const childId = newChild.id;
+
+    // 2. Insert caregiver
+    if (payload.caregiver_name) {
+      const { error: cgError } = await supabase.from('caregivers').insert({
+        child_id: childId,
+        name: payload.caregiver_name,
+        marital_status: payload.marital_status,
+        education: payload.education,
+        religion: payload.religion
+      });
+      if (cgError) throw cgError;
+    }
+
+    // 3. Insert social triage
+    const { data: st, error: stError } = await supabase.from('social_triage').insert({
+      child_id: childId,
+      date: payload.service_date || new Date().toISOString().split('T')[0]
+    }).select().single();
+    
+    if (!stError && st) {
+      const stId = st.id;
+      
+      // 4. Household Conditions
+      await supabase.from('household_conditions').insert({
+        social_triage_id: stId,
+        housing_type: payload.housing_type,
+        rooms: payload.rooms ? parseInt(payload.rooms) : null,
+        dwelling_type: payload.dwelling_type,
+        roof: payload.roof,
+        sanitation: payload.sanitation,
+        sewage: payload.sewage,
+        garbage: payload.garbage,
+        animals: payload.animals
+      });
+
+      // 5. Socioeconomics
+      await supabase.from('socioeconomics').insert({
+        social_triage_id: stId,
+        monthly_income: payload.monthly_income ? parseFloat(payload.monthly_income) : null,
+        father_job: payload.father_job,
+        mother_job: payload.mother_job,
+        caregiver_job: payload.caregiver_job,
+        observations: payload.social_observations
+      });
+
+      // 6. Dependents
+      if (payload.dependents && payload.dependents.length > 0) {
+        for (const dep of payload.dependents) {
+          if (dep.name) {
+            await supabase.from('dependents').insert({
+              social_triage_id: stId,
+              name: dep.name,
+              dob: dep.dob || null,
+              weight: dep.weight ? parseFloat(dep.weight) : null,
+              height: dep.height ? parseFloat(dep.height) : null,
+              muac: dep.muac ? parseFloat(dep.muac) : null
+            });
+          }
+        }
+      }
+    }
+
+    // 7. Initial Assessments
+    const { data: ia, error: iaError } = await supabase.from('initial_assessments').insert({
+      child_id: childId,
+      date: payload.service_date || new Date().toISOString().split('T')[0],
+      informant: payload.informant,
+      main_complaint: payload.main_complaint,
+      history: payload.history,
+      current_medications: payload.current_medications
+    }).select().single();
+
+    if (!iaError && ia) {
+      const iaId = ia.id;
+
+      await supabase.from('gestational_history').insert({
+        assessment_id: iaId,
+        prenatal_problems: payload.prenatal_problems,
+        prenatal_consultations: payload.prenatal_consultations ? parseInt(payload.prenatal_consultations) : null,
+        delivery_type: payload.delivery_type,
+        gestational_age: payload.gestational_age ? parseInt(payload.gestational_age) : null,
+        apgar_1: payload.apgar_1 ? parseInt(payload.apgar_1) : null,
+        apgar_5: payload.apgar_5 ? parseInt(payload.apgar_5) : null,
+        birth_weight: payload.birth_weight ? parseFloat(payload.birth_weight) : null,
+        birth_height: payload.birth_height ? parseFloat(payload.birth_height) : null,
+        birth_hc: payload.birth_hc ? parseFloat(payload.birth_hc) : null,
+        birth_tc: payload.birth_tc ? parseFloat(payload.birth_tc) : null,
+        birth_problems: payload.birth_problems
+      });
+
+      await supabase.from('feeding_history').insert({
+        assessment_id: iaId,
+        breast_milk: payload.breast_milk === 'Sim',
+        exclusive_breast_milk_until: payload.exclusive_breast_milk_until,
+        weaning_age: payload.weaning_age,
+        water_tea_intro: payload.water_tea_intro,
+        cow_milk_intro: payload.cow_milk_intro,
+        salty_mush_intro: payload.salty_mush_intro,
+        juice_intro: payload.juice_intro,
+        soup_intro: payload.soup_intro,
+        other_foods: payload.other_foods,
+        current_feeding: payload.current_feeding
+      });
+
+      await supabase.from('clinical_history').insert({
+        assessment_id: iaId,
+        supplements: payload.supplements,
+        previous_diseases: payload.previous_diseases,
+        mother_history: payload.mother_history,
+        father_history: payload.father_history,
+        other_relatives_history: payload.other_relatives_history,
+        family_malnutrition_history: payload.family_malnutrition_history,
+        consanguinity: payload.consanguinity === 'Sim',
+        hereditary_diseases: payload.hereditary_diseases,
+        family_dynamics: payload.family_dynamics,
+        immunization: payload.immunization
+      });
+
+      await supabase.from('physical_exam').insert({
+        assessment_id: iaId,
+        weight: payload.weight ? parseFloat(payload.weight) : null,
+        height: payload.height ? parseFloat(payload.height) : null,
+        z_score_height_age: payload.z_score_height_age ? parseFloat(payload.z_score_height_age) : null,
+        z_score_weight_height: payload.z_score_weight_height ? parseFloat(payload.z_score_weight_height) : null,
+        head_circumference: payload.head_circumference ? parseFloat(payload.head_circumference) : null,
+        muac: payload.muac ? parseFloat(payload.muac) : null,
+        bmi: payload.bmi ? parseFloat(payload.bmi) : null,
+        bmi_gestational: payload.bmi_gestational ? parseFloat(payload.bmi_gestational) : null,
+        bilateral_edema: payload.bilateral_edema,
+        axillary_temperature: payload.axillary_temperature ? parseFloat(payload.axillary_temperature) : null,
+        clinical_signs: payload.clinicalSigns || [],
+        oral_health: payload.oral_health,
+        other_findings: payload.other_findings
+      });
+
+      await supabase.from('nutritional_evaluation').insert({
+        assessment_id: iaId,
+        evaluation: payload.nutritionalEval || []
+      });
+    }
+
+    // 8. Clinical Event (CRITICAL for Dashboard)
+    const status = (payload.nutritionalEval?.length > 0 ? (payload.nutritionalEval.includes('Desnutrição aguda grave com complicações') || payload.nutritionalEval.includes('Desnutrição aguda grave sem complicações') ? 'DAG' : (payload.nutritionalEval.includes('Desnutrição aguda moderada (DAM)') ? 'DAM' : 'Adequado')) : 'Adequado');
+
+    const { error: eventError } = await supabase.from('clinical_events').insert({
+      child_id: childId,
+      event_type: 'initial',
+      date: payload.service_date || new Date().toISOString().split('T')[0],
+      weight: payload.weight ? parseFloat(payload.weight) : null,
+      height: payload.height ? parseFloat(payload.height) : null,
+      muac: payload.muac ? parseFloat(payload.muac) : null,
+      head_circumference: payload.head_circumference ? parseFloat(payload.head_circumference) : null,
+      bmi: payload.bmi ? parseFloat(payload.bmi) : null,
+      z_score_weight_height: payload.z_score_weight_height ? parseFloat(payload.z_score_weight_height) : null,
+      nutritional_status: status,
+      notes: payload.other_findings || 'Consulta Inicial',
+      return_date: payload.return_date || null
+    });
+
+    if (eventError) throw eventError;
+
+    // Refresh data
+    await fetchData();
   };
 
   const updatePatient = async (id: string, updates: Partial<Patient>) => {
@@ -190,6 +374,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       patients, 
       events, 
       addPatient, 
+      addFullPatientRecord,
       updatePatient, 
       addEvent, 
       updateEvent,
