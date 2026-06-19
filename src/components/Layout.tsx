@@ -257,14 +257,15 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         </div>
 
         {/* Secondary Sidebar */}
-        <aside
-          className={cn(
-            "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
-          theme.sidebarBg,
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="p-6 hidden md:block shrink-0">
+        {module !== 'workspace' && (
+          <aside
+            className={cn(
+              "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
+            theme.sidebarBg,
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          <div className="p-6 hidden md:block shrink-0">
           <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
             <div className="flex items-center gap-2 w-full">
               <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
@@ -405,29 +406,43 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   
         
         <div className={cn("shrink-0 p-4 border-t", theme.borderTop)}>
-          <div className="flex items-center justify-between px-2">
-            <Link 
-              to="/admin/profile" 
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
-            >
-              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white font-bold border-2 shadow-sm transition-colors", theme.avatarBg)}>
-                {user?.avatar || (user?.name ? user.name.charAt(0) : 'U')}
-              </div>
-              <div className="overflow-hidden text-left">
-                <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name || 'Usuário'}</p>
-                <p className={cn("text-[10px] uppercase tracking-wider font-black", theme.moduleName)}>{user?.role || 'Visitante'}</p>
-              </div>
-            </Link>
-            <button 
-              onClick={handleLogout} 
-              className={cn("p-2 rounded-lg transition-colors tooltip-target", theme.logoutBtn)} 
-              title="Sair"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
-      </aside>
+                        {item.name}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+
+            <div className="p-4 border-t border-white/20 shrink-0">
+              <Link to="/profile" className={cn("flex items-center gap-3 w-full p-2 rounded-xl transition-colors group", theme.avatarBg)}>
+                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden">
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name.charAt(0)
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name}</p>
+                  <p className={cn("text-xs truncate", theme.roleText)}>
+                    {user?.role === 'ADMIN' ? 'Administrador' : 
+                     user?.role === 'VOLUNTEER' ? 'Voluntário' : 
+                     user?.role === 'SPONSOR' ? 'Padrinho' : 'Usuário'}
+                  </p>
+                </div>
+              </Link>
+
+              <button
+                onClick={handleLogout}
+                className={cn("flex items-center gap-2 w-full px-4 py-2 mt-2 rounded-xl transition-colors text-sm font-bold", theme.logoutBtn)}
+              >
+                <LogOut size={18} />
+                Sair
+              </button>
+            </div>
+          </aside>
+        )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto w-full">
