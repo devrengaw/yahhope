@@ -9,8 +9,9 @@ import {
 import { cn } from '../../lib/utils';
 
 export function WorkspaceSidebar() {
-  const { spaces, lists, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, addList } = useClickUp();
+  const { spaces, lists, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
   const [expandedSpaces, setExpandedSpaces] = React.useState<Record<string, boolean>>({ 's1': true });
+  const [openMenu, setOpenMenu] = React.useState<string | null>(null);
   const location = useLocation();
 
   const toggleSpace = (id: string) => {
@@ -144,17 +145,44 @@ export function WorkspaceSidebar() {
                       </div>
                       <span className={cn("text-sm truncate", activeSpace === space.id && !activeList && location.pathname === '/workspace' ? "font-bold text-white" : "font-medium text-white/90")}>{space.name}</span>
                     </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Tem certeza que deseja excluir o espaço "${space.name}"?`)) {
-                          deleteSpace(space.id);
-                        }
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-white/70"
-                    >
-                      <MoreHorizontal size={14} />
-                    </button>
+                    <div className="relative flex items-center">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenu(openMenu === `space-${space.id}` ? null : `space-${space.id}`);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-white/70"
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                      
+                      {openMenu === `space-${space.id}` && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenu(null); }}></div>
+                          <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-100">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenu(null);
+                                const newName = window.prompt('Novo nome do Espaço:', space.name);
+                                if (newName) updateSpace(space.id, { name: newName });
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                            >Editar</button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenu(null);
+                                if (window.confirm(`Tem certeza que deseja excluir o espaço "${space.name}"?`)) {
+                                  deleteSpace(space.id);
+                                }
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 font-bold"
+                            >Excluir</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Lists under Space */}
@@ -172,10 +200,51 @@ export function WorkspaceSidebar() {
                             activeList === list.id && location.pathname === '/workspace' ? "bg-white/20 text-white font-bold" : "text-white/80 hover:bg-white/10 font-medium"
                           )}
                         >
-                          <Hash size={14} className={activeList === list.id && location.pathname === '/workspace' ? "text-white" : "text-white/60"} />
-                          <span className="text-sm truncate">
-                            {list.name}
-                          </span>
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Hash size={14} className={activeList === list.id && location.pathname === '/workspace' ? "text-white" : "text-white/60"} />
+                            <span className="text-sm truncate">
+                              {list.name}
+                            </span>
+                          </div>
+                          
+                          <div className="relative flex items-center">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenu(openMenu === `list-${list.id}` ? null : `list-${list.id}`);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded text-white/70"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            
+                            {openMenu === `list-${list.id}` && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenu(null); }}></div>
+                                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl z-50 py-1 border border-slate-100">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenu(null);
+                                      const newName = window.prompt('Novo nome da Lista:', list.name);
+                                      if (newName) updateList(list.id, { name: newName });
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                                  >Editar</button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenu(null);
+                                      if (window.confirm(`Tem certeza que deseja excluir a lista "${list.name}"?`)) {
+                                        deleteList(list.id);
+                                      }
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 font-bold"
+                                  >Excluir</button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       ))}
                       <div 
