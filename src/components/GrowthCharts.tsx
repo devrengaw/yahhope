@@ -11,7 +11,7 @@ interface GrowthChartsProps {
 }
 
 // Helper to generate mock WHO curves
-const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F', events: ClinicalEvent[], dob: string) => {
+const generateWHOCurves = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F') => {
   const data = [];
   
   if (type === 'heightForAge') {
@@ -21,21 +21,13 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
       const z2Offset = 4 + i * 0.05;
       const z3Offset = 6 + i * 0.08;
       
-      // Find patient measurement for this month
-      const patientEvent = events.find(e => {
-        const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
-        return ageMonths === i && e.height;
-      });
-
       data.push({
         x: i,
         z3: median + z3Offset,
         z2: median + z2Offset,
         z0: median,
         z_2: median - z2Offset,
-        z_3: median - z3Offset,
-        patientValue: patientEvent ? patientEvent.height : null,
-        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
+        z_3: median - z3Offset
       });
     }
   } else if (type === 'weightForHeight') {
@@ -45,18 +37,13 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
       const z2Offset = 0.5 + (x - 45) * 0.03;
       const z3Offset = 0.8 + (x - 45) * 0.04;
 
-      // Find patient measurement for this height
-      const patientEvent = events.find(e => e.height && Math.round(e.height) === x && e.weight);
-
       data.push({
         x: x,
         z3: median + z3Offset,
         z2: median + z2Offset,
         z0: median,
         z_2: median - z2Offset,
-        z_3: median - z3Offset,
-        patientValue: patientEvent ? patientEvent.weight : null,
-        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
+        z_3: median - z3Offset
       });
     }
   } else if (type === 'hcForAge') {
@@ -66,25 +53,36 @@ const generateChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge'
       const z2Offset = 1.5 + i * 0.01;
       const z3Offset = 2.2 + i * 0.015;
 
-      const patientEvent = events.find(e => {
-        const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
-        return ageMonths === i && e.head_circumference;
-      });
-
       data.push({
         x: i,
         z3: median + z3Offset,
         z2: median + z2Offset,
         z0: median,
         z_2: median - z2Offset,
-        z_3: median - z3Offset,
-        patientValue: patientEvent ? patientEvent.head_circumference : null,
-        patientDate: patientEvent ? parseLocalDate(patientEvent.date).toLocaleDateString() : null,
+        z_3: median - z3Offset
       });
     }
   }
   
   return data;
+};
+
+// Extract patient data correctly for each chart type
+const getPatientData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', events: ClinicalEvent[], dob: string) => {
+  const data: any[] = [];
+  events.forEach(e => {
+    if (type === 'heightForAge' && e.height) {
+      const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+      data.push({ x: ageMonths, y: e.height, date: parseLocalDate(e.date).toLocaleDateString() });
+    } else if (type === 'weightForHeight' && e.height && e.weight) {
+      data.push({ x: e.height, y: e.weight, date: parseLocalDate(e.date).toLocaleDateString() });
+    } else if (type === 'hcForAge' && e.head_circumference) {
+      const ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+      data.push({ x: ageMonths, y: e.head_circumference, date: parseLocalDate(e.date).toLocaleDateString() });
+    }
+  });
+  // Sort by x
+  return data.sort((a, b) => a.x - b.x);
 };
 
 export function GrowthCharts({ patient, events }: GrowthChartsProps) {
@@ -102,24 +100,27 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
       title: `Estatura por Idade - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Estatura (cm)',
-      data: useMemo(() => generateChartData('heightForAge', patient.gender, events, patient.dob), [patient, events]),
-      domain: [45, 125],
+      data: useMemo(() => generateWHOCurves('heightForAge', patient.gender), [patient.gender]),
+      patientData: useMemo(() => getPatientData('heightForAge', events, patient.dob), [events, patient.dob]),
+      domain: ['auto', 'auto'],
     },
     {
       id: 'weightForHeight',
       title: `Peso por Estatura - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Estatura (cm)',
       yAxisLabel: 'Peso (kg)',
-      data: useMemo(() => generateChartData('weightForHeight', patient.gender, events, patient.dob), [patient, events]),
-      domain: [2, 30],
+      data: useMemo(() => generateWHOCurves('weightForHeight', patient.gender), [patient.gender]),
+      patientData: useMemo(() => getPatientData('weightForHeight', events, patient.dob), [events, patient.dob]),
+      domain: ['auto', 'auto'],
     },
     {
       id: 'hcForAge',
       title: `Perímetro Craniano - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Perímetro Craniano (cm)',
-      data: useMemo(() => generateChartData('hcForAge', patient.gender, events, patient.dob), [patient, events]),
-      domain: [32, 54],
+      data: useMemo(() => generateWHOCurves('hcForAge', patient.gender), [patient.gender]),
+      patientData: useMemo(() => getPatientData('hcForAge', events, patient.dob), [events, patient.dob]),
+      domain: ['auto', 'auto'],
     }
   ];
 
@@ -128,16 +129,18 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
   const activeChartData = charts[currentChart];
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const patientData = payload.find((p: any) => p.dataKey === 'patientValue');
+      // Find patient data from the payload
+      const patientData = payload.find((p: any) => p.dataKey === 'y' || p.name === 'Paciente');
+      
       return (
         <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-sm">
-          <p className="font-bold text-slate-800 mb-2">{activeChartData.xAxisLabel}: {label}</p>
+          <p className="font-bold text-slate-800 mb-2">{activeChartData.xAxisLabel}: {payload[0].payload.x}</p>
           {patientData && patientData.value && (
             <div className="mb-2 pb-2 border-b border-slate-100">
               <p className="font-bold text-emerald-600">Paciente: {patientData.value} {activeChartData.yAxisLabel.split(' ')[1]}</p>
-              <p className="text-xs text-slate-500">Data: {patientData.payload.patientDate}</p>
+              <p className="text-xs text-slate-500">Data: {patientData.payload.date}</p>
             </div>
           )}
           <p className="text-slate-600">Z +3: {payload.find((p:any)=>p.dataKey==='z3')?.value.toFixed(1)}</p>
@@ -207,13 +210,15 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
               {/* Patient Data Points */}
               <Line 
-                type="monotone" 
-                dataKey="patientValue" 
+                data={activeChartData.patientData}
+                type="monotone"
+                dataKey="y" 
+                name="Paciente"
                 stroke={isBoy ? '#1e3a8a' : '#831843'} 
                 strokeWidth={3} 
-                connectNulls 
                 dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
                 activeDot={{ r: 8 }} 
+                isAnimationActive={true}
               />
             </ComposedChart>
           </ResponsiveContainer>
