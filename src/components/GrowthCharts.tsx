@@ -23,8 +23,8 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
 
   // 2. Add Patient X values and Data
   events.forEach(e => {
-    if (type === 'heightForAge' && e.height) {
-      let ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+    if (type === 'heightForAge' && e.height && e.height < 200) {
+      let ageMonths = differenceInDays(parseLocalDate(e.date), parseLocalDate(dob)) / 30.4375;
       if (ageMonths < 0) ageMonths = 0;
       
       const existing = dataMap.get(ageMonths) || { x: ageMonths };
@@ -32,15 +32,15 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(ageMonths, existing);
     } 
-    else if (type === 'weightForHeight' && e.height && e.weight) {
+    else if (type === 'weightForHeight' && e.height && e.weight && e.height < 200 && e.weight < 100) {
       const h = Math.round(e.height * 10) / 10;
       const existing = dataMap.get(h) || { x: h };
       existing.patientValue = e.weight;
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(h, existing);
     }
-    else if (type === 'hcForAge' && e.head_circumference) {
-      let ageMonths = differenceInMonths(parseLocalDate(e.date), parseLocalDate(dob));
+    else if (type === 'hcForAge' && e.head_circumference && e.head_circumference < 100) {
+      let ageMonths = differenceInDays(parseLocalDate(e.date), parseLocalDate(dob)) / 30.4375;
       if (ageMonths < 0) ageMonths = 0;
       
       const existing = dataMap.get(ageMonths) || { x: ageMonths };
