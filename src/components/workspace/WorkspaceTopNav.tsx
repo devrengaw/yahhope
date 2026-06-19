@@ -1,6 +1,6 @@
 import React from 'react';
 import { useClickUp } from '../../contexts/ClickUpContext';
-import { Share2, Settings, Users, Star, Lock, Layout, List, Kanban, Calendar, Bell } from 'lucide-react';
+import { Share2, Settings, Users, Star, Lock, Layout, List, Kanban, Calendar, Bell, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface TopNavProps {
