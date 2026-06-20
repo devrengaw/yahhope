@@ -28,14 +28,14 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
       if (ageMonths < 0) ageMonths = 0;
       
       const existing = dataMap.get(ageMonths) || { x: ageMonths };
-      existing.patientValue = e.height;
+      existing.patientValue = Number(e.height);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(ageMonths, existing);
     } 
     else if (type === 'weightForHeight' && e.height && e.weight && e.height < 200 && e.weight < 100) {
-      const h = Math.round(e.height * 10) / 10;
+      const h = Math.round(Number(e.height) * 10) / 10;
       const existing = dataMap.get(h) || { x: h };
-      existing.patientValue = e.weight;
+      existing.patientValue = Number(e.weight);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(h, existing);
     }
@@ -44,7 +44,7 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
       if (ageMonths < 0) ageMonths = 0;
       
       const existing = dataMap.get(ageMonths) || { x: ageMonths };
-      existing.patientValue = e.head_circumference;
+      existing.patientValue = Number(e.head_circumference);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(ageMonths, existing);
     }
@@ -221,12 +221,13 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
                 dataKey="patientValue" 
                 name="Paciente"
                 stroke={isBoy ? '#3b82f6' : '#ec4899'} 
-                strokeWidth={2} 
-                connectNulls
-                dot={{ r: 5, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
-                activeDot={{ r: 7 }} 
-                isAnimationActive={true}
+                strokeWidth={3} 
+                connectNulls={true}
+                dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
+                activeDot={{ r: 8 }} 
+                isAnimationActive={false}
               />
+              <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
