@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useClickUp } from '../../contexts/ClickUpContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
-  Hash, Link2, Star, Briefcase, Calendar
+  Hash, Link2, Star, Briefcase, Calendar, Users
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function WorkspaceSidebar() {
-  const { spaces, lists, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
-  const [expandedSpaces, setExpandedSpaces] = React.useState<Record<string, boolean>>({ 's1': true });
-  const [openMenu, setOpenMenu] = React.useState<string | null>(null);
+  const { spaces, lists, channels, addChannel, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
+  const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({ 's1': true });
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const location = useLocation();
 
   const toggleSpace = (id: string) => {
@@ -49,12 +49,24 @@ export function WorkspaceSidebar() {
                 <Inbox size={16} className="text-white/70" /> Caixa de Entrada
               </div>
             </button>
-            <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-medium">
+            <NavLink 
+              to="/workspace/my-tasks"
+              className={({ isActive }) => cn(
+                "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                isActive ? "bg-white/20 text-white font-bold" : "text-white hover:bg-white/10"
+              )}
+            >
               <CheckSquare size={16} className="text-white/70" /> Minhas Tarefas
-            </button>
-            <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-medium">
+            </NavLink>
+            <NavLink 
+              to="/workspace/search"
+              className={({ isActive }) => cn(
+                "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                isActive ? "bg-white/20 text-white font-bold" : "text-white hover:bg-white/10"
+              )}
+            >
               <Search size={16} className="text-white/70" /> Pesquisar
-            </button>
+            </NavLink>
           </div>
         </div>
 
@@ -62,19 +74,28 @@ export function WorkspaceSidebar() {
         <div className="p-3 border-b border-white/20">
           <div className="flex items-center justify-between px-2 mb-2 group">
             <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer hover:text-white">Canais</h3>
-            <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors">
+            <button 
+              onClick={() => {
+                const name = window.prompt('Nome do canal:');
+                if (name) addChannel(name.toLowerCase().replace(/\s+/g, '-'));
+              }}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors"
+            >
               <Plus size={14} />
             </button>
           </div>
-          <NavLink
-            to="/workspace/chat/geral"
-            className={({ isActive }) => cn(
-              "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-sm transition-all duration-300",
-              isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
-            )}
-          >
-            <Hash size={16} className="text-white/70" /> geral
-          </NavLink>
+          {channels.map(channel => (
+            <NavLink
+              key={channel.id}
+              to={`/workspace/chat/${channel.name}`}
+              className={({ isActive }) => cn(
+                "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-sm transition-all duration-300",
+                isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
+              )}
+            >
+              <Hash size={16} className="text-white/70" /> {channel.name}
+            </NavLink>
+          ))}
         </div>
 
         {/* Mensagens Diretas */}
@@ -97,6 +118,15 @@ export function WorkspaceSidebar() {
               )}
             >
               <Briefcase size={16} className="text-white/70" /> Projetos
+            </NavLink>
+            <NavLink
+              to="/workspace/equipes"
+              className={({ isActive }) => cn(
+                "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-sm transition-all duration-300",
+                isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
+              )}
+            >
+              <Users size={16} className="text-white/70" /> Equipes
             </NavLink>
             <NavLink
               to="/workspace/calendar"

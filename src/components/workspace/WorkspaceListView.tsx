@@ -7,11 +7,40 @@ import {
 import { cn } from '../../lib/utils';
 
 export function WorkspaceListView() {
-  const { lists, statuses, fields, tasks, activeList, updateTaskStatus } = useClickUp();
+  const { lists, statuses, fields, tasks, activeList, updateTaskStatus, addTask, addStatus } = useClickUp();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  
+  const [newTaskStatusId, setNewTaskStatusId] = useState<string | null>(null);
+  const [newTaskName, setNewTaskName] = useState('');
+  
+  const [isAddingStatus, setIsAddingStatus] = useState(false);
+  const [newStatusName, setNewStatusName] = useState('');
+  const [newStatusColor, setNewStatusColor] = useState('#3b82f6');
 
   const toggleGroup = (statusId: string) => {
     setCollapsedGroups(prev => ({ ...prev, [statusId]: !prev[statusId] }));
+  };
+
+  const handleAddTask = async (e: React.KeyboardEvent, statusId: string) => {
+    if (e.key === 'Enter' && newTaskName.trim()) {
+      await addTask(activeList!, newTaskName.trim(), statusId);
+      setNewTaskName('');
+      setNewTaskStatusId(null);
+    } else if (e.key === 'Escape') {
+      setNewTaskName('');
+      setNewTaskStatusId(null);
+    }
+  };
+
+  const handleAddStatus = async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && newStatusName.trim()) {
+      await addStatus(activeList!, newStatusName.trim().toUpperCase(), newStatusColor);
+      setNewStatusName('');
+      setIsAddingStatus(false);
+    } else if (e.key === 'Escape') {
+      setNewStatusName('');
+      setIsAddingStatus(false);
+    }
   };
 
   if (!activeList) return null;
@@ -99,9 +128,27 @@ export function WorkspaceListView() {
                   {/* Table Body (Tasks) */}
                   <div className="divide-y divide-slate-100">
                     {groupTasks.length === 0 ? (
-                      <div className="flex items-center px-12 py-3 text-sm font-medium text-slate-400 hover:bg-slate-50 cursor-pointer group transition-colors">
-                        <Plus size={14} className="mr-2 opacity-0 group-hover:opacity-100" /> Adicionar Tarefa
-                      </div>
+                      newTaskStatusId === status.id ? (
+                        <div className="flex items-center px-12 py-2">
+                          <input 
+                            autoFocus
+                            type="text"
+                            placeholder="Nome da tarefa (pressione Enter para salvar)"
+                            value={newTaskName}
+                            onChange={(e) => setNewTaskName(e.target.value)}
+                            onKeyDown={(e) => handleAddTask(e, status.id)}
+                            onBlur={() => setNewTaskStatusId(null)}
+                            className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                          />
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => setNewTaskStatusId(status.id)}
+                          className="flex items-center px-12 py-3 text-sm font-medium text-slate-400 hover:bg-slate-50 cursor-pointer group transition-colors"
+                        >
+                          <Plus size={14} className="mr-2 opacity-0 group-hover:opacity-100" /> Adicionar Tarefa
+                        </div>
+                      )
                     ) : (
                       groupTasks.map(task => (
                         <div key={task.id} className="flex items-center hover:bg-slate-50 transition-colors group">
@@ -137,9 +184,27 @@ export function WorkspaceListView() {
                   
                   {/* Add task row at bottom of group if there are tasks */}
                   {groupTasks.length > 0 && (
-                    <div className="flex items-center px-12 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors border-t border-slate-100">
-                      <Plus size={12} className="mr-1.5" /> Adicionar Tarefa
-                    </div>
+                    newTaskStatusId === status.id ? (
+                      <div className="flex items-center px-12 py-2 border-t border-slate-100 bg-slate-50">
+                        <input 
+                          autoFocus
+                          type="text"
+                          placeholder="Nome da tarefa (pressione Enter para salvar)"
+                          value={newTaskName}
+                          onChange={(e) => setNewTaskName(e.target.value)}
+                          onKeyDown={(e) => handleAddTask(e, status.id)}
+                          onBlur={() => setNewTaskStatusId(null)}
+                          className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => setNewTaskStatusId(status.id)}
+                        className="flex items-center px-12 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors border-t border-slate-100"
+                      >
+                        <Plus size={12} className="mr-1.5" /> Adicionar Tarefa
+                      </div>
+                    )
                   )}
                 </div>
               )}
@@ -147,9 +212,33 @@ export function WorkspaceListView() {
           );
         })}
 
-        <button className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mt-4 transition-colors">
-          <Plus size={16} /> Novo status
-        </button>
+        {isAddingStatus ? (
+          <div className="flex items-center gap-2 mt-4 max-w-sm">
+            <input 
+              type="color" 
+              value={newStatusColor} 
+              onChange={e => setNewStatusColor(e.target.value)} 
+              className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+            />
+            <input 
+              autoFocus
+              type="text"
+              placeholder="Nome do status e Enter..."
+              value={newStatusName}
+              onChange={e => setNewStatusName(e.target.value)}
+              onKeyDown={handleAddStatus}
+              className="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+            />
+            <button onClick={() => setIsAddingStatus(false)} className="text-slate-400 hover:text-slate-600 px-2">Cancelar</button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setIsAddingStatus(true)}
+            className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mt-4 transition-colors"
+          >
+            <Plus size={16} /> Novo status
+          </button>
+        )}
       </div>
     </div>
   );

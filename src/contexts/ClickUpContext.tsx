@@ -14,6 +14,11 @@ export interface CU_Folder {
   name: string;
 }
 
+export interface CU_Channel {
+  id: string;
+  name: string;
+}
+
 export interface CU_List {
   id: string;
   space_id: string;
@@ -73,6 +78,14 @@ interface ClickUpContextType {
   updateTaskStatus: (task_id: string, status_id: string) => Promise<void>;
   updateTaskField: (task_id: string, field_id: string, value: string) => Promise<void>;
   addField: (list_id: string, name: string, type: string) => Promise<void>;
+  
+  addStatus: (list_id: string, name: string, color: string) => Promise<void>;
+  updateStatus: (id: string, updates: Partial<CU_Status>) => Promise<void>;
+  deleteStatus: (id: string) => Promise<void>;
+
+  channels: CU_Channel[];
+  addChannel: (name: string) => Promise<void>;
+  
   loading: boolean;
 }
 
@@ -130,6 +143,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   const [statuses, setStatuses] = useState<CU_Status[]>([]);
   const [fields, setFields] = useState<CU_CustomField[]>([]);
   const [tasks, setTasks] = useState<CU_Task[]>([]);
+  const [channels, setChannels] = useState<CU_Channel[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
@@ -144,6 +158,8 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clickup_lists' }, () => fetchWorkspaceData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clickup_tasks' }, () => fetchWorkspaceData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clickup_task_custom_fields' }, () => fetchWorkspaceData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clickup_statuses' }, () => fetchWorkspaceData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_channels' }, () => fetchWorkspaceData())
       .subscribe();
 
     return () => { supabase.removeChannel(sub); };
@@ -161,7 +177,8 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         supabase.from('clickup_statuses').select('*'),
         supabase.from('clickup_custom_fields').select('*'),
         supabase.from('clickup_tasks').select('*'),
-        supabase.from('clickup_task_custom_fields').select('*')
+        supabase.from('clickup_task_custom_fields').select('*'),
+        supabase.from('workspace_channels').select('*')
       ]);
 
       if (!resSpaces.data || resSpaces.data.length === 0) {
@@ -202,6 +219,14 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
           setActiveSpace(resSpaces.data[0].id);
           const firstList = resLists.data?.find(l => l.space_id === resSpaces.data[0].id);
           if (firstList) setActiveList(firstList.id);
+        }
+        
+        // Channels fallback if none exists
+        if (res[7]?.data) {
+           setChannels(res[7].data);
+        } else {
+           // Provide default mock if table doesn't exist
+           setChannels([{ id: 'mock-geral', name: 'geral' }]);
         }
       }
     } catch (e) {
@@ -286,6 +311,29 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
     fetchWorkspaceData();
   };
 
+  const addStatus = async (list_id: string, name: string, color: string) => {
+    // Get max order index
+    const { data } = await supabase.from('clickup_statuses').select('order_index').eq('list_id', list_id).order('order_index', { ascending: false }).limit(1);
+    const order_index = data && data.length > 0 ? (data[0].order_index || 0) + 1 : 0;
+    await supabase.from('clickup_statuses').insert([{ list_id, name, color, order_index }]);
+    fetchWorkspaceData();
+  };
+
+  const updateStatus = async (id: string, updates: Partial<CU_Status>) => {
+    await supabase.from('clickup_statuses').update(updates).eq('id', id);
+    fetchWorkspaceData();
+  };
+
+  const deleteStatus = async (id: string) => {
+    await supabase.from('clickup_statuses').delete().eq('id', id);
+    fetchWorkspaceData();
+  };
+
+  const addChannel = async (name: string) => {
+    await supabase.from('workspace_channels').insert([{ name }]);
+    fetchWorkspaceData();
+  };
+
   return (
     <ClickUpContext.Provider value={{
       spaces, folders, lists, statuses, fields, tasks,
@@ -296,7 +344,10 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       addList,
       updateList,
       deleteList,
-      addTask, updateTaskStatus, updateTaskField, addField, loading
+      addTask, updateTaskStatus, updateTaskField, addField, 
+      addStatus, updateStatus, deleteStatus,
+      channels, addChannel,
+      loading
     }}>
       {children}
     </ClickUpContext.Provider>

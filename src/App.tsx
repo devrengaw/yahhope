@@ -66,6 +66,10 @@ import { AdminStoreManager } from './pages/admin/AdminStoreManager';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
 import { WorkspaceViewContainer } from './pages/erp/WorkspaceViewContainer';
+import { TeamProvider } from './contexts/TeamContext';
+import { TeamsContainer } from './pages/erp/teams/TeamsContainer';
+import { MyTasksView } from './pages/erp/MyTasksView';
+import { GlobalSearchView } from './pages/erp/GlobalSearchView';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -138,6 +142,7 @@ export default function App() {
             <InventoryProvider>
               <StoreProvider>
                 <WorkspaceProvider>
+                  <TeamProvider>
               <Router>
               <Routes>
                 {/* Dedicated full-screen Display Route */}
@@ -186,6 +191,9 @@ export default function App() {
                   </ProtectedRoute>
                 }>
                   <Route index element={<WorkspaceViewContainer />} />
+                  <Route path="equipes/*" element={<TeamsContainer />} />
+                  <Route path="my-tasks" element={<MyTasksView />} />
+                  <Route path="search" element={<GlobalSearchView />} />
                   <Route path="*" element={<WorkspaceViewContainer />} />
                 </Route>
 
@@ -246,6 +254,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Router>
+                  </TeamProvider>
                 </WorkspaceProvider>
               </StoreProvider>
             </InventoryProvider>

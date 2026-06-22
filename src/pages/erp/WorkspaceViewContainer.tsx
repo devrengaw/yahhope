@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { WorkspaceTopNav } from '../../components/workspace/WorkspaceTopNav';
 import { WorkspaceListView } from '../../components/workspace/WorkspaceListView';
+import { WorkspaceBoardView } from '../../components/workspace/WorkspaceBoardView';
+import { WorkspaceCalendarView } from '../../components/workspace/WorkspaceCalendarView';
 import { useClickUp } from '../../contexts/ClickUpContext';
 
 export function WorkspaceViewContainer() {
@@ -24,16 +26,8 @@ export function WorkspaceViewContainer() {
       
       <div className="flex-1 overflow-auto bg-white">
         {activeView === 'list' && <WorkspaceListView />}
-        {activeView === 'board' && (
-          <div className="p-8 flex items-center justify-center text-slate-400 font-bold border-2 border-dashed border-slate-100 m-8 rounded-2xl h-[calc(100%-4rem)]">
-            Kanban / Quadro em construção...
-          </div>
-        )}
-        {activeView === 'calendar' && (
-          <div className="p-8 flex items-center justify-center text-slate-400 font-bold border-2 border-dashed border-slate-100 m-8 rounded-2xl h-[calc(100%-4rem)]">
-            Calendário em construção...
-          </div>
-        )}
+        {activeView === 'board' && <WorkspaceBoardView />}
+        {activeView === 'calendar' && <WorkspaceCalendarView />}
       </div>
     </div>
   );
