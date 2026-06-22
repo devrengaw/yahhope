@@ -70,6 +70,10 @@ import { TeamProvider } from './contexts/TeamContext';
 import { TeamsContainer } from './pages/erp/teams/TeamsContainer';
 import { MyTasksView } from './pages/erp/MyTasksView';
 import { GlobalSearchView } from './pages/erp/GlobalSearchView';
+import { WorkspaceHome } from './pages/erp/WorkspaceHome';
+import { WorkspaceInbox } from './pages/erp/WorkspaceInbox';
+import { WorkspaceProjects } from './pages/erp/WorkspaceProjects';
+import { WorkspaceCalendarPage } from './pages/erp/WorkspaceCalendarPage';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -191,6 +195,10 @@ export default function App() {
                   </ProtectedRoute>
                 }>
                   <Route index element={<WorkspaceViewContainer />} />
+                  <Route path="inicio" element={<WorkspaceHome />} />
+                  <Route path="inbox" element={<WorkspaceInbox />} />
+                  <Route path="projects" element={<WorkspaceProjects />} />
+                  <Route path="calendar" element={<WorkspaceCalendarPage />} />
                   <Route path="equipes/*" element={<TeamsContainer />} />
                   <Route path="my-tasks" element={<MyTasksView />} />
                   <Route path="search" element={<GlobalSearchView />} />

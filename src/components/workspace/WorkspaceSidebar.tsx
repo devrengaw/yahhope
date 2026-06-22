@@ -12,6 +12,10 @@ export function WorkspaceSidebar() {
   const { spaces, lists, channels, addChannel, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({ 's1': true });
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  
+  const [newListSpaceId, setNewListSpaceId] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState('');
+  
   const location = useLocation();
 
   const toggleSpace = (id: string) => {
@@ -41,14 +45,26 @@ export function WorkspaceSidebar() {
             Meu Workspace
           </h3>
           <div className="space-y-0.5">
-            <button className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-medium">
+            <NavLink 
+              to="/workspace/inicio"
+              className={({ isActive }) => cn(
+                "w-full flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                isActive ? "bg-white/20 text-white font-bold" : "text-white hover:bg-white/10"
+              )}
+            >
               <Home size={16} className="text-white/70" /> Início
-            </button>
-            <button className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-medium">
+            </NavLink>
+            <NavLink 
+              to="/workspace/inbox"
+              className={({ isActive }) => cn(
+                "w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                isActive ? "bg-white/20 text-white font-bold" : "text-white hover:bg-white/10"
+              )}
+            >
               <div className="flex items-center gap-3">
                 <Inbox size={16} className="text-white/70" /> Caixa de Entrada
               </div>
-            </button>
+            </NavLink>
             <NavLink 
               to="/workspace/my-tasks"
               className={({ isActive }) => cn(
@@ -277,17 +293,43 @@ export function WorkspaceSidebar() {
                           </div>
                         </div>
                       ))}
-                      <div 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const name = window.prompt('Nome da nova Lista:');
-                          if (name) addList(space.id, name);
-                        }}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/10 text-white/60"
-                      >
-                        <Plus size={14} />
-                        <span className="text-xs font-medium">Adicionar Lista</span>
-                      </div>
+                      {newListSpaceId === space.id ? (
+                        <div className="flex items-center gap-2 px-2 py-1 bg-white/10 rounded-lg">
+                          <input 
+                            autoFocus
+                            type="text"
+                            placeholder="Nome da Lista..."
+                            value={newListName}
+                            onChange={(e) => setNewListName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newListName.trim()) {
+                                addList(space.id, newListName.trim());
+                                setNewListSpaceId(null);
+                                setNewListName('');
+                              } else if (e.key === 'Escape') {
+                                setNewListSpaceId(null);
+                                setNewListName('');
+                              }
+                            }}
+                            onBlur={() => {
+                              setNewListSpaceId(null);
+                              setNewListName('');
+                            }}
+                            className="w-full bg-transparent text-sm text-white placeholder:text-white/50 outline-none"
+                          />
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNewListSpaceId(space.id);
+                          }}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-white/10 text-white/60"
+                        >
+                          <Plus size={14} />
+                          <span className="text-xs font-medium">Adicionar Lista</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
