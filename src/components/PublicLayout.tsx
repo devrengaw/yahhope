@@ -59,7 +59,10 @@ export function PublicLayout() {
             </div>
             
             <div className="flex flex-col items-center md:items-end gap-4">
-
+              <div className="flex items-center gap-6 text-sm">
+                <Link to="/politica-de-privacidade" className="hover:text-white transition-colors">Política de Privacidade</Link>
+                <Link to="/termos-de-servico" className="hover:text-white transition-colors">Termos de Serviço</Link>
+              </div>
               <div className="text-xs">
                 &copy; {new Date().getFullYear()} YAHope. Todos os direitos reservados.
               </div>
