@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, S
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
-import { StatusBadge } from './Patients';
+import { StatusBadge } from '../components/StatusBadge';
 import { GrowthCharts } from '../components/GrowthCharts';
 import { PatientProfile } from '../components/PatientProfile';
 import { differenceInMonths, addDays, differenceInDays } from 'date-fns';
@@ -44,10 +44,10 @@ export function PatientDetails() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { patients, events, addEvent, updateEvent, updatePatient } = usePatients();
-  const { kits, items: inventoryItems, deductKitFromInventory } = useInventory();
-  const { adicionarNaFila, agendarAtendimento, atendimentos, concluirAtendimento, iniciarAtendimento } = useAtendimento();
+  const { addEvent, updateEvent, updatePatient, patients } = usePatients();
+  const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita } = useVisits();
+  const { agendarAtendimento, concluirAtendimento, iniciarAtendimento } = useAtendimento();
   const { sendNotification } = useNotification();
   
   const searchParams = new URLSearchParams(location.search);
@@ -59,7 +59,7 @@ export function PatientDetails() {
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   
   const patient = patients.find(p => p.id === id);
-  const patientEvents = events.filter(e => e.patient_id === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const patientEvents = patient ? [...(patient.events || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
 
   useEffect(() => {
     if (action === 'new-followup') {
@@ -86,26 +86,23 @@ export function PatientDetails() {
     } else if (action === 'referral') {
       setIsReferralModalOpen(true);
     }
-  }, [action, aptId]); // Removing patientEvents from deps to avoid re-triggering modal on save
+  }, [action, aptId]);
 
   const [isImpactModalOpen, setIsImpactModalOpen] = useState(false);
   const [impactMessage, setImpactMessage] = useState('');
   const [showImpactSuccess, setShowImpactSuccess] = useState(false);
   const [showQueueSuccess, setShowQueueSuccess] = useState(false);
 
-  const todayLocal = new Date();
-  const defaultReturnDate = formatLocalDate(addDays(todayLocal, 14));
-
-  // Modal Form State
+  // Form state
+  const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
   const [newWeight, setNewWeight] = useState('');
   const [newHeight, setNewHeight] = useState('');
   const [newMuac, setNewMuac] = useState('');
   const [newHead, setNewHead] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [returnDate, setReturnDate] = useState(defaultReturnDate);
+  const [returnDate, setReturnDate] = useState('');
   const [selectedKits, setSelectedKits] = useState<string[]>([]);
-  const [eventDate, setEventDate] = useState(formatLocalDate(todayLocal));
-  const [prescriptions, setPrescriptions] = useState([{ id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
+  const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
 
   // Referral Modal State
   const [refWeight, setRefWeight] = useState('');
@@ -137,11 +134,12 @@ export function PatientDetails() {
     e.preventDefault();
     
     // Filter out empty prescriptions
-    const validPrescriptions = prescriptions.filter(p => p.medication.trim() !== '' || p.treatment.trim() !== '').map(p => ({
+    const validPrescriptions = prescriptions.filter(p => p.item_id !== '' || p.medication.trim() !== '').map(p => ({
       ...p,
       medication: p.medication.trim(),
       treatment: p.treatment.trim(),
-      duration_days: parseInt(p.duration_days) || undefined
+      duration_days: parseInt(p.duration_days) || undefined,
+      quantity: parseInt(p.quantity) || undefined
     }));
 
     const newEvent: ClinicalEvent = {
@@ -166,6 +164,10 @@ export function PatientDetails() {
     
     if (selectedKits.length > 0) {
       selectedKits.forEach(kitId => deductKitFromInventory(kitId, patient.id));
+    }
+    
+    if (validPrescriptions.length > 0) {
+      deductPrescriptionsFromInventory(validPrescriptions, patient.id);
     }
 
     if (action === 'edit-last' && patientEvents[0]) {
@@ -931,16 +933,23 @@ export function PatientDetails() {
                   
                   {prescriptions.map((p, index) => (
                     <div key={p.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 relative group">
-                      <div className="sm:col-span-5 space-y-1">
-                        <input 
-                          type="text" 
-                          value={p.medication} 
-                          onChange={e => updatePrescription(p.id, 'medication', e.target.value)} 
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-                          placeholder="Ex: Plumpy'Nut" 
-                        />
-                      </div>
                       <div className="sm:col-span-4 space-y-1">
+                        <select
+                          value={p.item_id || ''}
+                          onChange={e => {
+                            const itemId = e.target.value;
+                            const item = items.find(i => i.id === itemId);
+                            setPrescriptions(prev => prev.map(pr => pr.id === p.id ? { ...pr, item_id: itemId, medication: item ? item.name : '' } : pr));
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                        >
+                          <option value="">Selecione do estoque...</option>
+                          {items.filter(i => !i.internal_use && i.quantity > 0).map(item => (
+                            <option key={item.id} value={item.id}>{item.name} ({item.quantity} dispon.)</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-3 space-y-1">
                         <input 
                           type="text" 
                           value={p.treatment} 
@@ -952,10 +961,20 @@ export function PatientDetails() {
                       <div className="sm:col-span-2 space-y-1">
                         <input 
                           type="number" 
+                          value={p.quantity} 
+                          onChange={e => updatePrescription(p.id, 'quantity', e.target.value)} 
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+                          placeholder="Qtd (Retirada)" 
+                          min="1"
+                        />
+                      </div>
+                      <div className="sm:col-span-2 space-y-1">
+                        <input 
+                          type="number" 
                           value={p.duration_days} 
                           onChange={e => updatePrescription(p.id, 'duration_days', e.target.value)} 
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-                          placeholder="Dias" 
+                          placeholder="Uso (Dias)" 
                           min="1"
                         />
                       </div>

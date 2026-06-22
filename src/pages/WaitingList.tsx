@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClipboardList, Plus, Search, UserPlus, X } from 'lucide-react';
+import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 
 interface WaitingChild {
@@ -12,6 +12,7 @@ interface WaitingChild {
   weight: string;
   height: string;
   muac: string;
+  head_circumference?: string;
   edema: string;
   notes: string;
   created_at: string;
@@ -31,6 +32,7 @@ export function WaitingList() {
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [muac, setMuac] = useState('');
+  const [headCircumference, setHeadCircumference] = useState('');
   const [edema, setEdema] = useState('Não');
   const [notes, setNotes] = useState('');
 
@@ -38,13 +40,13 @@ export function WaitingList() {
     e.preventDefault();
     const newChild: WaitingChild = {
       id: Date.now().toString(),
-      name, dob, guardian_name: guardianName, address, contact, weight, height, muac, edema, notes,
+      name, dob, guardian_name: guardianName, address, contact, weight, height, muac, head_circumference: headCircumference, edema, notes,
       created_at: new Date().toISOString().split('T')[0]
     };
     setList([newChild, ...list]);
     setIsModalOpen(false);
     // reset
-    setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setEdema('Não'); setNotes('');
+    setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setHeadCircumference(''); setEdema('Não'); setNotes('');
   };
 
   const getMalnutritionLevel = (child: WaitingChild) => {
@@ -107,6 +109,7 @@ export function WaitingList() {
                 <th className="p-4 font-medium text-slate-500 text-sm">Responsável</th>
                 <th className="p-4 font-medium text-slate-500 text-sm">Medidas</th>
                 <th className="p-4 font-medium text-slate-500 text-sm">Observação</th>
+                <th className="p-4 font-medium text-slate-500 text-sm text-right">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -131,16 +134,26 @@ export function WaitingList() {
                       <div className="text-xs space-y-1">
                         <p><span className="font-bold text-slate-400">P/E:</span> {child.weight || '--'}kg / {child.height || '--'}cm</p>
                         <p><span className="font-bold text-slate-400">PB:</span> {child.muac || '--'}cm</p>
+                        {child.head_circumference && <p><span className="font-bold text-slate-400">PC:</span> {child.head_circumference}cm</p>}
                         <p><span className="font-bold text-slate-400">Edema:</span> {child.edema}</p>
                       </div>
                     </td>
                     <td className="p-4 text-slate-600 max-w-xs truncate text-xs italic" title={child.notes}>{child.notes || '--'}</td>
+                    <td className="p-4 text-right">
+                      <Link 
+                        to="/nutrition/patients/new" 
+                        state={{ waitingChild: child }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl font-bold text-xs transition-colors whitespace-nowrap"
+                      >
+                        Iniciar <ArrowRight size={14} />
+                      </Link>
+                    </td>
                   </tr>
                 );
               })}
               {filteredList.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 text-sm">
+                  <td colSpan={6} className="p-8 text-center text-slate-500 text-sm">
                     Nenhuma criança na fila de espera.
                   </td>
                 </tr>
@@ -200,7 +213,7 @@ export function WaitingList() {
 
                 <div>
                   <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-[0.2em] mb-4">Medidas Antropométricas (Risco Nutricional)</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-slate-700 px-1">Peso (kg)</label>
                       <input type="number" step="0.01" value={weight} onChange={e => setWeight(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
@@ -212,6 +225,10 @@ export function WaitingList() {
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-rose-600 px-1 font-bold">PB (cm) *</label>
                       <input type="number" step="0.1" value={muac} onChange={e => setMuac(e.target.value)} placeholder="Braço" className="w-full bg-rose-50/50 border border-rose-200 rounded-2xl px-4 py-3 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all font-bold text-rose-700 placeholder:text-rose-300" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700 px-1">PC (cm)</label>
+                      <input type="number" step="0.1" value={headCircumference} onChange={e => setHeadCircumference(e.target.value)} placeholder="Cabeça" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-slate-700 px-1">Edema Bilateral</label>

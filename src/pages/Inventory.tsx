@@ -18,6 +18,7 @@ export function Inventory() {
   const [minQuantity, setMinQuantity] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
+  const [internalUse, setInternalUse] = useState(false);
 
   // Transaction Modal
   const [transactionModal, setTransactionModal] = useState<{isOpen: boolean, type: 'in'|'out', item: InventoryItem | null}>({isOpen: false, type: 'in', item: null});
@@ -52,9 +53,10 @@ export function Inventory() {
       setMinQuantity(item.min_quantity.toString());
       setExpirationDate(item.expiration_date || '');
       setPurchasePrice(item.purchase_price?.toString() || '');
+      setInternalUse(item.internal_use || false);
     } else {
       setEditingItem(null);
-      setName(''); setCategory(categories[0]?.name || ''); setQuantity(''); setUnit(''); setMinQuantity(''); setExpirationDate(''); setPurchasePrice('');
+      setName(''); setCategory(categories[0]?.name || ''); setQuantity(''); setUnit(''); setMinQuantity(''); setExpirationDate(''); setPurchasePrice(''); setInternalUse(false);
     }
     setIsItemModalOpen(true);
   };
@@ -66,7 +68,8 @@ export function Inventory() {
       name, category, quantity: parseInt(quantity) || 0, unit,
       min_quantity: parseInt(minQuantity) || 0,
       expiration_date: expirationDate || undefined,
-      purchase_price: parseFloat(purchasePrice) || undefined
+      purchase_price: parseFloat(purchasePrice) || undefined,
+      internal_use: internalUse
     };
 
     if (editingItem) {
@@ -260,9 +263,16 @@ export function Inventory() {
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 font-medium text-slate-900">{item.name}</td>
                       <td className="p-4 text-slate-600">
-                        <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg text-xs font-medium">
-                          {item.category}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg text-xs font-medium">
+                            {item.category}
+                          </span>
+                          {item.internal_use && (
+                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                              Uso Interno
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-slate-900 font-medium">
                         {item.quantity} <span className="text-slate-500 text-sm font-normal">{item.unit}</span>
@@ -481,6 +491,13 @@ export function Inventory() {
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">R$</span>
                     <input type="number" step="0.01" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" placeholder="0.00" />
                   </div>
+                </div>
+                
+                <div className="flex items-center gap-3 pt-2">
+                  <input type="checkbox" id="internalUse" checked={internalUse} onChange={e => setInternalUse(e.target.checked)} className="w-5 h-5 rounded-md border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                  <label htmlFor="internalUse" className="text-sm font-medium text-slate-700">
+                    Item de Uso Interno <span className="text-slate-400 font-normal">(não aparece para médicos prescreverem)</span>
+                  </label>
                 </div>
               </form>
             </div>

@@ -5,7 +5,7 @@ import { calculateAge, cn } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
 
 export function Patients() {
-  const { patients } = usePatients();
+  const { patients, events } = usePatients();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -41,6 +41,23 @@ export function Patients() {
     filterCommunity !== 'All',
     filterGender !== 'All'
   ].filter(Boolean).length;
+
+  const getNextReturnDate = (patientId: string) => {
+    const patientEvents = events
+      .filter(e => e.patient_id === patientId && e.return_date)
+      .sort((a, b) => new Date(b.return_date!).getTime() - new Date(a.return_date!).getTime());
+    
+    if (patientEvents.length === 0) return '--';
+    
+    // Check if the return date is in the past
+    const returnDate = new Date(patientEvents[0].return_date!);
+    const isOverdue = returnDate < new Date(new Date().setHours(0,0,0,0));
+    
+    return {
+      date: returnDate.toLocaleDateString('pt-BR'),
+      isOverdue
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -172,6 +189,7 @@ export function Patients() {
                 <th className="p-6">Idade</th>
                 <th className="p-6">Comunidade</th>
                 <th className="p-6">Status Nutricional</th>
+                <th className="p-6 text-center">Data do Retorno</th>
                 <th className="p-6 text-right">Ação</th>
               </tr>
             </thead>
@@ -199,6 +217,22 @@ export function Patients() {
                   <td className="p-6">
                     <StatusBadge status={patient.status} />
                   </td>
+                  <td className="p-6 text-center">
+                    {(() => {
+                      const ret = getNextReturnDate(patient.id);
+                      if (ret === '--') return <span className="text-slate-400 font-medium">--</span>;
+                      return (
+                        <span className={cn(
+                          "px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-block",
+                          ret.isOverdue 
+                            ? "bg-red-50 text-red-600 border border-red-100" 
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                        )}>
+                          {ret.date}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="p-6 text-right">
                     <Link 
                       to={`/nutrition/patients/${patient.id}`}
@@ -211,7 +245,7 @@ export function Patients() {
               ))}
               {filteredPatients.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center">
+                  <td colSpan={6} className="p-12 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <Search size={40} className="text-slate-200" />
                       <p className="text-slate-400 font-medium">Nenhuma criança encontrada.</p>

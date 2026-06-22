@@ -15,9 +15,11 @@ export interface Patient {
 }
 
 export interface Prescription {
+  item_id?: string;
   medication: string;
   treatment: string;
   duration_days?: number;
+  quantity?: number;
 }
 
 export interface User {
@@ -43,6 +45,7 @@ export interface InventoryItem {
   min_quantity: number;
   expiration_date?: string;
   purchase_price?: number;
+  internal_use?: boolean;
 }
 
 export interface KitItem {

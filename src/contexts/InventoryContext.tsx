@@ -24,6 +24,7 @@ interface InventoryContextType {
   deleteKit: (id: string) => void;
 
   deductKitFromInventory: (kitId: string, patientId?: string) => void;
+  deductPrescriptionsFromInventory: (prescriptions: any[], patientId: string) => void;
   addTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
 }
 
@@ -63,7 +64,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           unit: i.unit,
           min_quantity: i.min_quantity || 0,
           expiration_date: i.expiration_date,
-          purchase_price: i.purchase_price
+          purchase_price: i.purchase_price,
+          internal_use: i.internal_use || false
         })));
       }
 
@@ -113,7 +115,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           unit: item.unit,
           min_quantity: item.min_quantity,
           expiration_date: item.expiration_date,
-          purchase_price: item.purchase_price
+          purchase_price: item.purchase_price,
+          internal_use: item.internal_use || false
         });
       }
     };
@@ -131,7 +134,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       unit: item.unit,
       min_quantity: item.min_quantity,
       expiration_date: item.expiration_date,
-      purchase_price: item.purchase_price
+      purchase_price: item.purchase_price,
+      internal_use: item.internal_use || false
     }).select().single();
     if (data) {
       setItems(prev => prev.map(i => i.id === tempId ? { ...i, id: data.id } : i));
@@ -148,7 +152,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         unit: updates.unit,
         min_quantity: updates.min_quantity,
         expiration_date: updates.expiration_date,
-        purchase_price: updates.purchase_price
+        purchase_price: updates.purchase_price,
+        internal_use: updates.internal_use
       }).eq('id', id);
     }
   };
@@ -259,13 +264,43 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const deductPrescriptionsFromInventory = (prescriptions: any[], patientId: string) => {
+    if (!prescriptions || prescriptions.length === 0) return;
+
+    setItems(prevItems => {
+      const newItems = [...prevItems];
+      prescriptions.forEach(prescription => {
+        if (!prescription.item_id || !prescription.quantity) return;
+        
+        const itemIndex = newItems.findIndex(i => i.id === prescription.item_id);
+        if (itemIndex !== -1) {
+          // Deduct quantity
+          newItems[itemIndex] = {
+            ...newItems[itemIndex],
+            quantity: Math.max(0, newItems[itemIndex].quantity - prescription.quantity)
+          };
+
+          // Generate OUT transaction
+          addTransaction({
+            item_id: prescription.item_id,
+            type: 'out',
+            quantity: prescription.quantity,
+            reason: 'Prescrição Médica - Atendimento',
+            patient_id: patientId
+          });
+        }
+      });
+      return newItems;
+    });
+  };
+
   return (
     <InventoryContext.Provider value={{ 
       items, kits, categories, transactions, 
       setItems, setKits, setCategories, setTransactions, 
       addItem, updateItem, deleteItem,
       addKit, updateKit, deleteKit,
-      deductKitFromInventory, addTransaction 
+      deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction 
     }}>
       {children}
     </InventoryContext.Provider>

@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { differenceInYears, differenceInMonths, differenceInDays } from 'date-fns';
+import { differenceInYears, differenceInMonths, differenceInDays, intervalToDuration } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,10 +12,12 @@ export function calculateAge(dob: string | Date): string {
   if (isNaN(birthDate.getTime())) return '--';
   
   const today = new Date();
+  today.setHours(12, 0, 0, 0); // Normalize to midday to match parseLocalDate and avoid hour differences
   
-  const years = differenceInYears(today, birthDate);
-  const months = differenceInMonths(today, birthDate) % 12;
-  const days = differenceInDays(today, birthDate) % 30; // Approximation for display
+  const duration = intervalToDuration({ start: birthDate, end: today });
+  const years = duration.years || 0;
+  const months = duration.months || 0;
+  const days = duration.days || 0;
   
   if (years > 0) {
     return `${years}a ${months}m`;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronRight, ChevronLeft, Save, User, Activity, FileText, Home, HeartPulse, Plus, Trash2, ClipboardList, Stethoscope, CheckSquare, Heart } from 'lucide-react';
 import { differenceInMonths } from 'date-fns';
 import { calculateAge, cn, parseLocalDate } from '../lib/utils';
@@ -108,6 +108,27 @@ export function NewPatient() {
   const [educationalActions, setEducationalActions] = useState<string[]>([]);
   const [examsList, setExamsList] = useState([{ id: 1, name: '', result: '' }]);
   const [medicationsList, setMedicationsList] = useState([{ id: 1, name: '', dosage: '' }]);
+
+  const location = useLocation();
+  const waitingChild = location.state?.waitingChild;
+
+  useEffect(() => {
+    if (waitingChild) {
+      setFormData(prev => ({
+        ...prev,
+        name: waitingChild.name || '',
+        dob: waitingChild.dob || '',
+        address: waitingChild.address || '',
+        caregiver_name: waitingChild.guardian_name || '',
+        weight: waitingChild.weight || '',
+        height: waitingChild.height || '',
+        muac: waitingChild.muac || '',
+        head_circumference: waitingChild.head_circumference || '',
+        bilateral_edema: waitingChild.edema || 'Não',
+        other_findings: waitingChild.notes || ''
+      }));
+    }
+  }, [waitingChild]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;

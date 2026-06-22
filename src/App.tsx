@@ -11,6 +11,8 @@ import { Home } from './pages/public/Home';
 import { Login } from './pages/public/Login';
 import { Campaign } from './pages/public/Campaign';
 import { CampaignDisplay } from './pages/public/CampaignDisplay';
+import { PrivacyPolicy } from './pages/public/PrivacyPolicy';
+import { TermsOfService } from './pages/public/TermsOfService';
 
 import { Settings } from './pages/admin/Settings';
 import { Profile } from './pages/admin/Profile';
@@ -164,6 +166,8 @@ export default function App() {
                   <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
                   <Route path="/apoiador" element={<SupporterLanding />} />
                   <Route path="/campanha" element={<Campaign />} />
+                  <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+                  <Route path="/termos-de-servico" element={<TermsOfService />} />
                 </Route>
 
                 <Route path="/admin/*" element={

@@ -28,7 +28,9 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
     const exists = visits.find(v => v.patient_id === patientId && v.status === 'pending');
     if (exists) return;
 
+    const tempId = Math.random().toString();
     const newVisit = {
+      id: tempId,
       patient_id: patientId,
       acs_id: 'acs-1', 
       date: formatLocalDate(addDays(new Date(), 7)),
@@ -42,23 +44,38 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       last_clinical_date: clinicalDate
     };
 
-    const { data, error } = await supabase.from('home_visits').insert([newVisit]).select().single();
+    setVisits(prev => [newVisit as HomeVisit, ...prev]);
+
+    const { data, error } = await supabase.from('home_visits').insert([{
+      patient_id: newVisit.patient_id,
+      acs_id: newVisit.acs_id,
+      date: newVisit.date,
+      status: newVisit.status,
+      checklist: newVisit.checklist,
+      observations: newVisit.observations,
+      last_clinical_date: newVisit.last_clinical_date
+    }]).select().single();
+    
     if (data) {
-      setVisits(prev => [data as HomeVisit, ...prev]);
+      setVisits(prev => prev.map(v => v.id === tempId ? data as HomeVisit : v));
+    } else if (error) {
+      console.error('Error scheduling visit:', error);
     }
   };
 
   const concluirVisita = async (visitId: string, observations: string, checklist: any) => {
     const updates = { 
-      status: 'completed', 
+      status: 'completed' as const, 
       observations, 
       checklist,
       date: formatLocalDate(new Date()) 
     };
 
+    setVisits(prev => prev.map(v => v.id === visitId ? { ...v, ...updates } : v));
+
     const { error } = await supabase.from('home_visits').update(updates).eq('id', visitId);
-    if (!error) {
-      setVisits(prev => prev.map(v => v.id === visitId ? { ...v, ...updates } : v));
+    if (error) {
+      console.error('Error completing visit:', error);
     }
   };
 
