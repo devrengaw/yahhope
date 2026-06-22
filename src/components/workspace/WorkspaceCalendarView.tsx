@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useClickUp } from '../../contexts/ClickUpContext';
+import { useCalendar } from '../../contexts/CalendarContext';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, endOfWeek, isSameMonth, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Plus, Video, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { EventModal } from './calendar/EventModal';
 
 export function WorkspaceCalendarView() {
   const { tasks, activeList, statuses } = useClickUp();
-  const [currentDate, setCurrentDate] = React.useState(new Date());
+  const { events, attendees } = useCalendar();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  if (!activeList) return null;
-
-  const listTasks = tasks.filter(t => t.list_id === activeList && t.due_date);
+  // Consider all tasks if no active list is selected, or filter by activeList
+  const listTasks = tasks.filter(t => t.due_date && (!activeList || t.list_id === activeList));
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -27,12 +31,17 @@ export function WorkspaceCalendarView() {
       formattedDate = format(day, dateFormat);
       const cloneDay = day;
       
-      // Encontrar tarefas deste dia
+      // Encontrar tarefas e eventos deste dia
       const dayTasks = listTasks.filter(t => t.due_date && isSameDay(new Date(t.due_date), cloneDay));
+      const dayEvents = events.filter(e => isSameDay(new Date(e.start_time), cloneDay));
 
       days.push(
         <div
-          className={`min-h-[120px] p-2 border-r border-b border-slate-200 ${
+          onClick={() => {
+             // Future enhancement: pass selected date to modal
+             setIsModalOpen(true);
+          }}
+          className={`min-h-[120px] p-2 border-r border-b border-slate-200 cursor-pointer hover:bg-slate-50/50 transition-colors ${
             !isSameMonth(day, monthStart)
               ? "bg-slate-50 text-slate-400"
               : isSameDay(day, new Date())
@@ -46,15 +55,32 @@ export function WorkspaceCalendarView() {
           </div>
           
           <div className="mt-2 space-y-1">
+            {/* Renderizar Eventos (Reuniões/Disponibilidade) */}
+            {dayEvents.map(evt => {
+               const isMeeting = evt.event_type === 'meeting';
+               return (
+                <div 
+                  key={evt.id}
+                  className={`px-2 py-1 text-[11px] font-medium rounded border ${isMeeting ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'} truncate flex items-center gap-1`}
+                  title={evt.title}
+                >
+                  {isMeeting ? <Video size={10} /> : <Clock size={10} />}
+                  {format(new Date(evt.start_time), "HH:mm")} - {evt.title}
+                </div>
+               );
+            })}
+
+            {/* Renderizar Tarefas (Prazos) */}
             {dayTasks.map(task => {
               const status = statuses.find(s => s.id === task.status_id);
               return (
                 <div 
                   key={task.id}
-                  className="px-2 py-1 text-xs rounded truncate text-white"
+                  className="px-2 py-1 text-[11px] font-medium rounded truncate text-white shadow-sm flex items-center gap-1"
                   style={{ backgroundColor: status?.color || '#3b82f6' }}
-                  title={task.name}
+                  title={`Tarefa: ${task.name}`}
                 >
+                  <CalendarIcon size={10} />
                   {task.name}
                 </div>
               );
@@ -78,12 +104,18 @@ export function WorkspaceCalendarView() {
         <h2 className="text-xl font-bold text-slate-800 capitalize">
           {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
         </h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => setCurrentDate(new Date())}
-            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"
+            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
           >
             Hoje
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+          >
+            <Plus size={16} /> Novo Evento
           </button>
         </div>
       </div>
@@ -102,6 +134,8 @@ export function WorkspaceCalendarView() {
           {rows}
         </div>
       </div>
+
+      {isModalOpen && <EventModal onClose={() => setIsModalOpen(false)} />}
     </div>
   );
 }

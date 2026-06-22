@@ -74,6 +74,7 @@ import { WorkspaceHome } from './pages/erp/WorkspaceHome';
 import { WorkspaceInbox } from './pages/erp/WorkspaceInbox';
 import { WorkspaceProjects } from './pages/erp/WorkspaceProjects';
 import { WorkspaceCalendarPage } from './pages/erp/WorkspaceCalendarPage';
+import { CalendarProvider } from './contexts/CalendarContext';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -147,6 +148,7 @@ export default function App() {
               <StoreProvider>
                 <WorkspaceProvider>
                   <TeamProvider>
+                    <CalendarProvider>
               <Router>
               <Routes>
                 {/* Dedicated full-screen Display Route */}
@@ -262,6 +264,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Router>
+                    </CalendarProvider>
                   </TeamProvider>
                 </WorkspaceProvider>
               </StoreProvider>

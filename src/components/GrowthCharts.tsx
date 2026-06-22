@@ -21,8 +21,10 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
     for (let x = 45; x <= 120; x++) dataMap.set(x, { x: x });
   }
 
-  // 2. Add Patient X values and Data
-  events.forEach(e => {
+  // 2. Add Patient X values and Data (sorted by date ascending to ensure correct chronological line drawing)
+  const sortedEvents = [...events].sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
+  
+  sortedEvents.forEach(e => {
     if (type === 'heightForAge' && e.height && e.height < 200) {
       let ageMonths = differenceInDays(parseLocalDate(e.date), parseLocalDate(dob)) / 30.4375;
       if (ageMonths < 0) ageMonths = 0;

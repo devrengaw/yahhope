@@ -565,6 +565,7 @@ export function PatientDetails() {
                             <th className="p-5 text-center">Peso (kg)</th>
                             <th className="p-5 text-center">Est. (cm)</th>
                             <th className="p-5 text-center">PB (cm)</th>
+                            <th className="p-5 text-center">PC (cm)</th>
                             <th className="p-5 text-center">P/E (Z)</th>
                             <th className="p-5">Status</th>
                           </tr>
@@ -583,6 +584,9 @@ export function PatientDetails() {
                               </td>
                               <td className="p-5 text-center text-sm font-bold text-slate-700">
                                 {event.muac || '--'}
+                              </td>
+                              <td className="p-5 text-center text-sm font-bold text-slate-700">
+                                {event.head_circumference || '--'}
                               </td>
                               <td className="p-5 text-center text-sm">
                                  <span className={cn(
