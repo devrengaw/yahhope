@@ -44,10 +44,10 @@ export function PatientDetails() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { addEvent, updateEvent, updatePatient, patients } = usePatients();
+  const { addEvent, updateEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita } = useVisits();
-  const { agendarAtendimento, concluirAtendimento, iniciarAtendimento } = useAtendimento();
+  const { agendarAtendimento, concluirAtendimento, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
   
   const searchParams = new URLSearchParams(location.search);
@@ -59,7 +59,7 @@ export function PatientDetails() {
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   
   const patient = patients.find(p => p.id === id);
-  const patientEvents = patient ? [...(patient.events || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
+  const patientEvents = events.filter(e => e.patient_id === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   useEffect(() => {
     if (action === 'new-followup') {
@@ -224,9 +224,8 @@ export function PatientDetails() {
       const kit = kits.find(k => k.id === kitId);
       if (kit) {
         kit.items.forEach(kitItem => {
-          const invItem = inventoryItems.find(i => i.id === kitItem.item_id);
+          const invItem = items.find(i => i.id === kitItem.item_id);
           if (invItem && invItem.category === 'Medicamento') {
-            // Check if already in prescriptions to avoid duplicates
             setPrescriptions(prev => {
               const alreadyHas = prev.some(p => p.medication === invItem.name);
               if (alreadyHas) return prev;
@@ -257,7 +256,7 @@ export function PatientDetails() {
     setPrescriptions(prescriptions.filter(p => p.id !== id));
   };
 
-  const updatePrescription = (id: number, field: 'medication' | 'treatment' | 'duration_days', value: string) => {
+  const updatePrescription = (id: number, field: 'medication' | 'treatment' | 'duration_days' | 'quantity', value: string) => {
     setPrescriptions(prescriptions.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
