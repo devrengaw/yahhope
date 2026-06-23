@@ -69,7 +69,7 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  const agendarAtendimento = (patientId: string, patientName: string, date: string) => {
+  const agendarAtendimento = async (patientId: string, patientName: string, date: string) => {
     // Check if patient already scheduled for that date
     const exists = atendimentos.find(a => a.patient_id === patientId && a.date === date);
     if (exists) return;
