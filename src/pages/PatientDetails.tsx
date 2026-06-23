@@ -63,6 +63,9 @@ export function PatientDetails() {
 
   useEffect(() => {
     if (action === 'new-followup') {
+      const defaultReturnDate = new Date();
+      defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
+      setReturnDate(defaultReturnDate.toISOString().split('T')[0]);
       setIsModalOpen(true);
       if (aptId) {
         iniciarAtendimento(aptId);
@@ -88,6 +91,22 @@ export function PatientDetails() {
     }
   }, [action, aptId]);
 
+  const handleOpenNewFollowup = () => {
+    const defaultReturnDate = new Date();
+    defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
+    
+    setEventDate(new Date().toISOString().split('T')[0]);
+    setNewWeight('');
+    setNewHeight('');
+    setNewMuac('');
+    setNewHead('');
+    setNewNotes('');
+    setReturnDate(defaultReturnDate.toISOString().split('T')[0]);
+    setSelectedKits([]);
+    setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+    setIsModalOpen(true);
+  };
+
   const [isImpactModalOpen, setIsImpactModalOpen] = useState(false);
   const [impactMessage, setImpactMessage] = useState('');
   const [showImpactSuccess, setShowImpactSuccess] = useState(false);
@@ -101,6 +120,7 @@ export function PatientDetails() {
   const [newHead, setNewHead] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [returnDate, setReturnDate] = useState('');
+  const [professional, setProfessional] = useState('Dra. Helena');
   const [selectedKits, setSelectedKits] = useState<string[]>([]);
   const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
 
@@ -152,11 +172,11 @@ export function PatientDetails() {
       muac: parseFloat(newMuac) || undefined,
       head_circumference: parseFloat(newHead) || undefined,
       bmi: parseFloat(bmi as string) || undefined,
-      z_score_weight_height: zScore !== null ? zScore : undefined,
-      nutritional_status: isDischarge ? 'Alta' : calcStatus,
+      z_score_weight_height: calcStatus !== 'N/A' && zScore !== null ? zScore : undefined,
+      nutritional_status: calcStatus !== 'N/A' ? calcStatus : undefined,
+      professional: professional || 'Dra. Helena',
       prescriptions: validPrescriptions.length > 0 ? validPrescriptions : undefined,
       notes: newNotes,
-      professional: 'Dra. Helena (Logada)', // Simulated logged-in user
       return_date: isDischarge ? undefined : (returnDate || undefined),
       kit_delivered: selectedKits.length > 0 ? selectedKits : undefined,
       is_discharge: isDischarge,
@@ -366,7 +386,7 @@ export function PatientDetails() {
       {/* Action Bar */}
       <div className="flex flex-wrap gap-3">
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenNewFollowup}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
         >
           <Plus size={18} />
@@ -569,6 +589,7 @@ export function PatientDetails() {
                             <th className="p-5 text-center">PC (cm)</th>
                             <th className="p-5 text-center">P/E (Z)</th>
                             <th className="p-5">Status</th>
+                            <th className="p-5 text-right">Profissional</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -600,6 +621,9 @@ export function PatientDetails() {
                               </td>
                               <td className="p-5">
                                 {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
+                              </td>
+                              <td className="p-5 text-right text-xs font-bold text-slate-500">
+                                {event.professional || '--'}
                               </td>
                             </tr>
                           ))}
@@ -834,8 +858,14 @@ export function PatientDetails() {
                     <p className="text-sm font-bold text-emerald-900">{new Date().toLocaleDateString()}</p>
                   </div>
                   <div className="flex-1 min-w-[120px]">
-                    <p className="text-xs font-medium text-emerald-800 mb-1">Profissional</p>
-                    <p className="text-sm font-bold text-emerald-900">Dra. Helena (Logada)</p>
+                    <p className="text-xs font-medium text-emerald-800 mb-1">Profissional *</p>
+                    <input 
+                      required
+                      type="text" 
+                      value={professional} 
+                      onChange={e => setProfessional(e.target.value)}
+                      className="w-full bg-emerald-50/50 border-b-2 border-emerald-200 px-0 py-1 text-sm font-bold text-emerald-900 focus:border-emerald-500 focus:outline-none bg-transparent"
+                    />
                   </div>
                   <div className="flex-1 min-w-[120px]">
                     <p className="text-xs font-medium text-emerald-800 mb-1">Idade Atual</p>

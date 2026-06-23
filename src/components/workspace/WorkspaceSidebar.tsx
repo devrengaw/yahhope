@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useClickUp } from '../../contexts/ClickUpContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
@@ -10,6 +11,7 @@ import { cn } from '../../lib/utils';
 
 export function WorkspaceSidebar() {
   const { spaces, lists, channels, addChannel, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
+  const { confirm } = useConfirm();
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({ 's1': true });
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   
@@ -216,10 +218,10 @@ export function WorkspaceSidebar() {
                               className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 font-medium"
                             >Editar</button>
                             <button 
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
                                 setOpenMenu(null);
-                                if (window.confirm(`Tem certeza que deseja excluir o espaço "${space.name}"?`)) {
+                                if (await confirm(`Tem certeza que deseja excluir o espaço "${space.name}"?`)) {
                                   deleteSpace(space.id);
                                 }
                               }}
@@ -278,10 +280,10 @@ export function WorkspaceSidebar() {
                                     className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 font-medium"
                                   >Editar</button>
                                   <button 
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
                                       setOpenMenu(null);
-                                      if (window.confirm(`Tem certeza que deseja excluir a lista "${list.name}"?`)) {
+                                      if (await confirm(`Tem certeza que deseja excluir a lista "${list.name}"?`)) {
                                         deleteList(list.id);
                                       }
                                     }}

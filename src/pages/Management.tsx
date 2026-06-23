@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle, Activity, Plus, Edit2, Trash2, X, Tags, Shield } from 'lucide-react';
 import { InventoryCategory } from '../lib/mockData';
 import { useInventory } from '../contexts/InventoryContext';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { supabase } from '../lib/supabase';
 
 export function Management() {
   const [activeTab, setActiveTab] = useState<'visits_config' | 'categories'>('visits_config');
   
   // Categories State from Context
-  const { categories, setCategories } = useInventory();
+  const { categories, addCategory, updateCategory, deleteCategory } = useInventory();
+  const { confirm } = useConfirm();
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<InventoryCategory | null>(null);
   const [catName, setCatName] = useState('');
@@ -17,14 +20,37 @@ export function Management() {
   const [visitItems, setVisitItems] = useState<{id: string, label: string, required: boolean}[]>([]);
   const [newItemLabel, setNewItemLabel] = useState('');
 
-  const addVisitItem = () => {
-    if (!newItemLabel.trim()) return;
-    setVisitItems([...visitItems, { id: Date.now().toString(), label: newItemLabel, required: false }]);
-    setNewItemLabel('');
+  useEffect(() => {
+    fetchVisitConfigs();
+  }, []);
+
+  const fetchVisitConfigs = async () => {
+    const { data } = await supabase.from('visit_checklist_config').select('*').order('order_index', { ascending: true });
+    if (data) setVisitItems(data);
   };
 
-  const removeVisitItem = (id: string) => {
+  const addVisitItem = async () => {
+    if (!newItemLabel.trim()) return;
+    const tempId = Math.random().toString();
+    const newItem = { id: tempId, label: newItemLabel, required: false, order_index: visitItems.length };
+    
+    setVisitItems([...visitItems, newItem]);
+    setNewItemLabel('');
+
+    const { data } = await supabase.from('visit_checklist_config').insert([{
+      label: newItem.label,
+      required: newItem.required,
+      order_index: newItem.order_index
+    }]).select().single();
+
+    if (data) {
+      setVisitItems(prev => prev.map(item => item.id === tempId ? data : item));
+    }
+  };
+
+  const removeVisitItem = async (id: string) => {
     setVisitItems(visitItems.filter(item => item.id !== id));
+    await supabase.from('visit_checklist_config').delete().eq('id', id);
   };
 
   const openCategoryModal = (category?: InventoryCategory) => {
@@ -39,25 +65,19 @@ export function Management() {
     setIsCategoryModalOpen(true);
   };
 
-  const handleSaveCategory = (e: React.FormEvent) => {
+  const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newCat: InventoryCategory = {
-      id: editingCategory ? editingCategory.id : Date.now().toString(),
-      name: catName,
-      description: catDesc
-    };
-
     if (editingCategory) {
-      setCategories(categories.map(c => c.id === editingCategory.id ? newCat : c));
+      await updateCategory(editingCategory.id, { name: catName, description: catDesc });
     } else {
-      setCategories([...categories, newCat]);
+      await addCategory({ name: catName, description: catDesc });
     }
     setIsCategoryModalOpen(false);
   };
 
-  const handleDeleteCategory = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta categoria?')) {
-      setCategories(categories.filter(c => c.id !== id));
+  const handleDeleteCategory = async (id: string) => {
+    if (await confirm('Tem certeza que deseja excluir esta categoria?')) {
+      await deleteCategory(id);
     }
   };
 

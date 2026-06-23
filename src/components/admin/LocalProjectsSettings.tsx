@@ -3,8 +3,10 @@ import { Plus, Edit2, Trash2, Globe, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { YAHHopeProject } from '../../lib/mockData';
 import { LocalProjectModal } from './LocalProjectModal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export function LocalProjectsSettings() {
+  const { confirm } = useConfirm();
   const [projects, setProjects] = useState<YAHHopeProject[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<YAHHopeProject | null>(null);
@@ -40,7 +42,7 @@ export function LocalProjectsSettings() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este projeto local?')) {
+    if (await confirm('Tem certeza que deseja excluir este projeto local?')) {
       const { error } = await supabase.from('website_projects').delete().eq('id', id);
       if (!error) {
         setProjects(projects.filter(p => p.id !== id));

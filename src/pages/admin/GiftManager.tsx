@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit2, Trash2, Check, X, Image as ImageIcon, DollarSign, Heart } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export function GiftManager() {
   const [gifts, setGifts] = useState<{ id: string, name: string, price: string, impact: string, active: boolean, category: string, img: string }[]>([]);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     fetchGifts();
@@ -39,7 +41,7 @@ export function GiftManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if(confirm('Tem certeza que deseja remover este presente?')) {
+    if(await confirm('Tem certeza que deseja remover este presente?')) {
       setGifts(prev => prev.filter(g => g.id !== id));
       await supabase.from('store_products').delete().eq('id', id);
     }

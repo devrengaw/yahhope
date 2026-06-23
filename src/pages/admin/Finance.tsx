@@ -22,6 +22,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
 import { CategoryModal } from '../../components/admin/finance/CategoryModal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { cn } from '../../lib/utils';
 
 export interface Transaction {
@@ -48,6 +49,7 @@ export interface TransactionCategory {
 import { Project } from '../../lib/mockData';
 
 export function Finance() {
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'transactions' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
@@ -165,7 +167,7 @@ export function Finance() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta categoria? Transações vinculadas a ela não serão excluídas, mas perderão a referência.')) {
+    if (await confirm('Tem certeza que deseja excluir esta categoria? Transações vinculadas a ela não serão excluídas, mas perderão a referência.')) {
       const { error } = await supabase.from('finance_categories').delete().eq('id', id);
       if (error) alert('Erro ao excluir categoria');
     }

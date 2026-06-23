@@ -44,6 +44,7 @@ import { AtendimentoProvider } from './contexts/AtendimentoContext';
 import { VisitProvider } from './contexts/VisitContext';
 import { PatientProvider } from './contexts/PatientContext';
 import { ProjectProvider } from './contexts/ProjectContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AnnouncementProvider } from './contexts/AnnouncementContext';
 import { ImpactProvider } from './contexts/ImpactContext';
@@ -137,150 +138,152 @@ function RootRedirect() {
 
 export default function App() {
   return (
-  <AuthProvider>
-    <NotificationProvider>
-    <FundraisingProvider>
-    <AnnouncementProvider>
-      <ImpactProvider>
-        <PatientProvider>
-          <ProjectProvider>
-            <AtendimentoProvider>
-              <VisitProvider>
-            <InventoryProvider>
-              <StoreProvider>
-                <WorkspaceProvider>
-                  <TeamProvider>
-                    <CalendarProvider>
-              <Router>
-              <Routes>
-                {/* Dedicated full-screen Display Route */}
-                <Route path="/campanha-display" element={<CampaignDisplay />} />
+    <ConfirmProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <FundraisingProvider>
+            <AnnouncementProvider>
+              <ImpactProvider>
+                <PatientProvider>
+                  <ProjectProvider>
+                    <AtendimentoProvider>
+                      <VisitProvider>
+                        <InventoryProvider>
+                          <StoreProvider>
+                            <WorkspaceProvider>
+                              <TeamProvider>
+                                <CalendarProvider>
+                                  <Router>
+                                    <Routes>
+                                      {/* Dedicated full-screen Display Route */}
+                                      <Route path="/campanha-display" element={<CampaignDisplay />} />
 
-                <Route element={<PublicLayout />}>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/blog" element={<Blog />} />
-                  <Route path="/loja" element={<Ecommerce />} />
-                  <Route path="/projetos" element={<LocalProjects />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/set-password" element={<SetPassword />} />
-                  <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
-                  <Route path="/apoiador" element={<SupporterLanding />} />
-                  <Route path="/campanha" element={<Campaign />} />
-                  <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
-                  <Route path="/termos-de-servico" element={<TermsOfService />} />
-                </Route>
+                                      <Route element={<PublicLayout />}>
+                                        <Route path="/" element={<Home />} />
+                                        <Route path="/blog" element={<Blog />} />
+                                        <Route path="/loja" element={<Ecommerce />} />
+                                        <Route path="/projetos" element={<LocalProjects />} />
+                                        <Route path="/login" element={<Login />} />
+                                        <Route path="/set-password" element={<SetPassword />} />
+                                        <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
+                                        <Route path="/apoiador" element={<SupporterLanding />} />
+                                        <Route path="/campanha" element={<Campaign />} />
+                                        <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+                                        <Route path="/termos-de-servico" element={<TermsOfService />} />
+                                      </Route>
 
-                <Route path="/admin/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
-                    <Layout module="admin">
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/admin/projects" replace />} />
-                        <Route path="/impact-feed" element={<ImpactFeedManager />} />
-                        <Route path="/messages" element={<SupporterMessages />} />
-                        <Route path="/gifts" element={<GiftManager />} />
-                        <Route path="/fundraising" element={<FundraisingManager />} />
-                        <Route path="/projects" element={<Settings />} />
-                        <Route path="/local-projects" element={<Settings />} />
-                        <Route path="/users" element={<Settings />} />
-                        <Route path="/finance" element={<AdminFinance />} />
-                        <Route path="/store" element={<AdminStoreManager />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="*" element={<Navigate to="/admin/settings" replace />} />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                                      <Route path="/admin/*" element={
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
+                                          <Layout module="admin">
+                                            <Routes>
+                                              <Route path="/" element={<Navigate to="/admin/projects" replace />} />
+                                              <Route path="/impact-feed" element={<ImpactFeedManager />} />
+                                              <Route path="/messages" element={<SupporterMessages />} />
+                                              <Route path="/gifts" element={<GiftManager />} />
+                                              <Route path="/fundraising" element={<FundraisingManager />} />
+                                              <Route path="/projects" element={<Settings />} />
+                                              <Route path="/local-projects" element={<Settings />} />
+                                              <Route path="/users" element={<Settings />} />
+                                              <Route path="/finance" element={<AdminFinance />} />
+                                              <Route path="/store" element={<AdminStoreManager />} />
+                                              <Route path="/settings" element={<Settings />} />
+                                              <Route path="/profile" element={<Profile />} />
+                                              <Route path="*" element={<Navigate to="/admin/settings" replace />} />
+                                            </Routes>
+                                          </Layout>
+                                        </ProtectedRoute>
+                                      } />
 
-                {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
-                <Route path="/workspace" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                    <Layout module="workspace">
-                      <WorkspaceLayout />
-                    </Layout>
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<WorkspaceViewContainer />} />
-                  <Route path="inicio" element={<WorkspaceHome />} />
-                  <Route path="inbox" element={<WorkspaceInbox />} />
-                  <Route path="projects" element={<WorkspaceProjects />} />
-                  <Route path="calendar" element={<WorkspaceCalendarPage />} />
-                  <Route path="equipes/*" element={<TeamsContainer />} />
-                  <Route path="my-tasks" element={<MyTasksView />} />
-                  <Route path="search" element={<GlobalSearchView />} />
-                  <Route path="*" element={<WorkspaceViewContainer />} />
-                </Route>
+                                      {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
+                                      <Route path="/workspace" element={
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
+                                          <Layout module="workspace">
+                                            <WorkspaceLayout />
+                                          </Layout>
+                                        </ProtectedRoute>
+                                      }>
+                                        <Route index element={<WorkspaceViewContainer />} />
+                                        <Route path="inicio" element={<WorkspaceHome />} />
+                                        <Route path="inbox" element={<WorkspaceInbox />} />
+                                        <Route path="projects" element={<WorkspaceProjects />} />
+                                        <Route path="calendar" element={<WorkspaceCalendarPage />} />
+                                        <Route path="equipes/*" element={<TeamsContainer />} />
+                                        <Route path="my-tasks" element={<MyTasksView />} />
+                                        <Route path="search" element={<GlobalSearchView />} />
+                                        <Route path="*" element={<WorkspaceViewContainer />} />
+                                      </Route>
 
-                {/* Communication Module */}
-                <Route path="/communication/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                    <Layout module="communication">
-                      <Routes>
-                        <Route path="/" element={<CommDashboard />} />
-                        <Route path="/projects" element={<CommProjects />} />
-                        <Route path="/chat" element={<CommChat />} />
-                        <Route path="/blog" element={<CommBlogAdmin />} />
-                        <Route path="/email-templates" element={<CommEmailTemplates />} />
-                        <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                                      {/* Communication Module */}
+                                      <Route path="/communication/*" element={
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
+                                          <Layout module="communication">
+                                            <Routes>
+                                              <Route path="/" element={<CommDashboard />} />
+                                              <Route path="/projects" element={<CommProjects />} />
+                                              <Route path="/chat" element={<CommChat />} />
+                                              <Route path="/blog" element={<CommBlogAdmin />} />
+                                              <Route path="/email-templates" element={<CommEmailTemplates />} />
+                                              <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
+                                            </Routes>
+                                          </Layout>
+                                        </ProtectedRoute>
+                                      } />
 
-                {/* Nutrition Module */}
-                <Route path="/nutrition/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                    <Layout module="nutrition">
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/patients" element={<Patients />} />
-                        <Route path="/patients/new" element={<NewPatient />} />
-                        <Route path="/patients/:id" element={<PatientDetails />} />
-                        <Route path="/waiting-list" element={<WaitingList />} />
-                        <Route path="/updates" element={<NutritionSupporterUpdates />} />
-                        <Route path="/inventory" element={<Inventory />} />
-                        <Route path="/management" element={<Management />} />
-                        <Route path="/atendimento" element={<Atendimentos />} />
-                        <Route path="/visits" element={<HomeVisits />} />
-                        <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                } />
+                                      {/* Nutrition Module */}
+                                      <Route path="/nutrition/*" element={
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
+                                          <Layout module="nutrition">
+                                            <Routes>
+                                              <Route path="/" element={<Dashboard />} />
+                                              <Route path="/patients" element={<Patients />} />
+                                              <Route path="/patients/new" element={<NewPatient />} />
+                                              <Route path="/patients/:id" element={<PatientDetails />} />
+                                              <Route path="/waiting-list" element={<WaitingList />} />
+                                              <Route path="/updates" element={<NutritionSupporterUpdates />} />
+                                              <Route path="/inventory" element={<Inventory />} />
+                                              <Route path="/management" element={<Management />} />
+                                              <Route path="/atendimento" element={<Atendimentos />} />
+                                              <Route path="/visits" element={<HomeVisits />} />
+                                              <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
+                                            </Routes>
+                                          </Layout>
+                                        </ProtectedRoute>
+                                      } />
 
-                {/* Supporter Module / Portal */}
-                <Route path="/portal/*" element={
-                  <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'SPONSOR']}>
-                    <Layout module="supporter">
-                      <Routes>
-                        <Route path="/dashboard" element={<SponsorDashboard />} />
-                        <Route path="/sponsorship" element={<SponsorshipGallery />} />
-                        <Route path="/shop" element={<SupporterStore />} />
-                        <Route path="/messages" element={<PortalMessages />} />
-                        <Route path="/gifts" element={<PortalGifts />} />
-                        <Route path="/impact" element={<SponsorDashboard />} />
-                        <Route path="*" element={<Navigate to="/portal/dashboard" replace />} />
-                      </Routes>
-                    </Layout>
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Router>
-                    </CalendarProvider>
-                  </TeamProvider>
-                </WorkspaceProvider>
-              </StoreProvider>
-            </InventoryProvider>
-              </VisitProvider>
-            </AtendimentoProvider>
-          </ProjectProvider>
-        </PatientProvider>
-      </ImpactProvider>
-    </AnnouncementProvider>
-    </FundraisingProvider>
-    </NotificationProvider>
-  </AuthProvider>
+                                      {/* Supporter Module / Portal */}
+                                      <Route path="/portal/*" element={
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'SPONSOR']}>
+                                          <Layout module="supporter">
+                                            <Routes>
+                                              <Route path="/dashboard" element={<SponsorDashboard />} />
+                                              <Route path="/sponsorship" element={<SponsorshipGallery />} />
+                                              <Route path="/shop" element={<SupporterStore />} />
+                                              <Route path="/messages" element={<PortalMessages />} />
+                                              <Route path="/gifts" element={<PortalGifts />} />
+                                              <Route path="/impact" element={<SponsorDashboard />} />
+                                              <Route path="*" element={<Navigate to="/portal/dashboard" replace />} />
+                                            </Routes>
+                                          </Layout>
+                                        </ProtectedRoute>
+                                      } />
+                                      
+                                      <Route path="*" element={<Navigate to="/" replace />} />
+                                    </Routes>
+                                  </Router>
+                                </CalendarProvider>
+                              </TeamProvider>
+                            </WorkspaceProvider>
+                          </StoreProvider>
+                        </InventoryProvider>
+                      </VisitProvider>
+                    </AtendimentoProvider>
+                  </ProjectProvider>
+                </PatientProvider>
+              </ImpactProvider>
+            </AnnouncementProvider>
+          </FundraisingProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </ConfirmProvider>
   );
 }

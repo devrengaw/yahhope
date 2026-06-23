@@ -4,6 +4,7 @@ import { User, MapPin, Calendar, Users, Phone, Trash2, Edit2, Save, X, Home } fr
 import { calculateAge, cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { usePatients } from '../contexts/PatientContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 interface PatientProfileProps {
   patientId: string;
@@ -12,10 +13,10 @@ interface PatientProfileProps {
 export function PatientProfile({ patientId }: PatientProfileProps) {
   const navigate = useNavigate();
   const { deletePatient } = usePatients();
+  const { confirm } = useConfirm();
   
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   const [childData, setChildData] = useState<any>(null);
   const [caregiverData, setCaregiverData] = useState<any>(null);
@@ -112,9 +113,16 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
     }
   };
 
-  const handleDelete = () => {
-    deletePatient(patientId);
-    navigate('/nutrition/patients');
+  const handleDelete = async () => {
+    if (await confirm({
+      title: 'Tem certeza absoluta?',
+      message: 'A exclusão da criança apagará todo o seu histórico clínico, pesagens, consultas e dados da família. Esta ação é irreversível.',
+      confirmText: 'Sim, excluir permanentemente',
+      type: 'danger'
+    })) {
+      deletePatient(patientId);
+      navigate('/nutrition/patients');
+    }
   };
 
   if (loading) return <div className="p-8 text-center text-slate-500">Carregando ficha...</div>;
@@ -139,7 +147,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
                 <Edit2 size={16} /> Editar
               </button>
               <button 
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={handleDelete}
                 className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-red-100"
               >
                 <Trash2 size={16} /> Excluir
@@ -163,32 +171,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
           )}
         </div>
       </div>
-
-      {showDeleteConfirm && (
-        <div className="bg-red-50 border border-red-200 p-6 rounded-2xl shadow-sm animate-in fade-in zoom-in-95 duration-200">
-          <h3 className="text-red-800 font-black text-lg flex items-center gap-2 mb-2">
-            <Trash2 size={20} /> Tem certeza absoluta?
-          </h3>
-          <p className="text-red-700 text-sm mb-4 font-medium">
-            A exclusão da criança apagará <b>todo o seu histórico clínico, pesagens, consultas e dados da família</b>. 
-            Esta ação é irreversível.
-          </p>
-          <div className="flex gap-3">
-            <button 
-              onClick={handleDelete}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm"
-            >
-              Sim, excluir permanentemente
-            </button>
-            <button 
-              onClick={() => setShowDeleteConfirm(false)}
-              className="px-6 py-2 bg-white text-slate-700 font-bold text-sm rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Profile Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

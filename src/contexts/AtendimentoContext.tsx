@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { formatLocalDate } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 export type AtendimentoStatus = 'scheduled' | 'waiting' | 'in_progress' | 'completed';
 
@@ -22,34 +23,50 @@ interface AtendimentoContextType {
 
 const AtendimentoContext = createContext<AtendimentoContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_atendimentos';
+const STORAGE_KEY = 'yah_hope_atendimentos'; // kept for backward compatibility reference, but no longer used
 
 export function AtendimentoProvider({ children }: { children: React.ReactNode }) {
-  const [atendimentos, setAtendimentos] = useState<Atendimento[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [atendimentos, setAtendimentos] = useState<Atendimento[]>([]);
 
-  // Persist to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(atendimentos));
-  }, [atendimentos]);
+    fetchAtendimentos();
+
+    const sub = supabase.channel('atendimentos_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinical_appointments' }, () => {
+        fetchAtendimentos();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(sub); };
+  }, []);
+
+  const fetchAtendimentos = async () => {
+    const { data } = await supabase.from('clinical_appointments').select('*').order('date', { ascending: false });
+    if (data) {
+      setAtendimentos(data as Atendimento[]);
+    }
+  };
   
-  const adicionarNaFila = (patientId: string, patientName: string) => {
+  const adicionarNaFila = async (patientId: string, patientName: string) => {
     const today = formatLocalDate(new Date());
     // Check if patient already in queue for today (not completed)
     const exists = atendimentos.find(a => a.patient_id === patientId && a.date === today && a.status !== 'completed');
     if (exists) return;
 
-    const newAtendimento: Atendimento = {
-      id: Math.random().toString(36).substring(2, 9),
+    const newAtendimento: Omit<Atendimento, 'id'> = {
       patient_id: patientId,
       patient_name: patientName,
       status: 'waiting',
       date: today
     };
 
-    setAtendimentos(prev => [...prev, newAtendimento]);
+    const tempId = Math.random().toString();
+    setAtendimentos(prev => [...prev, { ...newAtendimento, id: tempId }]);
+
+    const { data } = await supabase.from('clinical_appointments').insert([newAtendimento]).select().single();
+    if (data) {
+      setAtendimentos(prev => prev.map(a => a.id === tempId ? data : a));
+    }
   };
 
   const agendarAtendimento = (patientId: string, patientName: string, date: string) => {
@@ -57,27 +74,35 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
     const exists = atendimentos.find(a => a.patient_id === patientId && a.date === date);
     if (exists) return;
 
-    const newAtendimento: Atendimento = {
-      id: Math.random().toString(36).substring(2, 9),
+    const newAtendimento: Omit<Atendimento, 'id'> = {
       patient_id: patientId,
       patient_name: patientName,
       status: 'scheduled',
       date: date
     };
 
-    setAtendimentos(prev => [...prev, newAtendimento]);
+    const tempId = Math.random().toString();
+    setAtendimentos(prev => [...prev, { ...newAtendimento, id: tempId }]);
+
+    const { data } = await supabase.from('clinical_appointments').insert([newAtendimento]).select().single();
+    if (data) {
+      setAtendimentos(prev => prev.map(a => a.id === tempId ? data : a));
+    }
   };
 
-  const marcarPresenca = (id: string) => {
+  const marcarPresenca = async (id: string) => {
     setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'waiting' } : a));
+    await supabase.from('clinical_appointments').update({ status: 'waiting' }).eq('id', id);
   };
 
-  const iniciarAtendimento = (id: string) => {
+  const iniciarAtendimento = async (id: string) => {
     setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'in_progress' } : a));
+    await supabase.from('clinical_appointments').update({ status: 'in_progress' }).eq('id', id);
   };
 
-  const concluirAtendimento = (id: string) => {
+  const concluirAtendimento = async (id: string) => {
     setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'completed' } : a));
+    await supabase.from('clinical_appointments').update({ status: 'completed' }).eq('id', id);
   };
 
   return (

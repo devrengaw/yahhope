@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Newspaper, Plus, Search, Edit2, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, X, AlignLeft, Calendar, Clock } from 'lucide-react';
 import { RichTextEditor } from '../../components/communication/RichTextEditor';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface BlogPost {
   id: string;
@@ -17,6 +18,7 @@ interface BlogPost {
 
 export function CommBlogAdmin() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const { confirm } = useConfirm();
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentPost, setCurrentPost] = useState<Partial<BlogPost> | null>(null);
@@ -29,8 +31,8 @@ export function CommBlogAdmin() {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este post?')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Tem certeza que deseja excluir este post?')) {
       setPosts(posts.filter(p => p.id !== id));
     }
   };

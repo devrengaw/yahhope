@@ -14,6 +14,7 @@ export function NutritionSupporterUpdates() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<UpdateStatus>('all');
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
   const handleSendUpdate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +39,13 @@ export function NutritionSupporterUpdates() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm('Deseja excluir esta atualização?')) {
-      deleteFeedItem(id);
+    setItemToDelete(id);
+  };
+
+  const executeDelete = () => {
+    if (itemToDelete !== null) {
+      deleteFeedItem(itemToDelete);
+      setItemToDelete(null);
     }
   };
 
@@ -239,6 +245,33 @@ export function NutritionSupporterUpdates() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {itemToDelete !== null && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] max-w-sm w-full p-8 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 text-center mb-2">Excluir Atualização?</h3>
+            <p className="text-slate-500 text-center text-sm mb-8 font-medium">Esta ação não pode ser desfeita. A atualização será removida permanentemente do feed dos apoiadores.</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={executeDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-600/20"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

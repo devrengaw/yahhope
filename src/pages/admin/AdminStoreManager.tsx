@@ -19,11 +19,13 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useStore, StoreProduct } from '../../contexts/StoreContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type TabType = 'dashboard' | 'products' | 'orders' | 'settings';
 
 export function AdminStoreManager() {
   const { products, addProduct, updateProduct, deleteProduct } = useStore();
+  const { confirm } = useConfirm();
   
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isStoreClosed, setIsStoreClosed] = useState(() => localStorage.getItem('yah_store_closed') === 'true');
@@ -63,8 +65,8 @@ export function AdminStoreManager() {
     setEditingProduct(null);
   };
 
-  const handleDeleteProduct = (id: string) => {
-    if (confirm('Tem certeza que deseja remover este produto? Esta ação não pode ser desfeita.')) {
+  const handleDeleteProduct = async (id: string) => {
+    if (await confirm('Tem certeza que deseja remover este produto? Esta ação não pode ser desfeita.')) {
       deleteProduct(id);
     }
   };

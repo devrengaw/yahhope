@@ -135,130 +135,108 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const updateCampaign = async (updates: Partial<Campaign>) => {
-    if (campaign.id !== '1') {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({
-          title: updates.title,
-          description: updates.description,
-          target_amount: updates.target_amount,
-          accept_pix: updates.accept_pix,
-          accept_card: updates.accept_card
-        })
-        .eq('id', campaign.id);
-        
-      if (!error) {
-        setCampaign(prev => ({ ...prev, ...updates }));
-        return { success: true };
-      } else {
-        console.error('Error updating campaign:', error);
-        return { success: false, error };
-      }
-    } else {
+    const { error } = await supabase
+      .from('campaigns')
+      .update({
+        title: updates.title,
+        description: updates.description,
+        target_amount: updates.target_amount,
+        accept_pix: updates.accept_pix,
+        accept_card: updates.accept_card
+      })
+      .eq('id', campaign.id);
+      
+    if (!error) {
       setCampaign(prev => ({ ...prev, ...updates }));
       return { success: true };
+    } else {
+      console.error('Error updating campaign:', error);
+      return { success: false, error };
     }
   };
 
   const addMilestone = async (milestone: Omit<CampaignMilestone, 'id'>) => {
-    if (campaign.id !== '1') {
-      const { data, error } = await supabase
-        .from('campaign_milestones')
-        .insert({
-          campaign_id: campaign.id,
-          title: milestone.title,
-          target_amount: milestone.target_amount,
-          description: milestone.description
-        })
-        .select()
-        .single();
-        
-      if (data && !error) {
-        setCampaign(prev => ({
-          ...prev,
-          milestones: [...prev.milestones, data].sort((a, b) => a.target_amount - b.target_amount)
-        }));
-      }
-    } else {
-      // fallback for empty DB
-      const newM = { ...milestone, id: Math.random().toString() };
+    const { data, error } = await supabase
+      .from('campaign_milestones')
+      .insert({
+        campaign_id: campaign.id,
+        title: milestone.title,
+        target_amount: milestone.target_amount,
+        description: milestone.description
+      })
+      .select()
+      .single();
+      
+    if (data && !error) {
       setCampaign(prev => ({
         ...prev,
-        milestones: [...prev.milestones, newM].sort((a, b) => a.target_amount - b.target_amount)
+        milestones: [...prev.milestones, data].sort((a, b) => a.target_amount - b.target_amount)
       }));
     }
   };
 
   const updateMilestone = async (id: string, updates: Partial<CampaignMilestone>) => {
-    if (campaign.id !== '1') {
-      await supabase
-        .from('campaign_milestones')
-        .update({
-          title: updates.title,
-          target_amount: updates.target_amount,
-          description: updates.description
-        })
-        .eq('id', id);
-        
-      setCampaign(prev => ({
-        ...prev,
-        milestones: prev.milestones.map(m => m.id === id ? { ...m, ...updates } : m).sort((a, b) => a.target_amount - b.target_amount)
-      }));
-    }
+    await supabase
+      .from('campaign_milestones')
+      .update({
+        title: updates.title,
+        target_amount: updates.target_amount,
+        description: updates.description
+      })
+      .eq('id', id);
+      
+    setCampaign(prev => ({
+      ...prev,
+      milestones: prev.milestones.map(m => m.id === id ? { ...m, ...updates } : m).sort((a, b) => a.target_amount - b.target_amount)
+    }));
   };
 
   const removeMilestone = async (id: string) => {
-    if (campaign.id !== '1') {
-      await supabase.from('campaign_milestones').delete().eq('id', id);
-      setCampaign(prev => ({
-        ...prev,
-        milestones: prev.milestones.filter(m => m.id !== id)
-      }));
-    }
+    await supabase.from('campaign_milestones').delete().eq('id', id);
+    setCampaign(prev => ({
+      ...prev,
+      milestones: prev.milestones.filter(m => m.id !== id)
+    }));
   };
 
   const createDonation = async (donation: Omit<Donation, 'id' | 'status' | 'date'>) => {
-    if (campaign.id !== '1') {
-      const { data } = await supabase.from('donations').insert({
-        campaign_id: campaign.id,
-        donor_name: donation.donor_name,
-        donor_email: donation.donor_email,
-        amount: donation.amount,
-        status: 'pending',
-        payment_method: donation.payment_method
-      }).select().single();
-      
-      if (data) {
-        const newDonation: Donation = {
-          id: data.id,
-          donor_name: data.donor_name,
-          donor_email: data.donor_email || '',
-          amount: data.amount,
-          status: data.status,
-          payment_method: data.payment_method,
-          date: data.created_at
-        };
-        setDonations(prev => [newDonation, ...prev]);
-      }
+    const { data } = await supabase.from('donations').insert({
+      campaign_id: campaign.id,
+      donor_name: donation.donor_name,
+      donor_email: donation.donor_email,
+      amount: donation.amount,
+      status: 'pending',
+      payment_method: donation.payment_method
+    }).select().single();
+    
+    if (data) {
+      const newDonation: Donation = {
+        id: data.id,
+        donor_name: data.donor_name,
+        donor_email: data.donor_email || '',
+        amount: data.amount,
+        status: data.status,
+        payment_method: data.payment_method,
+        date: data.created_at
+      };
+      setDonations(prev => [newDonation, ...prev]);
     }
   };
 
   const approveDonation = async (id: string) => {
-    if (campaign.id !== '1') {
-      // Mark as paid
-      const { data } = await supabase.from('donations').update({
-        status: 'paid',
-        paid_at: new Date().toISOString()
-      }).eq('id', id).select().single();
+    // Mark as paid
+    const { data } = await supabase.from('donations').update({
+      status: 'paid',
+      paid_at: new Date().toISOString()
+    }).eq('id', id).select().single();
+    
+    if (data) {
+      setDonations(prev => prev.map(d => d.id === id ? { ...d, status: 'paid' } : d));
       
-      if (data) {
-        setDonations(prev => prev.map(d => d.id === id ? { ...d, status: 'paid' } : d));
-        
-        // Update campaign amount
-        await supabase.from('campaigns').update({
-          current_amount: campaign.current_amount + data.amount
-        }).eq('id', campaign.id);
-      }
+      // Update campaign amount
+      await supabase.from('campaigns').update({
+        current_amount: campaign.current_amount + data.amount
+      }).eq('id', campaign.id);
     }
   };
 

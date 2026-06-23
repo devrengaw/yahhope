@@ -29,12 +29,16 @@ import { TeamList } from '../../components/erp/team/TeamList';
 import { TeamMemberModal } from '../../components/erp/team/TeamMemberModal';
 import { mockProjects, Project, mockTeamMembers, TeamMember } from '../../lib/mockData';
 import { useLocation } from 'react-router-dom';
+import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
 
 const CURRENT_USER_ID = '1';
 
 export function Settings() {
+  const { addNotification } = useNotification();
+  const { confirm, alert: showAlert } = useConfirm();
   const location = useLocation();
   
   // Determine active tab based on URL path
@@ -73,28 +77,6 @@ export function Settings() {
   // User/Team State
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    type: 'alert' | 'confirm';
-    onConfirm?: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'alert'
-  });
-
-  const closeDialog = () => setDialogConfig(prev => ({ ...prev, isOpen: false }));
-
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
-    setDialogConfig({ isOpen: true, title, message, type: 'confirm', onConfirm });
-  };
-
-  const showAlert = (title: string, message: string) => {
-    setDialogConfig({ isOpen: true, title, message, type: 'alert' });
-  };
 
   useEffect(() => {
     fetchUsers();
@@ -200,7 +182,7 @@ export function Settings() {
   };
 
   const handleDeleteMember = async (id: string) => {
-    showConfirm('Excluir Usuário', 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.', async () => {
+    if (await confirm({ title: 'Excluir Usuário', message: 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.', type: 'danger' })) {
       try {
         // Usa a Edge Function para deletar do Supabase Auth e também da tabela public.users
         const { error } = await supabase.functions.invoke('delete-user', {
@@ -213,7 +195,7 @@ export function Settings() {
         console.error('Error deleting user:', err);
         showAlert('Erro', 'Erro ao excluir usuário: ' + err.message);
       }
-    });
+    }
   };
 
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -224,7 +206,7 @@ export function Settings() {
   };
 
   const handleResendInvite = async (member: TeamMember) => {
-    showConfirm('Reenviar Convite', `Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`, async () => {
+    if (await confirm({ title: 'Reenviar Convite', message: `Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`, type: 'info' })) {
       try {
         const { error } = await supabase.functions.invoke('invite-user', {
           body: { email: member.email, name: member.name, role: member.role }
@@ -236,7 +218,7 @@ export function Settings() {
         console.error('Error resending invite:', err);
         showAlert('Erro', `Erro ao reenviar o e-mail: ${err.message}`);
       }
-    });
+    }
   };
 
   return (
@@ -415,38 +397,6 @@ export function Settings() {
         onSave={handleSaveMember}
         editingMember={selectedMember}
       />
-
-      {dialogConfig.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6">
-              <h3 className="text-xl font-black text-slate-900 mb-2 tracking-tight">{dialogConfig.title}</h3>
-              <p className="text-slate-600 mb-8 font-medium">{dialogConfig.message}</p>
-              <div className="flex justify-end gap-3">
-                {dialogConfig.type === 'confirm' && (
-                  <button 
-                    onClick={closeDialog}
-                    className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    if (dialogConfig.type === 'confirm' && dialogConfig.onConfirm) {
-                      dialogConfig.onConfirm();
-                    }
-                    closeDialog();
-                  }}
-                  className="px-6 py-2.5 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-md"
-                >
-                  {dialogConfig.type === 'confirm' ? 'Confirmar' : 'OK'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

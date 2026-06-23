@@ -144,12 +144,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       
     } catch (error) {
       console.error('Error fetching workspace data:', error);
-      // Fallback to local storage or empty if Supabase tables don't exist yet
-      const savedCh = localStorage.getItem('yah_workspace_channels');
-      if (savedCh) setChannels(JSON.parse(savedCh));
-      
-      const savedMsg = localStorage.getItem('yah_workspace_messages');
-      if (savedMsg) setMessages(JSON.parse(savedMsg));
     } finally {
       setLoading(false);
     }

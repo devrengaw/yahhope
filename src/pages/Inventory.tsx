@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Package, Plus, Search, AlertCircle, Edit2, Trash2, X, ArrowDownToLine, ArrowUpFromLine, BriefcaseMedical } from 'lucide-react';
 import { InventoryItem, Kit } from '../lib/mockData';
 import { useInventory } from '../contexts/InventoryContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function Inventory() {
-  const { items, setItems, kits, setKits, categories, transactions, addTransaction } = useInventory();
+  const { items, setItems, kits, addKit, updateKit, deleteKit, categories, transactions, addTransaction } = useInventory();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'items' | 'kits' | 'history'>('items');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -80,8 +82,8 @@ export function Inventory() {
     setIsItemModalOpen(false);
   };
 
-  const handleDeleteItem = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este item?')) {
+  const handleDeleteItem = async (id: string) => {
+    if (await confirm('Tem certeza que deseja excluir este item?')) {
       setItems(items.filter(i => i.id !== id));
     }
   };
@@ -138,7 +140,7 @@ export function Inventory() {
     setIsKitModalOpen(true);
   };
 
-  const handleSaveKit = (e: React.FormEvent) => {
+  const handleSaveKit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newKit: Kit = {
       id: editingKit ? editingKit.id : Date.now().toString(),
@@ -148,16 +150,16 @@ export function Inventory() {
     };
 
     if (editingKit) {
-      setKits(kits.map(k => k.id === editingKit.id ? newKit : k));
+      await updateKit(editingKit.id, newKit);
     } else {
-      setKits([newKit, ...kits]);
+      await addKit(newKit);
     }
     setIsKitModalOpen(false);
   };
 
-  const handleDeleteKit = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este kit?')) {
-      setKits(kits.filter(k => k.id !== id));
+  const handleDeleteKit = async (id: string) => {
+    if (await confirm('Tem certeza que deseja excluir este kit?')) {
+      await deleteKit(id);
     }
   };
 

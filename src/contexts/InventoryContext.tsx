@@ -23,6 +23,10 @@ interface InventoryContextType {
   updateKit: (id: string, updates: Partial<Kit>) => void;
   deleteKit: (id: string) => void;
 
+  addCategory: (category: Omit<InventoryCategory, 'id'>) => void;
+  updateCategory: (id: string, updates: Partial<InventoryCategory>) => void;
+  deleteCategory: (id: string) => void;
+
   deductKitFromInventory: (kitId: string, patientId?: string) => void;
   deductPrescriptionsFromInventory: (prescriptions: any[], patientId: string) => void;
   addTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
@@ -213,6 +217,35 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addCategory = async (category: Omit<InventoryCategory, 'id'>) => {
+    const tempId = Math.random().toString();
+    setCategories(prev => [...prev, { id: tempId, ...category }]);
+    const { data } = await supabase.from('inventory_categories').insert({
+      name: category.name,
+      description: category.description
+    }).select().single();
+    if (data) {
+      setCategories(prev => prev.map(c => c.id === tempId ? { ...c, id: data.id } : c));
+    }
+  };
+
+  const updateCategory = async (id: string, updates: Partial<InventoryCategory>) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    if (id.length > 10) {
+      await supabase.from('inventory_categories').update({
+        name: updates.name,
+        description: updates.description
+      }).eq('id', id);
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    if (id.length > 10) {
+      await supabase.from('inventory_categories').delete().eq('id', id);
+    }
+  };
+
   const addTransaction = async (t: Omit<InventoryTransaction, 'id' | 'date'>) => {
     const newTrans: InventoryTransaction = {
       ...t,
@@ -300,6 +333,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       setItems, setKits, setCategories, setTransactions, 
       addItem, updateItem, deleteItem,
       addKit, updateKit, deleteKit,
+      addCategory, updateCategory, deleteCategory,
       deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction 
     }}>
       {children}

@@ -5,8 +5,10 @@ import { FinanceSummary } from '../../components/erp/finance/FinanceSummary';
 import { TransactionList } from '../../components/erp/finance/TransactionList';
 import { TransactionModal } from '../../components/erp/finance/TransactionModal';
 import { Transaction } from '../../lib/mockData'; // keeping type
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export function Finance() {
+  const { confirm, alert: showAlert } = useConfirm();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,7 +25,7 @@ export function Finance() {
   }, []);
 
   const handleSendAccountability = async () => {
-    if (!window.confirm('Deseja enviar o e-mail de prestação de contas deste mês para todos os apoiadores ativos?')) return;
+    if (!(await confirm({ title: 'Prestar Contas', message: 'Deseja enviar o e-mail de prestação de contas deste mês para todos os apoiadores ativos?', type: 'info' }))) return;
     
     setIsSending(true);
     try {
@@ -37,10 +39,10 @@ export function Finance() {
       
       if (!response.ok) throw new Error('Falha ao enviar os e-mails');
       
-      alert('✅ Prestação de contas enviada com sucesso para todos os doadores!');
+      await showAlert('Sucesso', 'Prestação de contas enviada com sucesso para todos os doadores!');
     } catch (error) {
       console.error(error);
-      alert('Erro ao processar o envio. Verifique o console ou a API do Resend.');
+      await showAlert('Erro', 'Erro ao processar o envio. Verifique o console ou a API do Resend.');
     } finally {
       setIsSending(false);
     }
@@ -59,7 +61,7 @@ export function Finance() {
       }
     } catch (e) {
       console.error('Error saving transaction:', e);
-      alert('Erro ao salvar transação');
+      showAlert('Erro', 'Erro ao salvar transação');
     }
   };
 
