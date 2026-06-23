@@ -53,6 +53,11 @@ export function Management() {
     await supabase.from('visit_checklist_config').delete().eq('id', id);
   };
 
+  const toggleRequireVisitItem = async (id: string, currentRequired: boolean) => {
+    setVisitItems(visitItems.map(item => item.id === id ? { ...item, required: !currentRequired } : item));
+    await supabase.from('visit_checklist_config').update({ required: !currentRequired }).eq('id', id);
+  };
+
   const openCategoryModal = (category?: InventoryCategory) => {
     if (category) {
       setEditingCategory(category);
@@ -130,14 +135,23 @@ export function Management() {
                       {item.required && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Obrigatório</span>}
                     </div>
                   </div>
-                  {!item.required && (
-                    <button 
-                      onClick={() => removeVisitItem(item.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleRequireVisitItem(item.id, item.required)}
+                      className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider font-bold transition-colors ${item.required ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      title="Alternar Obrigatoriedade"
                     >
-                      <Trash2 size={18} />
+                      {item.required ? 'Obrigatório' : 'Opcional'}
                     </button>
-                  )}
+                    {!item.required && (
+                      <button 
+                        onClick={() => removeVisitItem(item.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
 

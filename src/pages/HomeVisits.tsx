@@ -4,6 +4,7 @@ import { useVisits } from '../contexts/VisitContext';
 import { usePatients } from '../contexts/PatientContext';
 import { HomeVisit } from '../lib/mockData';
 import { cn, formatLocalDate } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 export function HomeVisits() {
   const { visits, concluirVisita } = useVisits();
@@ -24,28 +25,43 @@ export function HomeVisits() {
            patient?.registration_number.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const [houseCleanliness, setHouseCleanliness] = useState(0);
-  const [vitaminsFollowed, setVitaminsFollowed] = useState(false);
-  const [recommendationsFollowed, setRecommendationsFollowed] = useState(false);
+  const [checklistConfig, setChecklistConfig] = useState<{id: string, label: string, required: boolean}[]>([]);
+  const [dynamicChecklist, setDynamicChecklist] = useState<Record<string, { checked: boolean, comment: string }>>({});
   const [observations, setObservations] = useState('');
+
+  // Fetch checklist config
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data } = await supabase.from('visit_checklist_config').select('*').order('order_index', { ascending: true });
+      if (data) {
+        setChecklistConfig(data);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   // Update form state when selectedVisit changes
   useEffect(() => {
     if (selectedVisit) {
-      setHouseCleanliness(selectedVisit.checklist.house_cleanliness);
-      setVitaminsFollowed(selectedVisit.checklist.vitamins_followed);
-      setRecommendationsFollowed(selectedVisit.checklist.medical_recommendations_followed);
-      setObservations(selectedVisit.observations);
+      setObservations(selectedVisit.observations || '');
+      if (selectedVisit.checklist?.dynamic) {
+        setDynamicChecklist(selectedVisit.checklist.dynamic);
+      } else {
+        // Initialize from config
+        const initial: Record<string, { checked: boolean, comment: string }> = {};
+        checklistConfig.forEach(item => {
+          initial[item.id] = { checked: false, comment: '' };
+        });
+        setDynamicChecklist(initial);
+      }
     }
-  }, [selectedVisit]);
+  }, [selectedVisit, checklistConfig]);
 
   const handleSaveVisit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedVisit) {
       concluirVisita(selectedVisit.id, observations, {
-        house_cleanliness: houseCleanliness,
-        vitamins_followed: vitaminsFollowed,
-        medical_recommendations_followed: recommendationsFollowed
+        dynamic: dynamicChecklist
       });
       alert('Visita concluída com sucesso!');
       setSelectedVisit(null);
@@ -198,50 +214,43 @@ export function HomeVisits() {
                   </h3>
                   
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 flex justify-between">
-                        Limpeza da Casa (1-5)
-                        <span className="text-emerald-600 font-bold">{houseCleanliness}/5</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="5" 
-                        step="1"
-                        disabled={selectedVisit.status === 'completed'}
-                        value={houseCleanliness}
-                        onChange={(e) => setHouseCleanliness(parseInt(e.target.value))}
-                        className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest px-1">
-                        <span>Precário</span>
-                        <span>Regular</span>
-                        <span>Excelente</span>
+                    {checklistConfig.length > 0 ? (
+                      checklistConfig.map(item => (
+                        <div key={item.id} className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              disabled={selectedVisit.status === 'completed'}
+                              checked={dynamicChecklist[item.id]?.checked || false}
+                              onChange={(e) => setDynamicChecklist(prev => ({
+                                ...prev,
+                                [item.id]: { ...prev[item.id], checked: e.target.checked, comment: prev[item.id]?.comment || '' }
+                              }))}
+                              className="w-5 h-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
+                            />
+                            <span className="text-sm font-medium text-slate-800">
+                              {item.label}
+                              {item.required && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase font-bold">Obrigatório</span>}
+                            </span>
+                          </label>
+                          <input 
+                            type="text"
+                            disabled={selectedVisit.status === 'completed'}
+                            placeholder="Comentário sobre este item (opcional)..."
+                            value={dynamicChecklist[item.id]?.comment || ''}
+                            onChange={(e) => setDynamicChecklist(prev => ({
+                              ...prev,
+                              [item.id]: { ...prev[item.id], checked: prev[item.id]?.checked || false, comment: e.target.value }
+                            }))}
+                            className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-slate-500 p-4 bg-slate-50 rounded-xl border border-slate-100 text-center">
+                        Nenhum item configurado no checklist. Configure em Gestão e Configurações.
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          disabled={selectedVisit.status === 'completed'}
-                          checked={vitaminsFollowed}
-                          onChange={(e) => setVitaminsFollowed(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
-                        />
-                        <span className="text-sm font-medium text-slate-700">Vitamina em dia</span>
-                      </label>
-                      <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          disabled={selectedVisit.status === 'completed'}
-                          checked={recommendationsFollowed}
-                          onChange={(e) => setRecommendationsFollowed(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
-                        />
-                        <span className="text-sm font-medium text-slate-700">Segue Recomendações</span>
-                      </label>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -256,7 +265,7 @@ export function HomeVisits() {
                     disabled={selectedVisit.status === 'completed'}
                     value={observations}
                     onChange={(e) => setObservations(e.target.value)}
-                    rows={4}
+                    rows={8}
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none"
                   />
                 </div>
