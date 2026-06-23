@@ -262,9 +262,9 @@ export function PatientDetails() {
   };
 
   const openReferralModal = () => {
-    setRefWeight(events[0]?.weight ? (events[0].weight * 1000).toString() : '');
-    setRefHeight(events[0]?.height ? events[0].height.toString() : '');
-    setRefPE(events[0]?.z_score_weight_height !== undefined ? events[0].z_score_weight_height.toString() : '');
+    setRefWeight(patientEvents[0]?.weight ? (patientEvents[0].weight * 1000).toString() : '');
+    setRefHeight(patientEvents[0]?.height ? patientEvents[0].height.toString() : '');
+    setRefPE(patientEvents[0]?.z_score_weight_height !== undefined ? patientEvents[0].z_score_weight_height.toString() : '');
     setEdema('Não');
     setEdemaLocation('');
     setReferralReason('');
@@ -310,8 +310,8 @@ export function PatientDetails() {
 
   const generateSuggestions = () => {
     const suggestions = [];
-    const lastEvent = events[0];
-    const prevEvent = events[1];
+    const lastEvent = patientEvents[0];
+    const prevEvent = patientEvents[1];
 
     if (lastEvent && prevEvent) {
       // Weight progress

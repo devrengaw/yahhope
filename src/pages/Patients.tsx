@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/StatusBadge';
 
 export function Patients() {
   const { patients, events } = usePatients();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -196,7 +197,11 @@ export function Patients() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredPatients.map((patient) => (
-                <tr key={patient.id} className="hover:bg-emerald-50/30 transition-all group/row">
+                <tr 
+                  key={patient.id} 
+                  onClick={() => navigate(`/nutrition/patients/${patient.id}`)}
+                  className="hover:bg-emerald-50/30 transition-all group/row cursor-pointer"
+                >
                   <td className="p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-sm border border-emerald-200/50 group-hover/row:scale-110 transition-transform">
@@ -235,12 +240,11 @@ export function Patients() {
                     })()}
                   </td>
                   <td className="p-6 text-right">
-                    <Link 
-                      to={`/nutrition/patients/${patient.id}`}
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:text-white hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-90"
+                    <button 
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover/row:text-white group-hover/row:bg-emerald-600 transition-all"
                     >
                       <ChevronRight size={20} />
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}
