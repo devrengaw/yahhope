@@ -102,16 +102,22 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // CRUD for items
   const addItem = async (item: InventoryItem) => {
-    const { data } = await supabase.from('inventory').insert({
+    const { data, error } = await supabase.from('inventory').insert({
       name: item.name,
       category: item.category,
       quantity: item.quantity,
       unit: item.unit,
       min_quantity: item.min_quantity,
-      expiration_date: item.expiration_date,
-      purchase_price: item.purchase_price,
+      expiration_date: item.expiration_date || null,
+      purchase_price: item.purchase_price || null,
       internal_use: item.internal_use || false
     }).select().single();
+    
+    if (error) {
+      console.error('Supabase Insert Error:', error);
+      alert('Erro ao salvar no banco: ' + error.message);
+    }
+    
     if (data) {
       setItems(prev => [{
         id: data.id,
@@ -134,11 +140,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       quantity: updates.quantity,
       unit: updates.unit,
       min_quantity: updates.min_quantity,
-      expiration_date: updates.expiration_date,
-      purchase_price: updates.purchase_price,
+      expiration_date: updates.expiration_date || null,
+      purchase_price: updates.purchase_price || null,
       internal_use: updates.internal_use
     }).eq('id', id);
-    if (!error) {
+    
+    if (error) {
+      console.error('Supabase Update Error:', error);
+      alert('Erro ao atualizar no banco: ' + error.message);
+    } else {
       setItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
     }
   };
@@ -197,10 +207,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory = async (category: Omit<InventoryCategory, 'id'>) => {
-    const { data } = await supabase.from('inventory_categories').insert({
+    const { data, error } = await supabase.from('inventory_categories').insert({
       name: category.name,
       description: category.description
     }).select().single();
+    
+    if (error) {
+      console.error('Supabase Insert Error:', error);
+      alert('Erro ao salvar no banco: ' + error.message);
+    }
+    
     if (data) {
       setCategories(prev => [...prev, { id: data.id, ...category }]);
     }
