@@ -5,7 +5,7 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 
 export function Inventory() {
-  const { items, setItems, kits, addKit, updateKit, deleteKit, categories, transactions, addTransaction } = useInventory();
+  const { items, addItem, updateItem, deleteItem, kits, addKit, updateKit, deleteKit, categories, transactions, addTransaction } = useInventory();
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'items' | 'kits' | 'history'>('items');
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,16 +75,16 @@ export function Inventory() {
     };
 
     if (editingItem) {
-      setItems(items.map(i => i.id === editingItem.id ? newItem : i));
+      updateItem(editingItem.id, newItem);
     } else {
-      setItems([newItem, ...items]);
+      addItem(newItem);
     }
     setIsItemModalOpen(false);
   };
 
   const handleDeleteItem = async (id: string) => {
     if (await confirm('Tem certeza que deseja excluir este item?')) {
-      setItems(items.filter(i => i.id !== id));
+      deleteItem(id);
     }
   };
 
@@ -104,16 +104,11 @@ export function Inventory() {
     const q = parseInt(transQuantity) || 0;
     const p = parseFloat(transPrice) || undefined;
 
-    setItems(items.map(i => {
-      if (i.id === item.id) {
-        return {
-          ...i,
-          quantity: type === 'in' ? i.quantity + q : Math.max(0, i.quantity - q),
-          purchase_price: type === 'in' && p !== undefined ? p : i.purchase_price
-        };
-      }
-      return i;
-    }));
+    const newQuantity = type === 'in' ? item.quantity + q : Math.max(0, item.quantity - q);
+    updateItem(item.id, {
+      quantity: newQuantity,
+      purchase_price: type === 'in' && p !== undefined ? p : item.purchase_price
+    });
 
     addTransaction({
       item_id: item.id,
