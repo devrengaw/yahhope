@@ -63,6 +63,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           min_quantity: i.min_quantity || 0,
           expiration_date: i.expiration_date,
           purchase_price: i.purchase_price,
+          currency: i.currency,
           internal_use: i.internal_use || false
         })));
       }
@@ -110,6 +111,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       min_quantity: item.min_quantity,
       expiration_date: item.expiration_date || null,
       purchase_price: item.purchase_price || null,
+      currency: item.currency || null,
       internal_use: item.internal_use || false
     }).select().single();
     
@@ -128,6 +130,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         min_quantity: data.min_quantity || 0,
         expiration_date: data.expiration_date,
         purchase_price: data.purchase_price,
+        currency: data.currency,
         internal_use: data.internal_use || false
       }, ...prev]);
     }
@@ -142,6 +145,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       min_quantity: updates.min_quantity,
       expiration_date: updates.expiration_date || null,
       purchase_price: updates.purchase_price || null,
+      currency: updates.currency || null,
       internal_use: updates.internal_use
     }).eq('id', id);
     

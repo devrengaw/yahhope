@@ -45,6 +45,7 @@ export interface InventoryItem {
   min_quantity: number;
   expiration_date?: string;
   purchase_price?: number;
+  currency?: 'MZN' | 'BRL';
   internal_use?: boolean;
 }
 
