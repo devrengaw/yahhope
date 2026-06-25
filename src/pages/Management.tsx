@@ -17,8 +17,10 @@ export function Management() {
   const [catDesc, setCatDesc] = useState('');
 
   // Visits Config State
-  const [visitItems, setVisitItems] = useState<{id: string, label: string, required: boolean}[]>([]);
+  const [visitItems, setVisitItems] = useState<{id: string, label: string, required: boolean, question_type?: string, options?: string[]}[]>([]);
   const [newItemLabel, setNewItemLabel] = useState('');
+  const [newItemType, setNewItemType] = useState('text');
+  const [newItemOptions, setNewItemOptions] = useState<string[]>(['Sim', 'Não']);
 
   useEffect(() => {
     fetchVisitConfigs();
@@ -31,16 +33,32 @@ export function Management() {
 
   const addVisitItem = async () => {
     if (!newItemLabel.trim()) return;
+    if (newItemType === 'options' && newItemOptions.some(opt => !opt.trim())) {
+      alert('Preencha todas as alternativas.');
+      return;
+    }
+
     const tempId = Math.random().toString();
-    const newItem = { id: tempId, label: newItemLabel, required: false, order_index: visitItems.length };
+    const newItem = { 
+      id: tempId, 
+      label: newItemLabel, 
+      required: false, 
+      order_index: visitItems.length,
+      question_type: newItemType,
+      options: newItemType === 'options' ? newItemOptions.filter(o => o.trim()) : []
+    };
     
     setVisitItems([...visitItems, newItem]);
     setNewItemLabel('');
+    setNewItemType('text');
+    setNewItemOptions(['Sim', 'Não']);
 
     const { data } = await supabase.from('visit_checklist_config').insert([{
       label: newItem.label,
       required: newItem.required,
-      order_index: newItem.order_index
+      order_index: newItem.order_index,
+      question_type: newItem.question_type,
+      options: newItem.options
     }]).select().single();
 
     if (data) {
@@ -131,8 +149,16 @@ export function Management() {
                       <CheckCircle size={16} />
                     </div>
                     <div>
-                      <span className="font-medium text-slate-900">{item.label}</span>
-                      {item.required && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Obrigatório</span>}
+                      <span className="font-medium text-slate-900 block">{item.label}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                          {item.question_type === 'boolean' ? 'Sim/Não' : item.question_type === 'options' ? 'Múltipla Escolha' : 'Texto'}
+                        </span>
+                        {item.required && <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Obrigatório</span>}
+                      </div>
+                      {item.question_type === 'options' && item.options && item.options.length > 0 && (
+                        <p className="text-xs text-slate-400 mt-1">Alternativas: {item.options.join(', ')}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -155,21 +181,67 @@ export function Management() {
                 </div>
               ))}
 
-              <div className="pt-4 flex gap-3">
-                <input 
-                  type="text" 
-                  value={newItemLabel}
-                  onChange={e => setNewItemLabel(e.target.value)}
-                  placeholder="Novo item do checklist..."
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                />
-                <button 
-                  onClick={addVisitItem}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm"
-                >
-                  <Plus size={20} />
-                  Adicionar
-                </button>
+              <div className="pt-4 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    value={newItemLabel}
+                    onChange={e => setNewItemLabel(e.target.value)}
+                    placeholder="Novo item do checklist..."
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+                  <select
+                    value={newItemType}
+                    onChange={e => setNewItemType(e.target.value)}
+                    className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-medium text-slate-700"
+                  >
+                    <option value="text">Campo de Texto</option>
+                    <option value="boolean">Sim/Não</option>
+                    <option value="options">Múltipla Escolha</option>
+                  </select>
+                  <button 
+                    onClick={addVisitItem}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors shadow-sm whitespace-nowrap"
+                  >
+                    <Plus size={20} />
+                    Adicionar
+                  </button>
+                </div>
+
+                {newItemType === 'options' && (
+                  <div className="pl-2 space-y-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Alternativas</p>
+                    {newItemOptions.map((opt, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={e => {
+                            const newOpts = [...newItemOptions];
+                            newOpts[index] = e.target.value;
+                            setNewItemOptions(newOpts);
+                          }}
+                          placeholder={`Alternativa ${index + 1}`}
+                          className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                        />
+                        {newItemOptions.length > 2 && (
+                          <button
+                            onClick={() => setNewItemOptions(newItemOptions.filter((_, i) => i !== index))}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setNewItemOptions([...newItemOptions, ''])}
+                      className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                    >
+                      <Plus size={16} /> Adicionar alternativa
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

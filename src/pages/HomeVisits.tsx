@@ -21,12 +21,14 @@ export function HomeVisits() {
 
   const filteredVisits = (activeTab === 'pending' ? pendingVisits : completedVisits).filter(visit => {
     const patient = getPatient(visit.patient_id);
-    return patient?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           patient?.registration_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const patientName = patient?.name || '';
+    const registration = patient?.registration_number || '';
+    return patientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           registration.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const [checklistConfig, setChecklistConfig] = useState<{id: string, label: string, required: boolean}[]>([]);
-  const [dynamicChecklist, setDynamicChecklist] = useState<Record<string, { checked: boolean, comment: string }>>({});
+  const [checklistConfig, setChecklistConfig] = useState<{id: string, label: string, required: boolean, question_type?: string, options?: string[]}[]>([]);
+  const [dynamicChecklist, setDynamicChecklist] = useState<Record<string, { checked: boolean, comment: string, value?: string }>>({});
   const [observations, setObservations] = useState('');
 
   // Fetch checklist config
@@ -48,9 +50,9 @@ export function HomeVisits() {
         setDynamicChecklist(selectedVisit.checklist.dynamic);
       } else {
         // Initialize from config
-        const initial: Record<string, { checked: boolean, comment: string }> = {};
+        const initial: Record<string, { checked: boolean, comment: string, value?: string }> = {};
         checklistConfig.forEach(item => {
-          initial[item.id] = { checked: false, comment: '' };
+          initial[item.id] = { checked: false, comment: '', value: '' };
         });
         setDynamicChecklist(initial);
       }
@@ -217,32 +219,94 @@ export function HomeVisits() {
                     {checklistConfig.length > 0 ? (
                       checklistConfig.map(item => (
                         <div key={item.id} className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              disabled={selectedVisit.status === 'completed'}
-                              checked={dynamicChecklist[item.id]?.checked || false}
-                              onChange={(e) => setDynamicChecklist(prev => ({
-                                ...prev,
-                                [item.id]: { ...prev[item.id], checked: e.target.checked, comment: prev[item.id]?.comment || '' }
-                              }))}
-                              className="w-5 h-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
-                            />
+                          <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-slate-800">
                               {item.label}
                               {item.required && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase font-bold">Obrigatório</span>}
                             </span>
-                          </label>
+                          </div>
+                          
+                          {/* Answer Input based on Type */}
+                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            {(!item.question_type || item.question_type === 'text') && (
+                              <input 
+                                type="text"
+                                disabled={selectedVisit.status === 'completed'}
+                                placeholder="Sua resposta..."
+                                value={dynamicChecklist[item.id]?.value || ''}
+                                onChange={(e) => setDynamicChecklist(prev => ({
+                                  ...prev,
+                                  [item.id]: { ...prev[item.id], value: e.target.value }
+                                }))}
+                                className="w-full text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                              />
+                            )}
+
+                            {item.question_type === 'boolean' && (
+                              <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input 
+                                    type="radio" 
+                                    name={`bool_${item.id}`}
+                                    disabled={selectedVisit.status === 'completed'}
+                                    checked={dynamicChecklist[item.id]?.value === 'Sim'}
+                                    onChange={() => setDynamicChecklist(prev => ({
+                                      ...prev,
+                                      [item.id]: { ...prev[item.id], value: 'Sim' }
+                                    }))}
+                                    className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
+                                  />
+                                  <span className="text-sm font-medium text-slate-700">Sim</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input 
+                                    type="radio" 
+                                    name={`bool_${item.id}`}
+                                    disabled={selectedVisit.status === 'completed'}
+                                    checked={dynamicChecklist[item.id]?.value === 'Não'}
+                                    onChange={() => setDynamicChecklist(prev => ({
+                                      ...prev,
+                                      [item.id]: { ...prev[item.id], value: 'Não' }
+                                    }))}
+                                    className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
+                                  />
+                                  <span className="text-sm font-medium text-slate-700">Não</span>
+                                </label>
+                              </div>
+                            )}
+
+                            {item.question_type === 'options' && (
+                              <div className="space-y-2">
+                                {item.options?.map((opt, idx) => (
+                                  <label key={idx} className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                      type="radio" 
+                                      name={`opt_${item.id}`}
+                                      disabled={selectedVisit.status === 'completed'}
+                                      checked={dynamicChecklist[item.id]?.value === opt}
+                                      onChange={() => setDynamicChecklist(prev => ({
+                                        ...prev,
+                                        [item.id]: { ...prev[item.id], value: opt }
+                                      }))}
+                                      className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500/20" 
+                                    />
+                                    <span className="text-sm font-medium text-slate-700">{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <input 
                             type="text"
                             disabled={selectedVisit.status === 'completed'}
-                            placeholder="Comentário sobre este item (opcional)..."
+                            placeholder="Comentário adicional sobre este item (opcional)..."
                             value={dynamicChecklist[item.id]?.comment || ''}
                             onChange={(e) => setDynamicChecklist(prev => ({
                               ...prev,
-                              [item.id]: { ...prev[item.id], checked: prev[item.id]?.checked || false, comment: e.target.value }
+                              [item.id]: { ...prev[item.id], comment: e.target.value }
                             }))}
-                            className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-slate-500"
                           />
                         </div>
                       ))

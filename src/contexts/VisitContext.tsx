@@ -16,8 +16,52 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   const [visits, setVisits] = useState<HomeVisit[]>([]);
 
   useEffect(() => {
-    fetchVisits();
+    fetchVisits().then(() => {
+      syncCompletedAtendimentosToVisits();
+    });
+
+    const sub = supabase.channel('visits_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'home_visits' }, () => {
+        fetchVisits();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(sub); };
   }, []);
+
+  const syncCompletedAtendimentosToVisits = async () => {
+    try {
+      const { data: atendimentos } = await supabase.from('clinical_appointments').select('*').eq('status', 'completed');
+      if (!atendimentos || atendimentos.length === 0) return;
+
+      const { data: visits } = await supabase.from('home_visits').select('patient_id, last_clinical_date');
+      if (!visits) return;
+
+      const visitsMap = new Set(visits.filter(v => v.last_clinical_date).map(v => `${v.patient_id}_${v.last_clinical_date}`));
+
+      const missingVisits = atendimentos.filter(a => !visitsMap.has(`${a.patient_id}_${a.date}`));
+
+      if (missingVisits.length > 0) {
+        const newVisits = missingVisits.map(a => ({
+          patient_id: a.patient_id,
+          date: formatLocalDate(addDays(new Date(a.date), 7)),
+          status: 'pending',
+          checklist: { dynamic: {} },
+          observations: '',
+          last_clinical_date: a.date
+        }));
+
+        const { error } = await supabase.from('home_visits').insert(newVisits);
+        if (error) {
+          console.error('Error syncing missed visits:', error);
+        } else {
+          fetchVisits();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync completed atendimentos:', err);
+    }
+  };
 
   const fetchVisits = async () => {
     const { data } = await supabase.from('home_visits').select('*').order('date', { ascending: false });
@@ -32,13 +76,10 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
     const newVisit = {
       id: tempId,
       patient_id: patientId,
-      acs_id: 'acs-1', 
       date: formatLocalDate(addDays(new Date(), 7)),
       status: 'pending',
       checklist: {
-        house_cleanliness: 0,
-        vitamins_followed: false,
-        medical_recommendations_followed: false
+        dynamic: {}
       },
       observations: '',
       last_clinical_date: clinicalDate
@@ -48,7 +89,6 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase.from('home_visits').insert([{
       patient_id: newVisit.patient_id,
-      acs_id: newVisit.acs_id,
       date: newVisit.date,
       status: newVisit.status,
       checklist: newVisit.checklist,

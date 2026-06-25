@@ -111,19 +111,19 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
       
       const newVisit = {
         patient_id: atendimento.patient_id,
-        acs_id: 'acs-1', 
         date: date,
         status: 'pending',
         checklist: {
-          house_cleanliness: 0,
-          vitamins_followed: false,
-          medical_recommendations_followed: false
+          dynamic: {} // Use empty dynamic checklist instead of old format
         },
         observations: '',
         last_clinical_date: atendimento.date
       };
 
-      await supabase.from('home_visits').insert([newVisit]);
+      const { error } = await supabase.from('home_visits').insert([newVisit]);
+      if (error) {
+        console.error('Failed to create home visit after attendance:', error);
+      }
     }
   };
 
