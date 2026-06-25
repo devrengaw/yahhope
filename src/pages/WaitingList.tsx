@@ -25,6 +25,7 @@ export function WaitingList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [filterLevel, setFilterLevel] = useState<string | null>(null);
   
   useEffect(() => {
     fetchWaitingList();
@@ -132,8 +133,17 @@ export function WaitingList() {
     }
     return { label: 'Pendente', color: 'bg-slate-100 text-slate-500 border-slate-200' };
   };
+  const stats = {
+    grave: list.filter(c => getMalnutritionLevel(c).label === 'Grave').length,
+    moderado: list.filter(c => getMalnutritionLevel(c).label === 'Moderado').length,
+    normal: list.filter(c => getMalnutritionLevel(c).label === 'Normal').length
+  };
 
-  const filteredList = list.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredList = list.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterLevel ? getMalnutritionLevel(c).label === filterLevel : true;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="space-y-6">
@@ -152,6 +162,30 @@ export function WaitingList() {
           <UserPlus size={20} />
           Nova Criança
         </button>
+      </div>
+
+      {/* Dashboard Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { id: 'grave', label: 'Grave', count: stats.grave, color: 'bg-red-50 text-red-700 border-red-200 ring-red-500' },
+          { id: 'moderado', label: 'Moderado', count: stats.moderado, color: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-500' },
+          { id: 'normal', label: 'Normal', count: stats.normal, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500' },
+        ].map(stat => (
+          <button
+            key={stat.id}
+            onClick={() => setFilterLevel(filterLevel === stat.label ? null : stat.label)}
+            className={cn(
+              "p-4 rounded-2xl border transition-all text-left flex items-center justify-between",
+              stat.color,
+              filterLevel === stat.label ? "ring-2 ring-offset-2" : "hover:brightness-95 opacity-80"
+            )}
+          >
+            <div>
+              <p className="text-xs font-bold opacity-80 uppercase tracking-wider">{stat.label}</p>
+              <h3 className="text-3xl font-black mt-1">{stat.count}</h3>
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -174,6 +208,7 @@ export function WaitingList() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="p-4 font-medium text-slate-500 text-sm w-12 text-center">#</th>
                 <th className="p-4 font-medium text-slate-500 text-sm">Criança</th>
                 <th className="p-4 font-medium text-slate-500 text-sm">Nível Risco</th>
                 <th className="p-4 font-medium text-slate-500 text-sm">Responsável</th>
@@ -183,13 +218,16 @@ export function WaitingList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredList.map((child) => {
+              {filteredList.map((child, index) => {
                 const level = getMalnutritionLevel(child);
                 return (
                   <tr key={child.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 text-center font-bold text-slate-400 text-sm">
+                      {index + 1}
+                    </td>
                     <td className="p-4">
                       <p className="font-medium text-slate-900">{child.name}</p>
-                      <p className="text-xs text-slate-500">{calculateAge(child.dob)} • Cad: {new Date(child.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-slate-500">{calculateAge(child.dob)} • Data de Cadastro: {new Date(child.created_at).toLocaleDateString()}</p>
                     </td>
                     <td className="p-4">
                       <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border", level.color)}>
@@ -240,7 +278,7 @@ export function WaitingList() {
               })}
               {filteredList.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-sm">
+                  <td colSpan={7} className="p-8 text-center text-slate-500 text-sm">
                     Nenhuma criança na fila de espera.
                   </td>
                 </tr>
