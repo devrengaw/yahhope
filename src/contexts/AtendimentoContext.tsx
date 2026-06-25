@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { formatLocalDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
+import { addDays } from 'date-fns';
 
 export type AtendimentoStatus = 'scheduled' | 'waiting' | 'in_progress' | 'completed';
 
@@ -101,8 +102,29 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
   };
 
   const concluirAtendimento = async (id: string) => {
+    const atendimento = atendimentos.find(a => a.id === id);
     setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'completed' } : a));
     await supabase.from('clinical_appointments').update({ status: 'completed' }).eq('id', id);
+
+    if (atendimento) {
+      const date = formatLocalDate(addDays(new Date(), 7));
+      
+      const newVisit = {
+        patient_id: atendimento.patient_id,
+        acs_id: 'acs-1', 
+        date: date,
+        status: 'pending',
+        checklist: {
+          house_cleanliness: 0,
+          vitamins_followed: false,
+          medical_recommendations_followed: false
+        },
+        observations: '',
+        last_clinical_date: atendimento.date
+      };
+
+      await supabase.from('home_visits').insert([newVisit]);
+    }
   };
 
   return (
