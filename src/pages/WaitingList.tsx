@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight } from 'lucide-react';
+import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight, Trash2, Edit2 } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
@@ -24,6 +24,7 @@ export function WaitingList() {
   const [list, setList] = useState<WaitingChild[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   useEffect(() => {
     fetchWaitingList();
@@ -51,23 +52,71 @@ export function WaitingList() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newChild = {
+    const childData = {
       name, dob, guardian_name: guardianName, address, contact, weight, height, muac, head_circumference: headCircumference, edema, notes
     };
     
-    const { data, error } = await supabase.from('waiting_list').insert(newChild).select().single();
-    
-    if (error) {
-      console.error(error);
-      alert('Erro ao salvar na fila de espera: ' + error.message);
-      return;
+    if (editingId) {
+      const { data, error } = await supabase.from('waiting_list').update(childData).eq('id', editingId).select().single();
+      if (error) {
+        console.error(error);
+        alert('Erro ao atualizar: ' + error.message);
+        return;
+      }
+      if (data) {
+        setList(list.map(c => c.id === editingId ? data : c));
+      }
+    } else {
+      const { data, error } = await supabase.from('waiting_list').insert(childData).select().single();
+      if (error) {
+        console.error(error);
+        alert('Erro ao salvar na fila de espera: ' + error.message);
+        return;
+      }
+      if (data) {
+        setList([data, ...list]);
+      }
     }
-    
-    if (data) {
-      setList([data, ...list]);
-      setIsModalOpen(false);
-      setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setHeadCircumference(''); setEdema('Não'); setNotes('');
+
+    setIsModalOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (child: WaitingChild) => {
+    setEditingId(child.id);
+    setName(child.name);
+    setDob(child.dob);
+    setGuardianName(child.guardian_name);
+    setAddress(child.address);
+    setContact(child.contact);
+    setWeight(child.weight);
+    setHeight(child.height);
+    setMuac(child.muac);
+    setHeadCircumference(child.head_circumference || '');
+    setEdema(child.edema);
+    setNotes(child.notes);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta criança da fila de espera?')) {
+      const { error } = await supabase.from('waiting_list').delete().eq('id', id);
+      if (!error) {
+        setList(list.filter(c => c.id !== id));
+      } else {
+        alert('Erro ao excluir: ' + error.message);
+      }
     }
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setHeadCircumference(''); setEdema('Não'); setNotes('');
+  };
+
+  const openNewModal = () => {
+    resetForm();
+    setIsModalOpen(true);
   };
 
   const getMalnutritionLevel = (child: WaitingChild) => {
@@ -97,7 +146,7 @@ export function WaitingList() {
           <p className="text-slate-500 mt-1">Triagem simplificada para identificação rápida de risco nutricional.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openNewModal}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm"
         >
           <UserPlus size={20} />
@@ -161,13 +210,30 @@ export function WaitingList() {
                     </td>
                     <td className="p-4 text-slate-600 max-w-xs truncate text-xs italic" title={child.notes}>{child.notes || '--'}</td>
                     <td className="p-4 text-right">
-                      <Link 
-                        to="/nutrition/patients/new" 
-                        state={{ waitingChild: child }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl font-bold text-xs transition-colors whitespace-nowrap"
-                      >
-                        Cadastrar Criança <ArrowRight size={14} />
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link 
+                          to="/nutrition/patients/new" 
+                          state={{ waitingChild: child }}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-bold text-xs transition-colors whitespace-nowrap"
+                          title="Cadastrar Criança Oficialmente"
+                        >
+                          Cadastrar
+                        </Link>
+                        <button
+                          onClick={() => handleEdit(child)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar Fila de Espera"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(child.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -193,7 +259,7 @@ export function WaitingList() {
                 <UserPlus size={24} className="text-emerald-600" />
                 Triagem Fila de Espera
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
                 <X size={20} />
               </button>
             </div>
