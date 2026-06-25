@@ -98,7 +98,9 @@ export function NewPatient() {
     // Sponsorship
     enable_sponsorship: false,
     child_profile: '',
-    child_photo: ''
+    child_photo: '',
+    
+    waiting_list_id: ''
   });
 
   // Complex States
@@ -125,7 +127,8 @@ export function NewPatient() {
         muac: waitingChild.muac || '',
         head_circumference: waitingChild.head_circumference || '',
         bilateral_edema: waitingChild.edema || 'Não',
-        other_findings: waitingChild.notes || ''
+        other_findings: waitingChild.notes || '',
+        waiting_list_id: waitingChild.id
       }));
     }
   }, [waitingChild]);

@@ -304,6 +304,11 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
     if (eventError) throw eventError;
 
+    // 13. Remove from waiting list if applicable
+    if (payload.waiting_list_id) {
+      await supabase.from('waiting_list').delete().eq('id', payload.waiting_list_id);
+    }
+
     // Refresh data
     await fetchData();
   };

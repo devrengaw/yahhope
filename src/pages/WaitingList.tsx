@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 interface WaitingChild {
   id: string;
@@ -22,6 +24,17 @@ export function WaitingList() {
   const [list, setList] = useState<WaitingChild[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  useEffect(() => {
+    fetchWaitingList();
+  }, []);
+
+  const fetchWaitingList = async () => {
+    const { data, error } = await supabase.from('waiting_list').select('*').order('created_at', { ascending: false });
+    if (data && !error) {
+      setList(data);
+    }
+  };
 
   // Form states
   const [name, setName] = useState('');
@@ -36,17 +49,25 @@ export function WaitingList() {
   const [edema, setEdema] = useState('Não');
   const [notes, setNotes] = useState('');
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newChild: WaitingChild = {
-      id: Date.now().toString(),
-      name, dob, guardian_name: guardianName, address, contact, weight, height, muac, head_circumference: headCircumference, edema, notes,
-      created_at: new Date().toISOString().split('T')[0]
+    const newChild = {
+      name, dob, guardian_name: guardianName, address, contact, weight, height, muac, head_circumference: headCircumference, edema, notes
     };
-    setList([newChild, ...list]);
-    setIsModalOpen(false);
-    // reset
-    setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setHeadCircumference(''); setEdema('Não'); setNotes('');
+    
+    const { data, error } = await supabase.from('waiting_list').insert(newChild).select().single();
+    
+    if (error) {
+      console.error(error);
+      alert('Erro ao salvar na fila de espera: ' + error.message);
+      return;
+    }
+    
+    if (data) {
+      setList([data, ...list]);
+      setIsModalOpen(false);
+      setName(''); setDob(''); setGuardianName(''); setAddress(''); setContact(''); setWeight(''); setHeight(''); setMuac(''); setHeadCircumference(''); setEdema('Não'); setNotes('');
+    }
   };
 
   const getMalnutritionLevel = (child: WaitingChild) => {
@@ -145,7 +166,7 @@ export function WaitingList() {
                         state={{ waitingChild: child }}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl font-bold text-xs transition-colors whitespace-nowrap"
                       >
-                        Iniciar <ArrowRight size={14} />
+                        Cadastrar Criança <ArrowRight size={14} />
                       </Link>
                     </td>
                   </tr>
