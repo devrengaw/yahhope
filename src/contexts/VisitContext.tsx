@@ -3,6 +3,7 @@ import { HomeVisit } from '../lib/mockData';
 import { formatLocalDate } from '../lib/utils';
 import { addDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface VisitContextType {
   visits: HomeVisit[];
@@ -14,6 +15,7 @@ const VisitContext = createContext<VisitContextType | undefined>(undefined);
 
 export function VisitProvider({ children }: { children: React.ReactNode }) {
   const [visits, setVisits] = useState<HomeVisit[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchVisits().then(() => {
@@ -44,6 +46,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       if (missingVisits.length > 0) {
         const newVisits = missingVisits.map(a => ({
           patient_id: a.patient_id,
+          acs_id: user?.id || null,
           date: formatLocalDate(addDays(new Date(a.date), 7)),
           status: 'pending',
           checklist: { dynamic: {} },
@@ -76,6 +79,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
     const newVisit = {
       id: tempId,
       patient_id: patientId,
+      acs_id: user?.id || null,
       date: formatLocalDate(addDays(new Date(), 7)),
       status: 'pending',
       checklist: {
@@ -89,6 +93,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase.from('home_visits').insert([{
       patient_id: newVisit.patient_id,
+      acs_id: newVisit.acs_id,
       date: newVisit.date,
       status: newVisit.status,
       checklist: newVisit.checklist,

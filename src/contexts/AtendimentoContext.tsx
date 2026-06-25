@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { formatLocalDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { addDays } from 'date-fns';
+import { useAuth } from './AuthContext';
 
 export type AtendimentoStatus = 'scheduled' | 'waiting' | 'in_progress' | 'completed';
 
@@ -28,6 +29,7 @@ const STORAGE_KEY = 'yah_hope_atendimentos'; // kept for backward compatibility 
 
 export function AtendimentoProvider({ children }: { children: React.ReactNode }) {
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchAtendimentos();
@@ -111,6 +113,7 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
       
       const newVisit = {
         patient_id: atendimento.patient_id,
+        acs_id: user?.id || null,
         date: date,
         status: 'pending',
         checklist: {
