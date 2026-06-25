@@ -33,7 +33,12 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
   const syncCompletedAtendimentosToVisits = async () => {
     try {
-      const { data: atendimentos } = await supabase.from('clinical_appointments').select('*').eq('status', 'completed');
+      // 1. Fetch from clinical_events instead of clinical_appointments queue
+      const { data: atendimentos } = await supabase
+        .from('clinical_events')
+        .select('*')
+        .in('event_type', ['initial', 'acompanhamento']);
+        
       if (!atendimentos || atendimentos.length === 0) return;
 
       const { data: visits } = await supabase.from('home_visits').select('patient_id, last_clinical_date');
@@ -41,11 +46,12 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
       const visitsMap = new Set(visits.filter(v => v.last_clinical_date).map(v => `${v.patient_id}_${v.last_clinical_date}`));
 
-      const missingVisits = atendimentos.filter(a => !visitsMap.has(`${a.patient_id}_${a.date}`));
+      // Use child_id since clinical_events uses child_id in DB schema
+      const missingVisits = atendimentos.filter(a => !visitsMap.has(`${a.child_id}_${a.date}`));
 
       if (missingVisits.length > 0) {
         const newVisits = missingVisits.map(a => ({
-          patient_id: a.patient_id,
+          patient_id: a.child_id,
           acs_id: user?.id || null,
           date: formatLocalDate(addDays(new Date(a.date), 7)),
           status: 'pending',
@@ -56,7 +62,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
         const { error } = await supabase.from('home_visits').insert(newVisits);
         if (error) {
-          console.error('Error syncing missed visits:', error);
+          console.error('Error syncing missed visits from clinical events:', error);
         } else {
           fetchVisits();
         }
