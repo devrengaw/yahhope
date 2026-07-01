@@ -18,13 +18,12 @@ const STEPS = [
 ];
 
 
-// Helper component for inputs
-const Input = ({ label, name, type = 'text', required = false, placeholder = '', formData, handleChange }: any) => (
+const Input = ({ label, name, type = 'text', required = false, placeholder = '', formData, handleChange, readOnly = false }: any) => (
   <div className="space-y-1">
     <label className="text-sm font-medium text-slate-700">{label} {required && '*'}</label>
     <input 
-      required={required} type={type} name={name} value={formData[name] || ''} onChange={handleChange} placeholder={placeholder}
-      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+      required={required} type={type} name={name} value={formData[name] || ''} onChange={handleChange} placeholder={placeholder} readOnly={readOnly}
+      className={cn("w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all", readOnly && "opacity-70 cursor-not-allowed")} 
     />
   </div>
 );
@@ -133,6 +132,26 @@ export function NewPatient() {
     }
   }, [waitingChild]);
 
+  const { patients, addFullPatientRecord } = usePatients();
+
+  // Auto-generate registration_number
+  useEffect(() => {
+    if (!formData.registration_number && patients.length > 0) {
+      const currentYear = new Date().getFullYear().toString();
+      const thisYearPatients = patients.filter(p => p.registration_number?.startsWith(currentYear));
+      let nextNumber = 1;
+      if (thisYearPatients.length > 0) {
+        const max = Math.max(...thisYearPatients.map(p => {
+          const numStr = p.registration_number.replace(currentYear, '');
+          return parseInt(numStr, 10) || 0;
+        }));
+        nextNumber = max + 1;
+      }
+      const newRegNum = `${currentYear}${nextNumber.toString().padStart(2, '0')}`;
+      setFormData(prev => ({ ...prev, registration_number: newRegNum }));
+    }
+  }, [patients, formData.registration_number]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
@@ -237,8 +256,6 @@ export function NewPatient() {
 
   }, [formData.weight, formData.height, formData.dob, formData.gender, formData.service_date]);
 
-  const { addFullPatientRecord } = usePatients();
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -320,7 +337,7 @@ export function NewPatient() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Input formData={formData} handleChange={handleChange} label="Data do Atendimento" name="service_date" type="date" required />
-                  <Input formData={formData} handleChange={handleChange} label="Número de Identificação" name="registration_number" required />
+                  <Input formData={formData} handleChange={handleChange} label="Número de Identificação" name="registration_number" required readOnly={true} />
                   <Input formData={formData} handleChange={handleChange} label="Nome da Criança" name="name" required />
                   <Input formData={formData} handleChange={handleChange} label="Data de Nascimento" name="dob" type="date" required />
                   <div className="space-y-1">

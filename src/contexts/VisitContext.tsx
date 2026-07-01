@@ -18,6 +18,8 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
+
     fetchVisits().then(() => {
       syncCompletedAtendimentosToVisits();
     });
@@ -29,7 +31,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => { supabase.removeChannel(sub); };
-  }, []);
+  }, [user?.id]);
 
   const syncCompletedAtendimentosToVisits = async () => {
     try {

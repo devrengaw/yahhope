@@ -1,14 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Package, Plus, Search, AlertCircle, Edit2, Trash2, X, ArrowDownToLine, ArrowUpFromLine, BriefcaseMedical } from 'lucide-react';
 import { InventoryItem, Kit } from '../lib/mockData';
 import { useInventory } from '../contexts/InventoryContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+
+const KitItemSelect = ({ items, categories, value, onChange }: { items: InventoryItem[], categories: any[], value: string, onChange: (id: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterCat, setFilterCat] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedItem = items.find(i => i.id === value);
+  const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+  const filtered = sortedItems.filter(i => 
+    i.name.toLowerCase().includes(search.toLowerCase()) &&
+    (filterCat === '' || i.category === filterCat)
+  );
+
+  return (
+    <div className="relative flex-1" ref={wrapperRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)} 
+        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none cursor-pointer flex justify-between items-center"
+      >
+        <span className={selectedItem ? "text-slate-900" : "text-slate-500"}>
+          {selectedItem ? `${selectedItem.name} (${selectedItem.unit})` : 'Selecione um item...'}
+        </span>
+        <ArrowDownToLine size={16} className="text-slate-400" />
+      </div>
+      
+      {isOpen && (
+        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden" style={{ minWidth: '300px' }}>
+          <div className="p-2 space-y-2 border-b border-slate-100 bg-slate-50">
+            <input 
+              type="text" 
+              placeholder="Buscar item..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            />
+            <select 
+              value={filterCat} 
+              onChange={e => setFilterCat(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            >
+              <option value="">Todas as categorias</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.map(item => (
+              <div 
+                key={item.id}
+                onClick={() => { onChange(item.id); setIsOpen(false); }} 
+                className="px-4 py-2 hover:bg-emerald-50 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-0"
+              >
+                <span className="text-sm font-medium text-slate-800">{item.name}</span>
+                <span className="text-xs text-slate-500 ml-2 truncate text-right">({item.category})</span>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="p-4 text-center text-sm text-slate-500">Nenhum item encontrado.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function Inventory() {
   const { items, addItem, updateItem, deleteItem, kits, addKit, updateKit, deleteKit, categories, transactions, addTransaction } = useInventory();
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'items' | 'kits' | 'history'>('items');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   
   // Item Modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -36,14 +115,24 @@ export function Inventory() {
   const [kitDesc, setKitDesc] = useState('');
   const [kitItems, setKitItems] = useState<{item_id: string, quantity: number}[]>([]);
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === '' || item.category === filterCategory;
+    
+    let matchesStatus = true;
+    if (filterStatus === 'out_of_stock') {
+      matchesStatus = item.quantity === 0;
+    } else if (filterStatus === 'low_stock') {
+      matchesStatus = item.quantity > 0 && item.quantity <= item.min_quantity;
+    }
+
+    return matchesSearch && matchesCategory && matchesStatus;
+  }).sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredKits = kits.filter(kit => 
     kit.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
   // --- Item Handlers ---
   const openItemModal = (item?: InventoryItem) => {
@@ -225,7 +314,7 @@ export function Inventory() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4">
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
@@ -236,6 +325,31 @@ export function Inventory() {
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
           />
         </div>
+        
+        {activeTab === 'items' && (
+          <div className="flex gap-4">
+            <select 
+              value={filterCategory} 
+              onChange={e => setFilterCategory(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none min-w-[150px]"
+            >
+              <option value="">Todas as categorias</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.name}>{cat.name}</option>
+              ))}
+            </select>
+
+            <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none min-w-[150px]"
+            >
+              <option value="">Todos os status</option>
+              <option value="out_of_stock">Sem Estoque</option>
+              <option value="low_stock">Baixo Estoque</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Items List */}
@@ -288,7 +402,11 @@ export function Inventory() {
                         </span>
                       </td>
                       <td className="p-4">
-                        {isExpired ? (
+                        {item.quantity === 0 ? (
+                          <span className="flex items-center gap-1 text-red-600 text-sm font-medium bg-red-50 px-2 py-1 rounded-lg w-fit">
+                            <AlertCircle size={14} /> Sem Estoque
+                          </span>
+                        ) : isExpired ? (
                           <span className="flex items-center gap-1 text-red-600 text-sm font-medium bg-red-50 px-2 py-1 rounded-lg w-fit">
                             <AlertCircle size={14} /> Vencido
                           </span>
@@ -357,7 +475,12 @@ export function Inventory() {
                   </div>
                   <div className="space-y-3 mt-2 flex-grow">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Itens do Kit</h4>
-                    {kit.items.map(ki => {
+                    {[...kit.items].sort((a, b) => {
+                      const itemA = items.find(i => i.id === a.item_id);
+                      const itemB = items.find(i => i.id === b.item_id);
+                      if (!itemA || !itemB) return 0;
+                      return itemA.name.localeCompare(itemB.name);
+                    }).map(ki => {
                       const item = items.find(i => i.id === ki.item_id);
                       if (!item) return null;
                       return (
@@ -632,13 +755,13 @@ export function Inventory() {
                   <div className="space-y-3">
                     {kitItems.map((ki, index) => (
                       <div key={index} className="flex gap-3 items-start">
-                        <div className="flex-1">
-                          <select required value={ki.item_id} onChange={e => updateKitItem(index, 'item_id', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none">
-                            <option value="">Selecione um item...</option>
-                            {items.map(item => (
-                              <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
-                            ))}
-                          </select>
+                        <div className="flex-1 min-w-[200px]">
+                          <KitItemSelect 
+                            items={items} 
+                            categories={categories}
+                            value={ki.item_id}
+                            onChange={(val) => updateKitItem(index, 'item_id', val)}
+                          />
                         </div>
                         <div className="w-32">
                           <input required type="number" min="1" placeholder="Qtd" value={ki.quantity} onChange={e => updateKitItem(index, 'quantity', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />

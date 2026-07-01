@@ -223,12 +223,25 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const updateCategory = async (id: string, updates: Partial<InventoryCategory>) => {
+    const oldCat = categories.find(c => c.id === id);
     const { error } = await supabase.from('inventory_categories').update({
       name: updates.name,
       description: updates.description
     }).eq('id', id);
     if (!error) {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+      
+      if (updates.name && oldCat && oldCat.name !== updates.name) {
+        const { error: itemError } = await supabase.from('inventory')
+          .update({ category: updates.name })
+          .eq('category', oldCat.name);
+          
+        if (!itemError) {
+          setItems(prev => prev.map(i => i.category === oldCat.name ? { ...i, category: updates.name as string } : i));
+        } else {
+          console.error('Error updating items category:', itemError);
+        }
+      }
     }
   };
 
