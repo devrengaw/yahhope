@@ -274,8 +274,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
           ...p,
           tasks: p.tasks.map(t => {
             if (t.id === taskId) {
-              updatedValues = { ...t.values, [columnId]: value };
-              return { ...t, values: updatedValues };
+              if (columnId === 'title') {
+                return { ...t, title: value };
+              } else {
+                updatedValues = { ...t.values, [columnId]: value };
+                return { ...t, values: updatedValues };
+              }
             }
             return t;
           })

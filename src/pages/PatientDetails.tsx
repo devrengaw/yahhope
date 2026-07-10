@@ -407,7 +407,7 @@ export function PatientDetails() {
           Enviar Atualização de Impacto
         </button>
         
-        {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed') ? (
+        {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
           <button 
             onClick={handleAddToQueue}
             className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"

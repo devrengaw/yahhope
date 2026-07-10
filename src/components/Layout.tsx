@@ -16,6 +16,7 @@ const nutritionNavItems = [
   { name: 'Atualizações Apoiador', path: '/nutrition/updates', icon: Newspaper },
   { name: 'Estoque', path: '/nutrition/inventory', icon: Package },
   { name: 'Visitas', path: '/nutrition/visits', icon: Home },
+  { name: 'Finanças', path: '/nutrition/finance', icon: DollarSign },
   { name: 'Gestão', path: '/nutrition/management', icon: Settings },
 ];
 
@@ -84,8 +85,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     const permissionKey = item.path.split('/').pop() || 'dashboard';
     const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication';
     const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : (permissionKey === 'blog' ? 'blog' : (permissionKey === 'chat' ? 'chat' : permissionKey)))));
+    const actualKey = (module === 'nutrition' && finalKey === 'finance') ? 'nutrition-finance' : finalKey;
     
-    return user?.permissions.includes(finalKey);
+    return user?.permissions.includes(actualKey);
   });
 
   const moduleName = 

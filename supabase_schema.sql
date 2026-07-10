@@ -482,3 +482,17 @@ CREATE TABLE yah_hope_projects (
   image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 37. finance_transactions module column
+ALTER TABLE finance_transactions ADD COLUMN IF NOT EXISTS module TEXT DEFAULT 'global';
+
+-- 38. nutrition_staff (RH da Nutrição)
+CREATE TABLE nutrition_staff (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  cost_aid_amount NUMERIC(10, 2) DEFAULT 0,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+

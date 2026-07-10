@@ -10,7 +10,7 @@ import { Project } from '../../lib/mockData';
 import { useProjects } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-export function Projects() {
+export function Projects({ workspaceMode = false }: { workspaceMode?: boolean }) {
   const { projects, addProject, updateProject } = useProjects();
   const { user } = useAuth();
   
@@ -29,7 +29,30 @@ export function Projects() {
     }
   };
 
-  const visibleProjects = projects.filter(p => !p.isPrivate || p.invitees.includes(user?.id || ''));
+  const visibleProjects = projects.filter(p => {
+    // Check if user is participating
+    const isInvitee = p.invitees.includes(user?.id || '') || p.invitees.includes(user?.name || '');
+    let isAssigned = false;
+    if (!isInvitee) {
+      const peopleColumns = (p.columns || []).filter(c => c.type === 'people').map(c => c.id);
+      isAssigned = p.tasks.some(t => {
+        return peopleColumns.some(colId => {
+          const assigned = t.values?.[colId] || [];
+          return assigned.includes(user?.id) || assigned.includes(user?.name);
+        });
+      });
+    }
+    
+    const isParticipating = isInvitee || isAssigned;
+
+    if (workspaceMode) {
+      return isParticipating;
+    }
+
+    // In global mode (admin), show all non-private projects OR private projects the user participates in
+    if (!p.isPrivate) return true;
+    return isParticipating;
+  });
 
   return (
     <div className="space-y-6">

@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getPermissionsForRole = (role: Role) => {
   if (role === 'ADMIN') {
-    return ['dashboard', 'patients', 'attendance', 'waiting-list', 'updates', 'inventory', 'visits', 'management', 'projects', 'finance', 'team', 'calendar', 'chat', 'blog', 'email-templates', 'impact-feed', 'messages', 'fundraising', 'local-projects', 'users', 'gifts', 'store', 'settings'];
+    return ['dashboard', 'patients', 'attendance', 'waiting-list', 'updates', 'inventory', 'visits', 'management', 'projects', 'finance', 'team', 'calendar', 'chat', 'blog', 'email-templates', 'impact-feed', 'messages', 'fundraising', 'local-projects', 'users', 'gifts', 'store', 'settings', 'nutrition-finance'];
   }
   if (role === 'SPONSOR') {
     return ['portal'];

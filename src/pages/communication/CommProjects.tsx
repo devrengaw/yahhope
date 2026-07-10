@@ -12,6 +12,7 @@ import {
 import { useProjects } from '../../contexts/ProjectContext';
 import { Project, ProjectTask, ColumnDefinition, ColumnType } from '../../lib/mockData';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
 export function CommProjects() {
@@ -20,6 +21,7 @@ export function CommProjects() {
     addColumn, updateColumn, deleteColumn,
     addTask, updateTask, updateTaskValue, deleteTask 
   } = useProjects();
+  const { user } = useAuth();
   
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,9 +54,9 @@ export function CommProjects() {
       end_date: '',
       budget: 0,
       isPrivate: false,
-      category: 'Geral',
+      category: 'Comunicação',
       priority: 'medium',
-      invitees: [],
+      invitees: user ? [user.id] : [],
       columns: [
         { id: 'c1', name: 'Status', type: 'status', options: ['Todo', 'Working on it', 'Stuck', 'Done'] },
         { id: 'c2', name: 'Owner', type: 'people' },
@@ -110,7 +112,13 @@ export function CommProjects() {
                 <LayoutGrid size={16} /> Kanban
               </button>
             </div>
-            <button className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:text-indigo-600 transition-all">
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Link copiado para a área de transferência!');
+              }}
+              className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:text-indigo-600 transition-all"
+            >
               <Share2 size={20} />
             </button>
           </div>
@@ -133,6 +141,7 @@ export function CommProjects() {
             updateTaskValue={updateTaskValue}
             addTask={addTask}
             deleteTask={deleteTask}
+            updateColumn={updateColumn}
             users={users}
           />
         )}
@@ -227,7 +236,7 @@ export function CommProjects() {
       {showNewProjectModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="bg-indigo-600 p-12 text-white relative">
+            <div className="bg-emerald-600 p-12 text-white relative">
               <h3 className="text-3xl font-black tracking-tight">Novo Quadro</h3>
               <p className="text-white/80 text-sm font-bold uppercase tracking-widest mt-2">Personalize seu fluxo de trabalho</p>
               <button 
@@ -260,7 +269,7 @@ export function CommProjects() {
               <div className="flex gap-4 pt-4">
                 <button 
                   type="submit"
-                  className="w-full px-8 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black transition-all shadow-xl shadow-indigo-200 active:scale-95 uppercase text-sm tracking-widest"
+                  className="w-full px-8 py-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[1.5rem] font-black transition-all shadow-xl shadow-emerald-200 active:scale-95 uppercase text-sm tracking-widest"
                 >
                   Criar e Abrir Quadro
                 </button>
@@ -527,10 +536,14 @@ function ProjectTableView({ project, updateTaskValue, addColumn, updateColumn, d
   );
 }
 
-function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask, users }: any) {
+function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask, updateColumn, users }: any) {
   const statusColumn = (project.columns || []).find((c: any) => c.type === 'status');
   const columns = statusColumn?.options || ['Todo'];
   const statusColumnId = statusColumn?.id;
+  
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [newColumnName, setNewColumnName] = useState('');
 
   const handleMoveTask = (taskId: string, newStatus: string) => {
     if (statusColumnId) {
@@ -538,58 +551,124 @@ function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask, user
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('taskId', taskId);
+  };
+
+  const handleDrop = (e: React.DragEvent, newStatus: string) => {
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId && statusColumnId) {
+      updateTaskValue(project.id, taskId, statusColumnId, newStatus);
+    }
+  };
+
+  const handleAddColumn = () => {
+    if (newColumnName.trim() && statusColumnId) {
+      updateColumn(project.id, statusColumnId, { options: [...columns, newColumnName.trim()] });
+      setNewColumnName('');
+    }
+  };
+
+  const handleDeleteColumn = (statusToDelete: string) => {
+    if (statusColumnId) {
+      updateColumn(project.id, statusColumnId, { options: columns.filter((c: string) => c !== statusToDelete) });
+    }
+  };
+
   return (
     <div className="flex gap-6 overflow-x-auto pb-10 min-h-[600px] animate-in fade-in duration-500">
-      {columns.map((status, idx) => {
+      {columns.map((status: string, idx: number) => {
         const tasks = project.tasks.filter((t: any) => 
           !statusColumnId || (t.values && t.values[statusColumnId] === status) || (!t.values?.[statusColumnId] && status === columns[0])
         );
 
         return (
-          <div key={status} className="flex-shrink-0 w-80 flex flex-col group/col">
+          <div 
+            key={status} 
+            className="flex-shrink-0 w-80 flex flex-col group/col"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleDrop(e, status)}
+          >
             <div className="flex items-center justify-between mb-6 px-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1 pr-2">
                 <div className={cn(
                   "w-3 h-3 rounded-full shadow-sm",
                   idx === 0 ? "bg-amber-500" : 
                   idx === columns.length - 1 ? "bg-emerald-500" : "bg-indigo-500"
                 )} />
-                <h3 className="text-sm font-black text-slate-900 tracking-tight">{status}</h3>
-                <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">
+                {editingColumn === status ? (
+                  <input 
+                    autoFocus
+                    className="text-sm font-black text-slate-900 tracking-tight bg-white border border-indigo-200 rounded px-2 py-1 w-full outline-none"
+                    defaultValue={status}
+                    onBlur={(e) => {
+                      if (e.target.value.trim() && e.target.value !== status && statusColumnId) {
+                        const newOptions = [...columns];
+                        newOptions[idx] = e.target.value.trim();
+                        updateColumn(project.id, statusColumnId, { options: newOptions });
+                      }
+                      setEditingColumn(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                    }}
+                  />
+                ) : (
+                  <h3 
+                    className="text-sm font-black text-slate-900 tracking-tight cursor-pointer hover:text-indigo-600 truncate"
+                    onClick={() => setEditingColumn(status)}
+                    title="Clique para editar"
+                  >
+                    {status}
+                  </h3>
+                )}
+                <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg flex-shrink-0">
                   {tasks.length}
                 </span>
               </div>
-              <button 
-                onClick={() => {
-                  const task: ProjectTask = {
-                    id: `t${Date.now()}`,
-                    title: 'Novo Card',
-                    description: '',
-                    status: 'todo',
-                    cost: 0,
-                    subtasks: [],
-                    invitees: [],
-                    priority: 'medium',
-                    values: statusColumnId ? { [statusColumnId]: status } : {}
-                  };
-                  addTask(project.id, task);
-                }}
-                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm opacity-0 group-hover/col:opacity-100"
-              >
-                <Plus size={16} />
-              </button>
+              <div className="flex gap-1 opacity-0 group-hover/col:opacity-100 transition-all">
+                <button 
+                  onClick={() => handleDeleteColumn(status)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all shadow-sm"
+                  title="Excluir Etapa"
+                >
+                  <Trash2 size={14} />
+                </button>
+                <button 
+                  onClick={() => {
+                    const task: ProjectTask = {
+                      id: `t${Date.now()}`,
+                      title: 'Novo Card',
+                      description: '',
+                      status: 'todo',
+                      cost: 0,
+                      subtasks: [],
+                      invitees: [],
+                      priority: 'medium',
+                      values: statusColumnId ? { [statusColumnId]: status } : {}
+                    };
+                    addTask(project.id, task);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all shadow-sm"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 space-y-4 min-h-[200px] p-2 rounded-[2rem] border border-transparent hover:border-slate-100 transition-all">
               {tasks.map((task: any) => (
                 <div 
                   key={task.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task.id)}
+                  onClick={() => setEditingTask(task)}
                   className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all group/card cursor-grab active:cursor-grabbing border-l-4"
                   style={{ borderLeftColor: idx === 0 ? '#f59e0b' : idx === columns.length - 1 ? '#10b981' : '#6366f1' }}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <h4 className="text-sm font-black text-slate-800 leading-tight group-hover/card:text-indigo-600 transition-colors">{task.title}</h4>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                       <button 
                         onClick={() => deleteTask(project.id, task.id)}
                         className="opacity-0 group-hover/card:opacity-100 text-slate-300 hover:text-red-500 p-1 transition-all"
@@ -641,6 +720,75 @@ function ProjectKanbanView({ project, updateTaskValue, addTask, deleteTask, user
           </div>
         );
       })}
+      
+      {/* Add New Column */}
+      <div className="flex-shrink-0 w-80 flex flex-col pt-12">
+        <div className="bg-slate-50/50 p-4 rounded-3xl border-2 border-dashed border-slate-200">
+          <input 
+            type="text"
+            value={newColumnName}
+            onChange={e => setNewColumnName(e.target.value)}
+            placeholder="Nova Etapa..."
+            className="w-full px-4 py-2 mb-2 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-600 outline-none focus:border-indigo-300"
+            onKeyDown={e => { if (e.key === 'Enter') handleAddColumn(); }}
+          />
+          <button 
+            onClick={handleAddColumn}
+            disabled={!newColumnName.trim()}
+            className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50"
+          >
+            Adicionar
+          </button>
+        </div>
+      </div>
+
+      {/* Task Edit Modal */}
+      {editingTask && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <h2 className="text-lg font-black text-slate-800">Editar Elemento</h2>
+              <button onClick={() => setEditingTask(null)} className="p-2 hover:bg-white rounded-xl text-slate-400"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título</label>
+                <input 
+                  type="text" 
+                  defaultValue={editingTask.title}
+                  onBlur={(e) => updateTaskValue(project.id, editingTask.id, 'title', e.target.value)}
+                  className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+              
+              {(project.columns || []).map((col: any) => (
+                <div key={col.id}>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{col.name}</label>
+                  <div className="mt-2 h-12 bg-slate-50 border border-slate-100 rounded-2xl overflow-hidden flex items-center">
+                    <div className="flex-1 h-full px-2">
+                      <CellEditor 
+                        projectId={project.id}
+                        taskId={editingTask.id}
+                        column={col}
+                        value={editingTask.values?.[col.id]}
+                        onUpdate={(val: any) => {
+                          updateTaskValue(project.id, editingTask.id, col.id, val);
+                          // Local update for immediate feedback
+                          setEditingTask((prev: any) => ({
+                            ...prev,
+                            values: { ...prev.values, [col.id]: val }
+                          }));
+                        }}
+                        users={users}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -752,6 +900,41 @@ function CellEditor({ projectId, taskId, column, value, onUpdate, users }: any) 
           className="w-full h-full pl-8 pr-4 py-3 bg-transparent border-none text-right text-xs font-black text-slate-800 outline-none focus:bg-slate-50"
           placeholder="0.00"
         />
+      </div>
+    );
+  }
+
+  if (column.type === 'file') {
+    return (
+      <div className="relative h-full flex items-center">
+        <FileText size={12} className="absolute left-3 text-slate-400" />
+        <input 
+          type="text"
+          value={value || ''}
+          onChange={(e) => onUpdate(e.target.value)}
+          className="w-full h-full pl-8 pr-4 py-3 bg-transparent border-none text-left text-xs font-medium text-slate-600 outline-none focus:bg-slate-50 placeholder:text-slate-200"
+          placeholder="Nome do arquivo ou link..."
+        />
+      </div>
+    );
+  }
+
+  if (column.type === 'link') {
+    return (
+      <div className="relative h-full flex items-center group">
+        <LinkIcon size={12} className="absolute left-3 text-slate-400" />
+        <input 
+          type="text"
+          value={value || ''}
+          onChange={(e) => onUpdate(e.target.value)}
+          className="w-full h-full pl-8 pr-8 py-3 bg-transparent border-none text-left text-xs font-medium text-slate-600 outline-none focus:bg-slate-50 placeholder:text-slate-200"
+          placeholder="Link do drive..."
+        />
+        {value && (
+          <a href={value.startsWith('http') ? value : `https://${value}`} target="_blank" rel="noreferrer" className="absolute right-2 p-1 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+             <LinkIcon size={12} />
+          </a>
+        )}
       </div>
     );
   }

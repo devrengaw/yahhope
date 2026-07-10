@@ -63,6 +63,7 @@ import { NutritionSupporterUpdates } from './pages/nutrition/SupporterUpdates';
 import { ImpactFeedManager } from './pages/admin/ImpactFeedManager';
 import { SupporterMessages } from './pages/admin/SupporterMessages';
 import { NutritionMessages } from './pages/nutrition/NutritionMessages';
+import { NutritionFinance } from './pages/nutrition/NutritionFinance';
 import { GiftManager } from './pages/admin/GiftManager';
 import { FundraisingManager } from './pages/admin/FundraisingManager';
 import { AdminStoreManager } from './pages/admin/AdminStoreManager';
@@ -242,6 +243,7 @@ export default function App() {
                                               <Route path="/updates" element={<NutritionSupporterUpdates />} />
                                               <Route path="/inventory" element={<Inventory />} />
                                               <Route path="/management" element={<Management />} />
+                                              <Route path="/finance" element={<NutritionFinance />} />
                                               <Route path="/atendimento" element={<Atendimentos />} />
                                               <Route path="/visits" element={<HomeVisits />} />
                                               <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />

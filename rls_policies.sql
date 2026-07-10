@@ -56,3 +56,8 @@ CREATE POLICY "Nutricao_Acesso_Physical" ON physical_exam FOR ALL TO authenticat
 CREATE POLICY "Nutricao_Acesso_Nutritional" ON nutritional_evaluation FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR')) WITH CHECK (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR'));
 
 CREATE POLICY "Nutricao_Acesso_Events" ON clinical_events FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR')) WITH CHECK (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR'));
+
+-- 4. Política para home_visits
+ALTER TABLE home_visits ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Nutricao_Acesso_HomeVisits" ON home_visits;
+CREATE POLICY "Nutricao_Acesso_HomeVisits" ON home_visits FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR')) WITH CHECK (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role != 'SPONSOR'));
