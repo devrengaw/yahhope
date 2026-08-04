@@ -52,6 +52,7 @@ export interface InventoryItem {
 export interface KitItem {
   item_id: string;
   quantity: number;
+  dosage?: string;
 }
 
 export interface Kit {

@@ -21,6 +21,7 @@ interface AtendimentoContextType {
   marcarPresenca: (id: string) => void;
   iniciarAtendimento: (id: string) => void;
   concluirAtendimento: (id: string) => void;
+  removerDaFila: (id: string) => void;
 }
 
 const AtendimentoContext = createContext<AtendimentoContextType | undefined>(undefined);
@@ -98,6 +99,11 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
     await supabase.from('clinical_appointments').update({ status: 'waiting' }).eq('id', id);
   };
 
+  const removerDaFila = async (id: string) => {
+    setAtendimentos(prev => prev.filter(a => a.id !== id));
+    await supabase.from('clinical_appointments').delete().eq('id', id);
+  };
+
   const iniciarAtendimento = async (id: string) => {
     setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'in_progress' } : a));
     await supabase.from('clinical_appointments').update({ status: 'in_progress' }).eq('id', id);
@@ -131,7 +137,15 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
   };
 
   return (
-    <AtendimentoContext.Provider value={{ atendimentos, adicionarNaFila, agendarAtendimento, marcarPresenca, iniciarAtendimento, concluirAtendimento }}>
+    <AtendimentoContext.Provider value={{ 
+      atendimentos, 
+      adicionarNaFila, 
+      agendarAtendimento,
+      marcarPresenca, 
+      iniciarAtendimento, 
+      concluirAtendimento,
+      removerDaFila
+    }}>
       {children}
     </AtendimentoContext.Provider>
   );

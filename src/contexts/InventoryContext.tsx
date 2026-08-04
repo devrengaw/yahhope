@@ -86,7 +86,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           description: k.description || '',
           items: kitItemsRes.data ? kitItemsRes.data.filter(ki => ki.kit_id === k.id).map(ki => ({
             item_id: ki.item_id,
-            quantity: ki.quantity
+            quantity: ki.quantity,
+            dosage: ki.dosage || undefined
           })) : []
         }));
         setKits(kData);
@@ -171,7 +172,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         await supabase.from('kit_items').insert(kit.items.map(ki => ({
           kit_id: data.id,
           item_id: ki.item_id,
-          quantity: ki.quantity
+          quantity: ki.quantity,
+          dosage: ki.dosage || null
         })));
       }
       setKits(prev => [{ ...kit, id: data.id }, ...prev]);
@@ -191,7 +193,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           await supabase.from('kit_items').insert(updates.items.map(ki => ({
             kit_id: id,
             item_id: ki.item_id,
-            quantity: ki.quantity
+            quantity: ki.quantity,
+            dosage: ki.dosage || null
           })));
         }
       }

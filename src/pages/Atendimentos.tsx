@@ -7,7 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import { formatLocalDate, cn } from '../lib/utils';
 
 export function Atendimentos() {
-  const { atendimentos, marcarPresenca, iniciarAtendimento, concluirAtendimento } = useAtendimento();
+  const { atendimentos, marcarPresenca, iniciarAtendimento, concluirAtendimento, removerDaFila } = useAtendimento();
   const [searchTerm, setSearchTerm] = useState('');
   const today = new Date();
   const todayDate = formatLocalDate(today);
@@ -21,6 +21,12 @@ export function Atendimentos() {
   const waiting = filteredAtendimentos.filter(a => a.status === 'waiting');
   const inProgress = filteredAtendimentos.filter(a => a.status === 'in_progress');
   const completed = filteredAtendimentos.filter(a => a.status === 'completed');
+
+  const handleRemove = (id: string, name: string) => {
+    if (window.confirm(`Tem certeza que deseja marcar falta ou remover "${name}" da fila?`)) {
+      removerDaFila(id);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -68,13 +74,22 @@ export function Atendimentos() {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Agendado</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => marcarPresenca(apt.id)}
-                  className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                  title="Marcar Presença"
-                >
-                  <UserCheck size={20} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => handleRemove(apt.id, apt.patient_name)}
+                    className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    title="Marcar Falta / Remover"
+                  >
+                    <X size={20} />
+                  </button>
+                  <button 
+                    onClick={() => marcarPresenca(apt.id)}
+                    className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                    title="Marcar Presença"
+                  >
+                    <UserCheck size={20} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -119,13 +134,22 @@ export function Atendimentos() {
                     <p className="text-[10px] font-black text-amber-500 uppercase tracking-tight">Na Fila</p>
                   </div>
                 </div>
-                <Link 
-                  to={`/nutrition/patients/${apt.patient_id}?action=new-followup&aptId=${apt.id}`}
-                  className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg"
-                >
-                  <PlayCircle size={14} />
-                  Chamar
-                </Link>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleRemove(apt.id, apt.patient_name)}
+                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Remover da Fila"
+                  >
+                    <X size={18} />
+                  </button>
+                  <Link 
+                    to={`/nutrition/patients/${apt.patient_id}?action=new-followup&aptId=${apt.id}`}
+                    className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg"
+                  >
+                    <PlayCircle size={14} />
+                    Chamar
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

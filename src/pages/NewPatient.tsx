@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronRight, ChevronLeft, Save, User, Activity, FileText, Home, HeartPulse, Plus, Trash2, ClipboardList, Stethoscope, CheckSquare, Heart } from 'lucide-react';
 import { differenceInMonths } from 'date-fns';
-import { calculateAge, cn, parseLocalDate } from '../lib/utils';
+import { calculateAge, cn, parseLocalDate, formatLocalDate } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
+import { useInventory } from '../contexts/InventoryContext';
 
 const STEPS = [
   { id: 1, title: 'Identificação', icon: User },
@@ -52,13 +53,14 @@ export function NewPatient() {
   // Form State
   const [formData, setFormData] = useState<Record<string, any>>({
     // Step 1: Identificação
-    service_date: new Date().toISOString().split('T')[0],
+    service_date: formatLocalDate(new Date()),
     registration_number: '', name: '', birthplace: '', province: '', origin: '',
     address: '', city: '', dob: '', gender: 'M', color: '', informant: '',
     main_complaint: '', history: '', current_medications: '',
     
     // Step 2: Triagem Social
     caregiver_name: '', marital_status: '', education: '', religion: '',
+    caregiver_phone: '', caregiver_email: '',
     housing_type: 'Própria', rooms: '', dwelling_type: '', roof: '', sanitation: '',
     sewage: '', garbage: '', animals: 'Não', monthly_income: '', father_job: '',
     mother_job: '', caregiver_job: '', social_observations: '',
@@ -93,6 +95,7 @@ export function NewPatient() {
     referral: '',
     return_date: '',
     filled_by: '',
+    general_observations: '',
     
     // Sponsorship
     enable_sponsorship: false,
@@ -132,11 +135,19 @@ export function NewPatient() {
     }
   }, [waitingChild]);
 
-  const { patients, addFullPatientRecord } = usePatients();
+  const { patients, addFullPatientRecord, isLoading } = usePatients();
+  const { kits, items, deductKitFromInventory } = useInventory();
+  const [selectedKits, setSelectedKits] = useState<string[]>([]);
+
+  const handleToggleKit = (kitId: string) => {
+    setSelectedKits(prev => 
+      prev.includes(kitId) ? prev.filter(id => id !== kitId) : [...prev, kitId]
+    );
+  };
 
   // Auto-generate registration_number
   useEffect(() => {
-    if (!formData.registration_number && patients.length > 0) {
+    if (!isLoading && !formData.registration_number) {
       const currentYear = new Date().getFullYear().toString();
       const thisYearPatients = patients.filter(p => p.registration_number?.startsWith(currentYear));
       let nextNumber = 1;
@@ -150,7 +161,7 @@ export function NewPatient() {
       const newRegNum = `${currentYear}${nextNumber.toString().padStart(2, '0')}`;
       setFormData(prev => ({ ...prev, registration_number: newRegNum }));
     }
-  }, [patients, formData.registration_number]);
+  }, [patients, isLoading, formData.registration_number]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -194,7 +205,7 @@ export function NewPatient() {
     if (serviceDate) {
       const returnDateObj = parseLocalDate(serviceDate);
       returnDateObj.setDate(returnDateObj.getDate() + 14);
-      const calculatedReturn = returnDateObj.toISOString().split('T')[0];
+      const calculatedReturn = formatLocalDate(returnDateObj);
       updates.return_date = calculatedReturn;
     }
 
@@ -260,16 +271,59 @@ export function NewPatient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...formData, dependents, clinicalSigns, nutritionalEval, educationalActions, examsList, medicationsList };
+    if (currentStep < STEPS.length) {
+      handleNext();
+      return;
+    }
     
     setIsSubmitting(true);
     try {
-      await addFullPatientRecord(payload);
-      alert('Cadastro realizado com sucesso!');
-      navigate('/nutrition/patients');
-    } catch (error: any) {
-      console.error('Failed to register patient:', error);
-      alert(`Erro ao salvar paciente: ${error?.message || 'Verifique sua conexão ou dados obrigatórios.'}`);
+      const validPrescriptions: any[] = medicationsList
+        .filter((m: any) => m.name.trim() !== '')
+        .map((m: any) => ({
+          medication: m.name.trim(),
+          treatment: m.dosage.trim(),
+        }));
+
+      // Auto-add kit items to prescriptions so they show up in medications area permanently
+      if (selectedKits.length > 0) {
+        selectedKits.forEach(kitId => {
+          const kit = kits.find(k => k.id === kitId);
+          if (kit) {
+            kit.items.forEach(kitItem => {
+              const invItem = items.find(i => i.id === kitItem.item_id);
+              validPrescriptions.push({
+                medication: invItem ? invItem.name : `Item do Kit ${kit.name}`,
+                treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
+                quantity: kitItem.quantity,
+              });
+            });
+          }
+        });
+      }
+
+      const payload = {
+        ...formData,
+        dependents,
+        clinicalSigns,
+        nutritionalEval,
+        educationalActions,
+        examsList,
+        prescriptions: validPrescriptions,
+        selectedKits
+      };
+      
+      const newChildId = await addFullPatientRecord(payload);
+      
+      // Deduct kits from inventory
+      if (selectedKits.length > 0 && newChildId) {
+        selectedKits.forEach(kitId => deductKitFromInventory(kitId, newChildId));
+      }
+      
+      navigate('/patients');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar cadastro. Verifique a conexão.');
     } finally {
       setIsSubmitting(false);
     }
@@ -335,6 +389,32 @@ export function NewPatient() {
             {/* STEP 1: Identificação */}
             {currentStep === 1 && (
               <div className="space-y-6">
+                <div className="flex items-center gap-6 mb-2">
+                  <div className="relative group cursor-pointer w-24 h-24 shrink-0">
+                    <div className="w-full h-full rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden hover:border-emerald-500 transition-colors">
+                      {formData.child_photo ? (
+                        <img src={formData.child_photo} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <User size={24} className="text-slate-400 group-hover:text-emerald-500 mb-1" />
+                          <span className="text-[9px] font-bold text-slate-400 text-center px-1">Upload</span>
+                        </div>
+                      )}
+                    </div>
+                    <input 
+                      type="file" 
+                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setFormData(prev => ({ ...prev, child_photo: URL.createObjectURL(file) }));
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Foto da Criança</h3>
+                    <p className="text-sm text-slate-500">Adicione uma foto ao prontuário (opcional)</p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Input formData={formData} handleChange={handleChange} label="Data do Atendimento" name="service_date" type="date" required />
                   <Input formData={formData} handleChange={handleChange} label="Número de Identificação" name="registration_number" required readOnly={true} />
@@ -381,32 +461,8 @@ export function NewPatient() {
                   </div>
                   {formData.enable_sponsorship && (
                     <div className="md:col-span-2 mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+                      <div className="grid grid-cols-1 gap-6 items-start">
                         <div className="md:col-span-1">
-                          <label className="text-sm font-medium text-slate-700 block mb-2">Foto da Criança</label>
-                          <div className="relative group cursor-pointer">
-                            <div className="aspect-square rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden hover:border-amber-500 transition-colors">
-                              {formData.child_photo ? (
-                                <img src={formData.child_photo} alt="Preview" className="w-full h-full object-cover" />
-                              ) : (
-                                <>
-                                  <Plus size={24} className="text-slate-400 group-hover:text-amber-500" />
-                                  <span className="text-[10px] font-bold text-slate-400 mt-2">Clique para Upload</span>
-                                </>
-                              )}
-                            </div>
-                            <input 
-                              type="file" 
-                              className="absolute inset-0 opacity-0 cursor-pointer" 
-                              onChange={(e) => {
-                                // Mock photo upload for demo
-                                const file = e.target.files?.[0];
-                                if (file) setFormData(prev => ({ ...prev, child_photo: URL.createObjectURL(file) }));
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="md:col-span-3">
                           <Input formData={formData} handleChange={handleChange} 
                             label="Perfil da Criança (Biografia para Apoiadores)" 
                             name="child_profile" 
@@ -431,6 +487,8 @@ export function NewPatient() {
                     <Select formData={formData} handleChange={handleChange} label="Estado Civil" name="marital_status" options={['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável']} />
                     <Select formData={formData} handleChange={handleChange} label="Grau de Instrução" name="education" options={['Nenhum', 'Ensino Primário', 'Ensino Secundário', 'Ensino Superior']} />
                     <Input formData={formData} handleChange={handleChange} label="Religião" name="religion" />
+                    <Input formData={formData} handleChange={handleChange} label="Celular" name="caregiver_phone" placeholder="(00) 00000-0000" />
+                    <Input formData={formData} handleChange={handleChange} label="E-mail" name="caregiver_email" type="email" placeholder="email@exemplo.com" />
                   </div>
                 </div>
 
@@ -694,9 +752,36 @@ export function NewPatient() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Input formData={formData} handleChange={handleChange} label="Data do Retorno (Automático +14 dias)" name="return_date" type="date" />
+                  
+                  {/* Kits Entregues */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Kits Entregues (selecione múltiplos se necessário)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {kits.map(kit => (
+                        <button
+                          key={kit.id}
+                          type="button"
+                          onClick={() => handleToggleKit(kit.id)}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all",
+                            selectedKits.includes(kit.id) 
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200" 
+                              : "bg-white border-slate-200 text-slate-400 hover:border-emerald-200 hover:text-emerald-600"
+                          )}
+                        >
+                          {kit.name}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedKits.length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic">Nenhum kit selecionado</p>
+                    )}
+                  </div>
+                  
+                  <Input formData={formData} handleChange={handleChange} label="Responsável pelo Preenchimento *" name="filled_by" required />
                 </div>
                 <Textarea formData={formData} handleChange={handleChange} label="Encaminhamento" name="referral" />
-                <Input formData={formData} handleChange={handleChange} label="Responsável pelo Preenchimento" name="filled_by" required />
+                <Textarea formData={formData} handleChange={handleChange} label="Observações Gerais sobre o Paciente" name="general_observations" />
               </div>
             )}
 

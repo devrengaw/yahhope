@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, MapPin, Calendar, Users, Phone, Trash2, Edit2, Save, X, Home } from 'lucide-react';
+import { User, MapPin, Calendar, Users, Phone, Trash2, Edit2, Save, X, Home, ClipboardList, HeartPulse, FileText, BriefcaseMedical, Baby, Activity } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { usePatients } from '../contexts/PatientContext';
@@ -21,6 +21,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
   const [childData, setChildData] = useState<any>(null);
   const [caregiverData, setCaregiverData] = useState<any>(null);
   const [householdData, setHouseholdData] = useState<any>(null);
+  const [fullData, setFullData] = useState<any>({});
 
   // Form State
   const [formData, setFormData] = useState<any>({});
@@ -52,11 +53,32 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
         }));
       }
 
-      // Fetch Triage & Household (Optional, for display only)
-      const { data: triage } = await supabase.from('social_triage').select('id').eq('child_id', patientId).single();
+      // Fetch Triage & Household & Socioeconomics
+      const { data: triage } = await supabase.from('social_triage').select('*').eq('child_id', patientId).single();
       if (triage) {
         const { data: household } = await supabase.from('household_conditions').select('*').eq('social_triage_id', triage.id).single();
         if (household) setHouseholdData(household);
+        
+        const { data: socioeconomics } = await supabase.from('socioeconomics').select('*').eq('social_triage_id', triage.id).single();
+        if (socioeconomics) setFullData((prev: any) => ({ ...prev, socioeconomics }));
+      }
+
+      // Fetch Initial Assessments & Related
+      const { data: ia } = await supabase.from('initial_assessments').select('*').eq('child_id', patientId).single();
+      if (ia) {
+        setFullData((prev: any) => ({ ...prev, initial_assessment: ia }));
+        
+        const { data: gestational } = await supabase.from('gestational_history').select('*').eq('assessment_id', ia.id).single();
+        if (gestational) setFullData((prev: any) => ({ ...prev, gestational }));
+        
+        const { data: feeding } = await supabase.from('feeding_history').select('*').eq('assessment_id', ia.id).single();
+        if (feeding) setFullData((prev: any) => ({ ...prev, feeding }));
+        
+        const { data: clinical } = await supabase.from('clinical_history').select('*').eq('assessment_id', ia.id).single();
+        if (clinical) setFullData((prev: any) => ({ ...prev, clinical }));
+        
+        const { data: physical } = await supabase.from('physical_exam').select('*').eq('assessment_id', ia.id).single();
+        if (physical) setFullData((prev: any) => ({ ...prev, physical }));
       }
 
     } catch (error) {
@@ -256,26 +278,120 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
           </div>
         </div>
 
-        {/* Housing Info (Display Only to keep it simple, or add edit if needed) */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <h3 className="text-sm font-black text-amber-800 uppercase tracking-widest flex items-center gap-2 mb-6">
-            <Home size={18} className="text-amber-500" /> Condições de Moradia (Triagem)
+        {/* Full Registration Data Accordions */}
+        <div className="md:col-span-2 space-y-4 mt-4">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-slate-200 pb-2">
+            <ClipboardList size={18} className="text-slate-500" /> Cadastro Completo (Admissão)
           </h3>
-          {householdData ? (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div><span className="text-slate-400 font-bold block text-[10px] uppercase">Tipo de Casa</span> <span className="font-medium text-slate-800">{householdData.housing_type || '--'}</span></div>
-                <div><span className="text-slate-400 font-bold block text-[10px] uppercase">Material</span> <span className="font-medium text-slate-800">{householdData.dwelling_type || '--'}</span></div>
-                <div><span className="text-slate-400 font-bold block text-[10px] uppercase">Saneamento</span> <span className="font-medium text-slate-800">{householdData.sanitation || '--'}</span></div>
-                <div><span className="text-slate-400 font-bold block text-[10px] uppercase">Animais no quintal</span> <span className="font-medium text-slate-800">{householdData.animals || '--'}</span></div>
+          
+          <details className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group">
+            <summary className="font-bold text-slate-800 px-6 py-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center list-none select-none">
+              <div className="flex items-center gap-2"><Home size={18} className="text-amber-500"/> Triagem Social e Condições de Moradia</div>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <DisplayField label="Tipo de Casa" value={householdData?.housing_type} />
+                <DisplayField label="Cômodos" value={householdData?.rooms} />
+                <DisplayField label="Material" value={householdData?.dwelling_type} />
+                <DisplayField label="Telhado" value={householdData?.roof} />
+                <DisplayField label="Saneamento" value={householdData?.sanitation} />
+                <DisplayField label="Esgoto" value={householdData?.sewage} />
+                <DisplayField label="Lixo" value={householdData?.garbage} />
+                <DisplayField label="Animais no Quintal" value={householdData?.animals} />
               </div>
-              <p className="text-xs text-slate-400 italic mt-4 pt-4 border-t border-slate-100">
-                Os dados completos de triagem (saneamento, lixo, dependentes e socioeconômicos) foram registrados na Avaliação Inicial.
-              </p>
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                <DisplayField label="Renda Mensal" value={fullData.socioeconomics?.monthly_income ? `MZN ${fullData.socioeconomics.monthly_income}` : ''} />
+                <DisplayField label="Trabalho Pai" value={fullData.socioeconomics?.father_job} />
+                <DisplayField label="Trabalho Mãe" value={fullData.socioeconomics?.mother_job} />
+                <DisplayField label="Trabalho Responsável" value={fullData.socioeconomics?.caregiver_job} />
+                <DisplayField label="Observações Sociais" value={fullData.socioeconomics?.observations} />
+              </div>
             </div>
-          ) : (
-            <p className="text-slate-400 text-sm">Nenhum formulário de triagem associado a esta criança.</p>
-          )}
+          </details>
+
+          <details className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group">
+            <summary className="font-bold text-slate-800 px-6 py-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center list-none select-none">
+              <div className="flex items-center gap-2"><Baby size={18} className="text-rose-500"/> História Gestacional</div>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+              <DisplayField label="Intercorrências Pré-Natal" value={fullData.gestational?.prenatal_problems} />
+              <DisplayField label="Consultas Pré-Natal" value={fullData.gestational?.prenatal_consultations} />
+              <DisplayField label="Tipo de Parto" value={fullData.gestational?.delivery_type} />
+              <DisplayField label="Idade Gestacional" value={fullData.gestational?.gestational_age} />
+              <DisplayField label="APGAR 1 min" value={fullData.gestational?.apgar_1} />
+              <DisplayField label="APGAR 5 min" value={fullData.gestational?.apgar_5} />
+              <DisplayField label="Peso ao Nascer" value={fullData.gestational?.birth_weight ? `${fullData.gestational.birth_weight} kg` : ''} />
+              <DisplayField label="Estatura ao Nascer" value={fullData.gestational?.birth_height ? `${fullData.gestational.birth_height} cm` : ''} />
+              <DisplayField label="PC ao Nascer" value={fullData.gestational?.birth_hc ? `${fullData.gestational.birth_hc} cm` : ''} />
+              <DisplayField label="Intercorrências no Parto" value={fullData.gestational?.birth_problems} />
+            </div>
+          </details>
+
+          <details className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group">
+            <summary className="font-bold text-slate-800 px-6 py-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center list-none select-none">
+              <div className="flex items-center gap-2"><FileText size={18} className="text-orange-500"/> Alimentação</div>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+              <DisplayField label="Leite Materno" value={fullData.feeding?.breast_milk ? 'Sim' : 'Não'} />
+              <DisplayField label="Exclusivo Até (meses)" value={fullData.feeding?.exclusive_breast_milk_until} />
+              <DisplayField label="Idade Desmame" value={fullData.feeding?.weaning_age} />
+              <DisplayField label="Intro: Água/Chá" value={fullData.feeding?.water_tea_intro} />
+              <DisplayField label="Intro: Leite de Vaca" value={fullData.feeding?.cow_milk_intro} />
+              <DisplayField label="Intro: Papa Salgada" value={fullData.feeding?.salty_mush_intro} />
+              <DisplayField label="Intro: Suco" value={fullData.feeding?.juice_intro} />
+              <DisplayField label="Intro: Sopa" value={fullData.feeding?.soup_intro} />
+              <DisplayField label="Outros Alimentos" value={fullData.feeding?.other_foods} />
+              <DisplayField label="Alimentação Atual" value={fullData.feeding?.current_feeding} />
+            </div>
+          </details>
+
+          <details className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group">
+            <summary className="font-bold text-slate-800 px-6 py-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center list-none select-none">
+              <div className="flex items-center gap-2"><BriefcaseMedical size={18} className="text-indigo-500"/> História Clínica e Familiar</div>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 text-sm grid grid-cols-2 md:grid-cols-3 gap-4">
+              <DisplayField label="Doenças Prévias" value={fullData.clinical?.previous_diseases} />
+              <DisplayField label="Suplementos" value={fullData.clinical?.supplements} />
+              <DisplayField label="Imunização" value={fullData.clinical?.immunization} />
+              <DisplayField label="Histórico Materno" value={fullData.clinical?.mother_history} />
+              <DisplayField label="Histórico Paterno" value={fullData.clinical?.father_history} />
+              <DisplayField label="Desnutrição na Família" value={fullData.clinical?.family_malnutrition_history} />
+              <DisplayField label="Consanguinidade" value={fullData.clinical?.consanguinity ? 'Sim' : 'Não'} />
+              <DisplayField label="Doenças Hereditárias" value={fullData.clinical?.hereditary_diseases} />
+              <DisplayField label="Dinâmica Familiar" value={fullData.clinical?.family_dynamics} />
+            </div>
+          </details>
+          
+          <details className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group">
+            <summary className="font-bold text-slate-800 px-6 py-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center list-none select-none">
+              <div className="flex items-center gap-2"><Activity size={18} className="text-emerald-500"/> Avaliação Inicial e Exame Físico</div>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="px-6 pb-6 pt-2 border-t border-slate-100 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                <DisplayField label="Data da Avaliação" value={fullData.initial_assessment?.date} />
+                <DisplayField label="Informante" value={fullData.initial_assessment?.informant} />
+                <DisplayField label="Queixa Principal" value={fullData.initial_assessment?.main_complaint} />
+                <DisplayField label="História da Doença" value={fullData.initial_assessment?.history} />
+                <DisplayField label="Medicamentos em Uso" value={fullData.initial_assessment?.current_medications} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-50">
+                <DisplayField label="Peso" value={fullData.physical?.weight ? `${fullData.physical.weight} kg` : ''} />
+                <DisplayField label="Estatura" value={fullData.physical?.height ? `${fullData.physical.height} cm` : ''} />
+                <DisplayField label="Perímetro Braquial" value={fullData.physical?.muac ? `${fullData.physical.muac} cm` : ''} />
+                <DisplayField label="Perímetro Cefálico" value={fullData.physical?.head_circumference ? `${fullData.physical.head_circumference} cm` : ''} />
+                <DisplayField label="Edema Bilateral" value={fullData.physical?.bilateral_edema} />
+                <DisplayField label="Temperatura" value={fullData.physical?.axillary_temperature ? `${fullData.physical.axillary_temperature} °C` : ''} />
+                <DisplayField label="Saúde Oral" value={fullData.physical?.oral_health} />
+                <DisplayField label="Outros Achados" value={fullData.physical?.other_findings} />
+              </div>
+            </div>
+          </details>
+
         </div>
       </div>
 
@@ -314,3 +430,10 @@ const ProfileField = ({ label, name, value, isEditing, onChange, type = 'text', 
     </div>
   );
 };
+
+const DisplayField = ({ label, value }: { label: string, value: any }) => (
+  <div className="flex flex-col">
+    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{label}</span>
+    <span className="text-sm font-medium text-slate-800 mt-0.5">{value || '--'}</span>
+  </div>
+);

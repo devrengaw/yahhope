@@ -10,7 +10,8 @@ interface PatientContextType {
   addEvent: (event: ClinicalEvent) => void;
   updateEvent: (id: string, updates: Partial<ClinicalEvent>) => void;
   deletePatient: (id: string) => void;
-  addFullPatientRecord: (payload: any) => Promise<void>;
+  addFullPatientRecord: (payload: any) => Promise<string>;
+  isLoading: boolean;
 }
 
 const PatientContext = createContext<PatientContextType | undefined>(undefined);
@@ -18,6 +19,7 @@ const PatientContext = createContext<PatientContextType | undefined>(undefined);
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [events, setEvents] = useState<ClinicalEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -25,6 +27,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
   const fetchData = async () => {
     try {
+      setIsLoading(true);
       const { data: childrenData } = await supabase.from('children').select(`
         *,
         caregivers (name)
@@ -87,6 +90,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Error fetching patients', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,7 +156,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         name: payload.caregiver_name,
         marital_status: payload.marital_status,
         education: payload.education,
-        religion: payload.religion
+        religion: payload.religion,
+        phone: payload.caregiver_phone,
+        email: payload.caregiver_email
       });
       if (cgError) throw cgError;
     }
@@ -298,8 +305,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       bmi: payload.bmi ? parseFloat(payload.bmi) : null,
       z_score_weight_height: payload.z_score_weight_height ? parseFloat(payload.z_score_weight_height) : null,
       nutritional_status: status,
-      notes: payload.other_findings || 'Consulta Inicial',
-      return_date: payload.return_date || null
+      notes: payload.general_observations || payload.other_findings || 'Consulta Inicial',
+      return_date: payload.return_date || null,
+      prescriptions: payload.prescriptions || null
     });
 
     if (eventError) throw eventError;
@@ -311,6 +319,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
     // Refresh data
     await fetchData();
+    return childId;
   };
 
   const updatePatient = async (id: string, updates: Partial<Patient>) => {
@@ -375,16 +384,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <PatientContext.Provider value={{ 
-      patients, 
-      events, 
-      addPatient, 
-      addFullPatientRecord,
-      updatePatient, 
-      addEvent, 
-      updateEvent,
-      deletePatient 
-    }}>
+    <PatientContext.Provider value={{ patients, events, addPatient, updatePatient, addEvent, updateEvent, deletePatient, addFullPatientRecord, isLoading }}>
       {children}
     </PatientContext.Provider>
   );

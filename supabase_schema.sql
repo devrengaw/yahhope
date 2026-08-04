@@ -36,6 +36,8 @@ CREATE TABLE caregivers (
   marital_status TEXT,
   education TEXT,
   religion TEXT,
+  phone TEXT,
+  email TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -305,6 +307,7 @@ CREATE TABLE kit_items (
   kit_id UUID REFERENCES kits(id) ON DELETE CASCADE,
   item_id UUID REFERENCES inventory(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL DEFAULT 1,
+  dosage TEXT,
   UNIQUE(kit_id, item_id)
 );
 

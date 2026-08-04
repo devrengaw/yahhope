@@ -12,6 +12,7 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useAtendimento } from '../contexts/AtendimentoContext';
 import { useVisits } from '../contexts/VisitContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Helper to calculate Z-score approximation based on WHO simplified math
 const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F') => {
@@ -49,6 +50,7 @@ export function PatientDetails() {
   const { agendarVisita, visits } = useVisits();
   const { agendarAtendimento, concluirAtendimento, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
+  const { user } = useAuth();
   
   const searchParams = new URLSearchParams(location.search);
   const action = searchParams.get('action');
@@ -73,7 +75,8 @@ export function PatientDetails() {
     if (action === 'new-followup') {
       const defaultReturnDate = new Date();
       defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
-      setReturnDate(defaultReturnDate.toISOString().split('T')[0]);
+      setReturnDate(formatLocalDate(defaultReturnDate));
+      setProfessional(user?.name || '');
       setIsModalOpen(true);
       if (aptId) {
         iniciarAtendimento(aptId);
@@ -103,15 +106,16 @@ export function PatientDetails() {
     const defaultReturnDate = new Date();
     defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
     
-    setEventDate(new Date().toISOString().split('T')[0]);
+    setEventDate(formatLocalDate(new Date()));
     setNewWeight('');
     setNewHeight('');
     setNewMuac('');
     setNewHead('');
     setNewNotes('');
-    setReturnDate(defaultReturnDate.toISOString().split('T')[0]);
+    setReturnDate(formatLocalDate(defaultReturnDate));
     setSelectedKits([]);
     setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+    setProfessional(user?.name || '');
     setIsModalOpen(true);
   };
 
@@ -121,14 +125,14 @@ export function PatientDetails() {
   const [showQueueSuccess, setShowQueueSuccess] = useState(false);
 
   // Form state
-  const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
+  const [eventDate, setEventDate] = useState(formatLocalDate(new Date()));
   const [newWeight, setNewWeight] = useState('');
   const [newHeight, setNewHeight] = useState('');
   const [newMuac, setNewMuac] = useState('');
   const [newHead, setNewHead] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [returnDate, setReturnDate] = useState('');
-  const [professional, setProfessional] = useState('Dra. Helena');
+  const [professional, setProfessional] = useState(user?.name || '');
   const [selectedKits, setSelectedKits] = useState<string[]>([]);
   const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
 
@@ -161,7 +165,7 @@ export function PatientDetails() {
           if (invItem) {
             activeMedications.push({
               medication: invItem.name,
-              treatment: `Via Kit: ${kit.name}`,
+              treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
               duration_days: undefined,
               quantity: kitItem.quantity,
             });
@@ -883,7 +887,22 @@ export function PatientDetails() {
                 <div className="flex flex-wrap gap-4 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
                   <div className="flex-1 min-w-[120px]">
                     <p className="text-xs font-medium text-emerald-800 mb-1">Data do Atendimento</p>
-                    <p className="text-sm font-bold text-emerald-900">{new Date().toLocaleDateString()}</p>
+                    <input 
+                      required
+                      type="date"
+                      value={eventDate}
+                      onChange={e => {
+                        setEventDate(e.target.value);
+                        if (e.target.value) {
+                          const newDate = parseLocalDate(e.target.value);
+                          if (!isNaN(newDate.getTime())) {
+                            newDate.setDate(newDate.getDate() + 14);
+                            setReturnDate(formatLocalDate(newDate));
+                          }
+                        }
+                      }}
+                      className="w-full bg-emerald-50/50 border-b-2 border-emerald-200 px-0 py-1 text-sm font-bold text-emerald-900 focus:border-emerald-500 focus:outline-none bg-transparent"
+                    />
                   </div>
                   <div className="flex-1 min-w-[120px]">
                     <p className="text-xs font-medium text-emerald-800 mb-1">Profissional *</p>

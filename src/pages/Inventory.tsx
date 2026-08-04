@@ -113,7 +113,7 @@ export function Inventory() {
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
   const [kitName, setKitName] = useState('');
   const [kitDesc, setKitDesc] = useState('');
-  const [kitItems, setKitItems] = useState<{item_id: string, quantity: number}[]>([]);
+  const [kitItems, setKitItems] = useState<{item_id: string, quantity: number, dosage?: string}[]>([]);
 
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -254,7 +254,7 @@ export function Inventory() {
     setKitItems([...kitItems, { item_id: '', quantity: 1 }]);
   };
 
-  const updateKitItem = (index: number, field: 'item_id' | 'quantity', value: string | number) => {
+  const updateKitItem = (index: number, field: 'item_id' | 'quantity' | 'dosage', value: string | number) => {
     const newItems = [...kitItems];
     newItems[index] = { ...newItems[index], [field]: value };
     setKitItems(newItems);
@@ -753,24 +753,43 @@ export function Inventory() {
                   </div>
                   
                   <div className="space-y-3">
-                    {kitItems.map((ki, index) => (
-                      <div key={index} className="flex gap-3 items-start">
-                        <div className="flex-1 min-w-[200px]">
-                          <KitItemSelect 
-                            items={items} 
-                            categories={categories}
-                            value={ki.item_id}
-                            onChange={(val) => updateKitItem(index, 'item_id', val)}
-                          />
+                    {kitItems.map((ki, index) => {
+                      const invItem = items.find(i => i.id === ki.item_id);
+                      const isMedication = invItem?.category?.toLowerCase().includes('medicamento') || invItem?.category?.toLowerCase().includes('remédio');
+                      
+                      return (
+                        <div key={index} className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-xl border border-slate-100">
+                          <div className="flex gap-3 items-start">
+                            <div className="flex-1 min-w-[200px]">
+                              <KitItemSelect 
+                                items={items} 
+                                categories={categories}
+                                value={ki.item_id}
+                                onChange={(val) => updateKitItem(index, 'item_id', val)}
+                              />
+                            </div>
+                            <div className="w-24">
+                              <input required type="number" min="1" placeholder="Qtd" value={ki.quantity} onChange={e => updateKitItem(index, 'quantity', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
+                            </div>
+                            <button type="button" onClick={() => removeKitItem(index)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors mt-0.5">
+                              <Trash2 size={20} />
+                            </button>
+                          </div>
+                          {isMedication && (
+                            <div className="w-full mt-1">
+                              <input 
+                                type="text" 
+                                placeholder="Posologia (ex: 1 comprimido 2x ao dia)" 
+                                value={ki.dosage || ''} 
+                                onChange={e => updateKitItem(index, 'dosage', e.target.value)} 
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                                required 
+                              />
+                            </div>
+                          )}
                         </div>
-                        <div className="w-32">
-                          <input required type="number" min="1" placeholder="Qtd" value={ki.quantity} onChange={e => updateKitItem(index, 'quantity', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
-                        </div>
-                        <button type="button" onClick={() => removeKitItem(index)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors mt-0.5">
-                          <Trash2 size={20} />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {kitItems.length === 0 && (
                       <div className="text-center p-4 border border-dashed border-slate-200 rounded-xl text-slate-500 text-sm">
                         Nenhum item adicionado ao kit.
