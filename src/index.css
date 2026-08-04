@@ -1,9 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'gotham-black';
+  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/Gotham-Black.otf') format('opentype');
+}
+@font-face {
+  font-family: 'gotham-bold';
+  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/Gotham-Bold.otf') format('opentype');
+}
+@font-face {
+  font-family: 'gotham-light';
+  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/GothamLight.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'gotham-regular';
+  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/GothamMedium.ttf') format('truetype');
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Antipol VF", "Antipol", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-gotham-black: "gotham-black", sans-serif;
+  --font-gotham-bold: "gotham-bold", sans-serif;
+  --font-gotham-light: "gotham-light", sans-serif;
+  --font-gotham-regular: "gotham-regular", sans-serif;
+
 
   /* Brand Colors */
   --color-brand-orange: #F49853;

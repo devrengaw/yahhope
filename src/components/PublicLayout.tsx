@@ -5,15 +5,18 @@ export function PublicLayout() {
   const location = useLocation();
   const isCampaignPage = location.pathname === '/campanha';
   const isLoginPage = location.pathname === '/login' || location.pathname === '/set-password' || location.pathname === '/cadastro-apadrinhador';
+  const isHomePage = location.pathname === '/';
 
   return (
     <div className={`min-h-screen flex flex-col ${isLoginPage ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      <header className={`w-full z-50 transition-all ${isLoginPage ? 'absolute top-0 bg-transparent' : 'bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20 md:h-24">
-            <Link to="/" className="flex items-center">
-              <img src="/logo.png" alt="YAH Hope" className={isLoginPage ? "h-12 md:h-16 object-contain brightness-0 invert opacity-90" : "h-12 md:h-16 object-contain brightness-0"} />
-            </Link>
+      {!isHomePage && (
+        <header className={`w-full z-50 transition-all ${isLoginPage ? 'absolute top-0 bg-transparent' : 'bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0'}`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-20 md:h-24">
+              <Link to="/" className="flex items-center">
+                <img src="/logo.png" alt="YAH Hope" className={isLoginPage ? "h-12 md:h-16 object-contain brightness-0 invert opacity-90" : "h-12 md:h-16 object-contain brightness-0"} />
+              </Link>
+
             
             <nav className="hidden md:flex items-center gap-8">
               <Link to="/" className={`text-sm font-medium transition-colors ${isLoginPage ? 'text-white/90 hover:text-white drop-shadow' : 'text-slate-600 hover:text-emerald-600'}`}>Início</Link>
@@ -42,12 +45,13 @@ export function PublicLayout() {
           </div>
         </div>
       </header>
+      )}
 
       <main className="flex-1 flex flex-col">
         <Outlet />
       </main>
 
-      {!isLoginPage && (
+      {!isLoginPage && !isHomePage && (
       <footer className="bg-slate-900 text-slate-400 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">

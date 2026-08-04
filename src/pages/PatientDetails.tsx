@@ -46,7 +46,7 @@ export function PatientDetails() {
   const navigate = useNavigate();
   const { addEvent, updateEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
-  const { agendarVisita } = useVisits();
+  const { agendarVisita, visits } = useVisits();
   const { agendarAtendimento, concluirAtendimento, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
   
@@ -59,7 +59,15 @@ export function PatientDetails() {
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   
   const patient = patients.find(p => p.id === id);
-  const patientEvents = events.filter(e => e.patient_id === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
+    id: v.id,
+    patient_id: v.patient_id,
+    event_type: 'acs_visit' as const,
+    date: v.date,
+    notes: v.observations || 'Visita domiciliar realizada.',
+    professional: 'ACS'
+  }));
+  const patientEvents = [...events.filter(e => e.patient_id === id), ...patientVisits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   useEffect(() => {
     if (action === 'new-followup') {
@@ -142,6 +150,26 @@ export function PatientDetails() {
   
   // For the diagnosis/Z-score, we use the latest clinical visit (not ACS visit)
   const latestClinicalEvent = patientEvents.find(e => e.event_type !== 'acs_visit') || patientEvents[0];
+
+  const activeMedications = [...(latestClinicalEvent?.prescriptions || [])];
+  if (latestClinicalEvent?.kit_delivered) {
+    latestClinicalEvent.kit_delivered.forEach(kitId => {
+      const kit = kits.find(k => k.id === kitId);
+      if (kit) {
+        kit.items.forEach(kitItem => {
+          const invItem = items.find(i => i.id === kitItem.item_id);
+          if (invItem) {
+            activeMedications.push({
+              medication: invItem.name,
+              treatment: `Via Kit: ${kit.name}`,
+              duration_days: undefined,
+              quantity: kitItem.quantity,
+            });
+          }
+        });
+      }
+    });
+  }
 
   if (!patient) return <div className="p-8 text-center">Paciente não encontrado</div>;
 
@@ -456,7 +484,7 @@ export function PatientDetails() {
                   </p>
                   {latestWeightEvent && (
                     <p className="text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-0.5 rounded-lg">
-                      Medido em {new Date(latestWeightEvent.date).toLocaleDateString('pt-BR')}
+                      Medido em {new Date(latestWeightEvent.date).toLocaleDateString('pt-BR')} ({calculateAge(patient.dob, latestWeightEvent.date)})
                     </p>
                   )}
                 </div>
@@ -470,7 +498,7 @@ export function PatientDetails() {
                   </p>
                   {latestHeightEvent && (
                     <p className="text-[10px] font-bold text-blue-600 mt-2 bg-blue-50 inline-block px-2 py-0.5 rounded-lg">
-                      Em {new Date(latestHeightEvent.date).toLocaleDateString('pt-BR')}
+                      Em {new Date(latestHeightEvent.date).toLocaleDateString('pt-BR')} ({calculateAge(patient.dob, latestHeightEvent.date)})
                     </p>
                   )}
                 </div>
@@ -498,7 +526,7 @@ export function PatientDetails() {
                   </p>
                   {latestHeadEvent && (
                     <p className="text-[10px] font-bold text-slate-400 mt-2">
-                      Medido em {new Date(latestHeadEvent.date).toLocaleDateString('pt-BR')}
+                      Medido em {new Date(latestHeadEvent.date).toLocaleDateString('pt-BR')} ({calculateAge(patient.dob, latestHeadEvent.date)})
                     </p>
                   )}
                 </div>
@@ -510,9 +538,9 @@ export function PatientDetails() {
                   <BriefcaseMedical size={18} className="text-emerald-600" />
                   Medicamentos e Suplementos Ativos
                 </h3>
-                {latestClinicalEvent?.prescriptions && latestClinicalEvent.prescriptions.length > 0 ? (
+                {activeMedications.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {latestClinicalEvent.prescriptions.map((p, i) => (
+                    {activeMedications.map((p, i) => (
                       <div key={i} className="bg-white p-5 rounded-2xl border border-emerald-100 flex flex-col group hover:shadow-md transition-all">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">

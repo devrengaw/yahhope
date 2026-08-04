@@ -9,6 +9,7 @@ interface VisitContextType {
   visits: HomeVisit[];
   agendarVisita: (patientId: string, clinicalDate: string) => void;
   concluirVisita: (visitId: string, observations: string, checklist: any) => void;
+  excluirVisita: (visitId: string) => void;
 }
 
 const VisitContext = createContext<VisitContextType | undefined>(undefined);
@@ -132,8 +133,16 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const excluirVisita = async (visitId: string) => {
+    setVisits(prev => prev.filter(v => v.id !== visitId));
+    const { error } = await supabase.from('home_visits').delete().eq('id', visitId);
+    if (error) {
+      console.error('Error deleting visit:', error);
+    }
+  };
+
   return (
-    <VisitContext.Provider value={{ visits, agendarVisita, concluirVisita }}>
+    <VisitContext.Provider value={{ visits, agendarVisita, concluirVisita, excluirVisita }}>
       {children}
     </VisitContext.Provider>
   );

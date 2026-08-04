@@ -6,15 +6,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function calculateAge(dob: string | Date): string {
+export function calculateAge(dob: string | Date, atDate?: string | Date): string {
   if (!dob) return '--';
   const birthDate = typeof dob === 'string' ? parseLocalDate(dob) : dob;
   if (isNaN(birthDate.getTime())) return '--';
   
-  const today = new Date();
-  today.setHours(12, 0, 0, 0); // Normalize to midday to match parseLocalDate and avoid hour differences
+  let targetDate = new Date();
+  if (atDate) {
+    targetDate = typeof atDate === 'string' ? parseLocalDate(atDate) : atDate;
+  }
+  targetDate.setHours(12, 0, 0, 0); // Normalize to midday
   
-  const duration = intervalToDuration({ start: birthDate, end: today });
+  const duration = intervalToDuration({ start: birthDate, end: targetDate });
   const years = duration.years || 0;
   const months = duration.months || 0;
   const days = duration.days || 0;

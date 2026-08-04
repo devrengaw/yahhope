@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, User, MapPin, ClipboardCheck, MessageSquare, Star } from 'lucide-react';
+import { Home, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, User, MapPin, ClipboardCheck, MessageSquare, Star, Trash2 } from 'lucide-react';
 import { useVisits } from '../contexts/VisitContext';
 import { usePatients } from '../contexts/PatientContext';
 import { HomeVisit } from '../lib/mockData';
@@ -7,7 +7,7 @@ import { cn, formatLocalDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
 export function HomeVisits() {
-  const { visits, concluirVisita } = useVisits();
+  const { visits, concluirVisita, excluirVisita } = useVisits();
   const { patients } = usePatients();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVisit, setSelectedVisit] = useState<HomeVisit | null>(null);
@@ -335,7 +335,7 @@ export function HomeVisits() {
                 </div>
 
                 {/* Actions */}
-                {selectedVisit.status === 'pending' && (
+                {selectedVisit.status === 'pending' ? (
                   <div className="pt-6 border-t border-slate-100 flex gap-3">
                     <button
                       type="submit"
@@ -343,6 +343,22 @@ export function HomeVisits() {
                     >
                       <CheckCircle2 size={20} />
                       Concluir e Salvar Visita
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pt-6 border-t border-slate-100 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Tem certeza que deseja excluir esta visita concluída?')) {
+                          excluirVisita(selectedVisit.id);
+                          setSelectedVisit(null);
+                        }
+                      }}
+                      className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Trash2 size={20} />
+                      Excluir Visita
                     </button>
                   </div>
                 )}
