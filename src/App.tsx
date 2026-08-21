@@ -131,6 +131,13 @@ function RootRedirect() {
     );
   }
 
+  // Intercept password recovery flow to prevent auto-login redirect
+  const hash = window.location.hash || '';
+  const search = window.location.search || '';
+  if (hash.includes('type=recovery') || search.includes('type=recovery') || hash.includes('recovery') || search.includes('recovery')) {
+    return <Navigate to="/set-password" />;
+  }
+
   if (!user) return <Navigate to="/login" />;
   if (user.role === 'SPONSOR') return <Navigate to="/portal" />;
   if (user.role === 'ADMIN') return <Navigate to="/admin" />;

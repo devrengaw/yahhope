@@ -15,6 +15,13 @@ export function Login() {
   // If user is already logged in, redirect them
   React.useEffect(() => {
     if (!loading && user) {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('type=recovery') || hash.includes('recovery') || search.includes('recovery')) {
+        navigate('/set-password');
+        return;
+      }
+
       if (user.role === 'SPONSOR') {
         navigate('/portal/dashboard');
         return;

@@ -292,11 +292,18 @@ export function NewPatient() {
           if (kit) {
             kit.items.forEach(kitItem => {
               const invItem = items.find(i => i.id === kitItem.item_id);
-              validPrescriptions.push({
-                medication: invItem ? invItem.name : `Item do Kit ${kit.name}`,
-                treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
-                quantity: kitItem.quantity,
-              });
+              if (invItem) {
+                const cat = invItem.category?.toLowerCase() || '';
+                const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
+                
+                if (isMedication) {
+                  validPrescriptions.push({
+                    medication: invItem.name,
+                    treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
+                    quantity: kitItem.quantity,
+                  });
+                }
+              }
             });
           }
         });
