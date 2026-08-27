@@ -82,9 +82,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
           prescriptions: e.prescriptions || [],
           professional: e.professional_id || 'Profissional',
           return_date: e.return_date,
-          kit_delivered: [],
+          kit_delivered: e.kit_delivered_id ? [e.kit_delivered_id] : [],
           hospital_referral: false,
-          is_discharge: false
+          is_discharge: e.is_discharge || false
         }));
         setEvents(formattedEvents);
       }
@@ -354,7 +354,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         z_score_weight_height: event.z_score_weight_height,
         nutritional_status: event.nutritional_status,
         prescriptions: event.prescriptions || null,
-        return_date: event.return_date || null
+        return_date: event.return_date || null,
+        kit_delivered_id: (event.kit_delivered && event.kit_delivered.length > 0) ? event.kit_delivered[0] : null,
+        is_discharge: event.is_discharge || false
       }).select().single();
 
       if (newEvent) {

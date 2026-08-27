@@ -15,28 +15,70 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 
 // Helper to calculate Z-score approximation based on WHO simplified math
-const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F') => {
+const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F', ageInMonths?: number) => {
   if (!weight || !height || height < 45 || height > 120) return { zScore: null, status: 'N/A' };
   
+  // 1. Weight-for-Height (WFH) Calculation (Original logic)
   const base = gender === 'M' ? 2.5 : 2.4;
-  const median = base + 0.15 * (height - 45) + 0.0015 * Math.pow(height - 45, 2);
-  const z2Offset = 0.5 + (height - 45) * 0.03;
-  const z3Offset = 0.8 + (height - 45) * 0.04;
+  const wfhMedian = base + 0.15 * (height - 45) + 0.0015 * Math.pow(height - 45, 2);
+  const wfhZ2Offset = 0.5 + (height - 45) * 0.03;
+  const wfhZ3Offset = 0.8 + (height - 45) * 0.04;
 
-  const z_2 = median - z2Offset;
-  const z_3 = median - z3Offset;
+  const wfh_z_2 = wfhMedian - wfhZ2Offset;
+  const wfh_z_3 = wfhMedian - wfhZ3Offset;
 
   let zScore = 0;
-  if (weight < median) {
-    zScore = -((median - weight) / (z2Offset / 2)); // Approximate SD
+  if (weight < wfhMedian) {
+    zScore = -((wfhMedian - weight) / (wfhZ2Offset / 2)); // Approximate SD
   } else {
-    zScore = ((weight - median) / (z2Offset / 2));
+    zScore = ((weight - wfhMedian) / (wfhZ2Offset / 2));
   }
 
   let status = 'Adequado';
-  if (weight <= z_3) status = 'DAG';
-  else if (weight <= z_2) status = 'DAM';
+  if (weight <= wfh_z_3) status = 'DAG';
+  else if (weight <= wfh_z_2) status = 'DAM';
   else if (zScore < -1) status = 'Risco';
+
+  // 2. Age-based checks for Stunting (Height-for-Age) and Underweight (Weight-for-Age)
+  if (ageInMonths !== undefined && ageInMonths >= 0) {
+    // Piecewise approximation for Median Height
+    let hfaMedian = 50;
+    if (ageInMonths <= 3) hfaMedian = 50 + ageInMonths * 3.5;
+    else if (ageInMonths <= 12) hfaMedian = 60.5 + (ageInMonths - 3) * 1.5;
+    else if (ageInMonths <= 24) hfaMedian = 74 + (ageInMonths - 12) * 1.0;
+    else if (ageInMonths <= 36) hfaMedian = 86 + (ageInMonths - 24) * 0.8;
+    else if (ageInMonths <= 48) hfaMedian = 95.6 + (ageInMonths - 36) * 0.7;
+    else hfaMedian = 104 + (ageInMonths - 48) * 0.5;
+
+    // Roughly -3 SD for height is 10-12% below median
+    const sd_h = hfaMedian * 0.04;
+    
+    // Piecewise approximation for Median Weight
+    let wfaMedian = 3.3;
+    if (ageInMonths <= 3) wfaMedian = 3.3 + ageInMonths * 0.9;
+    else if (ageInMonths <= 12) wfaMedian = 6.0 + (ageInMonths - 3) * 0.3;
+    else if (ageInMonths <= 24) wfaMedian = 8.7 + (ageInMonths - 12) * 0.23;
+    else if (ageInMonths <= 36) wfaMedian = 11.5 + (ageInMonths - 24) * 0.16;
+    else if (ageInMonths <= 48) wfaMedian = 13.4 + (ageInMonths - 36) * 0.15;
+    else wfaMedian = 15.2 + (ageInMonths - 48) * 0.15;
+
+    // Roughly -3 SD for weight is 25-30% below median
+    const sd_w = wfaMedian * 0.10;
+
+    // Check Stunting (Height-for-Age)
+    if (height <= hfaMedian - 3 * sd_h && status !== 'DAG') {
+      status = 'DAG'; // Severe stunting -> DAG
+    } else if (height <= hfaMedian - 2 * sd_h && (status === 'Adequado' || status === 'Risco')) {
+      status = 'DAM'; // Moderate stunting -> DAM
+    }
+
+    // Check Underweight (Weight-for-Age)
+    if (weight <= wfaMedian - 3 * sd_w && status !== 'DAG') {
+      status = 'DAG'; // Severe underweight -> DAG
+    } else if (weight <= wfaMedian - 2 * sd_w && (status === 'Adequado' || status === 'Risco')) {
+      status = 'DAM'; // Moderate underweight -> DAM
+    }
+  }
 
   return { zScore: parseFloat(zScore.toFixed(2)), status };
 };
@@ -185,7 +227,7 @@ export function PatientDetails() {
   // Auto-calculated fields for modal
   const ageInMonths = differenceInMonths(new Date(), new Date(patient.dob));
   const bmi = (newWeight && newHeight) ? (parseFloat(newWeight) / Math.pow(parseFloat(newHeight) / 100, 2)).toFixed(2) : '--';
-  const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender);
+  const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender, ageInMonths);
 
   const handleSaveEvent = (e: React.FormEvent, isDischarge: boolean = false) => {
     e.preventDefault();
@@ -198,6 +240,31 @@ export function PatientDetails() {
       duration_days: parseInt(p.duration_days) || undefined,
       quantity: parseInt(p.quantity) || undefined
     }));
+
+    // Extract medications from selected kits to include them in the active medications
+    if (selectedKits.length > 0) {
+      selectedKits.forEach(kitId => {
+        const kit = kits.find(k => k.id === kitId);
+        if (kit) {
+          kit.items.forEach(kitItem => {
+            const invItem = items.find(i => i.id === kitItem.item_id);
+            if (invItem) {
+              const cat = invItem.category?.toLowerCase() || '';
+              const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
+              if (isMedication) {
+                validPrescriptions.push({
+                  id: `k-${Date.now()}-${Math.random()}`,
+                  item_id: kitItem.item_id,
+                  medication: invItem.name,
+                  treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
+                  quantity: kitItem.quantity?.toString()
+                });
+              }
+            }
+          });
+        }
+      });
+    }
 
     const newEvent: ClinicalEvent = {
       id: `e${Date.now()}`,
@@ -777,11 +844,12 @@ export function PatientDetails() {
                           </div>
                         )}
 
-                        {event.kit_delivered && (
-                          <div className="mb-4 bg-emerald-50/50 border border-emerald-100 p-3 rounded-xl flex items-center gap-2 text-xs text-emerald-800">
-                            <BriefcaseMedical size={14} className="text-emerald-600 shadow-sm" />
-                            <span className="font-bold uppercase tracking-tight">Kit Entregue:</span> 
-                            <span className="font-semibold">{kits.find(k => k.id === event.kit_delivered)?.name || 'Kit Padrão'}</span>
+                        {event.kit_delivered && event.kit_delivered.length > 0 && (
+                          <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-100 mb-4">
+                            <Package className="w-4 h-4 text-orange-500" />
+                            <span className="text-sm text-orange-800">
+                              KIT ENTREGUE: <span className="font-semibold">{kits.find(k => k.id === event.kit_delivered?.[0])?.name || 'Kit Padrão'}</span>
+                            </span>
                           </div>
                         )}
 
