@@ -219,6 +219,7 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
                 stroke="#94a3b8"
                 tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
                 tickLine={{ stroke: '#cbd5e1' }}
+                tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
                 label={{ value: activeChartData.yAxisLabel, angle: -90, position: 'insideLeft', offset: -5, fill: '#334155', fontWeight: 'bold', fontSize: 12 }} 
               />
               <Tooltip content={<CustomTooltip />} />
