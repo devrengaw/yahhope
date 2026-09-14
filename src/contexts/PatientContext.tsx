@@ -324,15 +324,17 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
   const updatePatient = async (id: string, updates: Partial<Patient>) => {
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-    
     if (id.length > 10) { // Valid UUID rough check
-      await supabase.from('children').update({
-        registration_number: updates.registration_number,
-        name: updates.name,
-        dob: updates.dob,
-        gender: updates.gender,
-        address: updates.community
-      }).eq('id', id);
+      const payload: any = {};
+      if (updates.registration_number !== undefined) payload.registration_number = updates.registration_number;
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.dob !== undefined) payload.dob = updates.dob;
+      if (updates.gender !== undefined) payload.gender = updates.gender;
+      if (updates.community !== undefined) payload.address = updates.community;
+      
+      if (Object.keys(payload).length > 0) {
+        await supabase.from('children').update(payload).eq('id', id);
+      }
     }
   };
 
@@ -355,7 +357,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         nutritional_status: event.nutritional_status,
         prescriptions: event.prescriptions || null,
         return_date: event.return_date || null,
-        kit_delivered_id: (event.kit_delivered && event.kit_delivered.length > 0) ? event.kit_delivered[0] : null
+        kit_delivered_id: (event.kit_delivered && event.kit_delivered.length > 0) ? event.kit_delivered[0] : null,
+        professional_id: user?.id
       }).select().single();
 
       if (newEvent) {
@@ -371,7 +374,14 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         notes: updates.notes,
         weight: updates.weight,
         height: updates.height,
-        nutritional_status: updates.nutritional_status
+        muac: updates.muac,
+        head_circumference: updates.head_circumference,
+        bmi: updates.bmi,
+        z_score_weight_height: updates.z_score_weight_height,
+        nutritional_status: updates.nutritional_status,
+        prescriptions: updates.prescriptions || null,
+        return_date: updates.return_date || null,
+        kit_delivered_id: (updates.kit_delivered && updates.kit_delivered.length > 0) ? updates.kit_delivered[0] : null
       }).eq('id', id);
     }
   };

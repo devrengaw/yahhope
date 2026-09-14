@@ -101,6 +101,7 @@ export function PatientDetails() {
   const [activeTab, setActiveTab] = useState<'resumo' | 'ficha' | 'historico'>('resumo');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   
   const patient = patients.find(p => p.id === id);
   const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
@@ -129,6 +130,7 @@ export function PatientDetails() {
     } else if (action === 'edit-last') {
       const lastEvent = patientEvents[0];
       if (lastEvent) {
+        setEditingEventId(lastEvent.id);
         setNewWeight(lastEvent.weight?.toString() || '');
         setNewHeight(lastEvent.height?.toString() || '');
         setNewMuac(lastEvent.muac?.toString() || '');
@@ -136,6 +138,11 @@ export function PatientDetails() {
         setNewNotes(lastEvent.notes || '');
         setReturnDate(lastEvent.return_date || '');
         setSelectedKits(lastEvent.kit_delivered || []);
+        if (lastEvent.prescriptions && lastEvent.prescriptions.length > 0) {
+          setPrescriptions(lastEvent.prescriptions);
+        } else {
+          setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+        }
         setEventDate(lastEvent.date);
         setIsModalOpen(true);
       }
@@ -158,6 +165,25 @@ export function PatientDetails() {
     setSelectedKits([]);
     setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
     setProfessional(user?.name || '');
+    setEditingEventId(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditPastEvent = (event: any) => {
+    setEditingEventId(event.id);
+    setNewWeight(event.weight?.toString() || '');
+    setNewHeight(event.height?.toString() || '');
+    setNewMuac(event.muac?.toString() || '');
+    setNewHead(event.head_circumference?.toString() || '');
+    setNewNotes(event.notes || '');
+    setReturnDate(event.return_date || '');
+    setSelectedKits(event.kit_delivered || []);
+    if (event.prescriptions && event.prescriptions.length > 0) {
+      setPrescriptions(event.prescriptions);
+    } else {
+      setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+    }
+    setEventDate(event.date);
     setIsModalOpen(true);
   };
 
@@ -294,8 +320,8 @@ export function PatientDetails() {
       deductPrescriptionsFromInventory(validPrescriptions, patient.id);
     }
 
-    if (action === 'edit-last' && patientEvents[0]) {
-      updateEvent(patientEvents[0].id, newEvent);
+    if (editingEventId) {
+      updateEvent(editingEventId, newEvent);
     } else {
       addEvent(newEvent);
     }
@@ -314,7 +340,7 @@ export function PatientDetails() {
     }
 
     // Schedule ACS visit for next week only if it's a new clinical event
-    if (action !== 'edit-last') {
+    if (!editingEventId) {
       agendarVisita(patient.id, eventDate);
     }
 
@@ -764,6 +790,7 @@ export function PatientDetails() {
                         <th className="p-4 text-center">PB (cm)</th>
                         <th className="p-4 text-center">P/E (Z)</th>
                         <th className="p-4">Status</th>
+                        <th className="p-4 text-center">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -792,6 +819,14 @@ export function PatientDetails() {
                           </td>
                           <td className="p-4">
                             {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
+                          </td>
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => handleEditPastEvent(event)}
+                              className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
+                            >
+                              Editar
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -829,6 +864,14 @@ export function PatientDetails() {
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {event.professional}</span>
+                            {event.event_type !== 'acs_visit' && (
+                              <button
+                                onClick={() => handleEditPastEvent(event)}
+                                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 transition-all ml-2"
+                              >
+                                Editar
+                              </button>
+                            )}
                           </div>
                         </div>
 
