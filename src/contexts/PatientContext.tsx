@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface PatientContextType {
   patients: Patient[];
@@ -17,6 +18,7 @@ interface PatientContextType {
 const PatientContext = createContext<PatientContextType | undefined>(undefined);
 
 export function PatientProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [events, setEvents] = useState<ClinicalEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
