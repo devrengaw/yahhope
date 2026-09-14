@@ -355,8 +355,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         nutritional_status: event.nutritional_status,
         prescriptions: event.prescriptions || null,
         return_date: event.return_date || null,
-        kit_delivered_id: (event.kit_delivered && event.kit_delivered.length > 0) ? event.kit_delivered[0] : null,
-        is_discharge: event.is_discharge || false
+        kit_delivered_id: (event.kit_delivered && event.kit_delivered.length > 0) ? event.kit_delivered[0] : null
       }).select().single();
 
       if (newEvent) {

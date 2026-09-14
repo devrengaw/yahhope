@@ -12,10 +12,12 @@ export function Atendimentos() {
   const today = new Date();
   const todayDate = formatLocalDate(today);
 
-  const filteredAtendimentos = atendimentos.filter(a => 
-    a.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    a.date === todayDate
-  );
+  const filteredAtendimentos = atendimentos.filter(a => {
+    const matchesSearch = a.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const isToday = a.date === todayDate;
+    const isPastAndPending = a.date < todayDate && a.status !== 'completed';
+    return matchesSearch && (isToday || isPastAndPending);
+  });
 
   const scheduled = filteredAtendimentos.filter(a => a.status === 'scheduled');
   const waiting = filteredAtendimentos.filter(a => a.status === 'waiting');

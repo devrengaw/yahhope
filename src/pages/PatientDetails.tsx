@@ -233,7 +233,7 @@ export function PatientDetails() {
     e.preventDefault();
     
     // Filter out empty prescriptions
-    const validPrescriptions = prescriptions.filter(p => p.item_id !== '' || p.medication.trim() !== '').map(p => ({
+    const validPrescriptions = prescriptions.filter(p => (p.item_id && p.item_id !== '') || (p.medication && p.medication.trim() !== '')).map(p => ({
       ...p,
       medication: p.medication.trim(),
       treatment: p.treatment.trim(),
@@ -313,8 +313,10 @@ export function PatientDetails() {
       agendarAtendimento(patient.id, patient.name, returnDate);
     }
 
-    // Schedule ACS visit for next week
-    agendarVisita(patient.id, eventDate);
+    // Schedule ACS visit for next week only if it's a new clinical event
+    if (action !== 'edit-last') {
+      agendarVisita(patient.id, eventDate);
+    }
 
     // If it was an appointment from the queue, mark it as completed
     if (aptId) {
@@ -331,7 +333,7 @@ export function PatientDetails() {
     navigate(`/nutrition/patients/${patient.id}`, { replace: true });
     
     setNewWeight(''); setNewHeight(''); setNewMuac(''); setNewHead(''); setNewNotes(''); setReturnDate(formatLocalDate(addDays(new Date(), 14))); setSelectedKits([]); setEventDate(formatLocalDate(new Date()));
-    setPrescriptions([{ id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
+    setPrescriptions([{ id: Date.now().toString(), item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
     setActiveTab('historico');
   };
 
@@ -373,7 +375,7 @@ export function PatientDetails() {
   };
 
   const addPrescription = () => {
-    setPrescriptions([...prescriptions, { id: Date.now(), medication: '', treatment: '', duration_days: '' }]);
+    setPrescriptions([...prescriptions, { id: Date.now().toString(), item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
   };
 
   const removePrescription = (id: number) => {
