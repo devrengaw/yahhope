@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
