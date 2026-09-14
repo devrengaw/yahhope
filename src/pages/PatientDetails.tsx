@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
@@ -213,7 +213,9 @@ export function PatientDetails() {
   const [referralReason, setReferralReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
 
-
+  // Active Medication Editing State
+  const [editingMedicationIndex, setEditingMedicationIndex] = useState<number | null>(null);
+  const [editedMedication, setEditedMedication] = useState<{ medication: string, treatment: string, duration_days?: string }>({ medication: '', treatment: '' });
   // Find latest events with specific measurements
   const latestWeightEvent = patientEvents.find(e => e.weight !== undefined);
   const latestHeightEvent = patientEvents.find(e => e.height !== undefined);
@@ -235,12 +237,15 @@ export function PatientDetails() {
             const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
             
             if (isMedication) {
-              activeMedications.push({
-                medication: invItem.name,
-                treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
-                duration_days: undefined,
-                quantity: kitItem.quantity,
-              });
+              const alreadyHas = activeMedications.some(p => p.item_id === invItem.id || p.medication === invItem.name);
+              if (!alreadyHas) {
+                activeMedications.push({
+                  medication: invItem.name,
+                  treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
+                  duration_days: undefined,
+                  quantity: kitItem.quantity?.toString(),
+                });
+              }
             }
           }
         });
@@ -248,6 +253,25 @@ export function PatientDetails() {
     });
   }
 
+  const handleDeleteMedication = (index: number) => {
+    if (!latestClinicalEvent) return;
+    const newMeds = [...activeMedications];
+    newMeds.splice(index, 1);
+    updateEvent(latestClinicalEvent.id, { prescriptions: newMeds.length > 0 ? newMeds : undefined });
+  };
+
+  const handleSaveMedication = (index: number) => {
+    if (!latestClinicalEvent) return;
+    const newMeds = [...activeMedications];
+    newMeds[index] = { 
+      ...newMeds[index], 
+      ...editedMedication,
+      duration_days: editedMedication.duration_days ? parseInt(editedMedication.duration_days) : undefined
+    };
+    updateEvent(latestClinicalEvent.id, { prescriptions: newMeds });
+    setEditingMedicationIndex(null);
+  };
+  
   if (!patient) return <div className="p-8 text-center">Paciente não encontrado</div>;
 
   // Auto-calculated fields for modal
@@ -267,30 +291,7 @@ export function PatientDetails() {
       quantity: parseInt(p.quantity) || undefined
     }));
 
-    // Extract medications from selected kits to include them in the active medications
-    if (selectedKits.length > 0) {
-      selectedKits.forEach(kitId => {
-        const kit = kits.find(k => k.id === kitId);
-        if (kit) {
-          kit.items.forEach(kitItem => {
-            const invItem = items.find(i => i.id === kitItem.item_id);
-            if (invItem) {
-              const cat = invItem.category?.toLowerCase() || '';
-              const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
-              if (isMedication) {
-                validPrescriptions.push({
-                  id: `k-${Date.now()}-${Math.random()}`,
-                  item_id: kitItem.item_id,
-                  medication: invItem.name,
-                  treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
-                  quantity: kitItem.quantity?.toString()
-                });
-              }
-            }
-          });
-        }
-      });
-    }
+
 
     const newEvent: ClinicalEvent = {
       id: `e${Date.now()}`,
@@ -312,12 +313,26 @@ export function PatientDetails() {
       is_discharge: isDischarge,
     };
     
-    if (selectedKits.length > 0) {
-      selectedKits.forEach(kitId => deductKitFromInventory(kitId, patient.id));
+    const originalEvent = editingEventId ? patientEvents.find(e => e.id === editingEventId) : null;
+    
+    // Only deduct newly added kits during an edit
+    const originalKits = originalEvent?.kit_delivered || [];
+    const kitsToDeduct = editingEventId 
+      ? selectedKits.filter(kitId => !originalKits.includes(kitId))
+      : selectedKits;
+
+    if (kitsToDeduct.length > 0) {
+      kitsToDeduct.forEach(kitId => deductKitFromInventory(kitId, patient.id));
     }
     
-    if (validPrescriptions.length > 0) {
-      deductPrescriptionsFromInventory(validPrescriptions, patient.id);
+    // Only deduct newly added prescriptions during an edit
+    const originalPrescriptions = originalEvent?.prescriptions || [];
+    const prescriptionsToDeduct = editingEventId
+      ? validPrescriptions.filter(p => !originalPrescriptions.some(op => op.item_id === p.item_id))
+      : validPrescriptions;
+
+    if (prescriptionsToDeduct.length > 0) {
+      deductPrescriptionsFromInventory(prescriptionsToDeduct, patient.id);
     }
 
     if (editingEventId) {
@@ -369,6 +384,29 @@ export function PatientDetails() {
     
     if (isSelected) {
       newSelectedKits = selectedKits.filter(id => id !== kitId);
+      
+      // Auto-remove medications from this kit
+      const kit = kits.find(k => k.id === kitId);
+      if (kit) {
+        kit.items.forEach(kitItem => {
+          const invItem = items.find(i => i.id === kitItem.item_id);
+          if (invItem) {
+            const cat = invItem.category?.toLowerCase() || '';
+            const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
+            
+            if (isMedication) {
+              setPrescriptions(prev => {
+                // If it's the last one, leave an empty template
+                const filtered = prev.filter(p => p.medication !== invItem.name);
+                if (filtered.length === 0) {
+                  return [{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }];
+                }
+                return filtered;
+              });
+            }
+          }
+        });
+      }
     } else {
       newSelectedKits = [...selectedKits, kitId];
       
@@ -377,15 +415,27 @@ export function PatientDetails() {
       if (kit) {
         kit.items.forEach(kitItem => {
           const invItem = items.find(i => i.id === kitItem.item_id);
-          if (invItem && invItem.category === 'Medicamento') {
-            setPrescriptions(prev => {
-              const alreadyHas = prev.some(p => p.medication === invItem.name);
-              if (alreadyHas) return prev;
-              
-              // Remove first empty prescription if it exists
-              const cleaned = prev.filter(p => p.medication !== '' || p.treatment !== '');
-              return [...cleaned, { id: Date.now() + Math.random(), medication: invItem.name, treatment: '', duration_days: '' }];
-            });
+          if (invItem) {
+            const cat = invItem.category?.toLowerCase() || '';
+            const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
+            
+            if (isMedication) {
+              setPrescriptions(prev => {
+                const alreadyHas = prev.some(p => p.medication === invItem.name);
+                if (alreadyHas) return prev;
+                
+                // Remove first empty prescription if it exists
+                const cleaned = prev.filter(p => p.medication !== '' || p.treatment !== '');
+                return [...cleaned, { 
+                  id: Date.now().toString() + Math.random().toString(), 
+                  item_id: invItem.id,
+                  medication: invItem.name, 
+                  treatment: kitItem.dosage || '', 
+                  duration_days: '',
+                  quantity: kitItem.quantity?.toString() || '1'
+                }];
+              });
+            }
           }
         });
       }
@@ -646,47 +696,104 @@ export function PatientDetails() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {activeMedications.map((p, i) => (
                       <div key={i} className="bg-white p-5 rounded-2xl border border-emerald-100 flex flex-col group hover:shadow-md transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">
-                            Prescrito em {parseLocalDate(latestClinicalEvent.date).toLocaleDateString('pt-BR')}
-                          </span>
-                          <Sparkles size={14} className="text-emerald-400" />
-                        </div>
-                        
-                        <p className="text-sm font-black text-slate-800 mb-1">{p.medication}</p>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{p.treatment || 'Posologia não informada'}</p>
-                        
-                        {p.duration_days ? (() => {
-                          const prescribedDate = parseLocalDate(latestClinicalEvent.date);
-                          const today = new Date();
-                          const daysTaken = Math.max(0, differenceInDays(today, prescribedDate));
-                          const endDate = addDays(prescribedDate, p.duration_days);
-                          const isFinished = daysTaken >= p.duration_days;
-
-                          return (
-                            <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
-                              <div className="flex justify-between items-center text-[11px] uppercase tracking-wider">
-                                <span className="font-bold text-slate-500">Uso (Dias)</span>
-                                <span className={cn("font-black", isFinished ? "text-slate-400" : "text-emerald-600")}>
-                                  {Math.min(daysTaken, p.duration_days)} / {p.duration_days}
-                                </span>
-                              </div>
-                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                <div 
-                                  className={cn("h-full rounded-full transition-all", isFinished ? "bg-slate-300" : "bg-emerald-500")}
-                                  style={{ width: `${Math.min((daysTaken / p.duration_days) * 100, 100)}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
-                                <span>{isFinished ? 'TRATAMENTO CONCLUÍDO' : 'EM ANDAMENTO'}</span>
-                                <span>FIM: {endDate.toLocaleDateString('pt-BR')}</span>
+                        {editingMedicationIndex === i ? (
+                          <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Editando Medicação</span>
+                            </div>
+                            <input
+                              type="text"
+                              value={editedMedication.medication}
+                              onChange={e => setEditedMedication(prev => ({ ...prev, medication: e.target.value }))}
+                              className="w-full text-sm font-black text-slate-800 mb-2 border-b-2 border-slate-200 focus:border-emerald-500 outline-none pb-1 bg-transparent"
+                              placeholder="Nome da Medicação"
+                            />
+                            <textarea
+                              value={editedMedication.treatment}
+                              onChange={e => setEditedMedication(prev => ({ ...prev, treatment: e.target.value }))}
+                              className="w-full text-xs font-medium text-slate-600 leading-relaxed mb-4 border-b-2 border-slate-200 focus:border-emerald-500 outline-none pb-1 bg-transparent resize-none"
+                              placeholder="Posologia"
+                              rows={2}
+                            />
+                            <div className="flex gap-2 items-center mb-4">
+                              <span className="text-xs font-bold text-slate-500">Duração (Dias):</span>
+                              <input
+                                type="number"
+                                value={editedMedication.duration_days || ''}
+                                onChange={e => setEditedMedication(prev => ({ ...prev, duration_days: e.target.value }))}
+                                className="w-16 text-center text-sm font-bold border-b-2 border-slate-200 focus:border-emerald-500 outline-none bg-transparent"
+                                placeholder="--"
+                              />
+                            </div>
+                            <div className="mt-auto flex justify-end gap-2 pt-3 border-t border-slate-100">
+                              <button onClick={() => setEditingMedicationIndex(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                <X size={16} />
+                              </button>
+                              <button onClick={() => handleSaveMedication(i)} className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors">
+                                <Save size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">
+                                Prescrito em {parseLocalDate(latestClinicalEvent.date).toLocaleDateString('pt-BR')}
+                              </span>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => {
+                                  setEditingMedicationIndex(i);
+                                  setEditedMedication({ 
+                                    medication: p.medication, 
+                                    treatment: p.treatment,
+                                    duration_days: p.duration_days?.toString() || ''
+                                  });
+                                }} className="p-1 text-slate-400 hover:text-emerald-600 transition-colors">
+                                  <Edit2 size={14} />
+                                </button>
+                                <button onClick={() => handleDeleteMedication(i)} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             </div>
-                          );
-                        })() : (
-                          <div className="mt-auto space-y-2 border-t border-slate-100 pt-3">
-                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Uso Contínuo / Sem Prazo</p>
-                          </div>
+                            
+                            <p className="text-sm font-black text-slate-800 mb-1">{p.medication}</p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{p.treatment || 'Posologia não informada'}</p>
+                            
+                            {p.duration_days ? (() => {
+                              const prescribedDate = parseLocalDate(latestClinicalEvent.date);
+                              const today = new Date();
+                              const daysTaken = Math.max(0, differenceInDays(today, prescribedDate));
+                              const endDate = addDays(prescribedDate, p.duration_days);
+                              const isFinished = daysTaken >= p.duration_days;
+
+                              return (
+                                <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
+                                  <div className="flex justify-between items-center text-[11px] uppercase tracking-wider">
+                                    <span className="font-bold text-slate-500">Uso (Dias)</span>
+                                    <span className={cn("font-black", isFinished ? "text-slate-400" : "text-emerald-600")}>
+                                      {Math.min(daysTaken, p.duration_days)} / {p.duration_days}
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div 
+                                      className={cn("h-full rounded-full transition-all", isFinished ? "bg-slate-300" : "bg-emerald-500")}
+                                      style={{ width: `${Math.min((daysTaken / p.duration_days) * 100, 100)}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                    <span>{isFinished ? 'TRATAMENTO CONCLUÍDO' : 'EM ANDAMENTO'}</span>
+                                    <span>FIM: {endDate.toLocaleDateString('pt-BR')}</span>
+                                  </div>
+                                </div>
+                              );
+                            })() : (
+                              <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 flex items-center justify-between">
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Uso Contínuo / Sem Prazo</p>
+                                 <Sparkles size={14} className="text-emerald-400 opacity-50" />
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
