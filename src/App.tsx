@@ -67,6 +67,14 @@ import { NutritionFinance } from './pages/nutrition/NutritionFinance';
 import { GiftManager } from './pages/admin/GiftManager';
 import { FundraisingManager } from './pages/admin/FundraisingManager';
 import { AdminStoreManager } from './pages/admin/AdminStoreManager';
+import { HomeHighlightsManager } from './pages/admin/HomeHighlightsManager';
+import { ImpactMetricsManager } from './pages/admin/ImpactMetricsManager';
+import { TopBannerManager } from './pages/admin/TopBannerManager';
+import { HomeHighlightsProvider } from './contexts/HomeHighlightsContext';
+import { ImpactMetricsProvider } from './contexts/ImpactMetricsContext';
+import { TopBannerProvider } from './contexts/TopBannerContext';
+import { BlogProvider } from './contexts/BlogContext';
+import { WebsiteProjectsProvider } from './contexts/WebsiteProjectsContext';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
 import { WorkspaceViewContainer } from './pages/erp/WorkspaceViewContainer';
@@ -161,34 +169,43 @@ export default function App() {
                             <WorkspaceProvider>
                               <TeamProvider>
                                 <CalendarProvider>
-                                  <Router>
-                                    <Routes>
-                                      {/* Dedicated full-screen Display Route */}
-                                      <Route path="/campanha-display" element={<CampaignDisplay />} />
+                                  <HomeHighlightsProvider>
+                                    <ImpactMetricsProvider>
+                                      <TopBannerProvider>
+                                        <BlogProvider>
+                                          <WebsiteProjectsProvider>
+                                        <Router>
+                                      <Routes>
+                                        {/* Dedicated full-screen Display Route */}
+                                        <Route path="/campanha-display" element={<CampaignDisplay />} />
 
-                                      <Route element={<PublicLayout />}>
-                                        <Route path="/" element={<Home />} />
-                                        <Route path="/blog" element={<Blog />} />
-                                        <Route path="/loja" element={<Ecommerce />} />
-                                        <Route path="/projetos" element={<LocalProjects />} />
-                                        <Route path="/login" element={<Login />} />
-                                        <Route path="/set-password" element={<SetPassword />} />
-                                        <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
-                                        <Route path="/apoiador" element={<SupporterLanding />} />
-                                        <Route path="/campanha" element={<Campaign />} />
-                                        <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
-                                        <Route path="/termos-de-servico" element={<TermsOfService />} />
-                                      </Route>
+                                        <Route element={<PublicLayout />}>
+                                          <Route path="/" element={<Home />} />
+                                          <Route path="/blog" element={<Blog />} />
+                                          <Route path="/blog/:id" element={<Blog />} />
+                                          <Route path="/loja" element={<Ecommerce />} />
+                                          <Route path="/projetos" element={<LocalProjects />} />
+                                          <Route path="/login" element={<Login />} />
+                                          <Route path="/set-password" element={<SetPassword />} />
+                                          <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
+                                          <Route path="/apoiador" element={<SupporterLanding />} />
+                                          <Route path="/campanha" element={<Campaign />} />
+                                          <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+                                          <Route path="/termos-de-servico" element={<TermsOfService />} />
+                                        </Route>
 
-                                      <Route path="/admin/*" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
-                                          <Layout module="admin">
-                                            <Routes>
-                                              <Route path="/" element={<Navigate to="/admin/projects" replace />} />
-                                              <Route path="/impact-feed" element={<ImpactFeedManager />} />
-                                              <Route path="/messages" element={<SupporterMessages />} />
-                                              <Route path="/gifts" element={<GiftManager />} />
-                                              <Route path="/fundraising" element={<FundraisingManager />} />
+                                        <Route path="/admin/*" element={
+                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
+                                            <Layout module="admin">
+                                              <Routes>
+                                                <Route path="/" element={<Navigate to="/admin/projects" replace />} />
+                                                <Route path="/home-highlights" element={<HomeHighlightsManager />} />
+                                                <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
+                                                <Route path="/top-banner" element={<TopBannerManager />} />
+                                                <Route path="/impact-feed" element={<ImpactFeedManager />} />
+                                                <Route path="/messages" element={<SupporterMessages />} />
+                                                <Route path="/gifts" element={<GiftManager />} />
+                                                <Route path="/fundraising" element={<FundraisingManager />} />
                                               <Route path="/projects" element={<Settings />} />
                                               <Route path="/local-projects" element={<Settings />} />
                                               <Route path="/users" element={<Settings />} />
@@ -279,6 +296,11 @@ export default function App() {
                                       <Route path="*" element={<Navigate to="/" replace />} />
                                     </Routes>
                                   </Router>
+                                </WebsiteProjectsProvider>
+                                </BlogProvider>
+                                </TopBannerProvider>
+                                </ImpactMetricsProvider>
+                                </HomeHighlightsProvider>
                                 </CalendarProvider>
                               </TeamProvider>
                             </WorkspaceProvider>

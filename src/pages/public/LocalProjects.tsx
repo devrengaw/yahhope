@@ -1,18 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Heart, ArrowRight, MapPin, CheckCircle, Clock } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { YAHHopeProject } from '../../lib/mockData';
 
 export function LocalProjects() {
-  const [projects, setProjects] = useState<YAHHopeProject[]>([]);
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      const { data } = await supabase.from('website_projects').select('*').order('created_at', { ascending: false });
-      if (data) setProjects(data as YAHHopeProject[]);
-    };
-    fetchProjects();
-  }, []);
+  const { projects } = useWebsiteProjects();
 
   const activeProjects = projects.filter(p => p.status === 'active');
   const plannedProjects = projects.filter(p => p.status === 'planned');
@@ -25,10 +17,21 @@ export function LocalProjects() {
           src={project.image_url} 
           alt={project.title} 
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif';
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
         <div className="absolute bottom-6 left-6 right-6">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {project.category && (
+              <span 
+                className="text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-xs"
+                style={{ backgroundColor: project.tag_color || '#F49853' }}
+              >
+                {project.category}
+              </span>
+            )}
             {project.status === 'active' && <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Heart size={12} /> Em Andamento</span>}
             {project.status === 'planned' && <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Clock size={12} /> Planejado</span>}
             {project.status === 'completed' && <span className="bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><CheckCircle size={12} /> Concluído</span>}
@@ -38,10 +41,13 @@ export function LocalProjects() {
       </div>
       <div className="p-8 flex flex-col flex-grow">
         <p className="text-slate-500 leading-relaxed mb-8 flex-grow">{project.description}</p>
-        <button className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn">
+        <a 
+          href={project.link || '/campanha'}
+          className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn"
+        >
           <span className="font-bold text-sm tracking-tight">Saiba como apoiar</span>
           <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-        </button>
+        </a>
       </div>
     </div>
   );

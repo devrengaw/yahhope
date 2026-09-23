@@ -18,9 +18,23 @@
   src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/GothamMedium.ttf') format('truetype');
 }
 
+@font-face {
+  font-family: 'Antipol VF';
+  src: local('Antipol VF'), local('Antipol-VF'), local('AntipolVF'), local('Antipol Variable'), local('Antipol');
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Antipol';
+  src: local('Antipol'), local('Antipol VF'), local('Antipol Bold'), local('Antipol-Bold');
+  font-weight: 100 900;
+  font-style: normal;
+}
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Antipol VF", "Antipol", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "gotham-regular", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Antipol VF", "Antipol", ui-sans-serif, system-ui, sans-serif;
+  --font-antipol: "Antipol VF", "Antipol", ui-sans-serif, system-ui, sans-serif;
   --font-gotham-black: "gotham-black", sans-serif;
   --font-gotham-bold: "gotham-bold", sans-serif;
   --font-gotham-light: "gotham-light", sans-serif;
@@ -104,4 +118,67 @@
     background: white;
   }
 }
+
+/* Project HOPE inspired decorative circles and animations */
+.circle-effect {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.circle-effect[data-position="right"] {
+  left: auto;
+  right: -15%;
+}
+
+.circle-effect[data-position="left"] {
+  right: auto;
+  left: -15%;
+}
+
+.circle-effect-circle {
+  position: absolute;
+  border-radius: 9999px;
+  animation: circleSpin 60s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-effect-circle:nth-child(1) {
+  width: 650px;
+  height: 650px;
+  opacity: 0.22;
+  animation-duration: 75s;
+}
+
+.circle-effect-circle:nth-child(2) {
+  width: 1050px;
+  height: 1050px;
+  opacity: 0.15;
+  animation-duration: 110s;
+  animation-direction: reverse;
+}
+
+.circle-effect-circle:nth-child(3) {
+  width: 1550px;
+  height: 1550px;
+  opacity: 0.09;
+  animation-duration: 150s;
+}
+
+@keyframes circleSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 

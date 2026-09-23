@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -29,6 +29,9 @@ const workspaceNavItems = [
 ];
 
 const adminNavItems = [
+  { name: 'Aviso do Topo', path: '/admin/top-banner', icon: Megaphone },
+  { name: 'Destaques Home', path: '/admin/home-highlights', icon: Sparkles },
+  { name: 'Cards de Impacto', path: '/admin/impact-metrics', icon: BarChart3 },
   { name: 'Feed de Impacto', path: '/admin/impact-feed', icon: TrendingUp },
   { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
   { name: 'Captação', path: '/admin/fundraising', icon: Target },

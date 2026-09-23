@@ -261,9 +261,62 @@ export interface YAHHopeProject {
   id: string;
   title: string;
   description: string;
+  category?: string;
+  tag_color?: string;
+  link?: string;
+  order?: number;
   status: 'active' | 'planned' | 'completed';
   image_url: string;
   created_at: string;
 }
 
-export const mockYAHHopeProjects: YAHHopeProject[] = [];
+export const mockYAHHopeProjects: YAHHopeProject[] = [
+  {
+    id: 'proj-1',
+    title: 'Casa Nutri & Saúde Infantil',
+    description: 'Acompanhamento terapêutico e nutricional para 20 crianças recuperarem peso e saúde.',
+    category: 'Nutrição & Saúde',
+    tag_color: '#92BF78',
+    status: 'active',
+    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
+    link: '/projetos',
+    order: 1,
+    created_at: '2025-01-01'
+  },
+  {
+    id: 'proj-2',
+    title: 'Mentoria & Bolsas Universitárias',
+    description: 'Garantindo que 5 jovens capacitados concluam a faculdade e construam novos horizontes.',
+    category: 'Educação Superior',
+    tag_color: '#88A1F2',
+    status: 'active',
+    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
+    link: '/projetos',
+    order: 2,
+    created_at: '2025-01-02'
+  },
+  {
+    id: 'proj-3',
+    title: 'Oficinas de Costura & Hortas',
+    description: 'Autonomia financeira e geração de renda para mães e famílias que antes não tinham perspectivas.',
+    category: 'Capacitação & Renda',
+    tag_color: '#EBC878',
+    status: 'active',
+    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
+    link: '/projetos',
+    order: 3,
+    created_at: '2025-01-03'
+  },
+  {
+    id: 'proj-4',
+    title: 'Resposta Humanitária & Fé',
+    description: 'Kits de higiene, apoio emergencial e suporte pastoral para resgatar dignidade humana.',
+    category: 'Ação Emergencial',
+    tag_color: '#F49853',
+    status: 'active',
+    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
+    link: '/campanha',
+    order: 4,
+    created_at: '2025-01-04'
+  }
+];

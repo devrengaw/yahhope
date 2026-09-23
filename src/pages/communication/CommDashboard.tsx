@@ -15,6 +15,7 @@ import { ptBR } from 'date-fns/locale';
 import { useProjects } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAnnouncements } from '../../contexts/AnnouncementContext';
+import { useBlog } from '../../contexts/BlogContext';
 import { cn } from '../../lib/utils';
 import { PersonalActivity } from '../../lib/mockData';
 import { Announcement } from '../../contexts/AnnouncementContext';
@@ -24,6 +25,7 @@ export function CommDashboard() {
   const { user } = useAuth();
   const { projects, activities, addActivity, deleteActivity } = useProjects();
   const { announcements, addAnnouncement, deleteAnnouncement } = useAnnouncements();
+  const { posts } = useBlog();
   
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
@@ -46,7 +48,7 @@ export function CommDashboard() {
   const stats = [
     { name: 'Projetos Ativos', value: projects.length.toString(), icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { name: 'Mensagens Novas', value: '0', icon: MessageSquare, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { name: 'Posts no Blog', value: '0', icon: Newspaper, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { name: 'Posts no Blog', value: posts.length.toString(), icon: Newspaper, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { name: 'Avisos Equipe', value: announcements.length.toString(), icon: Bell, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
