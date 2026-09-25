@@ -1,9 +1,15 @@
 import React from 'react';
 import { Shield, Lock, Eye, FileText, CheckCircle2 } from 'lucide-react';
+import { SEO } from '../../components/common/SEO';
 
 export function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-16">
+      <SEO 
+        title="Política de Privacidade | YAH Hope"
+        description="Saiba como a YAH Hope protege sua privacidade e gerencia dados de doações e apoiadores com total segurança e transparência."
+        canonical="https://yahhope.org/politica-de-privacidade"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Section */}

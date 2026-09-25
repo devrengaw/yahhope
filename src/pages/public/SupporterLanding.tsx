@@ -2,6 +2,7 @@ import React from 'react';
 import { Heart, ShieldCheck, ShoppingBag, ArrowRight, Star, Users, Globe } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { SEO } from '../../components/common/SEO';
 
 export function SupporterLanding() {
   const { user } = useAuth();
@@ -25,6 +26,12 @@ export function SupporterLanding() {
 
   return (
     <div className="min-h-screen bg-white">
+      <SEO 
+        title="Seja um Apoiador e Apadrinhe | YAH Hope"
+        description="Torne-se um apoiador da YAH Hope. Apadrinhe uma criança, receba relatórios médicos e pedagógicos transparentes e transforme vidas com amor e dignidade."
+        keywords="apadrinhar criança, ser apoiador ONG, apadrinhamento infantil Moçambique, doar mensalmente, YAH Hope portal"
+        canonical="https://yahhope.org/apoiador"
+      />
       {/* Hero Section */}
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">

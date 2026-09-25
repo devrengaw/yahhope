@@ -1,9 +1,15 @@
 import React from 'react';
 import { Scale, BookOpen, AlertTriangle, HelpCircle } from 'lucide-react';
+import { SEO } from '../../components/common/SEO';
 
 export function TermsOfService() {
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-16">
+      <SEO 
+        title="Termos de Serviço | YAH Hope"
+        description="Conheça os termos de serviço e diretrizes de uso da plataforma humanitária e portal de apoiadores da YAH Hope."
+        canonical="https://yahhope.org/termos-de-servico"
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Section */}

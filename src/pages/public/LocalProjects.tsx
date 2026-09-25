@@ -2,6 +2,7 @@ import React from 'react';
 import { Heart, ArrowRight, MapPin, CheckCircle, Clock } from 'lucide-react';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { YAHHopeProject } from '../../lib/mockData';
+import { SEO } from '../../components/common/SEO';
 
 export function LocalProjects() {
   const { projects } = useWebsiteProjects();
@@ -54,6 +55,12 @@ export function LocalProjects() {
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-20">
+      <SEO 
+        title="Projetos Humanitários e Sociais | YAH Hope"
+        description="Conheça os projetos humanitários da YAH Hope: nutrição infantil, perfuração de poços de água potável, apoio educacional e desenvolvimento em Moçambique e Brasil."
+        keywords="projetos humanitários, ONG Moçambique, poços de água potável África, combate à desnutrição, projetos sociais YAH Hope"
+        canonical="https://yahhope.org/projetos"
+      />
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20 text-center">
         <div className="inline-flex items-center justify-center p-3 bg-amber-50 rounded-2xl mb-6">

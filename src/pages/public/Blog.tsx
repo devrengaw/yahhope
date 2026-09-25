@@ -14,6 +14,7 @@ import {
   Bookmark,
   Sparkles
 } from 'lucide-react';
+import { SEO } from '../../components/common/SEO';
 
 export function Blog() {
   const { posts } = useBlog();
@@ -76,6 +77,32 @@ export function Blog() {
 
     return (
       <div className="min-h-screen bg-slate-50/60 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 font-gotham-regular">
+        <SEO 
+          title={`${selectedPost.title} | Blog YAH Hope`}
+          description={selectedPost.excerpt || selectedPost.content?.slice(0, 155) || 'Acompanhe esta história de transformação e impacto social da YAH Hope.'}
+          ogImage={selectedPost.image}
+          ogType="article"
+          canonical={`https://yahhope.org/blog/${selectedPost.id}`}
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "BlogPosting",
+            "headline": selectedPost.title,
+            "image": selectedPost.image ? [selectedPost.image] : undefined,
+            "author": {
+              "@type": "Person",
+              "name": selectedPost.author || 'Equipe YAH Hope'
+            },
+            "publisher": {
+              "@type": "NGO",
+              "name": "YAH Hope",
+              "logo": {
+                "@type": "ImageObject",
+                "url": "https://yahhope.org/logo.png"
+              }
+            },
+            "description": selectedPost.excerpt || selectedPost.title
+          }}
+        />
         <div className="max-w-4xl mx-auto">
           
           {/* Top Bar Navigation */}
@@ -275,6 +302,12 @@ export function Blog() {
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-50/50 py-12 px-4 sm:px-6 lg:px-8 font-gotham-regular">
+      <SEO 
+        title="Histórias de Esperança e Notícias | Blog YAH Hope"
+        description="Acompanhe histórias reais de transformação, notícias de ações humanitárias e relatórios de campo da YAH Hope em Moçambique e no Brasil."
+        keywords="blog YAH Hope, histórias de superação, missões Moçambique, ajuda humanitária notícias, testemunhos, voluntariado"
+        canonical="https://yahhope.org/blog"
+      />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-14">

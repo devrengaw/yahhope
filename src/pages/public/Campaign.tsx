@@ -3,6 +3,7 @@ import { Heart, Target, ChevronRight, CheckCircle2, TrendingUp, DollarSign } fro
 import { useFundraising } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
 import { Link } from 'react-router-dom';
+import { SEO } from '../../components/common/SEO';
 
 const QUOTAS = [
   { amount: 50, label: 'Alimenta uma criança', icon: Heart },
@@ -163,6 +164,23 @@ export function Campaign() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      <SEO 
+        title="Faça sua Doação | Transforme Vidas com a YAH Hope"
+        description="Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos de água, saúde e desenvolvimento em Moçambique."
+        keywords="doação humanitária, doar para ONG, combate à desnutrição, doação Moçambique, apadrinhar criança YAH Hope"
+        canonical="https://yahhope.org/campanha"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "DonateAction",
+          "name": "Campanha Solidária YAH Hope",
+          "description": "Contribua com a campanha de combate à desnutrição infantil e ações humanitárias.",
+          "recipient": {
+            "@type": "NGO",
+            "name": "YAH Hope",
+            "url": "https://yahhope.org"
+          }
+        }}
+      />
       {/* Hero Section */}
       <div 
         className="w-full pt-32 pb-48 px-4 relative overflow-hidden flex items-end justify-center min-h-[500px]"

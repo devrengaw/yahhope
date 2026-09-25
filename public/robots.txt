@@ -1,0 +1,21 @@
+# Robots.txt for YAH Hope (https://yahhope.org)
+User-agent: *
+Allow: /
+Allow: /projetos
+Allow: /campanha
+Allow: /blog
+Allow: /loja
+Allow: /apoiador
+Allow: /politica-de-privacidade
+Allow: /termos-de-servico
+
+# Disallow private and administrative areas
+Disallow: /admin/
+Disallow: /workspace/
+Disallow: /nutrition/
+Disallow: /portal/
+Disallow: /communication/
+Disallow: /set-password
+
+# Sitemap
+Sitemap: https://yahhope.org/sitemap.xml

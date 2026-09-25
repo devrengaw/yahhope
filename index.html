@@ -1,16 +1,107 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon & Touch Icons -->
+    <link rel="icon" type="image/png" href="/icone.png" />
+    <link rel="apple-touch-icon" href="/icone.png" />
+    <meta name="theme-color" content="#F49853" />
+
+    <!-- Google Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;700&family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Poppins:wght@300;400;700&display=swap" rel="stylesheet">
-    <title>YAH Hope | Fé em Ação e Transformação de Vidas</title>
+
+    <!-- Primary Meta Tags -->
+    <title>YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social</title>
+    <meta name="title" content="YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social" />
+    <meta name="description" content="A YAH Hope é uma agência humanitária sem fins lucrativos dedicada a erradicar a desnutrição infantil, garantir acesso à água potável, saúde e educação em Moçambique e no Brasil. Doe ou apadrinhe uma criança!" />
+    <meta name="keywords" content="YAH Hope, ONG, ajuda humanitária, desnutrição infantil, Moçambique, Nampula, apadrinhar criança, doação ONG, projetos sociais, voluntariado, Yah Church, impacto social" />
+    <meta name="author" content="YAH Hope" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://yahhope.org/" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="YAH Hope" />
+    <meta property="og:url" content="https://yahhope.org/" />
+    <meta property="og:title" content="YAH Hope | Fé em Ação e Transformação Social" />
+    <meta property="og:description" content="Transformando histórias e salvando vidas através do combate à desnutrição infantil, suporte médico e projetos comunitários em Moçambique e no Brasil." />
+    <meta property="og:image" content="https://yahhope.org/logo.png" />
+    <meta property="og:image:alt" content="Logotipo YAH Hope - Fé em Ação" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://yahhope.org/" />
+    <meta name="twitter:title" content="YAH Hope | Fé em Ação e Transformação Social" />
+    <meta name="twitter:description" content="Transformando histórias e salvando vidas através do combate à desnutrição infantil, suporte médico e projetos comunitários em Moçambique e no Brasil." />
+    <meta name="twitter:image" content="https://yahhope.org/logo.png" />
+
+    <!-- JSON-LD Structured Data: NGO / NonProfitOrganization -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "NGO",
+        "name": "YAH Hope",
+        "alternateName": "YAH Hope Organização Humanitária",
+        "url": "https://yahhope.org",
+        "logo": "https://yahhope.org/logo.png",
+        "image": "https://yahhope.org/hero_bg.jpg",
+        "description": "Agência humanitária dedicada a erradicar a desnutrição infantil, fomentar a educação universitária e desenvolver comunidades em extrema vulnerabilidade em Moçambique e no Brasil.",
+        "email": "contato@yahhope.org",
+        "areaServed": [
+          {
+            "@type": "Country",
+            "name": "Moçambique"
+          },
+          {
+            "@type": "Country",
+            "name": "Brasil"
+          }
+        ],
+        "knowsAbout": [
+          "Combate à desnutrição infantil",
+          "Assistência médica humanitária",
+          "Acesso à água potável",
+          "Desenvolvimento comunitário sustentável"
+        ],
+        "sameAs": [
+          "https://www.instagram.com",
+          "https://www.youtube.com",
+          "https://www.facebook.com",
+          "https://www.linkedin.com"
+        ],
+        "potentialAction": {
+          "@type": "DonateAction",
+          "target": "https://yahhope.org/campanha",
+          "recipient": {
+            "@type": "NGO",
+            "name": "YAH Hope"
+          }
+        }
+      }
+    </script>
+
+    <!-- JSON-LD Structured Data: WebSite with Search -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "YAH Hope",
+        "url": "https://yahhope.org/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://yahhope.org/blog?post={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

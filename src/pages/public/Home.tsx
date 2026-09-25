@@ -30,6 +30,7 @@ import { useHomeHighlights, HomeHighlightItem } from '../../contexts/HomeHighlig
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { useImpactMetrics } from '../../contexts/ImpactMetricsContext';
 import { ImpactIcon } from '../../components/common/ImpactIcon';
+import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
@@ -140,6 +141,12 @@ export function Home() {
 
   return (
     <div className="bg-white min-h-screen font-gotham-regular text-slate-800 antialiased selection:bg-[#F49853] selection:text-white">
+      <SEO 
+        title="YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social"
+        description="A YAH Hope é uma agência humanitária que combate a desnutrição infantil, garante acesso à água potável, saúde e educação em Moçambique e no Brasil. Conheça e apoie!"
+        keywords="YAH Hope, ONG, ajuda humanitária, combate à desnutrição infantil, Moçambique, Nampula, apadrinhar criança, doação ONG, projetos sociais"
+        canonical="https://yahhope.org/"
+      />
       
       {/* Hero Home Block with YAH Hope Visual Identity & Floating Stripe Donation Card */}
       <section className="relative overflow-hidden bg-[#F49853] text-white pt-12 pb-36 lg:pt-16 lg:pb-48">
@@ -192,7 +199,7 @@ export function Home() {
             {/* Left Column: Headline and Story */}
             <div className="lg:col-span-7 xl:col-span-7 text-left space-y-6">
               <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-heading font-black tracking-tight leading-[1.05] text-white drop-shadow-md">
-                BEM-VINDO
+                BEM-VINDO À <span className="block text-[#FFE8B3]">YAH HOPE</span>
               </h1>
 
               <p className="text-lg sm:text-xl md:text-2xl text-white/95 font-gotham-regular leading-relaxed max-w-xl drop-shadow-xs">

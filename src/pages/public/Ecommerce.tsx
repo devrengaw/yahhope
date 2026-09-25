@@ -1,5 +1,6 @@
 import { ShoppingCart } from 'lucide-react';
 import { useStore } from '../../contexts/StoreContext';
+import { SEO } from '../../components/common/SEO';
 
 export function Ecommerce() {
   const { products } = useStore();
@@ -7,10 +8,16 @@ export function Ecommerce() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <SEO 
+        title="Loja Solidária | Produtos com Propósito | YAH Hope"
+        description="Adquira produtos exclusivos na Loja Solidária da YAH Hope. Todo o valor arrecadado financia ações de combate à desnutrição e desenvolvimento social."
+        keywords="loja solidária, produtos sociais, compras beneficentes, YAH Hope loja"
+        canonical="https://yahhope.org/loja"
+      />
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-slate-900 mb-4">Loja Solidária</h1>
         <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-          Adquira produtos exclusivos e ajude a financiar os projetos da YAHope.
+          Adquira produtos exclusivos e ajude a financiar os projetos da YAH Hope.
         </p>
       </div>
 
