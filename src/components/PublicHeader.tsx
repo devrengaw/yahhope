@@ -10,6 +10,7 @@ import {
   CreditCard 
 } from 'lucide-react';
 import { useTopBanner } from '../contexts/TopBannerContext';
+import { useWebsiteProjects } from '../contexts/WebsiteProjectsContext';
 
 const STRIPE_QUOTAS = [
   { amount: 50, label: 'Alimenta uma criança', icon: Heart },
@@ -21,6 +22,10 @@ export function PublicHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { banner: topBanner } = useTopBanner();
+  const { projects: websiteProjects } = useWebsiteProjects();
+
+  const activeLocalProjects = websiteProjects.filter(p => p.status === 'active' || !p.status);
+  const localProjects = activeLocalProjects.length > 0 ? activeLocalProjects : websiteProjects;
 
   const [alertVisible, setAlertVisible] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -192,21 +197,45 @@ export function PublicHeader() {
                   <span>Nossas Soluções</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
-                <div className="absolute top-full left-0 w-80 bg-white shadow-xl rounded-2xl p-5 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider mb-3">Frentes de Ação</p>
-                  <div className="space-y-3 font-gotham-regular">
-                    <div>
-                      <Link to="/projetos" className="font-gotham-bold text-slate-900 hover:text-[#F49853] block">Casa Nutri</Link>
-                      <p className="text-xs text-slate-500 font-gotham-light">Acompanhamento e suplementação para 9 crianças.</p>
-                    </div>
-                    <div>
-                      <Link to="/projetos" className="font-gotham-bold text-slate-900 hover:text-[#F49853] block">Apoio a Universitários</Link>
-                      <p className="text-xs text-slate-500 font-gotham-light">Bolsas integrais e mentoria de liderança.</p>
-                    </div>
-                    <div>
-                      <Link to="/projetos" className="font-gotham-bold text-slate-900 hover:text-[#F49853] block">Oficinas de Renda & Costura</Link>
-                      <p className="text-xs text-slate-500 font-gotham-light">Capacitação prática para autonomia das famílias.</p>
-                    </div>
+                <div className="absolute top-full left-0 w-84 bg-white shadow-xl rounded-2xl p-5 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                    <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider">Projetos Locais</p>
+                    <Link to="/projetos" className="text-[10px] text-slate-400 hover:text-[#F49853] font-medium transition-colors">
+                      Ver todos ({localProjects.length})
+                    </Link>
+                  </div>
+                  <div className="space-y-2.5 font-gotham-regular max-h-[360px] overflow-y-auto pr-1">
+                    {localProjects.map((proj) => (
+                      <Link 
+                        key={proj.id} 
+                        to={proj.link || '/projetos'}
+                        className="block p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors group/proj"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: proj.tag_color || '#F49853' }} 
+                          />
+                          <p className="font-gotham-bold text-slate-900 group-hover/proj:text-[#F49853] text-xs transition-colors line-clamp-1">
+                            {proj.title}
+                          </p>
+                        </div>
+                        {proj.description && (
+                          <p className="text-[11px] text-slate-500 font-gotham-light line-clamp-2 mt-1 pl-4 leading-relaxed">
+                            {proj.description}
+                          </p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="pt-3 mt-2 border-t border-slate-100">
+                    <Link 
+                      to="/projetos" 
+                      className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center justify-between transition-colors"
+                    >
+                      <span>Conhecer Todos os Projetos</span>
+                      <ArrowRight size={13} />
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -364,14 +393,28 @@ export function PublicHeader() {
                   onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'solutions' ? null : 'solutions')}
                   className="flex items-center justify-between w-full py-2 hover:text-[#F49853] cursor-pointer"
                 >
-                  <span>Nossas Soluções</span>
+                  <span>Nossas Soluções (Projetos Locais)</span>
                   <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'solutions' ? 'rotate-180' : ''}`} />
                 </button>
                 {activeMobileSubmenu === 'solutions' && (
                   <div className="pl-4 py-2 space-y-2 text-xs font-gotham-regular text-slate-600 border-l-2 border-[#F49853]/30 ml-2">
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Casa Nutri</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Apoio a Universitários</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Oficinas de Renda</Link>
+                    {localProjects.map((proj) => (
+                      <Link 
+                        key={proj.id} 
+                        to={proj.link || '/projetos'} 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-1 hover:text-[#F49853]"
+                      >
+                        {proj.title}
+                      </Link>
+                    ))}
+                    <Link 
+                      to="/projetos" 
+                      onClick={() => setMobileMenuOpen(false)} 
+                      className="block pt-1 font-gotham-bold text-[#F49853] hover:underline"
+                    >
+                      Ver todos os projetos →
+                    </Link>
                   </div>
                 )}
               </div>

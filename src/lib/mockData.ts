@@ -274,7 +274,7 @@ export const mockYAHHopeProjects: YAHHopeProject[] = [
   {
     id: 'proj-1',
     title: 'Casa Nutri & Saúde Infantil',
-    description: 'Acompanhamento terapêutico e nutricional para 20 crianças recuperarem peso e saúde.',
+    description: 'Acompanhamento terapêutico e nutricional para 9 crianças recuperarem peso e saúde.',
     category: 'Nutrição & Saúde',
     tag_color: '#92BF78',
     status: 'active',
