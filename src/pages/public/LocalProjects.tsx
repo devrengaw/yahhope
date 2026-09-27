@@ -1,11 +1,13 @@
 import React from 'react';
 import { Heart, ArrowRight, MapPin, CheckCircle, Clock } from 'lucide-react';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
+import { useDonationModal } from '../../contexts/DonationModalContext';
 import { YAHHopeProject } from '../../lib/mockData';
 import { SEO } from '../../components/common/SEO';
 
 export function LocalProjects() {
   const { projects } = useWebsiteProjects();
+  const { openDonationModal } = useDonationModal();
 
   const activeProjects = projects.filter(p => p.status === 'active');
   const plannedProjects = projects.filter(p => p.status === 'planned');
@@ -42,13 +44,27 @@ export function LocalProjects() {
       </div>
       <div className="p-8 flex flex-col flex-grow">
         <p className="text-slate-500 leading-relaxed mb-8 flex-grow">{project.description}</p>
-        <a 
-          href={project.link || '/campanha'}
-          className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn"
+        <button 
+          type="button"
+          onClick={() => {
+            if (project.link && project.link.startsWith('http')) {
+              window.open(project.link, '_blank');
+              return;
+            }
+            openDonationModal({
+              title: project.title,
+              category: project.category,
+              tagColor: project.tag_color,
+              imageUrl: project.image_url,
+              description: project.description,
+              link: project.link && project.link !== '/projetos' ? project.link : '/campanha',
+            });
+          }}
+          className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn cursor-pointer"
         >
           <span className="font-bold text-sm tracking-tight">Saiba como apoiar</span>
           <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-        </a>
+        </button>
       </div>
     </div>
   );

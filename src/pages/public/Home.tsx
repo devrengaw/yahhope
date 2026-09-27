@@ -32,6 +32,7 @@ import { useImpactMetrics } from '../../contexts/ImpactMetricsContext';
 import { ImpactIcon } from '../../components/common/ImpactIcon';
 import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
+import { useDonationModal } from '../../contexts/DonationModalContext';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
 const STRIPE_QUOTAS = [
@@ -42,6 +43,7 @@ const STRIPE_QUOTAS = [
 
 export function Home() {
   const navigate = useNavigate();
+  const { openDonationModal } = useDonationModal();
 
   // Interactive UI States
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -726,7 +728,7 @@ export function Home() {
           </div>
           <div>
             <button
-              onClick={() => setDonationModalOpen(true)}
+              onClick={() => openDonationModal()}
               className="inline-flex items-center gap-3 bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-4 rounded-full font-gotham-bold text-base md:text-lg shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
               <span>Seja um Agente de Esperança</span>

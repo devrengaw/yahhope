@@ -279,7 +279,7 @@ export const mockYAHHopeProjects: YAHHopeProject[] = [
     tag_color: '#92BF78',
     status: 'active',
     image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-    link: '/projetos',
+    link: '/campanha',
     order: 1,
     created_at: '2025-01-01'
   },
@@ -291,7 +291,7 @@ export const mockYAHHopeProjects: YAHHopeProject[] = [
     tag_color: '#88A1F2',
     status: 'active',
     image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
-    link: '/projetos',
+    link: '/campanha',
     order: 2,
     created_at: '2025-01-02'
   },
@@ -303,7 +303,7 @@ export const mockYAHHopeProjects: YAHHopeProject[] = [
     tag_color: '#EBC878',
     status: 'active',
     image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
-    link: '/projetos',
+    link: '/campanha',
     order: 3,
     created_at: '2025-01-03'
   },
