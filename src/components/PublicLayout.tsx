@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { PublicHeader } from './PublicHeader';
 import { PublicFooter } from './PublicFooter';
+import { DonationModal } from './common/DonationModal';
 
 export function PublicLayout() {
   const location = useLocation();
@@ -21,6 +22,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <PublicFooter />
+      <DonationModal />
     </div>
   );
 }

@@ -87,6 +87,7 @@ import { WorkspaceInbox } from './pages/erp/WorkspaceInbox';
 import { WorkspaceProjects } from './pages/erp/WorkspaceProjects';
 import { WorkspaceCalendarPage } from './pages/erp/WorkspaceCalendarPage';
 import { CalendarProvider } from './contexts/CalendarContext';
+import { DonationModalProvider } from './contexts/DonationModalContext';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
@@ -175,6 +176,7 @@ export default function App() {
                                         <BlogProvider>
                                           <WebsiteProjectsProvider>
                                         <Router>
+                                          <DonationModalProvider>
                                       <Routes>
                                         {/* Dedicated full-screen Display Route */}
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
@@ -295,6 +297,7 @@ export default function App() {
                                       
                                       <Route path="*" element={<Navigate to="/" replace />} />
                                     </Routes>
+                                          </DonationModalProvider>
                                   </Router>
                                 </WebsiteProjectsProvider>
                                 </BlogProvider>

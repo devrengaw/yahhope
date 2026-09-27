@@ -11,18 +11,14 @@ import {
 } from 'lucide-react';
 import { useTopBanner } from '../contexts/TopBannerContext';
 import { useWebsiteProjects } from '../contexts/WebsiteProjectsContext';
-
-const STRIPE_QUOTAS = [
-  { amount: 50, label: 'Alimenta uma criança', icon: Heart },
-  { amount: 120, label: 'Apadrinhamento mensal', icon: Heart, isPopular: true },
-  { amount: 300, label: 'Cesta básica + Suplementos', icon: Heart },
-];
+import { useDonationModal } from '../contexts/DonationModalContext';
 
 export function PublicHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { banner: topBanner } = useTopBanner();
   const { projects: websiteProjects } = useWebsiteProjects();
+  const { openDonationModal } = useDonationModal();
 
   const activeLocalProjects = websiteProjects.filter(p => p.status === 'active' || !p.status);
   const localProjects = activeLocalProjects.length > 0 ? activeLocalProjects : websiteProjects;
@@ -32,8 +28,6 @@ export function PublicHeader() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeMobileSubmenu, setActiveMobileSubmenu] = useState<string | null>(null);
-  const [donationModalOpen, setDonationModalOpen] = useState(false);
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Quick donate action handler
   const handleDonateAction = () => {
@@ -44,7 +38,7 @@ export function PublicHeader() {
         return;
       }
     }
-    setDonationModalOpen(true);
+    openDonationModal();
   };
 
   // Search submit handler
@@ -55,43 +49,6 @@ export function PublicHeader() {
     navigate(`/blog?post=${encodeURIComponent(searchQuery.trim())}`);
   };
 
-  // Stripe Checkout direct handler
-  const handleStripeCheckout = async (amount: number) => {
-    setIsCheckingOut(true);
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      if (!supabaseUrl) {
-        navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
-        return;
-      }
-
-      const baseUrl = supabaseUrl.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          amount,
-          isMonthly: true,
-          successUrl: `${window.location.origin}/campanha?status=success`,
-          cancelUrl: `${window.location.origin}/?status=cancel`
-        })
-      });
-
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
-      }
-    } catch {
-      navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
-    } finally {
-      setIsCheckingOut(false);
-    }
-  };
 
   return (
     <>
@@ -122,7 +79,7 @@ export function PublicHeader() {
             <div className="flex items-center gap-3 shrink-0">
               {topBanner.buttonActionType === 'donation_modal' ? (
                 <button
-                  onClick={() => setDonationModalOpen(true)}
+                  onClick={() => openDonationModal()}
                   style={{ backgroundColor: topBanner.tagColor || '#F49853' }}
                   className="inline-flex items-center gap-1.5 hover:opacity-90 text-white font-gotham-bold text-xs uppercase tracking-wider px-4 py-1.5 rounded-full transition-transform active:scale-95 shadow-sm cursor-pointer"
                 >
@@ -458,7 +415,7 @@ export function PublicHeader() {
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    setDonationModalOpen(true);
+                    openDonationModal();
                   }}
                   className="w-full text-center py-3 px-4 rounded-xl bg-[#F49853] text-white font-gotham-bold hover:bg-[#e0853d] shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
@@ -482,82 +439,6 @@ export function PublicHeader() {
           <Heart size={18} className="fill-white group-hover:scale-110 transition-transform" />
         </button>
       </aside>
-
-      {/* 5. Donation Lightbox Modal */}
-      {donationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-gotham-regular">
-          <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity"
-            onClick={() => setDonationModalOpen(false)}
-          />
-          <div className="relative bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden z-10 border border-orange-100">
-            <button 
-              onClick={() => setDonationModalOpen(false)}
-              className="absolute top-4 right-4 z-20 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors cursor-pointer"
-              aria-label="Fechar"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="relative h-44 sm:h-48 bg-slate-900">
-              <img 
-                src="https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif" 
-                alt="Casa Nutri" 
-                className="w-full h-full object-cover opacity-80"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
-              <div className="absolute bottom-4 left-6 right-6 text-white">
-                <span className="bg-[#F49853] text-white text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-1 inline-block">
-                  Apoio Imediato
-                </span>
-                <h3 className="text-xl sm:text-2xl font-black">
-                  Resgate a Infância na Casa Nutri
-                </h3>
-              </div>
-            </div>
-
-            <div className="p-6 sm:p-7">
-              <p className="text-slate-600 text-xs sm:text-sm font-gotham-light leading-relaxed mb-4">
-                Selecione uma das cotas para iniciar sua contribuição:
-              </p>
-
-              <div className="space-y-2 mb-5">
-                {STRIPE_QUOTAS.map((q) => (
-                  <button
-                    key={q.amount}
-                    type="button"
-                    disabled={isCheckingOut}
-                    onClick={() => {
-                      setDonationModalOpen(false);
-                      handleStripeCheckout(q.amount);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-slate-200 hover:border-[#F49853] hover:bg-orange-50/50 transition-all text-left group cursor-pointer"
-                  >
-                    <div>
-                      <span className="text-sm font-gotham-bold text-slate-900 block">R$ {q.amount}</span>
-                      <span className="text-xs text-slate-500 font-gotham-regular">{q.label}</span>
-                    </div>
-                    <ArrowRight size={16} className="text-slate-400 group-hover:text-[#F49853] group-hover:translate-x-1 transition-all" />
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={() => {
-                    setDonationModalOpen(false);
-                    navigate('/campanha');
-                  }}
-                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                >
-                  <CreditCard size={15} />
-                  <span>Outro Valor / Definir Quantia</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
