@@ -2,19 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Home, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, User, MapPin, ClipboardCheck, MessageSquare, Star, Trash2 } from 'lucide-react';
 import { useVisits } from '../contexts/VisitContext';
 import { usePatients } from '../contexts/PatientContext';
+import { useAtendimento } from '../contexts/AtendimentoContext';
 import { HomeVisit } from '../lib/mockData';
-import { cn, formatLocalDate } from '../lib/utils';
+import { cn, formatLocalDate, formatDisplayDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
 export function HomeVisits() {
   const { visits, concluirVisita, excluirVisita } = useVisits();
   const { patients } = usePatients();
+  const { atendimentos } = useAtendimento();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVisit, setSelectedVisit] = useState<HomeVisit | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const today = formatLocalDate(new Date());
 
-  // Filter pending visits
-  const pendingVisits = visits.filter(v => v.status === 'pending');
+  // Filter pending visits: only for patients whose attendance has been finalized (not currently uncompleted in consultation queue)
+  const pendingVisits = visits.filter(v => {
+    if (v.status !== 'pending') return false;
+    const hasUncompletedConsultation = atendimentos.some(
+      a => a.patient_id === v.patient_id && a.status !== 'completed' && a.date <= today
+    );
+    return !hasUncompletedConsultation;
+  });
   const completedVisits = visits.filter(v => v.status === 'completed');
 
   const getPatient = (id: string) => patients.find(p => p.id === id);
@@ -138,7 +147,7 @@ export function HomeVisits() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {visit.date}
+                        {formatDisplayDate(visit.date)}
                       </span>
                       {visit.status === 'completed' ? (
                         <CheckCircle2 size={14} className="text-blue-500" />
@@ -155,7 +164,7 @@ export function HomeVisits() {
                     </div>
                     {visit.last_clinical_date && (
                       <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase tracking-widest">Consulta: {new Date(visit.last_clinical_date).toLocaleDateString()}</span>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-black uppercase tracking-widest">Consulta: {formatDisplayDate(visit.last_clinical_date)}</span>
                       </div>
                     )}
                   </button>

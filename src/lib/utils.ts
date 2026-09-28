@@ -49,3 +49,14 @@ export function parseLocalDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day, 12, 0, 0); // Midday to avoid DST issues
 }
+
+export function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return '--';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+  }
+  return dateStr;
+}

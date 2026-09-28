@@ -90,7 +90,7 @@ export function PatientDetails() {
   const { addEvent, updateEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita, visits } = useVisits();
-  const { agendarAtendimento, concluirAtendimento, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
+  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
   const { user } = useAuth();
   
@@ -278,8 +278,11 @@ export function PatientDetails() {
   const ageInMonths = differenceInMonths(new Date(), new Date(patient.dob));
   const bmi = (newWeight && newHeight) ? (parseFloat(newWeight) / Math.pow(parseFloat(newHeight) / 100, 2)).toFixed(2) : '--';
   const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender, ageInMonths);
+  const queueAppointment = patient ? atendimentos.find(
+    a => a.patient_id === patient.id && a.status !== 'completed' && a.date <= formatLocalDate(new Date())
+  ) : undefined;
 
-  const handleSaveEvent = (e: React.FormEvent, isDischarge: boolean = false) => {
+  const handleSaveEvent = async (e: React.FormEvent, isDischarge: boolean = false) => {
     e.preventDefault();
     
     // Filter out empty prescriptions
@@ -349,22 +352,35 @@ export function PatientDetails() {
       updatePatient(patient.id, { status: calcStatus as any });
     }
     
-    // Auto-schedule return if set and not discharge
-    if (returnDate && !isDischarge) {
+    // Auto-schedule return if set, not discharge, not editing an old event, and date is in future
+    const today = formatLocalDate(new Date());
+    if (returnDate && !isDischarge && !editingEventId && returnDate > today) {
       agendarAtendimento(patient.id, patient.name, returnDate);
     }
 
-    // Schedule ACS visit for next week only if it's a new clinical event
-    if (!editingEventId) {
+    // Match and conclude appointment from queue if present (either via aptId or direct patient match)
+    let concludedFromQueue = false;
+    if (aptId) {
+      await concluirAtendimento(aptId);
+      concludedFromQueue = true;
+    }
+    
+    // Also match any active appointment in the queue for this patient (e.g. attendant accessed via Crianças > Novo Acompanhamento)
+    const matched = await concluirAtendimentosPorPaciente(patient.id);
+    if (matched) {
+      concludedFromQueue = true;
+    }
+
+    // Schedule ACS visit for next week ONLY after attendance is finalized
+    // (concluirAtendimento already schedules the visit when concluding a queue appointment)
+    if (!editingEventId && !concludedFromQueue) {
       agendarVisita(patient.id, eventDate);
     }
 
-    // If it was an appointment from the queue, mark it as completed
-    if (aptId) {
-      concluirAtendimento(aptId);
+    if (concludedFromQueue) {
       sendNotification(
         'Evolução Atualizada',
-        `O atendimento de ${patient.name} foi finalizado. Peso registrado: ${newWeight || '--'}kg, Estatura: ${newHeight || '--'}cm. Acesso o portal para ver detalhes.`,
+        `O atendimento de ${patient.name} foi finalizado e retirado da fila. Peso registrado: ${newWeight || '--'}kg, Estatura: ${newHeight || '--'}cm. Acesso o portal para ver detalhes.`,
         'success'
       );
     }
@@ -1107,6 +1123,21 @@ export function PatientDetails() {
 
             <div className="p-6 overflow-y-auto flex-1">
               <form id="followup-form" onSubmit={handleSaveEvent} className="space-y-6">
+                
+                {/* Queue Match Alert Banner */}
+                {queueAppointment && !editingEventId && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-emerald-800 animate-in fade-in duration-300">
+                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="font-bold">
+                        Criança identificada na fila ({queueAppointment.status === 'in_progress' ? 'Em Atendimento' : queueAppointment.status === 'waiting' ? 'Na Fila' : 'Agendado'})
+                      </p>
+                      <p className="text-[11px] text-emerald-700 mt-0.5">
+                        Ao salvar este acompanhamento, o status passará direto para <strong>Atendidos Hoje</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Auto-filled Info */}
                 <div className="flex flex-wrap gap-4 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">

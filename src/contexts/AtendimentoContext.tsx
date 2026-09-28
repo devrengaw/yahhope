@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { formatLocalDate } from '../lib/utils';
+import { formatLocalDate, parseLocalDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { addDays } from 'date-fns';
 import { useAuth } from './AuthContext';
@@ -20,7 +20,8 @@ interface AtendimentoContextType {
   agendarAtendimento: (patientId: string, patientName: string, date: string) => void;
   marcarPresenca: (id: string) => void;
   iniciarAtendimento: (id: string) => void;
-  concluirAtendimento: (id: string) => void;
+  concluirAtendimento: (id: string) => Promise<void>;
+  concluirAtendimentosPorPaciente: (patientId: string) => Promise<boolean>;
   removerDaFila: (id: string) => void;
 }
 
@@ -110,30 +111,57 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
   };
 
   const concluirAtendimento = async (id: string) => {
+    const today = formatLocalDate(new Date());
     const atendimento = atendimentos.find(a => a.id === id);
-    setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'completed' } : a));
-    await supabase.from('clinical_appointments').update({ status: 'completed' }).eq('id', id);
+    setAtendimentos(prev => prev.map(a => a.id === id ? { ...a, status: 'completed', date: today } : a));
+    await supabase.from('clinical_appointments').update({ status: 'completed', date: today }).eq('id', id);
 
     if (atendimento) {
-      const date = formatLocalDate(addDays(new Date(), 7));
-      
-      const newVisit = {
-        patient_id: atendimento.patient_id,
-        acs_id: user?.id || null,
-        date: date,
-        status: 'pending',
-        checklist: {
-          dynamic: {} // Use empty dynamic checklist instead of old format
-        },
-        observations: '',
-        last_clinical_date: atendimento.date
-      };
+      // Check if a pending visit already exists for this patient
+      const { data: existingVisit } = await supabase
+        .from('home_visits')
+        .select('id')
+        .eq('patient_id', atendimento.patient_id)
+        .eq('status', 'pending')
+        .maybeSingle();
 
-      const { error } = await supabase.from('home_visits').insert([newVisit]);
-      if (error) {
-        console.error('Failed to create home visit after attendance:', error);
+      if (!existingVisit) {
+        const date = formatLocalDate(addDays(parseLocalDate(today), 7));
+        const newVisit = {
+          patient_id: atendimento.patient_id,
+          acs_id: user?.id || null,
+          date: date,
+          status: 'pending',
+          checklist: {
+            dynamic: {} // Use empty dynamic checklist instead of old format
+          },
+          observations: '',
+          last_clinical_date: today
+        };
+
+        const { error } = await supabase.from('home_visits').insert([newVisit]);
+        if (error) {
+          console.error('Failed to create home visit after attendance:', error);
+        }
       }
     }
+  };
+
+  const concluirAtendimentosPorPaciente = async (patientId: string): Promise<boolean> => {
+    const today = formatLocalDate(new Date());
+    // Find any appointments in the queue, in progress, or scheduled for today/pending for this patient
+    const matching = atendimentos.filter(
+      a => a.patient_id === patientId && a.status !== 'completed' && a.date <= today
+    );
+
+    if (matching.length === 0) {
+      return false;
+    }
+
+    for (const apt of matching) {
+      await concluirAtendimento(apt.id);
+    }
+    return true;
   };
 
   return (
@@ -144,6 +172,7 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
       marcarPresenca, 
       iniciarAtendimento, 
       concluirAtendimento,
+      concluirAtendimentosPorPaciente,
       removerDaFila
     }}>
       {children}
