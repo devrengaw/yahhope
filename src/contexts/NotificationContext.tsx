@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { pushNotificationService } from '../services/pushNotifications';
+import { isNative } from '../lib/capacitor';
 
 export interface Notification {
   id: string;
@@ -15,8 +17,10 @@ interface NotificationContextType {
   sendNotification: (title: string, message: string, type?: Notification['type']) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
-  requestPermission: () => Promise<void>;
+  requestPermission: (userId?: string) => Promise<void>;
   permission: NotificationPermission;
+  isNativePush: boolean;
+  pushToken: string | null;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -24,12 +28,37 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [pushToken, setPushToken] = useState<string | null>(pushNotificationService.getToken());
 
   useEffect(() => {
     if ('Notification' in window) {
       setPermission(window.Notification.permission);
     }
     fetchNotifications();
+
+    if (isNative) {
+      pushNotificationService.init().then(() => {
+        setPushToken(pushNotificationService.getToken());
+      });
+    }
+
+    // Handle in-app custom push event from Capacitor
+    const handlePushEvent = (e: any) => {
+      const detail = e.detail;
+      if (detail) {
+        const newNotif: Notification = {
+          id: detail.id || Math.random().toString(),
+          title: detail.title || 'Notificação YAH Hope',
+          message: detail.body || '',
+          read: false,
+          date: new Date().toISOString(),
+          type: 'info'
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+      }
+    };
+
+    window.addEventListener('yah_push_received', handlePushEvent);
 
     // Subscribe to realtime notifications
     const channel = supabase
@@ -46,11 +75,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         };
         setNotifications(prev => [newNotif, ...prev]);
 
-        // Browser push
-        if ('Notification' in window && window.Notification.permission === 'granted') {
+        // Browser push if on web
+        if (!isNative && 'Notification' in window && window.Notification.permission === 'granted') {
           new window.Notification(newRecord.title, {
             body: newRecord.message,
-            icon: '/vite.svg',
+            icon: '/icone.png',
           });
         }
       })
@@ -58,6 +87,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('yah_push_received', handlePushEvent);
     };
   }, []);
 
@@ -83,7 +113,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  const requestPermission = async () => {
+  const requestPermission = async (userId?: string) => {
+    if (isNative) {
+      await pushNotificationService.init(userId);
+      setPushToken(pushNotificationService.getToken());
+      return;
+    }
+
     if (!('Notification' in window)) {
       alert('Seu navegador não suporta notificações.');
       return;
@@ -140,7 +176,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       markAsRead, 
       markAllAsRead, 
       requestPermission, 
-      permission 
+      permission,
+      isNativePush: isNative,
+      pushToken
     }}>
       {children}
     </NotificationContext.Provider>

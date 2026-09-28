@@ -89,6 +89,16 @@ import { WorkspaceCalendarPage } from './pages/erp/WorkspaceCalendarPage';
 import { CalendarProvider } from './contexts/CalendarContext';
 import { DonationModalProvider } from './contexts/DonationModalContext';
 
+import { isNative } from './lib/capacitor';
+import { PortalLogin } from './pages/portal/PortalLogin';
+import { MobileDonorLayout } from './components/mobile/MobileDonorLayout';
+import { MobileDonorHome } from './pages/portal/mobile/MobileDonorHome';
+import { MobileDonorChildren } from './pages/portal/mobile/MobileDonorChildren';
+import { MobileDonorProjects } from './pages/portal/mobile/MobileDonorProjects';
+import { MobileDonorBlog } from './pages/portal/mobile/MobileDonorBlog';
+import { MobileDonorDonate } from './pages/portal/mobile/MobileDonorDonate';
+import { PortalMyDonations } from './pages/portal/PortalMyDonations';
+
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -101,7 +111,10 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
     );
   }
 
-  if (!user) return <Navigate to="/login" />;
+  if (!user) {
+    const isPortalOrApp = location.pathname.startsWith('/portal') || isNative;
+    return <Navigate to={isPortalOrApp ? "/portal/login" : "/login"} />;
+  }
   
   // Admin has access to everything
   if (user.role === 'ADMIN') return <>{children}</>;
@@ -147,8 +160,13 @@ function RootRedirect() {
     return <Navigate to="/set-password" />;
   }
 
+  if (isNative) {
+    if (!user) return <Navigate to="/portal/login" />;
+    return <Navigate to="/portal/dashboard" />;
+  }
+
   if (!user) return <Navigate to="/login" />;
-  if (user.role === 'SPONSOR') return <Navigate to="/portal" />;
+  if (user.role === 'SPONSOR') return <Navigate to="/portal/dashboard" />;
   if (user.role === 'ADMIN') return <Navigate to="/admin" />;
   return <Navigate to="/workspace" />;
 }
@@ -182,7 +200,9 @@ export default function App() {
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
 
                                         <Route element={<PublicLayout />}>
-                                          <Route path="/" element={<Home />} />
+                                          <Route path="/portal/login" element={<PortalLogin />} />
+                                          <Route path="/app/login" element={<PortalLogin />} />
+                                          <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
                                           <Route path="/blog" element={<Blog />} />
                                           <Route path="/blog/:id" element={<Blog />} />
                                           <Route path="/loja" element={<Ecommerce />} />
@@ -278,22 +298,30 @@ export default function App() {
                                         </ProtectedRoute>
                                       } />
 
-                                      {/* Supporter Module / Portal */}
+                                      {/* Supporter Module / Portal (Mobile Donor Experience) */}
                                       <Route path="/portal/*" element={
                                         <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'SPONSOR']}>
-                                          <Layout module="supporter">
+                                          <MobileDonorLayout>
                                             <Routes>
-                                              <Route path="/dashboard" element={<SponsorDashboard />} />
-                                              <Route path="/sponsorship" element={<SponsorshipGallery />} />
+                                              <Route path="/" element={<Navigate to="/portal/dashboard" replace />} />
+                                              <Route path="/dashboard" element={<MobileDonorHome />} />
+                                              <Route path="/sponsorship" element={<MobileDonorChildren />} />
+                                              <Route path="/projects" element={<MobileDonorProjects />} />
+                                              <Route path="/blog" element={<MobileDonorBlog />} />
+                                              <Route path="/donations" element={<MobileDonorDonate />} />
+                                              <Route path="/my-donations" element={<PortalMyDonations />} />
                                               <Route path="/shop" element={<SupporterStore />} />
                                               <Route path="/messages" element={<PortalMessages />} />
                                               <Route path="/gifts" element={<PortalGifts />} />
-                                              <Route path="/impact" element={<SponsorDashboard />} />
+                                              <Route path="/impact" element={<MobileDonorHome />} />
                                               <Route path="*" element={<Navigate to="/portal/dashboard" replace />} />
                                             </Routes>
-                                          </Layout>
+                                          </MobileDonorLayout>
                                         </ProtectedRoute>
                                       } />
+
+                                      {/* Alias /app routes */}
+                                      <Route path="/app/*" element={<Navigate to="/portal/dashboard" replace />} />
                                       
                                       <Route path="*" element={<Navigate to="/" replace />} />
                                     </Routes>

@@ -5,7 +5,7 @@ import { DonationModal } from './common/DonationModal';
 
 export function PublicLayout() {
   const location = useLocation();
-  const isLoginPage = location.pathname === '/login' || location.pathname === '/set-password' || location.pathname === '/cadastro-apadrinhador';
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/set-password' || location.pathname === '/cadastro-apadrinhador' || location.pathname.startsWith('/portal/login') || location.pathname.startsWith('/app/login');
 
   if (isLoginPage) {
     return (
