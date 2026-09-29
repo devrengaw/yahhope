@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Send, Mail, Users, CheckCircle2, AlertCircle, Plus, Eye, BarChart3, 
   ArrowRight, Search, Filter, RefreshCw, Copy, Trash2, ExternalLink, 
-  Clock, Check, MousePointer, Smartphone, Monitor, ChevronRight, X, Sparkles,
+  Clock, Check, MousePointer, Smartphone, Monitor, ChevronRight, ChevronDown, ChevronUp, X, Sparkles,
   FileText, Upload, UserCheck, ShieldCheck, Heart, UserPlus, HelpCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -17,7 +17,11 @@ import {
   AudienceStats 
 } from '../../services/emailCampaignService';
 
-export function CommEmailCampaigns() {
+interface CommEmailCampaignsProps {
+  embedded?: boolean;
+}
+
+export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps = {}) {
   const { user } = useAuth();
 
   // Estados principais
@@ -83,6 +87,40 @@ export function CommEmailCampaigns() {
 
   // Pré-visualização Desktop vs Mobile
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+
+  // Destinatários expandidos inline no próprio card da campanha
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [inlineRecipients, setInlineRecipients] = useState<Record<string, CampaignRecipient[]>>({});
+  const [loadingInlineRecipients, setLoadingInlineRecipients] = useState<string | null>(null);
+  const [inlineSearch, setInlineSearch] = useState('');
+  const [inlineFilter, setInlineFilter] = useState<'all' | 'opened' | 'not_opened'>('all');
+
+  const handleToggleExpand = async (campaignId: string) => {
+    if (expandedCampaignId === campaignId) {
+      setExpandedCampaignId(null);
+      return;
+    }
+    setExpandedCampaignId(campaignId);
+    setInlineSearch('');
+    setInlineFilter('all');
+    if (!inlineRecipients[campaignId]) {
+      setLoadingInlineRecipients(campaignId);
+      try {
+        const recs = await emailCampaignService.fetchCampaignRecipients(campaignId);
+        setInlineRecipients(prev => ({ ...prev, [campaignId]: recs }));
+      } finally {
+        setLoadingInlineRecipients(null);
+      }
+    }
+  };
+
+  const handleSimulateInline = async (recipientId: string, campaignId: string) => {
+    await emailCampaignService.simulateInteraction(recipientId, 'open');
+    const recs = await emailCampaignService.fetchCampaignRecipients(campaignId);
+    setInlineRecipients(prev => ({ ...prev, [campaignId]: recs }));
+    const updatedCampaigns = await emailCampaignService.fetchCampaigns();
+    setCampaigns(updatedCampaigns);
+  };
 
   // Inicialização
   useEffect(() => {
@@ -563,126 +601,308 @@ export function CommEmailCampaigns() {
             const openRate = camp.sent_count > 0 ? Math.round((camp.opened_count / camp.sent_count) * 100) : 0;
             const clickRate = camp.sent_count > 0 ? Math.round((camp.clicked_count / camp.sent_count) * 100) : 0;
 
+            const isExpanded = expandedCampaignId === camp.id;
+            const recs = inlineRecipients[camp.id] || [];
+            const openedRecs = recs.filter(r => (r.open_count || 0) > 0);
+            const notOpenedRecs = recs.filter(r => (r.open_count || 0) === 0);
+
             return (
               <div
                 key={camp.id}
-                onClick={() => camp.status === 'sent' && handleOpenAnalytics(camp)}
-                className={cn(
-                  "bg-white rounded-3xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6",
-                  camp.status === 'sent' && "cursor-pointer hover:border-amber-200"
-                )}
+                className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden"
               >
-                {/* Lado Esquerdo: Info da Campanha */}
-                <div className="space-y-2 flex-1">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider",
-                      camp.status === 'sent' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                      camp.status === 'sending' ? "bg-blue-50 text-blue-700 animate-pulse border border-blue-200" :
-                      "bg-slate-100 text-slate-700 border border-slate-200"
-                    )}>
-                      {camp.status === 'sent' ? '✓ Enviada' : camp.status === 'sending' ? 'Disparando...' : 'Rascunho'}
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      {camp.sent_at ? `Enviada em ${new Date(camp.sent_at).toLocaleDateString('pt-BR')} às ${new Date(camp.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : `Criada em ${new Date(camp.created_at).toLocaleDateString('pt-BR')}`}
-                    </span>
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium">
-                      {camp.audience_summary || `${camp.total_recipients} destinatários`}
-                    </span>
-                  </div>
-
-                  <h3 className="text-lg font-black text-slate-900">
-                    {camp.title}
-                  </h3>
-                  <p className="text-sm text-slate-600 flex items-center gap-1.5">
-                    <span className="font-semibold text-slate-400">Assunto:</span>
-                    {camp.subject}
-                  </p>
-                </div>
-
-                {/* Centro: Métricas de Leitura & Engajamento (Mailchimp Feedback) */}
-                {camp.status === 'sent' ? (
-                  <div className="flex flex-wrap items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 w-full lg:w-auto">
-                    {/* Aberturas / Leituras */}
-                    <div className="min-w-[120px]">
-                      <div className="flex items-center justify-between text-xs font-bold mb-1">
-                        <span className="text-slate-600 flex items-center gap-1">
-                          <Eye size={13} className="text-emerald-500" /> Aberturas
+                {/* Linha Principal da Campanha */}
+                <div className="p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                  {/* Lado Esquerdo: Info da Campanha */}
+                  <div className="space-y-2 flex-1">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider",
+                        camp.status === 'sent' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                        camp.status === 'sending' ? "bg-blue-50 text-blue-700 animate-pulse border border-blue-200" :
+                        "bg-slate-100 text-slate-700 border border-slate-200"
+                      )}>
+                        {camp.status === 'sent' ? '✓ Enviada' : camp.status === 'sending' ? 'Disparando...' : 'Rascunho'}
+                      </span>
+                      {camp.sent_at ? (
+                        <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1 rounded-full font-bold flex items-center gap-1.5">
+                          <Clock size={13} className="text-amber-600" />
+                          Enviado em {new Date(camp.sent_at).toLocaleDateString('pt-BR')} às {new Date(camp.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-emerald-700">{openRate}%</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-emerald-500 h-full rounded-full transition-all" 
-                          style={{ width: `${Math.min(openRate, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        <strong>{camp.opened_count}</strong> de {camp.sent_count} leram
-                      </p>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">
+                          Criada em {new Date(camp.created_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium">
+                        {camp.audience_summary || `${camp.total_recipients} destinatários`}
+                      </span>
                     </div>
 
-                    {/* Cliques */}
-                    <div className="min-w-[120px]">
-                      <div className="flex items-center justify-between text-xs font-bold mb-1">
-                        <span className="text-slate-600 flex items-center gap-1">
-                          <MousePointer size={13} className="text-indigo-500" /> Cliques
-                        </span>
-                        <span className="text-indigo-700">{clickRate}%</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-indigo-500 h-full rounded-full transition-all" 
-                          style={{ width: `${Math.min(clickRate, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        <strong>{camp.clicked_count}</strong> interagiram
-                      </p>
-                    </div>
+                    <h3 className="text-lg font-black text-slate-900">
+                      {camp.title}
+                    </h3>
+                    <p className="text-sm text-slate-600 flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-400">Assunto:</span>
+                      {camp.subject}
+                    </p>
                   </div>
-                ) : (
-                  <div className="text-sm text-slate-400 italic">
-                    Rascunho pronto para envio ({camp.total_recipients} destinatários selecionados)
-                  </div>
-                )}
 
-                {/* Lado Direito: Ações */}
-                <div className="flex items-center gap-2 shrink-0">
+                  {/* Centro: Métricas de Leitura & Engajamento (Mailchimp Feedback) */}
                   {camp.status === 'sent' ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenAnalytics(camp);
-                      }}
-                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
-                    >
-                      <BarChart3 size={14} />
-                      Métricas & Leituras
-                    </button>
+                    <div className="flex flex-wrap items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 w-full lg:w-auto">
+                      {/* Aberturas / Leituras */}
+                      <div className="min-w-[130px]">
+                        <div className="flex items-center justify-between text-xs font-bold mb-1">
+                          <span className="text-slate-600 flex items-center gap-1">
+                            <Eye size={13} className="text-emerald-500" /> Aberturas / Leituras
+                          </span>
+                          <span className="text-emerald-700">{openRate}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-emerald-500 h-full rounded-full transition-all" 
+                            style={{ width: `${Math.min(openRate, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          <strong className="text-emerald-600">{camp.opened_count}</strong> de {camp.sent_count} abriram
+                        </p>
+                      </div>
+
+                      {/* Cliques */}
+                      <div className="min-w-[120px]">
+                        <div className="flex items-center justify-between text-xs font-bold mb-1">
+                          <span className="text-slate-600 flex items-center gap-1">
+                            <MousePointer size={13} className="text-indigo-500" /> Cliques
+                          </span>
+                          <span className="text-indigo-700">{clickRate}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-indigo-500 h-full rounded-full transition-all" 
+                            style={{ width: `${Math.min(clickRate, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          <strong className="text-indigo-600">{camp.clicked_count}</strong> interagiram
+                        </p>
+                      </div>
+                    </div>
                   ) : (
-                    <button
-                      onClick={async () => {
-                        const confirmSend = window.confirm(`Deseja disparar este rascunho para ${camp.total_recipients} destinatários agora?`);
-                        if (!confirmSend) return;
-                        await emailCampaignService.dispatchCampaign(camp.id);
-                        await loadData();
-                      }}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm shadow-amber-500/20"
-                    >
-                      <Send size={14} />
-                      Disparar Agora
-                    </button>
+                    <div className="text-sm text-slate-400 italic">
+                      Rascunho pronto para envio ({camp.total_recipients} destinatários selecionados)
+                    </div>
                   )}
 
-                  <button
-                    onClick={(e) => handleDeleteCampaign(camp.id, e)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                    title="Excluir campanha"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {/* Lado Direito: Ações */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {camp.status === 'sent' && (
+                      <button
+                        onClick={() => handleToggleExpand(camp.id)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer",
+                          isExpanded
+                            ? "bg-amber-500 text-white shadow-amber-500/20"
+                            : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                        )}
+                      >
+                        <Users size={14} />
+                        Ver Status por E-mail
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+
+                    {camp.status === 'sent' ? (
+                      <button
+                        onClick={() => handleOpenAnalytics(camp)}
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-xs cursor-pointer"
+                      >
+                        <BarChart3 size={14} />
+                        Relatório
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const confirmSend = window.confirm(`Deseja disparar este rascunho para ${camp.total_recipients} destinatários agora?`);
+                          if (!confirmSend) return;
+                          await emailCampaignService.dispatchCampaign(camp.id);
+                          await loadData();
+                        }}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm shadow-amber-500/20 cursor-pointer"
+                      >
+                        <Send size={14} />
+                        Disparar Agora
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => handleDeleteCampaign(camp.id, e)}
+                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                      title="Excluir campanha"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
+
+                {/* PAINEL EXPANSÍVEL: DESTINATÁRIOS E FEEDBACK DE ABERTURA POR E-MAIL */}
+                {camp.status === 'sent' && isExpanded && (
+                  <div className="border-t border-slate-100 bg-slate-50/80 p-6 space-y-4 animate-in fade-in duration-200">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                          <Mail size={16} className="text-amber-500" />
+                          Feedback de Aberturas por E-mail
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {camp.sent_at ? `E-mail disparado em ${new Date(camp.sent_at).toLocaleDateString('pt-BR')} às ${new Date(camp.sent_at).toLocaleTimeString('pt-BR')}` : 'Enviado'}
+                        </p>
+                      </div>
+
+                      {/* Resumo de Leituras */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="bg-white border border-slate-200 px-3 py-1 rounded-xl text-slate-700 font-semibold shadow-xs">
+                          Total: <strong>{recs.length || camp.total_recipients}</strong>
+                        </span>
+                        <span className="bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl text-emerald-800 font-bold shadow-xs flex items-center gap-1">
+                          <CheckCircle2 size={13} className="text-emerald-600" />
+                          <strong>{openedRecs.length}</strong> abriram ({recs.length > 0 ? Math.round((openedRecs.length / recs.length) * 100) : 0}%)
+                        </span>
+                        <span className="bg-rose-50 border border-rose-200 px-3 py-1 rounded-xl text-rose-800 font-bold shadow-xs flex items-center gap-1">
+                          <Clock size={13} className="text-rose-600" />
+                          <strong>{notOpenedRecs.length}</strong> não abriram
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Barra de Filtro e Busca */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-xs">
+                        <button
+                          onClick={() => setInlineFilter('all')}
+                          className={cn(
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            inlineFilter === 'all' ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          Todos ({recs.length})
+                        </button>
+                        <button
+                          onClick={() => setInlineFilter('opened')}
+                          className={cn(
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            inlineFilter === 'opened' ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          🟢 Aberto ({openedRecs.length})
+                        </button>
+                        <button
+                          onClick={() => setInlineFilter('not_opened')}
+                          className={cn(
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            inlineFilter === 'not_opened' ? "bg-rose-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          ⏳ Não Aberto ({notOpenedRecs.length})
+                        </button>
+                      </div>
+
+                      <div className="relative w-full sm:w-64">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={inlineSearch}
+                          onChange={(e) => setInlineSearch(e.target.value)}
+                          placeholder="Buscar por e-mail ou nome..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Lista / Tabela por E-mail */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                            <th className="py-2.5 px-4">E-mail do Destinatário</th>
+                            <th className="py-2.5 px-4">Nome</th>
+                            <th className="py-2.5 px-4">Status de Abertura</th>
+                            <th className="py-2.5 px-4">Quando Abriu</th>
+                            <th className="py-2.5 px-4 text-right">Simular</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {loadingInlineRecipients === camp.id ? (
+                            <tr>
+                              <td colSpan={5} className="py-6 text-center text-slate-400">
+                                <RefreshCw size={18} className="animate-spin mx-auto mb-1 text-amber-500" />
+                                Carregando destinatários...
+                              </td>
+                            </tr>
+                          ) : recs.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-6 text-center text-slate-400 italic">
+                                Nenhum destinatário registrado nesta campanha.
+                              </td>
+                            </tr>
+                          ) : (
+                            recs
+                              .filter(r => {
+                                const matchSearch = r.email.toLowerCase().includes(inlineSearch.toLowerCase()) ||
+                                                    (r.name && r.name.toLowerCase().includes(inlineSearch.toLowerCase()));
+                                if (!matchSearch) return false;
+                                if (inlineFilter === 'opened') return (r.open_count || 0) > 0;
+                                if (inlineFilter === 'not_opened') return (r.open_count || 0) === 0;
+                                return true;
+                              })
+                              .map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="py-2.5 px-4 font-mono font-bold text-slate-800">
+                                    {r.email}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-600">
+                                    {r.name || '—'}
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    {(r.open_count || 0) > 0 ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        <Check size={12} className="text-emerald-600" />
+                                        Aberto ({r.open_count} {r.open_count === 1 ? 'leitura' : 'leituras'})
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                        <Clock size={12} className="text-slate-400" />
+                                        Não aberto ainda
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-500">
+                                    {r.opened_at ? (
+                                      <span>
+                                        {new Date(r.opened_at).toLocaleDateString('pt-BR')} às {new Date(r.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right">
+                                    <button
+                                      onClick={() => handleSimulateInline(r.id, camp.id)}
+                                      className="px-2 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors cursor-pointer"
+                                      title="Simular que este destinatário abriu o e-mail para testar métrica"
+                                    >
+                                      +1 Abertura
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

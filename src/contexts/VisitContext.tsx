@@ -40,57 +40,107 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       const { data: clinicalEvents } = await supabase
         .from('clinical_events')
         .select('child_id, date')
-        .not('event_type', 'in', '("acs_visit","observation")');
+        .not('event_type', 'in', '("acs_visit","observation")')
+        .order('date', { ascending: false });
+
+      if (!clinicalEvents || clinicalEvents.length === 0) return;
 
       // 2. Fetch all existing visits (both completed and pending)
       const { data: visitsData } = await supabase.from('home_visits').select('*');
       const allVisits = (visitsData || []) as HomeVisit[];
 
+      // Find the latest attendance wave date across the clinic
+      const latestWaveDate = clinicalEvents[0].date;
+
       const defaultAcsId = user?.id || (await supabase.auth.getUser()).data.user?.id || '417afa81-df6d-406e-b605-86beec9da3f0';
       const toInsert: { patient_id: string; acs_id: string; date: string; status: 'pending'; checklist: any; observations: string; last_clinical_date: string }[] = [];
+      const staleVisitIds: string[] = [];
 
-      const today = new Date();
-
-      if (clinicalEvents) {
-        for (const ev of clinicalEvents) {
-          const evDate = parseLocalDate(ev.date);
-          const daysAgo = differenceInDays(today, evDate);
-
-          // Only auto-sync attendances from recent cycles (within 14 days)
-          if (daysAgo >= 0 && daysAgo <= 14) {
-            // Check if ANY visit (completed or pending) already matches this consultation
-            // either directly by last_clinical_date or by occurring in the following week (1 to 13 days)
-            const hasMatchingVisit = allVisits.some(v => {
-              if (v.patient_id !== ev.child_id) return false;
-              if (v.last_clinical_date === ev.date) return true;
-              const diff = differenceInDays(parseLocalDate(v.date), evDate);
-              return diff >= 1 && diff <= 13;
-            });
-
-            const alreadyQueued = toInsert.some(v => v.patient_id === ev.child_id && v.last_clinical_date === ev.date);
-
-            if (!hasMatchingVisit && !alreadyQueued) {
-              toInsert.push({
-                patient_id: ev.child_id,
-                acs_id: defaultAcsId,
-                date: formatLocalDate(addDays(evDate, 7)),
-                status: 'pending',
-                checklist: { dynamic: {} },
-                observations: '',
-                last_clinical_date: ev.date
-              });
-            }
-          }
+      // Group clinical events by child to find each child's latest attendance
+      const latestEventByChild = new Map<string, string>();
+      for (const ev of clinicalEvents) {
+        if (!latestEventByChild.has(ev.child_id)) {
+          latestEventByChild.set(ev.child_id, ev.date);
         }
       }
 
+      // Group existing pending visits by patient
+      const pendingByChild = new Map<string, HomeVisit[]>();
+      for (const v of allVisits) {
+        if (v.status === 'pending') {
+          const list = pendingByChild.get(v.patient_id) || [];
+          list.push(v);
+          pendingByChild.set(v.patient_id, list);
+        }
+      }
+
+      // 3. For each child that attended the latest wave:
+      latestEventByChild.forEach((lastClinDate, childId) => {
+        const childPending = pendingByChild.get(childId) || [];
+
+        // If the child did not attend the latest attendance wave, any pending visit is from an obsolete past cycle
+        if (lastClinDate !== latestWaveDate) {
+          childPending.forEach(v => staleVisitIds.push(v.id));
+          return;
+        }
+
+        // Check if the latest attendance has already been visited by ACS
+        const alreadyVisited = allVisits.some(v => {
+          if (v.patient_id !== childId || v.status !== 'completed') return false;
+          if (v.last_clinical_date === lastClinDate) return true;
+          const diff = differenceInDays(parseLocalDate(v.date), parseLocalDate(lastClinDate));
+          return diff >= 1 && diff <= 13;
+        });
+
+        if (alreadyVisited) {
+          // Already completed, so remove any lingering pending visits for this child
+          childPending.forEach(v => staleVisitIds.push(v.id));
+        } else {
+          // Keep only 1 pending visit matching this latest consultation; delete any others/duplicates
+          const matchingPending = childPending.filter(v => v.last_clinical_date === lastClinDate);
+          const otherPending = childPending.filter(v => v.last_clinical_date !== lastClinDate);
+          otherPending.forEach(v => staleVisitIds.push(v.id));
+
+          if (matchingPending.length > 1) {
+            for (let i = 1; i < matchingPending.length; i++) {
+              staleVisitIds.push(matchingPending[i].id);
+            }
+          } else if (matchingPending.length === 0) {
+            toInsert.push({
+              patient_id: childId,
+              acs_id: defaultAcsId,
+              date: formatLocalDate(addDays(parseLocalDate(lastClinDate), 7)),
+              status: 'pending',
+              checklist: { dynamic: {} },
+              observations: '',
+              last_clinical_date: lastClinDate
+            });
+          }
+        }
+      });
+
+      // Also clean up pending visits for children who have no clinical events at all
+      pendingByChild.forEach((pVisits, childId) => {
+        if (!latestEventByChild.has(childId)) {
+          pVisits.forEach(v => staleVisitIds.push(v.id));
+        }
+      });
+
+      // Execute deletes of stale/superseded visits
+      if (staleVisitIds.length > 0) {
+        await supabase.from('home_visits').delete().in('id', staleVisitIds);
+      }
+
+      // Execute inserts for missing visits of latest wave
       if (toInsert.length > 0) {
         const { error } = await supabase.from('home_visits').insert(toInsert);
         if (error) {
           console.error('Error syncing missed visits:', error);
-        } else {
-          fetchVisits();
         }
+      }
+
+      if (staleVisitIds.length > 0 || toInsert.length > 0) {
+        fetchVisits();
       }
     } catch (err) {
       console.error('Failed to sync completed atendimentos:', err);

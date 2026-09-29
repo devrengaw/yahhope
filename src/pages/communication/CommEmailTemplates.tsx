@@ -4,6 +4,7 @@ import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settin
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 import { RichTextEditor } from '../../components/admin/communication/RichTextEditor';
+import { CommEmailCampaigns } from './CommEmailCampaigns';
 
 type TemplateType = 'donation_thank_you' | 'accountability' | 'new_admin_user' | 'new_sponsor';
 
@@ -18,6 +19,7 @@ interface EmailTemplate {
 }
 
 export function CommEmailTemplates() {
+  const [viewMode, setViewMode] = useState<'campaigns' | 'templates'>('campaigns');
   const [activeTab, setActiveTab] = useState<'settings' | TemplateType>('settings');
   const [isSaved, setIsSaved] = useState(false);
 
@@ -188,64 +190,71 @@ export function CommEmailTemplates() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 pb-20">
-      <div className="flex justify-between items-center">
+      {/* Top Header com Seletor de Abas Limpo */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Mail className="text-indigo-500" size={32} />
-            Editor de E-mails
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Mail className="text-amber-500" size={32} />
+            Comunicação & E-mail
           </h1>
-          <p className="text-slate-500 mt-2 font-medium">
-            Gerencie e personalize os e-mails enviados pelo sistema.
+          <p className="text-slate-500 mt-1 text-sm font-medium">
+            Dispare comunicados em massa estilo Mailchimp e gerencie templates de e-mail do sistema.
           </p>
         </div>
+
         <div className="flex items-center gap-3">
-          <Link
-            to="/communication/campaigns"
-            className="px-5 py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 text-sm"
-          >
-            <Send size={18} />
-            Disparo de Campanhas
-          </Link>
-          <button
-            onClick={handleSave}
-            className={cn(
-              "px-6 py-3 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg text-sm",
-              isSaved 
-                ? "bg-emerald-500 text-white shadow-emerald-500/20" 
-                : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
-            )}
-          >
-            {isSaved ? (
-              <><CheckCircle2 size={20} /> Salvo com sucesso!</>
-            ) : (
-              <><Save size={20} /> Salvar Template de E-mail</>
-            )}
-          </button>
+          {/* Alternador de Abas */}
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => setViewMode('campaigns')}
+              className={cn(
+                "px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer",
+                viewMode === 'campaigns'
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Send size={15} className={viewMode === 'campaigns' ? "text-amber-500" : "text-slate-400"} />
+              Disparo & Campanhas
+            </button>
+            <button
+              onClick={() => setViewMode('templates')}
+              className={cn(
+                "px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer",
+                viewMode === 'templates'
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <LayoutTemplate size={15} className={viewMode === 'templates' ? "text-indigo-500" : "text-slate-400"} />
+              Templates do Sistema
+            </button>
+          </div>
+
+          {viewMode === 'templates' && (
+            <button
+              onClick={handleSave}
+              className={cn(
+                "px-5 py-2.5 rounded-xl font-black flex items-center gap-2 transition-all shadow-md text-xs sm:text-sm cursor-pointer",
+                isSaved 
+                  ? "bg-emerald-500 text-white shadow-emerald-500/20" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
+              )}
+            >
+              {isSaved ? (
+                <><CheckCircle2 size={18} /> Salvo!</>
+              ) : (
+                <><Save size={18} /> Salvar Template</>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Banner de Disparo de Campanhas Mailchimp */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200/80 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
-            <Sparkles size={22} />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-slate-900 text-base">Quer criar e disparar um e-mail em massa agora?</h3>
-            <p className="text-slate-600 text-xs mt-0.5">
-              Utilize o novo módulo estilo <strong>Mailchimp</strong> para enviar comunicados para usuários, doadores e e-mails externos com feedback de leituras e aberturas!
-            </p>
-          </div>
-        </div>
-        <Link
-          to="/communication/campaigns"
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors whitespace-nowrap shadow-sm"
-        >
-          Acessar Disparo de E-mails →
-        </Link>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+      {viewMode === 'campaigns' ? (
+        <CommEmailCampaigns embedded={true} />
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         
         {/* COLUNA 1: Lista de Templates */}
         <div className="w-full lg:w-64 shrink-0 bg-white rounded-3xl border border-slate-100 p-4 shadow-sm h-fit">
@@ -563,6 +572,7 @@ export function CommEmailTemplates() {
         </div>
 
       </div>
+      )}
     </div>
   );
 }

@@ -16,18 +16,37 @@ export function HomeVisits() {
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const today = formatLocalDate(new Date());
 
-  // Filter pending visits: only for patients whose attendance has been finalized
-  // A visit is only held back if the child is currently scheduled/waiting in today's clinic queue
-  // or has an uncompleted consultation scheduled AFTER the last clinical date
-  const pendingVisits = visits.filter(v => {
-    if (v.status !== 'pending') return false;
-    const hasUncompletedConsultation = atendimentos.some(
-      a => a.patient_id === v.patient_id && 
-           a.status !== 'completed' && 
-           (a.date === today || (v.last_clinical_date ? a.date > v.last_clinical_date && a.date <= today : false))
-    );
-    return !hasUncompletedConsultation;
-  }).sort((a, b) => a.date.localeCompare(b.date));
+  // Filter pending visits: only the latest pending visit per child, and only for children who completed attendance
+  const pendingVisits = React.useMemo(() => {
+    const patientVisitsMap = new Map<string, HomeVisit[]>();
+    for (const v of visits) {
+      if (v.status !== 'pending') continue;
+      const list = patientVisitsMap.get(v.patient_id) || [];
+      list.push(v);
+      patientVisitsMap.set(v.patient_id, list);
+    }
+
+    const result: HomeVisit[] = [];
+
+    patientVisitsMap.forEach((pVisits, patientId) => {
+      // Keep strictly the latest pending visit for this patient
+      pVisits.sort((a, b) => b.date.localeCompare(a.date));
+      const latest = pVisits[0];
+
+      // Exclude if patient currently has an uncompleted consultation scheduled for today or after the last clinical date
+      const hasUncompletedConsultation = atendimentos.some(
+        a => a.patient_id === patientId && 
+             a.status !== 'completed' && 
+             (a.date === today || (latest.last_clinical_date ? a.date > latest.last_clinical_date && a.date <= today : false))
+      );
+
+      if (!hasUncompletedConsultation) {
+        result.push(latest);
+      }
+    });
+
+    return result.sort((a, b) => a.date.localeCompare(b.date));
+  }, [visits, atendimentos, today]);
 
   const completedVisits = visits.filter(v => v.status === 'completed').sort((a, b) => b.date.localeCompare(a.date));
 
