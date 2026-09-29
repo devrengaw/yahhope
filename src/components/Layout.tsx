@@ -201,7 +201,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
       
       {/* Primary Sidebar - Workspaces */}
-      {module !== 'supporter' && (
+      {module !== 'supporter' && user?.role !== 'OBSERVER' && (
         <div className="w-16 sm:w-[72px] bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
           <Link 
             to="/workspace" 
@@ -281,7 +281,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         </div>
 
         {/* Mobile Module Switcher */}
-        {module !== 'supporter' && (
+        {module !== 'supporter' && user?.role !== 'OBSERVER' && (
           <div className={cn("md:hidden flex items-center justify-around p-3 border-b shrink-0", theme.borderTop)}>
             <Link to="/workspace" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'workspace' ? theme.itemActiveBg : theme.itemInactiveBg)}>
               <Home size={22} className={module === 'workspace' ? theme.iconActive : theme.moduleName} />
@@ -423,7 +423,8 @@ export function Layout({ children, module }: { children: React.ReactNode, module
                   <p className={cn("text-xs truncate", theme.roleText)}>
                     {user?.role === 'ADMIN' ? 'Administrador' : 
                      user?.role === 'VOLUNTEER' ? 'Voluntário' : 
-                     user?.role === 'SPONSOR' ? 'Padrinho' : 'Usuário'}
+                     user?.role === 'SPONSOR' ? 'Padrinho' : 
+                     user?.role === 'OBSERVER' ? 'Observador(a)' : 'Usuário'}
                   </p>
                 </div>
               </Link>

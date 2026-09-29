@@ -25,6 +25,8 @@ export function PortalLogin() {
 
       if (user.role === 'SPONSOR') {
         navigate('/portal/dashboard', { replace: true });
+      } else if (user.role === 'OBSERVER') {
+        navigate('/nutrition/patients', { replace: true });
       } else if (user.role === 'ADMIN') {
         navigate('/portal/dashboard', { replace: true });
       } else {

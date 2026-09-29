@@ -5,6 +5,7 @@ import { differenceInMonths } from 'date-fns';
 import { calculateAge, cn, parseLocalDate, formatLocalDate } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
 import { useInventory } from '../contexts/InventoryContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const STEPS = [
   { id: 1, title: 'Identificação', icon: User },
@@ -48,7 +49,14 @@ const Textarea = ({ label, name, rows = 3, formData, handleChange }: any) => (
 
 export function NewPatient() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  
+  useEffect(() => {
+    if (user?.role === 'OBSERVER') {
+      navigate('/nutrition/patients', { replace: true });
+    }
+  }, [user, navigate]);
   
   // Form State
   const [formData, setFormData] = useState<Record<string, any>>({

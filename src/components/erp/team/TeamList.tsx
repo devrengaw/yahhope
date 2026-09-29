@@ -25,6 +25,8 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamList
         return { label: 'Assistente Social', colors: 'bg-orange-100 text-orange-800 border-orange-200' };
       case 'volunteer':
         return { label: 'Voluntário(a)', colors: 'bg-purple-100 text-purple-800 border-purple-200' };
+      case 'observer':
+        return { label: 'Observador(a)', colors: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
       default:
         return { label: role, colors: 'bg-slate-100 text-slate-800 border-slate-200' };
     }

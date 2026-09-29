@@ -76,7 +76,7 @@ export interface InventoryTransaction {
 export interface ClinicalEvent {
   id: string;
   patient_id: string;
-  event_type: 'initial' | 'return' | 'acs_visit' | 'referral' | 'acompanhamento';
+  event_type: 'initial' | 'return' | 'acs_visit' | 'referral' | 'acompanhamento' | 'observation';
   date: string;
   notes: string;
   weight?: number;
@@ -202,7 +202,7 @@ export const mockInventoryCategories: InventoryCategory[] = [];
 
 export const mockTransactionCategories: TransactionCategory[] = [];
 
-export type TeamMemberRole = 'admin' | 'coordinator' | 'volunteer' | 'doctor' | 'nurse' | 'social_worker' | 'acs';
+export type TeamMemberRole = 'admin' | 'coordinator' | 'volunteer' | 'doctor' | 'nurse' | 'social_worker' | 'acs' | 'observer';
 export type TeamMemberStatus = 'active' | 'inactive' | 'on_leave';
 
 export interface TeamMember {

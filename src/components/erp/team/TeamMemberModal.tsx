@@ -112,7 +112,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
       join_date: joinDate,
       department,
       category_id: categoryId || undefined,
-      permissions: selectedPermissions
+      permissions: role === 'observer' ? ['patients'] : selectedPermissions
     });
     
     // Reset form
@@ -186,7 +186,13 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
               <label className="block text-sm font-medium text-slate-700 mb-1">Cargo / Função</label>
               <select
                 value={role}
-                onChange={e => setRole(e.target.value as TeamMemberRole)}
+                onChange={e => {
+                  const newRole = e.target.value as TeamMemberRole;
+                  setRole(newRole);
+                  if (newRole === 'observer') {
+                    setSelectedPermissions(['patients']);
+                  }
+                }}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white"
                 required
               >
@@ -196,6 +202,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
                 <option value="doctor">Médico(a)</option>
                 <option value="acs">ACS (Agente Comunitário de Saúde)</option>
                 <option value="coordinator">Coordenador(a)</option>
+                <option value="observer">Observador(a) de Saúde</option>
                 <option value="admin">Administrador(a)</option>
               </select>
             </div>

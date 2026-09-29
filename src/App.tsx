@@ -121,7 +121,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
   // Check if role is allowed
   if (!allowedRoles.includes(user.role)) {
-    const fallback = user.role === 'SPONSOR' ? '/portal' : '/workspace';
+    const fallback = user.role === 'SPONSOR' ? '/portal' : user.role === 'OBSERVER' ? '/nutrition/patients' : '/workspace';
     
     // Prevent infinite loop if already at fallback
     if (location.pathname.startsWith(fallback)) {
@@ -139,6 +139,14 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
     return <Navigate to={fallback} />;
   }
   
+  return <>{children}</>;
+}
+
+function ObserverRestricted({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === 'OBSERVER') {
+    return <Navigate to="/nutrition/patients" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -168,6 +176,7 @@ function RootRedirect() {
   if (!user) return <Navigate to="/login" />;
   if (user.role === 'SPONSOR') return <Navigate to="/portal/dashboard" />;
   if (user.role === 'ADMIN') return <Navigate to="/admin" />;
+  if (user.role === 'OBSERVER') return <Navigate to="/nutrition/patients" />;
   return <Navigate to="/workspace" />;
 }
 
@@ -278,20 +287,20 @@ export default function App() {
 
                                       {/* Nutrition Module */}
                                       <Route path="/nutrition/*" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
+                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER']}>
                                           <Layout module="nutrition">
                                             <Routes>
-                                              <Route path="/" element={<Dashboard />} />
+                                              <Route path="/" element={<ObserverRestricted><Dashboard /></ObserverRestricted>} />
                                               <Route path="/patients" element={<Patients />} />
-                                              <Route path="/patients/new" element={<NewPatient />} />
+                                              <Route path="/patients/new" element={<ObserverRestricted><NewPatient /></ObserverRestricted>} />
                                               <Route path="/patients/:id" element={<PatientDetails />} />
-                                              <Route path="/waiting-list" element={<WaitingList />} />
-                                              <Route path="/updates" element={<NutritionSupporterUpdates />} />
-                                              <Route path="/inventory" element={<Inventory />} />
-                                              <Route path="/management" element={<Management />} />
-                                              <Route path="/finance" element={<NutritionFinance />} />
-                                              <Route path="/atendimento" element={<Atendimentos />} />
-                                              <Route path="/visits" element={<HomeVisits />} />
+                                              <Route path="/waiting-list" element={<ObserverRestricted><WaitingList /></ObserverRestricted>} />
+                                              <Route path="/updates" element={<ObserverRestricted><NutritionSupporterUpdates /></ObserverRestricted>} />
+                                              <Route path="/inventory" element={<ObserverRestricted><Inventory /></ObserverRestricted>} />
+                                              <Route path="/management" element={<ObserverRestricted><Management /></ObserverRestricted>} />
+                                              <Route path="/finance" element={<ObserverRestricted><NutritionFinance /></ObserverRestricted>} />
+                                              <Route path="/atendimento" element={<ObserverRestricted><Atendimentos /></ObserverRestricted>} />
+                                              <Route path="/visits" element={<ObserverRestricted><HomeVisits /></ObserverRestricted>} />
                                               <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
                                             </Routes>
                                           </Layout>

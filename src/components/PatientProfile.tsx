@@ -5,6 +5,7 @@ import { calculateAge, cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { usePatients } from '../contexts/PatientContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PatientProfileProps {
   patientId: string;
@@ -12,8 +13,10 @@ interface PatientProfileProps {
 
 export function PatientProfile({ patientId }: PatientProfileProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { deletePatient } = usePatients();
   const { confirm } = useConfirm();
+  const isObserver = user?.role === 'OBSERVER';
   
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -159,39 +162,41 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
           <User className="text-emerald-500" /> 
           Ficha Cadastral
         </h2>
-        <div className="flex gap-2">
-          {!isEditing ? (
-            <>
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-slate-200"
-              >
-                <Edit2 size={16} /> Editar
-              </button>
-              <button 
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-red-100"
-              >
-                <Trash2 size={16} /> Excluir
-              </button>
-            </>
-          ) : (
-            <>
-              <button 
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-slate-200"
-              >
-                <X size={16} /> Cancelar
-              </button>
-              <button 
-                onClick={handleSave}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-sm"
-              >
-                <Save size={16} /> Salvar Alterações
-              </button>
-            </>
-          )}
-        </div>
+        {!isObserver && (
+          <div className="flex gap-2">
+            {!isEditing ? (
+              <>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-slate-200"
+                >
+                  <Edit2 size={16} /> Editar
+                </button>
+                <button 
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-red-100"
+                >
+                  <Trash2 size={16} /> Excluir
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 border border-slate-200"
+                >
+                  <X size={16} /> Cancelar
+                </button>
+                <button 
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <Save size={16} /> Salvar Alterações
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Profile Details Grid */}

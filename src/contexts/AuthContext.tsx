@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export type Role = 'ADMIN' | 'USER' | 'SPONSOR';
+export type Role = 'ADMIN' | 'USER' | 'SPONSOR' | 'OBSERVER';
 
 export interface User {
   id: string;
@@ -30,6 +30,9 @@ const getPermissionsForRole = (role: Role) => {
   }
   if (role === 'SPONSOR') {
     return ['portal'];
+  }
+  if (role === 'OBSERVER') {
+    return ['patients'];
   }
   return ['dashboard', 'patients', 'attendance', 'waiting-list', 'inventory', 'management', 'atendimento', 'messages', 'updates', 'visits'];
 };
@@ -127,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: finalUser.name,
         email: finalUser.email,
         role: roleStr,
-        permissions: (finalUser.permissions && Array.isArray(finalUser.permissions)) ? finalUser.permissions : getPermissionsForRole(roleStr),
+        permissions: roleStr === 'OBSERVER' ? ['patients'] : ((finalUser.permissions && Array.isArray(finalUser.permissions)) ? finalUser.permissions : getPermissionsForRole(roleStr)),
         avatar: finalUser.name ? finalUser.name[0].toUpperCase() : 'U'
       };
 

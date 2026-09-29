@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
+import { useAuth } from '../contexts/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 
 export function Patients() {
   const { patients, events } = usePatients();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -68,13 +70,15 @@ export function Patients() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Crianças</h1>
           <p className="text-slate-500 mt-1 font-medium">Gestão de prontuários e acompanhamentos</p>
         </div>
-        <Link 
-          to="/nutrition/patients/new"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-200 active:scale-95"
-        >
-          <Plus size={20} />
-          Novo Cadastro
-        </Link>
+        {user?.role !== 'OBSERVER' && (
+          <Link 
+            to="/nutrition/patients/new"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Cadastro
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">

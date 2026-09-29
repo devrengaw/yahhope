@@ -27,6 +27,11 @@ export function Login() {
         return;
       }
 
+      if (user.role === 'OBSERVER') {
+        navigate('/nutrition/patients');
+        return;
+      }
+
       if (user.role === 'ADMIN') {
         navigate('/workspace');
         return;

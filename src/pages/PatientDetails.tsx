@@ -93,6 +93,7 @@ export function PatientDetails() {
   const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
   const { user } = useAuth();
+  const isObserver = user?.role === 'OBSERVER';
   
   const searchParams = new URLSearchParams(location.search);
   const action = searchParams.get('action');
@@ -102,6 +103,13 @@ export function PatientDetails() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Observer Observation Modal State
+  const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+  const [observationDate, setObservationDate] = useState(formatLocalDate(new Date()));
+  const [observationProfessional, setObservationProfessional] = useState(user?.name || '');
+  const [observationNotes, setObservationNotes] = useState('');
+  const [isSavingObservation, setIsSavingObservation] = useState(false);
   
   const patient = patients.find(p => p.id === id);
   const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
@@ -115,6 +123,12 @@ export function PatientDetails() {
   const patientEvents = [...events.filter(e => e.patient_id === id), ...patientVisits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   useEffect(() => {
+    if (isObserver) {
+      if (action || aptId) {
+        navigate(`/nutrition/patients/${id}`, { replace: true });
+      }
+      return;
+    }
     if (action === 'new-followup') {
       const defaultReturnDate = new Date();
       defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
@@ -222,8 +236,33 @@ export function PatientDetails() {
   const latestMuacEvent = patientEvents.find(e => e.muac !== undefined);
   const latestHeadEvent = patientEvents.find(e => e.head_circumference !== undefined);
   
-  // For the diagnosis/Z-score, we use the latest clinical visit (not ACS visit)
-  const latestClinicalEvent = patientEvents.find(e => e.event_type !== 'acs_visit') || patientEvents[0];
+  // For the diagnosis/Z-score, we use the latest clinical visit (not ACS visit and not observer notes)
+  const latestClinicalEvent = patientEvents.find(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation') || patientEvents[0];
+
+  const handleSaveObservation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!observationNotes.trim() || !patient) return;
+    setIsSavingObservation(true);
+    try {
+      const newEvent: ClinicalEvent = {
+        id: Math.random().toString(36).substring(2, 9),
+        patient_id: patient.id,
+        event_type: 'observation',
+        date: observationDate,
+        notes: observationNotes.trim(),
+        professional: observationProfessional.trim() || user?.name || 'Profissional Observador'
+      };
+      await addEvent(newEvent);
+      setIsObservationModalOpen(false);
+      setObservationNotes('');
+      setActiveTab('historico');
+    } catch (err) {
+      console.error('Erro ao salvar observação:', err);
+      alert('Erro ao salvar observação clínica.');
+    } finally {
+      setIsSavingObservation(false);
+    }
+  };
 
   const activeMedications = [...(latestClinicalEvent?.prescriptions || [])];
   if (latestClinicalEvent?.kit_delivered) {
@@ -583,41 +622,58 @@ export function PatientDetails() {
 
       {/* Action Bar */}
       <div className="flex flex-wrap gap-3">
-        <button 
-          onClick={handleOpenNewFollowup}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-        >
-          <Plus size={18} />
-          Novo Acompanhamento
-        </button>
-        <button 
-          onClick={openReferralModal}
-          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-        >
-          <FileText size={18} />
-          Gerar Encaminhamento
-        </button>
-        <button 
-          onClick={() => setIsImpactModalOpen(true)}
-          className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-        >
-          <Heart size={18} className="fill-amber-600" />
-          Enviar Atualização de Impacto
-        </button>
-        
-        {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
+        {isObserver ? (
           <button 
-            onClick={handleAddToQueue}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+            onClick={() => {
+              setObservationDate(formatLocalDate(new Date()));
+              setObservationProfessional(user?.name || '');
+              setObservationNotes('');
+              setIsObservationModalOpen(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md shadow-indigo-100 text-sm active:scale-95"
           >
-            <Clock size={18} className="text-emerald-600" />
-            Colocar na Fila
+            <MessageSquare size={18} />
+            Adicionar Observação Clínica
           </button>
         ) : (
-          <div className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm">
-            <CheckCircle2 size={18} className="text-slate-400" />
-            Já está na Fila
-          </div>
+          <>
+            <button 
+              onClick={handleOpenNewFollowup}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+            >
+              <Plus size={18} />
+              Novo Acompanhamento
+            </button>
+            <button 
+              onClick={openReferralModal}
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+            >
+              <FileText size={18} />
+              Gerar Encaminhamento
+            </button>
+            <button 
+              onClick={() => setIsImpactModalOpen(true)}
+              className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+            >
+              <Heart size={18} className="fill-amber-600" />
+              Enviar Atualização de Impacto
+            </button>
+            
+            {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
+              <button 
+                onClick={handleAddToQueue}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+              >
+                <Clock size={18} className="text-emerald-600" />
+                Colocar na Fila
+              </button>
+            ) : (
+              <div className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm">
+                <CheckCircle2 size={18} className="text-slate-400" />
+                Já está na Fila
+              </div>
+            )}
+          </>
         )}
 
         {showImpactSuccess && (
@@ -756,21 +812,23 @@ export function PatientDetails() {
                               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">
                                 Prescrito em {parseLocalDate(latestClinicalEvent.date).toLocaleDateString('pt-BR')}
                               </span>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => {
-                                  setEditingMedicationIndex(i);
-                                  setEditedMedication({ 
-                                    medication: p.medication, 
-                                    treatment: p.treatment,
-                                    duration_days: p.duration_days?.toString() || ''
-                                  });
-                                }} className="p-1 text-slate-400 hover:text-emerald-600 transition-colors">
-                                  <Edit2 size={14} />
-                                </button>
-                                <button onClick={() => handleDeleteMedication(i)} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
+                              {!isObserver && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => {
+                                    setEditingMedicationIndex(i);
+                                    setEditedMedication({ 
+                                      medication: p.medication, 
+                                      treatment: p.treatment,
+                                      duration_days: p.duration_days?.toString() || ''
+                                    });
+                                  }} className="p-1 text-slate-400 hover:text-emerald-600 transition-colors">
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button onClick={() => handleDeleteMedication(i)} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             
                             <p className="text-sm font-black text-slate-800 mb-1">{p.medication}</p>
@@ -913,11 +971,11 @@ export function PatientDetails() {
                         <th className="p-4 text-center">PB (cm)</th>
                         <th className="p-4 text-center">P/E (Z)</th>
                         <th className="p-4">Status</th>
-                        <th className="p-4 text-center">Ações</th>
+                        {!isObserver && <th className="p-4 text-center">Ações</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {patientEvents.filter(e => e.event_type !== 'acs_visit').map((event) => (
+                      {patientEvents.filter(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation').map((event) => (
                         <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-4 text-xs font-medium text-slate-600">
                             {parseLocalDate(event.date).toLocaleDateString()}
@@ -943,14 +1001,16 @@ export function PatientDetails() {
                           <td className="p-4">
                             {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
                           </td>
-                          <td className="p-4 text-center">
-                            <button
-                              onClick={() => handleEditPastEvent(event)}
-                              className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
-                            >
-                              Editar
-                            </button>
-                          </td>
+                          {!isObserver && (
+                            <td className="p-4 text-center">
+                              <button
+                                onClick={() => handleEditPastEvent(event)}
+                                className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
+                              >
+                                Editar
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -971,7 +1031,8 @@ export function PatientDetails() {
                         "absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 transition-transform group-hover:scale-110",
                         event.event_type === 'initial' ? 'bg-blue-500' :
                         event.event_type === 'acompanhamento' ? 'bg-emerald-500' :
-                        event.event_type === 'acs_visit' ? 'bg-amber-500' : 'bg-slate-500'
+                        event.event_type === 'acs_visit' ? 'bg-amber-500' : 
+                        event.event_type === 'observation' ? 'bg-indigo-500' : 'bg-slate-500'
                       )}></div>
                       
                       <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
@@ -980,14 +1041,20 @@ export function PatientDetails() {
                             <span className="font-bold text-slate-900 capitalize text-lg">
                               {event.event_type === 'initial' ? 'Avaliação Inicial' : 
                                event.event_type === 'acompanhamento' ? 'Acompanhamento Clínico' :
-                               event.event_type === 'acs_visit' ? 'Visita ACS' : 'Retorno'}
+                               event.event_type === 'acs_visit' ? 'Visita ACS' : 
+                               event.event_type === 'observation' ? 'Observação Clínica / Parecer' : 'Retorno'}
                             </span>
+                            {event.event_type === 'observation' && (
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                                Observador
+                              </span>
+                            )}
                             {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {event.professional}</span>
-                            {event.event_type !== 'acs_visit' && (
+                            {event.event_type !== 'acs_visit' && event.event_type !== 'observation' && !isObserver && (
                               <button
                                 onClick={() => handleEditPastEvent(event)}
                                 className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 transition-all ml-2"
@@ -999,8 +1066,11 @@ export function PatientDetails() {
                         </div>
 
                         {event.notes && (
-                          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 mb-4">
-                            <p className="text-slate-600 text-sm italic">"{event.notes}"</p>
+                          <div className={cn(
+                            "p-4 rounded-xl border mb-4",
+                            event.event_type === 'observation' ? "bg-indigo-50/50 border-indigo-100 text-slate-700" : "bg-slate-50/50 border-slate-100 text-slate-600"
+                          )}>
+                            <p className="text-sm font-medium leading-relaxed">"{event.notes}"</p>
                           </div>
                         )}
 
@@ -1541,6 +1611,91 @@ export function PatientDetails() {
                 >
                   <Send size={16} />
                   Enviar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Observation Modal (Observadores de Saúde & Equipe) */}
+      {isObservationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-xl w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <MessageSquare size={22} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Observação Clínica</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Parecer e notas técnicas sobre {patient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsObservationModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveObservation} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+                    Data da Observação
+                  </label>
+                  <input 
+                    type="date"
+                    value={observationDate}
+                    onChange={(e) => setObservationDate(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+                    Profissional / Especialidade
+                  </label>
+                  <input 
+                    type="text"
+                    value={observationProfessional}
+                    onChange={(e) => setObservationProfessional(e.target.value)}
+                    placeholder="Ex: Dra. Mariana - Pediatra"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+                  Parecer Clínico / Observações *
+                </label>
+                <textarea 
+                  value={observationNotes}
+                  onChange={(e) => setObservationNotes(e.target.value)}
+                  rows={5}
+                  required
+                  placeholder="Descreva suas observações técnicas sobre o quadro da criança, acompanhamento de evolução, alertas ou considerações multidisciplinares..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all resize-none font-medium text-slate-800 leading-relaxed"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsObservationModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!observationNotes.trim() || isSavingObservation}
+                  className="flex-1 bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSavingObservation ? 'Salvando...' : 'Salvar Observação'}
                 </button>
               </div>
             </form>
