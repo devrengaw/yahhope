@@ -90,7 +90,7 @@ export function PatientDetails() {
   const { addEvent, updateEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita, visits } = useVisits();
-  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, adicionarNaFila, atendimentos } = useAtendimento();
+  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
   const { user } = useAuth();
   const isObserver = user?.role === 'OBSERVER';
@@ -122,6 +122,22 @@ export function PatientDetails() {
   }));
   const patientEvents = [...events.filter(e => e.patient_id === id), ...patientVisits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+  // Helper to match a clinical consultation to its corresponding home visit (scheduled for the following week)
+  const getVisitForEvent = (eventDate: string) => {
+    if (!visits || !patient) return null;
+    // 1. Direct match by last_clinical_date
+    const directMatch = visits.find(v => v.patient_id === patient.id && v.last_clinical_date === eventDate);
+    if (directMatch) return directMatch;
+
+    // 2. Proximity match: scheduled for ~7 days after eventDate (between 1 and 10 days)
+    const pDate = parseLocalDate(eventDate);
+    return visits.find(v => {
+      if (v.patient_id !== patient.id) return false;
+      const diff = differenceInDays(parseLocalDate(v.date), pDate);
+      return diff >= 1 && diff <= 10;
+    });
+  };
+
   useEffect(() => {
     if (isObserver) {
       if (action || aptId) {
@@ -135,11 +151,9 @@ export function PatientDetails() {
       setReturnDate(formatLocalDate(defaultReturnDate));
       setProfessional(user?.name || '');
       setIsModalOpen(true);
-      if (aptId) {
-        iniciarAtendimento(aptId);
-        if (patient) {
-          sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
-        }
+      if (patient) {
+        iniciarAtendimentoPorPaciente(patient.id, patient.name);
+        sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
       }
     } else if (action === 'edit-last') {
       const lastEvent = patientEvents[0];
@@ -163,7 +177,7 @@ export function PatientDetails() {
     } else if (action === 'referral') {
       setIsReferralModalOpen(true);
     }
-  }, [action, aptId]);
+  }, [action, aptId, patient?.id]);
 
   const handleOpenNewFollowup = () => {
     const defaultReturnDate = new Date();
@@ -181,6 +195,11 @@ export function PatientDetails() {
     setProfessional(user?.name || '');
     setEditingEventId(null);
     setIsModalOpen(true);
+
+    if (patient) {
+      iniciarAtendimentoPorPaciente(patient.id, patient.name);
+      sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
+    }
   };
 
   const handleEditPastEvent = (event: any) => {
@@ -410,9 +429,8 @@ export function PatientDetails() {
       concludedFromQueue = true;
     }
 
-    // Schedule ACS visit for next week ONLY after attendance is finalized
-    // (concluirAtendimento already schedules the visit when concluding a queue appointment)
-    if (!editingEventId && !concludedFromQueue) {
+    // Always ensure the ACS visit for next week is scheduled for new clinical events
+    if (!editingEventId) {
       agendarVisita(patient.id, eventDate);
     }
 
@@ -971,48 +989,102 @@ export function PatientDetails() {
                         <th className="p-4 text-center">PB (cm)</th>
                         <th className="p-4 text-center">P/E (Z)</th>
                         <th className="p-4">Status</th>
+                        <th className="p-4 text-center">Visita Domiciliar</th>
                         {!isObserver && <th className="p-4 text-center">Ações</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {patientEvents.filter(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation').map((event) => (
-                        <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-4 text-xs font-medium text-slate-600">
-                            {parseLocalDate(event.date).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 text-center text-sm font-bold text-slate-900">
-                            {event.weight || '--'}
-                          </td>
-                          <td className="p-4 text-center text-sm font-semibold text-slate-700">
-                            {event.height || '--'}
-                          </td>
-                          <td className="p-4 text-center text-sm font-semibold text-slate-700">
-                            {event.muac || '--'}
-                          </td>
-                          <td className="p-4 text-center text-sm">
-                             <span className={cn(
-                               "font-bold",
-                               event.z_score_weight_height && event.z_score_weight_height < -2 ? "text-red-500" : 
-                               event.z_score_weight_height && event.z_score_weight_height < -1 ? "text-amber-500" : "text-emerald-500"
-                             )}>
-                               {event.z_score_weight_height !== undefined ? event.z_score_weight_height : '--'}
-                             </span>
-                          </td>
-                          <td className="p-4">
-                            {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
-                          </td>
-                          {!isObserver && (
-                            <td className="p-4 text-center">
-                              <button
-                                onClick={() => handleEditPastEvent(event)}
-                                className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
-                              >
-                                Editar
-                              </button>
+                      {patientEvents.filter(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation').map((event) => {
+                        const relatedVisit = getVisitForEvent(event.date);
+                        return (
+                          <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-4 text-xs font-medium text-slate-600">
+                              {parseLocalDate(event.date).toLocaleDateString()}
                             </td>
-                          )}
-                        </tr>
-                      ))}
+                            <td className="p-4 text-center text-sm font-bold text-slate-900">
+                              {event.weight || '--'}
+                            </td>
+                            <td className="p-4 text-center text-sm font-semibold text-slate-700">
+                              {event.height || '--'}
+                            </td>
+                            <td className="p-4 text-center text-sm font-semibold text-slate-700">
+                              {event.muac || '--'}
+                            </td>
+                            <td className="p-4 text-center text-sm">
+                               <span className={cn(
+                                 "font-bold",
+                                 event.z_score_weight_height && event.z_score_weight_height < -2 ? "text-red-500" : 
+                                 event.z_score_weight_height && event.z_score_weight_height < -1 ? "text-amber-500" : "text-emerald-500"
+                               )}>
+                                 {event.z_score_weight_height !== undefined ? event.z_score_weight_height : '--'}
+                               </span>
+                            </td>
+                            <td className="p-4">
+                              {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
+                            </td>
+                            <td className="p-4 text-center">
+                              {relatedVisit ? (
+                                relatedVisit.status === 'completed' ? (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                                      Visitada ({parseLocalDate(relatedVisit.date).toLocaleDateString('pt-BR')})
+                                    </span>
+                                    {relatedVisit.observations && (
+                                      <span className="text-[9px] text-slate-400 font-medium max-w-[140px] truncate" title={relatedVisit.observations}>
+                                        {relatedVisit.observations}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                      <Clock size={12} className="text-amber-600 shrink-0" />
+                                      Na Fila ({parseLocalDate(relatedVisit.date).toLocaleDateString('pt-BR')})
+                                    </span>
+                                    <span className="text-[9px] text-amber-600/80 font-bold uppercase tracking-tight">
+                                      Semana seguinte
+                                    </span>
+                                  </div>
+                                )
+                              ) : (
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                    Não visitada
+                                  </span>
+                                  {!isObserver && (
+                                    <button
+                                      onClick={async () => {
+                                        await agendarVisita(patient.id, event.date);
+                                        sendNotification(
+                                          'Visita Agendada',
+                                          `A visita de ${patient.name} foi colocada na fila para a semana seguinte (${parseLocalDate(formatLocalDate(addDays(parseLocalDate(event.date), 7))).toLocaleDateString('pt-BR')}).`,
+                                          'success'
+                                        );
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
+                                      title="Colocar na fila de visitas domiciliares"
+                                    >
+                                      <Plus size={11} />
+                                      Colocar na Fila
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            {!isObserver && (
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => handleEditPastEvent(event)}
+                                  className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
+                                >
+                                  Editar
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

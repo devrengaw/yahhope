@@ -15,7 +15,13 @@ export function Atendimentos() {
   const filteredAtendimentos = atendimentos.filter(a => {
     const matchesSearch = a.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
     const isToday = a.date === todayDate;
-    const isPastAndPending = a.date < todayDate && a.status !== 'completed';
+    
+    // Past appointments only show up if the child has not completed another appointment on or after that date
+    const hasBeenCompletedLater = atendimentos.some(
+      other => other.patient_id === a.patient_id && other.status === 'completed' && other.date >= a.date
+    );
+    const isPastAndPending = a.date < todayDate && a.status !== 'completed' && !hasBeenCompletedLater;
+
     return matchesSearch && (isToday || isPastAndPending);
   });
 

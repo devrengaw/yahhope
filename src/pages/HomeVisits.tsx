@@ -16,15 +16,20 @@ export function HomeVisits() {
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const today = formatLocalDate(new Date());
 
-  // Filter pending visits: only for patients whose attendance has been finalized (not currently uncompleted in consultation queue)
+  // Filter pending visits: only for patients whose attendance has been finalized
+  // A visit is only held back if the child is currently scheduled/waiting in today's clinic queue
+  // or has an uncompleted consultation scheduled AFTER the last clinical date
   const pendingVisits = visits.filter(v => {
     if (v.status !== 'pending') return false;
     const hasUncompletedConsultation = atendimentos.some(
-      a => a.patient_id === v.patient_id && a.status !== 'completed' && a.date <= today
+      a => a.patient_id === v.patient_id && 
+           a.status !== 'completed' && 
+           (a.date === today || (v.last_clinical_date ? a.date > v.last_clinical_date && a.date <= today : false))
     );
     return !hasUncompletedConsultation;
-  });
-  const completedVisits = visits.filter(v => v.status === 'completed');
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+  const completedVisits = visits.filter(v => v.status === 'completed').sort((a, b) => b.date.localeCompare(a.date));
 
   const getPatient = (id: string) => patients.find(p => p.id === id);
 
