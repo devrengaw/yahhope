@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { HomeVisit } from '../lib/mockData';
 import { formatLocalDate, parseLocalDate } from '../lib/utils';
-import { addDays } from 'date-fns';
+import { addDays, differenceInDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -36,57 +36,50 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
 
   const syncCompletedAtendimentosToVisits = async () => {
     try {
-      // 1. Sync visits for clinical appointments that are completed
-      const { data: atendimentos } = await supabase
-        .from('clinical_appointments')
-        .select('*')
-        .eq('status', 'completed');
-
-      // 2. Also check clinical events (the clinical source of truth)
+      // 1. Clinical events are the clinical source of truth
       const { data: clinicalEvents } = await supabase
         .from('clinical_events')
-        .select('child_id, date');
+        .select('child_id, date')
+        .not('event_type', 'in', '("acs_visit","observation")');
 
-      const { data: visitsData } = await supabase.from('home_visits').select('patient_id, last_clinical_date');
-      const visitsMap = new Set((visitsData || []).filter(v => v.last_clinical_date).map(v => `${v.patient_id}_${v.last_clinical_date}`));
+      // 2. Fetch all existing visits (both completed and pending)
+      const { data: visitsData } = await supabase.from('home_visits').select('*');
+      const allVisits = (visitsData || []) as HomeVisit[];
 
       const defaultAcsId = user?.id || (await supabase.auth.getUser()).data.user?.id || '417afa81-df6d-406e-b605-86beec9da3f0';
       const toInsert: { patient_id: string; acs_id: string; date: string; status: 'pending'; checklist: any; observations: string; last_clinical_date: string }[] = [];
 
-      // Check appointments
-      if (atendimentos) {
-        for (const a of atendimentos) {
-          const key = `${a.patient_id}_${a.date}`;
-          if (!visitsMap.has(key)) {
-            visitsMap.add(key);
-            toInsert.push({
-              patient_id: a.patient_id,
-              acs_id: defaultAcsId,
-              date: formatLocalDate(addDays(parseLocalDate(a.date), 7)),
-              status: 'pending',
-              checklist: { dynamic: {} },
-              observations: '',
-              last_clinical_date: a.date
-            });
-          }
-        }
-      }
+      const today = new Date();
 
-      // Check clinical events
       if (clinicalEvents) {
         for (const ev of clinicalEvents) {
-          const key = `${ev.child_id}_${ev.date}`;
-          if (!visitsMap.has(key)) {
-            visitsMap.add(key);
-            toInsert.push({
-              patient_id: ev.child_id,
-              acs_id: defaultAcsId,
-              date: formatLocalDate(addDays(parseLocalDate(ev.date), 7)),
-              status: 'pending',
-              checklist: { dynamic: {} },
-              observations: '',
-              last_clinical_date: ev.date
+          const evDate = parseLocalDate(ev.date);
+          const daysAgo = differenceInDays(today, evDate);
+
+          // Only auto-sync attendances from recent cycles (within 14 days)
+          if (daysAgo >= 0 && daysAgo <= 14) {
+            // Check if ANY visit (completed or pending) already matches this consultation
+            // either directly by last_clinical_date or by occurring in the following week (1 to 13 days)
+            const hasMatchingVisit = allVisits.some(v => {
+              if (v.patient_id !== ev.child_id) return false;
+              if (v.last_clinical_date === ev.date) return true;
+              const diff = differenceInDays(parseLocalDate(v.date), evDate);
+              return diff >= 1 && diff <= 13;
             });
+
+            const alreadyQueued = toInsert.some(v => v.patient_id === ev.child_id && v.last_clinical_date === ev.date);
+
+            if (!hasMatchingVisit && !alreadyQueued) {
+              toInsert.push({
+                patient_id: ev.child_id,
+                acs_id: defaultAcsId,
+                date: formatLocalDate(addDays(evDate, 7)),
+                status: 'pending',
+                checklist: { dynamic: {} },
+                observations: '',
+                last_clinical_date: ev.date
+              });
+            }
           }
         }
       }
@@ -160,6 +153,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   };
 
   const concluirVisita = async (visitId: string, observations: string, checklist: any) => {
+    const targetVisit = visits.find(v => v.id === visitId);
     const updates = { 
       status: 'completed' as const, 
       observations, 
@@ -172,6 +166,26 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.from('home_visits').update(updates).eq('id', visitId);
     if (error) {
       console.error('Error completing visit:', error);
+    }
+
+    // Clean up any other pending visits for the same patient and consultation cycle
+    if (targetVisit?.patient_id) {
+      const duplicates = visits.filter(v => 
+        v.id !== visitId && 
+        v.patient_id === targetVisit.patient_id && 
+        v.status === 'pending' && 
+        (
+          (targetVisit.last_clinical_date && v.last_clinical_date === targetVisit.last_clinical_date) ||
+          (targetVisit.last_clinical_date && Math.abs(differenceInDays(parseLocalDate(v.date), parseLocalDate(targetVisit.last_clinical_date))) <= 13)
+        )
+      );
+
+      if (duplicates.length > 0) {
+        for (const dup of duplicates) {
+          await supabase.from('home_visits').delete().eq('id', dup.id);
+        }
+        setVisits(prev => prev.filter(v => !duplicates.some(d => d.id === v.id)));
+      }
     }
   };
 

@@ -125,17 +125,45 @@ export function PatientDetails() {
   // Helper to match a clinical consultation to its corresponding home visit (scheduled for the following week)
   const getVisitForEvent = (eventDate: string) => {
     if (!visits || !patient) return null;
-    // 1. Direct match by last_clinical_date
-    const directMatch = visits.find(v => v.patient_id === patient.id && v.last_clinical_date === eventDate);
-    if (directMatch) return directMatch;
-
-    // 2. Proximity match: scheduled for ~7 days after eventDate (between 1 and 10 days)
+    const pVisits = visits.filter(v => v.patient_id === patient.id);
     const pDate = parseLocalDate(eventDate);
-    return visits.find(v => {
-      if (v.patient_id !== patient.id) return false;
+
+    // 1. Prioritize COMPLETED visits
+    // 1a. Direct match by last_clinical_date
+    const directCompleted = pVisits.find(v => v.status === 'completed' && v.last_clinical_date === eventDate);
+    if (directCompleted) return directCompleted;
+
+    // 1b. Weekly cycle proximity match: visit occurred in the following week window (1 to 13 days after eventDate)
+    const proximityCompleted = pVisits.find(v => {
+      if (v.status !== 'completed') return false;
       const diff = differenceInDays(parseLocalDate(v.date), pDate);
-      return diff >= 1 && diff <= 10;
+      return diff >= 1 && diff <= 13;
     });
+    if (proximityCompleted) return proximityCompleted;
+
+    // 2. Fallback to PENDING visits
+    // 2a. Direct match by last_clinical_date
+    const directPending = pVisits.find(v => v.status === 'pending' && v.last_clinical_date === eventDate);
+    if (directPending) return directPending;
+
+    // 2b. Proximity match for pending visit (scheduled in the following week)
+    const proximityPending = pVisits.find(v => {
+      if (v.status !== 'pending') return false;
+      const diff = differenceInDays(parseLocalDate(v.date), pDate);
+      return diff >= 1 && diff <= 13;
+    });
+    if (proximityPending) return proximityPending;
+
+    return null;
+  };
+
+  const formatProfessionalName = (prof?: string) => {
+    if (!prof) return 'Profissional';
+    if (prof === 'db5a34ae-1fd2-44ac-8135-f1a0bea91c29') return 'Amos Inacio';
+    if (prof === '417afa81-df6d-406e-b605-86beec9da3f0') return 'Lucas Wagner';
+    if (user && user.id === prof) return user.name;
+    if (prof.includes('-') && prof.length > 20) return 'Amos Inacio';
+    return prof;
   };
 
   useEffect(() => {
@@ -954,7 +982,7 @@ export function PatientDetails() {
                                 {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
                               </td>
                               <td className="p-5 text-right text-xs font-bold text-slate-500">
-                                {event.professional || '--'}
+                                {formatProfessionalName(event.professional)}
                               </td>
                             </tr>
                           ))}
@@ -1125,7 +1153,7 @@ export function PatientDetails() {
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
-                            <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {event.professional}</span>
+                            <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {formatProfessionalName(event.professional)}</span>
                             {event.event_type !== 'acs_visit' && event.event_type !== 'observation' && !isObserver && (
                               <button
                                 onClick={() => handleEditPastEvent(event)}

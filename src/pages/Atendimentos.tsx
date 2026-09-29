@@ -2,17 +2,26 @@ import { useState } from 'react';
 import { Search, CheckCircle2, Clock, UserCheck, Activity, ArrowRight, PlayCircle, X, Calendar, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAtendimento, Atendimento } from '../contexts/AtendimentoContext';
+import { usePatients } from '../contexts/PatientContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatLocalDate, cn } from '../lib/utils';
 
 export function Atendimentos() {
   const { atendimentos, marcarPresenca, iniciarAtendimento, concluirAtendimento, removerDaFila } = useAtendimento();
+  const { patients } = usePatients();
   const [searchTerm, setSearchTerm] = useState('');
   const today = new Date();
   const todayDate = formatLocalDate(today);
 
+  const registeredPatientIds = new Set(patients.map(p => p.id));
+
   const filteredAtendimentos = atendimentos.filter(a => {
+    // Only show appointments of registered children
+    if (patients.length > 0 && !registeredPatientIds.has(a.patient_id)) {
+      return false;
+    }
+
     const matchesSearch = a.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
     const isToday = a.date === todayDate;
     

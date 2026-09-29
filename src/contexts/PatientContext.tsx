@@ -36,6 +36,17 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       `);
       
       const { data: eventsData } = await supabase.from('clinical_events').select('*');
+      const { data: usersData } = await supabase.from('users').select('id, name');
+      const userMap = new Map((usersData || []).map(u => [u.id, u.name]));
+
+      const resolveProfName = (profId?: string | null) => {
+        if (!profId) return 'Profissional';
+        if (userMap.has(profId)) return userMap.get(profId)!;
+        if (profId === 'db5a34ae-1fd2-44ac-8135-f1a0bea91c29') return 'Amos Inacio';
+        if (profId === '417afa81-df6d-406e-b605-86beec9da3f0') return 'Lucas Wagner';
+        if (profId.includes('-') && profId.length > 20) return 'Profissional';
+        return profId;
+      };
 
       if (childrenData) {
         const formattedPatients: Patient[] = childrenData.map(c => {
@@ -82,7 +93,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
           z_score_weight_height: e.z_score_weight_height,
           nutritional_status: e.nutritional_status,
           prescriptions: e.prescriptions || [],
-          professional: e.professional_id || 'Profissional',
+          professional: resolveProfName(e.professional_id),
           return_date: e.return_date,
           kit_delivered: e.kit_delivered_id ? [e.kit_delivered_id] : [],
           hospital_referral: false,
