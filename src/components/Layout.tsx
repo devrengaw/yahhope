@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -29,6 +29,7 @@ const workspaceNavItems = [
 ];
 
 const adminNavItems = [
+  { name: 'Dashboard de Acessos', path: '/admin/analytics', icon: BarChart3 },
   { name: 'Aviso do Topo', path: '/admin/top-banner', icon: Megaphone },
   { name: 'Destaques Home', path: '/admin/home-highlights', icon: Sparkles },
   { name: 'Cards de Impacto', path: '/admin/impact-metrics', icon: BarChart3 },
@@ -49,6 +50,7 @@ const communicationNavItems = [
   { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
   { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
   { name: 'Blog', path: '/communication/blog', icon: Newspaper },
+  { name: 'Disparo de E-mails', path: '/communication/campaigns', icon: Send },
   { name: 'Templates de E-mail', path: '/communication/email-templates', icon: Mail },
   { name: 'Gestão', path: '/communication/management', icon: Settings },
 ];
@@ -86,7 +88,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
-    const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication';
+    const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication' || permissionKey === 'analytics';
     const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : (permissionKey === 'blog' ? 'blog' : (permissionKey === 'chat' ? 'chat' : permissionKey)))));
     const actualKey = (module === 'nutrition' && finalKey === 'finance') ? 'nutrition-finance' : finalKey;
     
@@ -194,7 +196,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   };
 
   const hasNutrition = user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits'].includes(p));
-  const hasCommunication = user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'email-templates'].includes(p));
+  const hasCommunication = user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'campaigns', 'email-templates'].includes(p));
   const hasAdmin = user?.permissions && user.permissions.some(p => ['settings', 'impact-feed', 'messages', 'gifts', 'fundraising', 'store', 'local-projects', 'users'].includes(p));
 
   return (

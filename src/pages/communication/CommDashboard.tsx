@@ -3,7 +3,7 @@ import {
   LayoutDashboard, MessageSquare, Briefcase, Newspaper, 
   TrendingUp, Users, Target, Plus, Bell, Trash2,
   Clock, ArrowRight, X, UserPlus, Info, Calendar as CalendarIcon,
-  ChevronLeft, ChevronRight, Check
+  ChevronLeft, ChevronRight, Check, Send
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
@@ -222,13 +222,22 @@ export function CommDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <LayoutDashboard className="text-indigo-600" size={32} />
             Painel de Comunicação
           </h1>
           <p className="text-slate-500 mt-1 font-medium italic">Gestão centralizada de projetos e avisos.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/communication/campaigns"
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm transition-all shadow-md shadow-amber-500/20 flex items-center gap-2"
+          >
+            <Send size={16} />
+            Disparo de E-mails
+          </Link>
         </div>
       </div>
 

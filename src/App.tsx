@@ -59,6 +59,7 @@ import { SponsorSetup } from './pages/public/SponsorSetup';
 import { CommChat } from './pages/communication/CommChat';
 import { CommBlogAdmin } from './pages/communication/CommBlogAdmin';
 import { CommEmailTemplates } from './pages/communication/CommEmailTemplates';
+import { CommEmailCampaigns } from './pages/communication/CommEmailCampaigns';
 import { NutritionSupporterUpdates } from './pages/nutrition/SupporterUpdates';
 import { ImpactFeedManager } from './pages/admin/ImpactFeedManager';
 import { SupporterMessages } from './pages/admin/SupporterMessages';
@@ -70,6 +71,8 @@ import { AdminStoreManager } from './pages/admin/AdminStoreManager';
 import { HomeHighlightsManager } from './pages/admin/HomeHighlightsManager';
 import { ImpactMetricsManager } from './pages/admin/ImpactMetricsManager';
 import { TopBannerManager } from './pages/admin/TopBannerManager';
+import { AdminAnalyticsDashboard } from './pages/admin/AdminAnalyticsDashboard';
+import { AnalyticsTracker } from './components/analytics/AnalyticsTracker';
 import { HomeHighlightsProvider } from './contexts/HomeHighlightsContext';
 import { ImpactMetricsProvider } from './contexts/ImpactMetricsContext';
 import { TopBannerProvider } from './contexts/TopBannerContext';
@@ -203,6 +206,7 @@ export default function App() {
                                         <BlogProvider>
                                           <WebsiteProjectsProvider>
                                         <Router>
+                                          <AnalyticsTracker />
                                           <DonationModalProvider>
                                       <Routes>
                                         {/* Dedicated full-screen Display Route */}
@@ -229,7 +233,8 @@ export default function App() {
                                           <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
                                             <Layout module="admin">
                                               <Routes>
-                                                <Route path="/" element={<Navigate to="/admin/projects" replace />} />
+                                                <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
+                                                <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
                                                 <Route path="/home-highlights" element={<HomeHighlightsManager />} />
                                                 <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
                                                 <Route path="/top-banner" element={<TopBannerManager />} />
@@ -278,7 +283,8 @@ export default function App() {
                                               <Route path="/projects" element={<CommProjects />} />
                                               <Route path="/chat" element={<CommChat />} />
                                               <Route path="/blog" element={<CommBlogAdmin />} />
-                                              <Route path="/email-templates" element={<CommEmailTemplates />} />
+                                              <Route path="/campaigns" element={<CommEmailCampaigns />} />
+                                               <Route path="/email-templates" element={<CommEmailTemplates />} />
                                               <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
                                             </Routes>
                                           </Layout>

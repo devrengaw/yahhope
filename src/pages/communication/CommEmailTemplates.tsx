@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mail, Save, FileText, CheckCircle2, Image as ImageIcon, Palette, Settings, LayoutTemplate, Heart, Eye, Send, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 import { RichTextEditor } from '../../components/admin/communication/RichTextEditor';
@@ -197,21 +198,51 @@ export function CommEmailTemplates() {
             Gerencie e personalize os e-mails enviados pelo sistema.
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          className={cn(
-            "px-6 py-3 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg",
-            isSaved 
-              ? "bg-emerald-500 text-white shadow-emerald-500/20" 
-              : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
-          )}
+        <div className="flex items-center gap-3">
+          <Link
+            to="/communication/campaigns"
+            className="px-5 py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 text-sm"
+          >
+            <Send size={18} />
+            Disparo de Campanhas
+          </Link>
+          <button
+            onClick={handleSave}
+            className={cn(
+              "px-6 py-3 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg text-sm",
+              isSaved 
+                ? "bg-emerald-500 text-white shadow-emerald-500/20" 
+                : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
+            )}
+          >
+            {isSaved ? (
+              <><CheckCircle2 size={20} /> Salvo com sucesso!</>
+            ) : (
+              <><Save size={20} /> Salvar Template de E-mail</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Banner de Disparo de Campanhas Mailchimp */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200/80 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
+            <Sparkles size={22} />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-base">Quer criar e disparar um e-mail em massa agora?</h3>
+            <p className="text-slate-600 text-xs mt-0.5">
+              Utilize o novo módulo estilo <strong>Mailchimp</strong> para enviar comunicados para usuários, doadores e e-mails externos com feedback de leituras e aberturas!
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/communication/campaigns"
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors whitespace-nowrap shadow-sm"
         >
-          {isSaved ? (
-            <><CheckCircle2 size={20} /> Salvo com sucesso!</>
-          ) : (
-            <><Save size={20} /> Salvar Template de E-mail</>
-          )}
-        </button>
+          Acessar Disparo de E-mails →
+        </Link>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">
