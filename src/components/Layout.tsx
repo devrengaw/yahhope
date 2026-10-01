@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -21,11 +21,11 @@ const nutritionNavItems = [
 ];
 
 const workspaceNavItems = [
-  { name: 'Dashboard Pessoal', path: '/workspace', icon: LayoutDashboard },
+  { name: 'Início', path: '/workspace/inicio', icon: Home },
+  { name: 'Minhas Tarefas', path: '/workspace/my-tasks', icon: ClipboardList },
   { name: 'Projetos', path: '/workspace/projects', icon: Briefcase },
-  { name: 'Financeiro', path: '/workspace/finance', icon: DollarSign },
-  { name: 'Equipe', path: '/workspace/team', icon: Users },
   { name: 'Agenda', path: '/workspace/calendar', icon: Calendar },
+  { name: 'Caixa de Entrada', path: '/workspace/inbox', icon: Mail },
 ];
 
 const adminNavItems = [
@@ -72,6 +72,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   const { channels, addChannel } = workspaceData || {};
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopSidebarHidden, setIsDesktopSidebarHidden] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
 
@@ -80,26 +81,37 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Bloquear scroll de fundo quando o menu estiver aberto no celular
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isMobileMenuOpen]);
-
   // Fechar ao pressionar a tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const isAdmin = user?.role === 'ADMIN';
+  const hasWorkspace = user?.role !== 'OBSERVER';
+
+  const hasNutrition = 
+    isAdmin || 
+    ['USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER'].includes(user?.role || '') ||
+    Boolean(user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits', 'dashboard', 'nutrition'].includes(p)));
+
+  const hasCommunication = 
+    isAdmin || 
+    ['USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'COORDINATOR'].includes(user?.role || '') ||
+    Boolean(user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication'].includes(p)));
+
+  const hasAdmin = 
+    isAdmin || 
+    (user?.role === 'USER' && (
+      !user?.permissions || 
+      user.permissions.length === 0 || 
+      user.permissions.some(p => ['settings', 'impact-feed', 'messages', 'gifts', 'fundraising', 'store', 'local-projects', 'users', 'admin', 'finance', 'analytics', 'all'].includes(p))
+    ));
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
@@ -108,17 +120,34 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     module === 'supporter' ? supporterNavItems :
     adminNavItems;
   
-  // Filter items by permission (simplified mapping)
+  // Filter items by permission
   const navItems = initialNavItems.filter(item => {
-    if (module === 'supporter' || module === 'workspace') return true; // Workspace is open to all who log in
-    
+    // Admin has access to all items unconditionally
+    if (isAdmin) return true;
+
+    // Supporter and Workspace items are available to all authorized users
+    if (module === 'supporter' || module === 'workspace') return true;
+
+    // If permissions array is empty or includes 'all', allow all items for this module
+    if (!user?.permissions || user.permissions.length === 0 || user.permissions.includes('all')) return true;
+
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
     const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication' || permissionKey === 'analytics';
-    const finalKey = isDashboard ? 'dashboard' : (permissionKey === 'atendimento' ? 'attendance' : (permissionKey === 'estoque' ? 'inventory' : (permissionKey === 'settings' ? 'settings' : (permissionKey === 'blog' ? 'blog' : (permissionKey === 'chat' ? 'chat' : permissionKey)))));
-    const actualKey = (module === 'nutrition' && finalKey === 'finance') ? 'nutrition-finance' : finalKey;
-    
-    return user?.permissions.includes(actualKey);
+    if (isDashboard) return true;
+
+    const mappedKey = 
+      permissionKey === 'atendimento' ? 'attendance' :
+      permissionKey === 'estoque' ? 'inventory' :
+      permissionKey === 'top-banner' ? 'settings' :
+      permissionKey === 'home-highlights' ? 'settings' :
+      permissionKey === 'impact-metrics' ? 'settings' :
+      permissionKey === 'nutrition-finance' ? 'finance' :
+      permissionKey;
+
+    const actualKey = (module === 'nutrition' && mappedKey === 'finance') ? 'nutrition-finance' : mappedKey;
+
+    return user.permissions.includes(actualKey) || user.permissions.includes(permissionKey) || user.permissions.includes(item.path);
   });
 
   const moduleName = 
@@ -255,9 +284,6 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     navigate('/login');
   };
 
-  const hasNutrition = user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits'].includes(p));
-  const hasCommunication = user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'campaigns', 'email-templates'].includes(p));
-  const hasAdmin = user?.permissions && user.permissions.some(p => ['settings', 'impact-feed', 'messages', 'gifts', 'fundraising', 'store', 'local-projects', 'users'].includes(p));
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
@@ -316,224 +342,308 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             <button 
               onClick={() => setIsMobileMenuOpen(prev => !prev)} 
               aria-label={isMobileMenuOpen ? "Fechar Menu Lateral" : "Abrir Menu Lateral"}
-              className="p-1.5 -ml-1 rounded-xl active:scale-95 transition-all hover:bg-black/10 cursor-pointer flex items-center justify-center"
+              className="px-2.5 py-1.5 rounded-xl bg-black/15 active:scale-95 transition-all text-white flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer"
             >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              <span className="text-[11px]">{isMobileMenuOpen ? 'Fechar' : 'Menu'}</span>
             </button>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
-              <span className="text-xs font-bold opacity-80 truncate max-w-[130px]">{moduleName}</span>
+              <span className="text-xs font-bold opacity-90 truncate max-w-[140px]">{moduleName}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <NotificationBell isLight={isLightSidebar} />
           </div>
         </div>
 
         {/* Secondary Sidebar */}
-        {module !== 'workspace' && (
-          <aside
-            className={cn(
-              "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shadow-2xl flex flex-col border-r pt-safe pb-safe",
-              theme.sidebarBg,
-              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-            )}
-          >
-            {/* Header Mobile do Menu Lateral com botão Fechar */}
-            <div className={cn("p-4 md:hidden flex items-center justify-between border-b shrink-0", theme.borderTop)}>
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col border-r pt-safe pb-safe",
+            theme.sidebarBg,
+            module === 'workspace' 
+              ? "md:hidden" 
+              : (isDesktopSidebarHidden ? "md:hidden" : "md:relative md:translate-x-0 md:shadow-none"),
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Header Mobile do Menu Lateral com botão Fechar bem destacado */}
+          <div className={cn("p-4 md:hidden flex items-center justify-between border-b shrink-0", theme.borderTop)}>
+            <div className="flex items-center gap-2.5">
+              <img src="/logo.png" alt="YAH Hope" className={cn("h-7 object-contain", isLightSidebar ? "brightness-0" : "")} />
+              <div>
+                <p className={cn("text-xs font-black leading-tight", isLightSidebar ? "text-slate-900" : "text-white")}>YAH Hope</p>
+                <p className={cn("text-[10px] font-semibold uppercase tracking-wider", theme.moduleName)}>{moduleName}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                "px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-xs active:scale-95",
+                isLightSidebar 
+                  ? "bg-slate-100 text-slate-700 hover:bg-slate-200" 
+                  : "bg-white/20 text-white hover:bg-white/30 border border-white/20"
+              )}
+              aria-label="Esconder menu lateral"
+            >
+              <span>Esconder</span>
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Header Desktop da Barra Lateral */}
+          <div className="p-6 hidden md:block shrink-0">
+            <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
               <div className="flex items-center gap-2">
-                <img src="/logo.png" alt="YAH Hope" className={cn("h-7 object-contain", isLightSidebar ? "brightness-0" : "")} />
+                <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsDesktopSidebarHidden(true)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+                  title="Esconder menu lateral no computador"
+                  aria-label="Esconder menu lateral"
+                >
+                  <PanelLeftClose size={18} />
+                </button>
+                <NotificationBell isLight={isLightSidebar} />
+              </div>
+            </div>
+            <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
+          </div>
+
+          {/* Seletor de Módulos (Mobile) com Nomes e Ícones Claros */}
+          {module !== 'supporter' && user?.role !== 'OBSERVER' && (
+            <div className={cn("p-3 border-b shrink-0", theme.borderTop)}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <p className={cn("text-[10px] font-black uppercase tracking-wider", theme.roleText)}>
+                  Módulos do Sistema
+                </p>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/10 font-bold opacity-80">
+                  Alternar
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {hasWorkspace && (
+                  <Link
+                    to="/workspace"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      (module as string) === 'workspace'
+                        ? "bg-white text-slate-900 shadow-sm ring-2 ring-white/50"
+                        : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
+                    )}
+                  >
+                    <Home size={16} className={(module as string) === 'workspace' ? "text-amber-500" : "text-white/80"} />
+                    <span className="truncate">Workspace</span>
+                  </Link>
+                )}
+
+                {hasNutrition && (
+                  <Link
+                    to="/nutrition"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      module === 'nutrition'
+                        ? "bg-white text-slate-900 shadow-sm ring-2 ring-white/50"
+                        : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
+                    )}
+                  >
+                    <Activity size={16} className={module === 'nutrition' ? "text-emerald-600" : "text-white/80"} />
+                    <span className="truncate">Nutrição</span>
+                  </Link>
+                )}
+
+                {hasCommunication && (
+                  <Link
+                    to="/communication"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      module === 'communication'
+                        ? "bg-white text-slate-900 shadow-sm ring-2 ring-white/50"
+                        : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
+                    )}
+                  >
+                    <MessageSquare size={16} className={module === 'communication' ? "text-blue-500" : "text-white/80"} />
+                    <span className="truncate">Comunicação</span>
+                  </Link>
+                )}
+
+                {hasAdmin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      module === 'admin'
+                        ? "bg-white text-slate-900 shadow-sm ring-2 ring-white/50"
+                        : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
+                    )}
+                  >
+                    <Settings size={16} className={module === 'admin' ? "text-indigo-600" : "text-white/80"} />
+                    <span className="truncate">Admin</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <nav 
+            className="mt-3 flex-1 overflow-y-auto overscroll-contain px-3 pb-32" 
+            style={{ WebkitOverflowScrolling: 'touch' }}
+            aria-label="Navegação Lateral"
+          >
+            {(module as string) === 'workspace' ? (
+              <div className="pb-4">
+                <div className="mb-4">
+                  <div className="flex items-center justify-between px-2 mb-2">
+                    <p className={cn("text-xs font-bold uppercase tracking-wider", theme.roleText)}>Canais</p>
+                    {user?.role === 'ADMIN' && (
+                      <button 
+                        onClick={() => setIsChannelModalOpen(true)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-1">
+                    {channels?.map(channel => (
+                      <li key={channel.id}>
+                        <Link
+                          to={`/workspace/chat/${channel.id}`}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 group",
+                            location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace')
+                              ? theme.itemActiveBg
+                              : theme.itemInactiveBg
+                          )}
+                        >
+                          <span className="font-light text-lg opacity-70">#</span>
+                          <span className={cn(location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace') ? "font-bold" : "")}>
+                            {channel.name}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
                 <div>
-                  <p className={cn("text-xs font-black leading-tight", isLightSidebar ? "text-slate-900" : "text-white")}>YAH Hope</p>
-                  <p className={cn("text-[10px] font-semibold uppercase tracking-wider", theme.moduleName)}>{moduleName}</p>
+                  <p className={cn("px-2 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Atalhos do Workspace</p>
+                  <ul className="space-y-1">
+                    {workspaceNavItems.map(item => (
+                      <li key={item.path}>
+                        <Link
+                          to={item.path}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group",
+                            location.pathname === item.path ? theme.itemActiveBg : theme.itemInactiveBg
+                          )}
+                        >
+                          <item.icon size={18} className={location.pathname === item.path ? theme.iconActive : theme.iconInactive} />
+                          <span>{item.name}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
+            ) : (
+              <div>
+                <p className={cn("px-2 mb-2 text-[10px] font-black uppercase tracking-wider", theme.roleText)}>
+                  Itens do Módulo ({navItems.length})
+                </p>
+                <ul className="space-y-1">
+                  {navItems.map((item) => {
+                    const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
+                    return (
+                      <li key={item.path}>
+                        <Link
+                          to={item.path}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group",
+                            isActive ? theme.itemActiveBg : theme.itemInactiveBg
+                          )}
+                        >
+                          <item.icon size={18} className={isActive ? theme.iconActive : theme.moduleName} />
+                          <span className="truncate">{item.name}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </nav>
+
+          <div className="p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] border-t border-white/20 shrink-0 space-y-2">
+            <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 w-full p-2 rounded-xl transition-colors group", theme.avatarBg)}>
+              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name.charAt(0)
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name}</p>
+                <p className={cn("text-xs truncate", theme.roleText)}>
+                  {user?.role === 'ADMIN' ? 'Administrador' : 
+                   user?.role === 'VOLUNTEER' ? 'Voluntário' : 
+                   user?.role === 'SPONSOR' ? 'Padrinho' : 
+                   user?.role === 'OBSERVER' ? 'Observador(a)' : 'Usuário'}
+                </p>
+              </div>
+            </Link>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
-                  "p-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 text-xs font-bold",
-                  isLightSidebar ? "text-slate-600 hover:bg-slate-100" : "text-white/80 hover:bg-white/10"
+                  "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all md:hidden cursor-pointer",
+                  isLightSidebar ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "bg-white/15 text-white hover:bg-white/25"
                 )}
-                aria-label="Fechar menu lateral"
+                aria-label="Esconder menu lateral"
               >
-                <span className="text-[11px]">Fechar</span>
-                <X size={18} />
+                <X size={15} />
+                <span>Esconder</span>
               </button>
-            </div>
-
-            {/* Header Desktop da Barra Lateral */}
-            <div className="p-6 hidden md:block shrink-0">
-              <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
-                <div className="flex items-center gap-2 w-full">
-                  <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
-                </div>
-                <NotificationBell isLight={isLightSidebar} />
-              </div>
-              <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
-            </div>
-
-        {/* Mobile Module Switcher */}
-        {module !== 'supporter' && user?.role !== 'OBSERVER' && (
-          <div className={cn("md:hidden flex items-center justify-around p-3 border-b shrink-0", theme.borderTop)}>
-            <Link to="/workspace" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", (module as string) === 'workspace' ? theme.itemActiveBg : theme.itemInactiveBg)}>
-              <Home size={22} className={(module as string) === 'workspace' ? theme.iconActive : theme.moduleName} />
-            </Link>
-            {hasNutrition && (
-              <Link to="/nutrition" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'nutrition' ? theme.itemActiveBg : theme.itemInactiveBg)}>
-                <Activity size={22} className={module === 'nutrition' ? theme.iconActive : theme.moduleName} />
-              </Link>
-            )}
-            {hasCommunication && (
-              <Link to="/communication" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'communication' ? theme.itemActiveBg : theme.itemInactiveBg)}>
-                <MessageSquare size={22} className={module === 'communication' ? theme.iconActive : theme.moduleName} />
-              </Link>
-            )}
-            {hasAdmin && (
-              <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'admin' ? theme.itemActiveBg : theme.itemInactiveBg)}>
-                <Settings size={22} className={module === 'admin' ? theme.iconActive : theme.moduleName} />
-              </Link>
-            )}
-          </div>
-        )}
-        
-        <nav className="mt-4 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
-          {(module as string) === 'workspace' ? (
-            <div className="px-3 pb-4">
-              <div className="mb-6">
-                <div className="flex items-center justify-between px-4 mb-2">
-                  <p className={cn("text-xs font-bold uppercase tracking-wider", theme.roleText)}>Canais</p>
-                  {user?.role === 'ADMIN' && (
-                    <button 
-                      onClick={() => setIsChannelModalOpen(true)}
-                      className="text-slate-400 hover:text-white transition-colors"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  )}
-                </div>
-                <ul className="space-y-1">
-                  {channels?.map(channel => (
-                    <li key={channel.id}>
-                      <Link
-                        to={`/workspace/chat/${channel.id}`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                          location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace')
-                            ? theme.itemActiveBg
-                            : theme.itemInactiveBg
-                        )}
-                      >
-                        <span className="font-light text-lg opacity-70">#</span>
-                        <span className={cn(location.pathname === `/workspace/chat/${channel.id}` || (channel.id === 'geral' && location.pathname === '/workspace') ? "font-bold" : "")}>
-                          {channel.name}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="mb-6">
-                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Mensagens Diretas</p>
-                <div className="px-4 text-sm text-slate-500 italic opacity-70">
-                  Nenhuma conversa ativa
-                </div>
-              </div>
-
-              <div>
-                <p className={cn("px-4 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Organização</p>
-                <ul className="space-y-1">
-                  <li>
-                    <Link
-                      to="/workspace/projects"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname.startsWith('/workspace/projects')
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <Briefcase size={16} className={location.pathname.startsWith('/workspace/projects') ? theme.iconActive : theme.iconInactive} />
-                      <span className={cn(location.pathname.startsWith('/workspace/projects') ? "font-bold" : "")}>Projetos</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/workspace/calendar"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-1.5 rounded-md text-sm transition-all duration-300 group",
-                        location.pathname.startsWith('/workspace/calendar')
-                          ? theme.itemActiveBg
-                          : theme.itemInactiveBg
-                      )}
-                    >
-                      <Calendar size={16} className={location.pathname.startsWith('/workspace/calendar') ? theme.iconActive : theme.iconInactive} />
-                      <span className={cn(location.pathname.startsWith('/workspace/calendar') ? "font-bold" : "")}>Agenda</span>
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          ) : (
-            <ul className="space-y-1 px-3">
-              {navItems.map((item) => {
-                const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
-                return (
-                  <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all duration-300 group",
-                          isActive ? theme.itemActiveBg : theme.itemInactiveBg
-                        )}
-                      >
-                        <item.icon size={20} className={isActive ? theme.iconActive : theme.moduleName} />
-                      {item.name}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </nav>
-
-            <div className="p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] border-t border-white/20 shrink-0">
-              <Link to="/profile" className={cn("flex items-center gap-3 w-full p-2 rounded-xl transition-colors group", theme.avatarBg)}>
-                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden">
-                  {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    user?.name.charAt(0)
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn("text-sm font-bold truncate", isLightSidebar ? "text-slate-900" : "text-white")}>{user?.name}</p>
-                  <p className={cn("text-xs truncate", theme.roleText)}>
-                    {user?.role === 'ADMIN' ? 'Administrador' : 
-                     user?.role === 'VOLUNTEER' ? 'Voluntário' : 
-                     user?.role === 'SPONSOR' ? 'Padrinho' : 
-                     user?.role === 'OBSERVER' ? 'Observador(a)' : 'Usuário'}
-                  </p>
-                </div>
-              </Link>
-
               <button
                 onClick={handleLogout}
-                className={cn("flex items-center gap-2 w-full px-4 py-2 mt-2 rounded-xl transition-colors text-sm font-bold", theme.logoutBtn)}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                  theme.logoutBtn
+                )}
               >
-                <LogOut size={18} />
-                Sair
+                <LogOut size={15} />
+                <span>Sair</span>
               </button>
             </div>
-          </aside>
-        )}
+          </div>
+        </aside>
 
       {/* Main Content */}
-      <main className={cn("flex-1 w-full pb-20 md:pb-0", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
+      <main className={cn("flex-1 w-full pb-20 md:pb-0 relative", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
+        {/* Botão flutuante para reabrir menu no Desktop se estiver oculto */}
+        {isDesktopSidebarHidden && module !== 'workspace' && (
+          <button
+            onClick={() => setIsDesktopSidebarHidden(false)}
+            className="hidden md:flex fixed top-4 left-20 z-30 items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 rounded-xl shadow-md border border-slate-200 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
+            title="Expandir menu lateral"
+          >
+            <PanelLeftOpen size={16} className="text-[#88A1F2]" />
+            <span>Expandir Menu</span>
+          </button>
+        )}
+
         {module === 'workspace' ? (
           children
         ) : (
