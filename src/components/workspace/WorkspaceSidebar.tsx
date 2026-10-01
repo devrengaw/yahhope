@@ -5,11 +5,16 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
-  Hash, Link2, Star, Briefcase, Calendar, Users
+  Hash, Link2, Star, Briefcase, Calendar, Users, X
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export function WorkspaceSidebar() {
+interface WorkspaceSidebarProps {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSidebarProps = {}) {
   const { spaces, lists, channels, addChannel, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
   const { confirm } = useConfirm();
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({ 's1': true });
@@ -25,9 +30,13 @@ export function WorkspaceSidebar() {
   };
 
   return (
-    <div className="w-[260px] bg-[#EBBF6E] flex flex-col h-full border-r border-[#EBBF6E] shrink-0 text-white">
+    <div className={cn(
+      "w-[260px] max-w-[85vw] bg-[#EBBF6E] flex flex-col h-full border-r border-[#EBBF6E] shrink-0 text-white transition-transform duration-300",
+      "fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0",
+      isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
+    )}>
       {/* Top Header */}
-      <div className="p-4 flex items-center justify-between border-b border-white/20 cursor-pointer hover:bg-white/10 transition-colors">
+      <div className="p-4 flex items-center justify-between border-b border-white/20 hover:bg-white/10 transition-colors">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-lg text-white flex items-center justify-center font-black">
             YH
@@ -37,7 +46,18 @@ export function WorkspaceSidebar() {
             <p className="text-[10px] text-white/70 font-medium">Plano Premium</p>
           </div>
         </div>
-        <ChevronDown size={16} className="text-white/70" />
+        <div className="flex items-center gap-1">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-white/20 text-white md:hidden cursor-pointer"
+              aria-label="Fechar menu lateral"
+            >
+              <X size={18} />
+            </button>
+          )}
+          <ChevronDown size={16} className="text-white/70 hidden md:block" />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden">

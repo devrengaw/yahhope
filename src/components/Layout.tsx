@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -74,6 +74,32 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+
+  // Fechar o menu automaticamente ao mudar de rota
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Bloquear scroll de fundo quando o menu estiver aberto no celular
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
+  // Fechar ao pressionar a tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
@@ -283,17 +309,24 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       <div className="flex-1 flex flex-col md:flex-row relative">
         {/* Mobile Header with Safe Area for Notch and Status Bar */}
         <div className={cn(
-          "md:hidden px-4 pt-[calc(0.85rem+env(safe-area-inset-top,0px))] pb-3.5 flex justify-between items-center shadow-md z-20 transition-colors shrink-0",
+          "md:hidden px-4 pt-[calc(0.85rem+env(safe-area-inset-top,0px))] pb-3.5 flex justify-between items-center shadow-md z-30 transition-colors shrink-0",
           theme.mobileHeader
         )}>
-          <div className="flex items-center">
-            <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
-          </div>
-          <div className="flex items-center gap-4">
-            <NotificationBell isLight={isLightSidebar} />
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Abrir Menu">
+          <div className="flex items-center gap-2.5">
+            <button 
+              onClick={() => setIsMobileMenuOpen(prev => !prev)} 
+              aria-label={isMobileMenuOpen ? "Fechar Menu Lateral" : "Abrir Menu Lateral"}
+              className="p-1.5 -ml-1 rounded-xl active:scale-95 transition-all hover:bg-black/10 cursor-pointer flex items-center justify-center"
+            >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="YAH Hope" className={cn("h-6 object-contain", isLightSidebar ? "brightness-0" : "")} />
+              <span className="text-xs font-bold opacity-80 truncate max-w-[130px]">{moduleName}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationBell isLight={isLightSidebar} />
           </div>
         </div>
 
@@ -301,20 +334,43 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {module !== 'workspace' && (
           <aside
             className={cn(
-              "fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-2xl flex flex-col border-r pt-safe pb-safe",
-            theme.sidebarBg,
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          <div className="p-6 hidden md:block shrink-0">
-          <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
-            <div className="flex items-center gap-2 w-full">
-              <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
+              "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shadow-2xl flex flex-col border-r pt-safe pb-safe",
+              theme.sidebarBg,
+              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            )}
+          >
+            {/* Header Mobile do Menu Lateral com botão Fechar */}
+            <div className={cn("p-4 md:hidden flex items-center justify-between border-b shrink-0", theme.borderTop)}>
+              <div className="flex items-center gap-2">
+                <img src="/logo.png" alt="YAH Hope" className={cn("h-7 object-contain", isLightSidebar ? "brightness-0" : "")} />
+                <div>
+                  <p className={cn("text-xs font-black leading-tight", isLightSidebar ? "text-slate-900" : "text-white")}>YAH Hope</p>
+                  <p className={cn("text-[10px] font-semibold uppercase tracking-wider", theme.moduleName)}>{moduleName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  "p-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 text-xs font-bold",
+                  isLightSidebar ? "text-slate-600 hover:bg-slate-100" : "text-white/80 hover:bg-white/10"
+                )}
+                aria-label="Fechar menu lateral"
+              >
+                <span className="text-[11px]">Fechar</span>
+                <X size={18} />
+              </button>
             </div>
-            <NotificationBell isLight={isLightSidebar} />
-          </div>
-          <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
-        </div>
+
+            {/* Header Desktop da Barra Lateral */}
+            <div className="p-6 hidden md:block shrink-0">
+              <div className={cn("font-bold text-2xl tracking-tight flex items-center justify-between gap-2 w-full", isLightSidebar ? "text-slate-900" : "text-white")}>
+                <div className="flex items-center gap-2 w-full">
+                  <img src="/logo.png" alt="YAH Hope" className={cn("h-8 object-contain", isLightSidebar ? "brightness-0" : "")} />
+                </div>
+                <NotificationBell isLight={isLightSidebar} />
+              </div>
+              <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
+            </div>
 
         {/* Mobile Module Switcher */}
         {module !== 'supporter' && user?.role !== 'OBSERVER' && (
@@ -513,26 +569,28 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               );
             })}
             <button
-              onClick={() => setIsMobileMenuOpen(true)}
+              onClick={() => setIsMobileMenuOpen(prev => !prev)}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all",
+                "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all cursor-pointer",
                 isMobileMenuOpen ? "text-[#F49853] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
               )}
+              aria-label={isMobileMenuOpen ? "Esconder Menu Lateral" : "Mostrar Menu Lateral"}
             >
               <div className="p-1">
-                <Menu size={20} strokeWidth={2} />
+                {isMobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2} />}
               </div>
-              <span className="text-[10px] tracking-tight">Mais</span>
+              <span className="text-[10px] tracking-tight">{isMobileMenuOpen ? 'Fechar' : 'Menu'}</span>
             </button>
           </div>
         </nav>
       )}
 
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay (Backdrop escuro para fechar ao tocar fora) */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-all duration-300"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-all duration-300 cursor-pointer animate-in fade-in"
           onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
         />
       )}
       </div> {/* Closes Main Content Area */}
