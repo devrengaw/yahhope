@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
@@ -13,6 +13,7 @@ import { useAtendimento } from '../contexts/AtendimentoContext';
 import { useVisits } from '../contexts/VisitContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 // Helper to calculate Z-score approximation based on WHO simplified math
 const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F', ageInMonths?: number) => {
@@ -87,11 +88,12 @@ export function PatientDetails() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { addEvent, updateEvent, updatePatient, patients, events } = usePatients();
+  const { addEvent, updateEvent, deleteEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita, visits } = useVisits();
   const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos } = useAtendimento();
   const { sendNotification } = useNotification();
+  const { confirm } = useConfirm();
   const { user } = useAuth();
   const isObserver = user?.role === 'OBSERVER';
   
@@ -159,6 +161,9 @@ export function PatientDetails() {
 
   const formatProfessionalName = (prof?: string) => {
     if (!prof) return 'Profissional';
+    if (prof === 'Dra. Helena (Logada)' || prof.includes('(Logada)') || prof === 'Dra. Helena') {
+      return user?.name || 'Profissional';
+    }
     if (prof === 'db5a34ae-1fd2-44ac-8135-f1a0bea91c29') return 'Amos Inacio';
     if (prof === '417afa81-df6d-406e-b605-86beec9da3f0') return 'Lucas Wagner';
     if (user && user.id === prof) return user.name;
@@ -203,6 +208,7 @@ export function PatientDetails() {
         setIsModalOpen(true);
       }
     } else if (action === 'referral') {
+      setRefProfessional(user?.name || '');
       setIsReferralModalOpen(true);
     }
   }, [action, aptId, patient?.id]);
@@ -244,8 +250,29 @@ export function PatientDetails() {
     } else {
       setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
     }
+    setProfessional(event.professional || user?.name || '');
     setEventDate(event.date);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteEvent = async (eventId: string, eventDate: string) => {
+    const isConfirmed = await confirm({
+      title: 'Excluir Atendimento',
+      message: `Tem certeza que deseja excluir o atendimento do dia ${parseLocalDate(eventDate).toLocaleDateString()}? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      await deleteEvent(eventId);
+      sendNotification('Atendimento Excluído', 'O atendimento foi excluído com sucesso.', 'info');
+    } catch (error) {
+      console.error('Erro ao excluir atendimento:', error);
+      sendNotification('Erro', 'Não foi possível excluir o atendimento.', 'error');
+    }
   };
 
   const [isImpactModalOpen, setIsImpactModalOpen] = useState(false);
@@ -266,6 +293,7 @@ export function PatientDetails() {
   const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
 
   // Referral Modal State
+  const [refProfessional, setRefProfessional] = useState(user?.name || '');
   const [refWeight, setRefWeight] = useState('');
   const [refHeight, setRefHeight] = useState('');
   const [refPE, setRefPE] = useState('');
@@ -273,6 +301,15 @@ export function PatientDetails() {
   const [edemaLocation, setEdemaLocation] = useState('');
   const [referralReason, setReferralReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
+
+  // Sync state with user when auth resolves
+  useEffect(() => {
+    if (user?.name) {
+      if (!professional) setProfessional(user.name);
+      if (!refProfessional) setRefProfessional(user.name);
+      if (!observationProfessional) setObservationProfessional(user.name);
+    }
+  }, [user?.name]);
 
   // Active Medication Editing State
   const [editingMedicationIndex, setEditingMedicationIndex] = useState<number | null>(null);
@@ -394,7 +431,7 @@ export function PatientDetails() {
       bmi: parseFloat(bmi as string) || undefined,
       z_score_weight_height: calcStatus !== 'N/A' && zScore !== null ? zScore : undefined,
       nutritional_status: calcStatus !== 'N/A' ? calcStatus : undefined,
-      professional: professional || 'Dra. Helena',
+      professional: professional || user?.name || 'Profissional',
       prescriptions: validPrescriptions.length > 0 ? validPrescriptions : undefined,
       notes: newNotes,
       return_date: isDischarge ? undefined : (returnDate || undefined),
@@ -564,6 +601,7 @@ export function PatientDetails() {
   };
 
   const openReferralModal = () => {
+    setRefProfessional(user?.name || '');
     setRefWeight(patientEvents[0]?.weight ? (patientEvents[0].weight * 1000).toString() : '');
     setRefHeight(patientEvents[0]?.height ? patientEvents[0].height.toString() : '');
     setRefPE(patientEvents[0]?.z_score_weight_height !== undefined ? patientEvents[0].z_score_weight_height.toString() : '');
@@ -587,7 +625,7 @@ export function PatientDetails() {
       weight: parseFloat(refWeight) / 1000,
       height: parseFloat(refHeight),
       z_score_weight_height: parseFloat(refPE),
-      professional: 'Dra. Helena (Logada)',
+      professional: refProfessional.trim() || user?.name || 'Profissional',
       hospital_referral: true,
     };
     
@@ -1102,12 +1140,23 @@ export function PatientDetails() {
                             </td>
                             {!isObserver && (
                               <td className="p-4 text-center">
-                                <button
-                                  onClick={() => handleEditPastEvent(event)}
-                                  className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 transition-all"
-                                >
-                                  Editar
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => handleEditPastEvent(event)}
+                                    className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 transition-all cursor-pointer"
+                                    title="Editar atendimento"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteEvent(event.id, event.date)}
+                                    className="text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-all cursor-pointer flex items-center gap-1"
+                                    title="Excluir atendimento"
+                                  >
+                                    <Trash2 size={11} />
+                                    Excluir
+                                  </button>
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -1155,12 +1204,23 @@ export function PatientDetails() {
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {formatProfessionalName(event.professional)}</span>
                             {event.event_type !== 'acs_visit' && event.event_type !== 'observation' && !isObserver && (
-                              <button
-                                onClick={() => handleEditPastEvent(event)}
-                                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 transition-all ml-2"
-                              >
-                                Editar
-                              </button>
+                              <div className="flex items-center gap-1.5 ml-2">
+                                <button
+                                  onClick={() => handleEditPastEvent(event)}
+                                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 transition-all cursor-pointer"
+                                  title="Editar atendimento"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEvent(event.id, event.date)}
+                                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 transition-all cursor-pointer"
+                                  title="Excluir atendimento"
+                                >
+                                  <Trash2 size={11} />
+                                  Excluir
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1566,6 +1626,17 @@ export function PatientDetails() {
                     <p className="text-xs font-medium text-emerald-800 mb-1">Data</p>
                     <p className="text-sm font-bold text-emerald-900">{new Date().toLocaleDateString()}</p>
                   </div>
+                  <div className="col-span-2">
+                    <p className="text-xs font-medium text-emerald-800 mb-1">Profissional Responsável *</p>
+                    <input 
+                      required
+                      type="text" 
+                      value={refProfessional} 
+                      onChange={e => setRefProfessional(e.target.value)}
+                      placeholder="Nome do profissional"
+                      className="w-full bg-white border border-emerald-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 {/* Measurements */}
@@ -1853,7 +1924,8 @@ export function PatientDetails() {
           </div>
           
           <div className="mt-24 pt-8 border-t border-black text-center w-64 mx-auto">
-            <p>Assinatura do Profissional</p>
+            <p className="font-bold text-sm">{refProfessional.trim() || user?.name || 'Profissional'}</p>
+            <p className="text-xs text-gray-600">Assinatura do Profissional</p>
           </div>
         </div>
       </div>

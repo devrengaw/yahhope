@@ -10,6 +10,7 @@ interface PatientContextType {
   updatePatient: (id: string, updates: Partial<Patient>) => void;
   addEvent: (event: ClinicalEvent) => void;
   updateEvent: (id: string, updates: Partial<ClinicalEvent>) => void;
+  deleteEvent: (id: string) => Promise<void>;
   deletePatient: (id: string) => void;
   addFullPatientRecord: (payload: any) => Promise<string>;
   isLoading: boolean;
@@ -399,6 +400,17 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteEvent = async (id: string) => {
+    setEvents(prev => prev.filter(e => e.id !== id));
+    try {
+      if (id.length > 10) {
+        await supabase.from('clinical_events').delete().eq('id', id);
+      }
+    } catch (err) {
+      console.error('Error deleting event:', err);
+    }
+  };
+
   const deletePatient = async (id: string) => {
     setPatients(prev => prev.filter(p => p.id !== id));
     setEvents(prev => prev.filter(e => e.patient_id !== id));
@@ -408,7 +420,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <PatientContext.Provider value={{ patients, events, addPatient, updatePatient, addEvent, updateEvent, deletePatient, addFullPatientRecord, isLoading }}>
+    <PatientContext.Provider value={{ patients, events, addPatient, updatePatient, addEvent, updateEvent, deleteEvent, deletePatient, addFullPatientRecord, isLoading }}>
       {children}
     </PatientContext.Provider>
   );
