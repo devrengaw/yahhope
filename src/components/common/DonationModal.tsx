@@ -71,12 +71,15 @@ export function DonationModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-gotham-regular animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 font-gotham-regular animate-fade-in">
       <div 
         className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity"
         onClick={closeDonationModal}
       />
-      <div className="relative bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden z-10 border border-orange-100 flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-t-[2.5rem] sm:rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden z-10 border border-orange-100 flex flex-col max-h-[88vh] sm:max-h-[90vh] pb-safe animate-slideUp sm:animate-none">
+        {/* Mobile Drag Indicator Handle */}
+        <div className="sm:hidden w-12 h-1 bg-white/50 rounded-full mx-auto absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none" />
+
         <button 
           onClick={closeDonationModal}
           className="absolute top-4 right-4 z-20 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors cursor-pointer"

@@ -21,6 +21,8 @@ export interface EmailCampaign {
   delivered_count: number;
   opened_count: number;
   clicked_count: number;
+  replied_count?: number;
+  bounced_count?: number;
   failed_count: number;
   scheduled_for?: string;
   sent_at?: string;
@@ -34,15 +36,20 @@ export interface CampaignRecipient {
   campaign_id: string;
   email: string;
   name?: string;
-  recipient_type: 'user' | 'donor' | 'sponsor' | 'caregiver' | 'external';
-  status: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'failed';
+  recipient_type: 'apoiador' | 'user' | 'donor' | 'sponsor' | 'caregiver' | 'external';
+  status: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'replied' | 'bounced' | 'failed';
   resend_id?: string;
   error_message?: string;
   sent_at?: string;
+  delivered_at?: string;
   opened_at?: string;
   open_count: number;
   clicked_at?: string;
   click_count: number;
+  replied_at?: string;
+  reply_count?: number;
+  reply_snippet?: string;
+  bounced_at?: string;
   user_agent?: string;
   created_at: string;
 }
@@ -265,6 +272,8 @@ export const emailCampaignService = {
       delivered_count: 0,
       opened_count: 0,
       clicked_count: 0,
+      replied_count: 0,
+      bounced_count: 0,
       failed_count: 0
     };
 
@@ -362,51 +371,145 @@ export const emailCampaignService = {
     }
   },
 
-  // Simular abertura ou clique para demonstração/testes de métricas
-  async simulateInteraction(recipientId: string, type: 'open' | 'click') {
+  // Retorna o endereço do endpoint de Webhook do Resend
+  getWebhookUrl(): string {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://seu-projeto.supabase.co';
+    return `${supabaseUrl}/functions/v1/resend-webhook`;
+  },
+
+  // Registrar manualmente que um destinatário respondeu à mensagem
+  async recordReply(recipientId: string, snippet: string = 'Resposta registrada manualmente'): Promise<void> {
     const { data: rec } = await supabase
       .from('email_campaign_recipients')
-      .select('campaign_id, open_count, click_count, status')
+      .select('campaign_id, reply_count, status')
       .eq('id', recipientId)
       .single();
 
     if (!rec) return;
 
-    if (type === 'open') {
+    const newReplyCount = (rec.reply_count || 0) + 1;
+    await supabase
+      .from('email_campaign_recipients')
+      .update({
+        status: 'replied',
+        replied_at: new Date().toISOString(),
+        reply_count: newReplyCount,
+        reply_snippet: snippet
+      })
+      .eq('id', recipientId);
+
+    if (rec.reply_count === 0 || !rec.reply_count) {
+      const { data: camp } = await supabase.from('email_campaigns').select('replied_count').eq('id', rec.campaign_id).single();
+      if (camp) {
+        await supabase.from('email_campaigns').update({
+          replied_count: (camp.replied_count || 0) + 1,
+          updated_at: new Date().toISOString()
+        }).eq('id', rec.campaign_id);
+      }
+    }
+  },
+
+  // Simular abertura, clique, resposta ou bounce para testes de métricas em tempo real
+  async simulateInteraction(recipientId: string, type: 'open' | 'click' | 'reply' | 'delivered' | 'bounced') {
+    const { data: rec } = await supabase
+      .from('email_campaign_recipients')
+      .select('campaign_id, open_count, click_count, reply_count, status')
+      .eq('id', recipientId)
+      .single();
+
+    if (!rec) return;
+
+    const now = new Date().toISOString();
+
+    if (type === 'delivered') {
+      await supabase
+        .from('email_campaign_recipients')
+        .update({
+          status: ['opened', 'clicked', 'replied'].includes(rec.status) ? rec.status : 'delivered',
+          delivered_at: now
+        })
+        .eq('id', recipientId);
+    } else if (type === 'open') {
       const newOpenCount = (rec.open_count || 0) + 1;
       await supabase
         .from('email_campaign_recipients')
         .update({
-          status: rec.status === 'clicked' ? 'clicked' : 'opened',
-          opened_at: new Date().toISOString(),
+          status: ['clicked', 'replied'].includes(rec.status) ? rec.status : 'opened',
+          opened_at: rec.opened_at || now,
           open_count: newOpenCount
         })
         .eq('id', recipientId);
 
-      if (rec.open_count === 0) {
+      if (rec.open_count === 0 || !rec.open_count) {
         const { data: camp } = await supabase.from('email_campaigns').select('opened_count').eq('id', rec.campaign_id).single();
         if (camp) {
-          await supabase.from('email_campaigns').update({ opened_count: (camp.opened_count || 0) + 1 }).eq('id', rec.campaign_id);
+          await supabase.from('email_campaigns').update({ 
+            opened_count: (camp.opened_count || 0) + 1,
+            updated_at: now 
+          }).eq('id', rec.campaign_id);
         }
       }
-    } else {
+    } else if (type === 'click') {
       const newClickCount = (rec.click_count || 0) + 1;
       await supabase
         .from('email_campaign_recipients')
         .update({
-          status: 'clicked',
-          clicked_at: new Date().toISOString(),
+          status: rec.status === 'replied' ? 'replied' : 'clicked',
+          clicked_at: rec.clicked_at || now,
           click_count: newClickCount,
-          opened_at: new Date().toISOString(),
-          open_count: rec.open_count > 0 ? rec.open_count : 1
+          opened_at: rec.opened_at || now,
+          open_count: (rec.open_count && rec.open_count > 0) ? rec.open_count : 1
         })
         .eq('id', recipientId);
 
-      if (rec.click_count === 0) {
-        const { data: camp } = await supabase.from('email_campaigns').select('clicked_count').eq('id', rec.campaign_id).single();
+      if (rec.click_count === 0 || !rec.click_count) {
+        const { data: camp } = await supabase.from('email_campaigns').select('clicked_count, opened_count').eq('id', rec.campaign_id).single();
         if (camp) {
-          await supabase.from('email_campaigns').update({ clicked_count: (camp.clicked_count || 0) + 1 }).eq('id', rec.campaign_id);
+          await supabase.from('email_campaigns').update({ 
+            clicked_count: (camp.clicked_count || 0) + 1,
+            opened_count: (camp.opened_count || 0) + (rec.open_count ? 0 : 1),
+            updated_at: now 
+          }).eq('id', rec.campaign_id);
         }
+      }
+    } else if (type === 'reply') {
+      const newReplyCount = (rec.reply_count || 0) + 1;
+      await supabase
+        .from('email_campaign_recipients')
+        .update({
+          status: 'replied',
+          replied_at: now,
+          reply_count: newReplyCount,
+          reply_snippet: 'Olá, obrigado pelo e-mail! Gostaria de saber mais.'
+        })
+        .eq('id', recipientId);
+
+      if (rec.reply_count === 0 || !rec.reply_count) {
+        const { data: camp } = await supabase.from('email_campaigns').select('replied_count').eq('id', rec.campaign_id).single();
+        if (camp) {
+          await supabase.from('email_campaigns').update({ 
+            replied_count: (camp.replied_count || 0) + 1,
+            updated_at: now 
+          }).eq('id', rec.campaign_id);
+        }
+      }
+    } else if (type === 'bounced') {
+      await supabase
+        .from('email_campaign_recipients')
+        .update({
+          status: 'bounced',
+          bounced_at: now,
+          error_message: 'Endereço de e-mail rejeitado pelo servidor de destino (Bounced)'
+        })
+        .eq('id', recipientId);
+
+      const { data: camp } = await supabase.from('email_campaigns').select('bounced_count, failed_count').eq('id', rec.campaign_id).single();
+      if (camp) {
+        await supabase.from('email_campaigns').update({
+          bounced_count: (camp.bounced_count || 0) + 1,
+          failed_count: (camp.failed_count || 0) + 1,
+          updated_at: now
+        }).eq('id', rec.campaign_id);
       }
     }
   },

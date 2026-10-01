@@ -3,7 +3,8 @@ import {
   Send, Mail, Users, CheckCircle2, AlertCircle, Plus, Eye, BarChart3, 
   ArrowRight, Search, Filter, RefreshCw, Copy, Trash2, ExternalLink, 
   Clock, Check, MousePointer, Smartphone, Monitor, ChevronRight, ChevronDown, ChevronUp, X, Sparkles,
-  FileText, Upload, UserCheck, ShieldCheck, Heart, UserPlus, HelpCircle
+  FileText, Upload, UserCheck, ShieldCheck, Heart, UserPlus, HelpCircle,
+  MessageSquare, Share2, CheckCheck, CornerDownLeft, AlertTriangle, Radio
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -81,9 +82,20 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   // Modal de Analytics / Relatório de Leituras
   const [selectedCampaignForAnalytics, setSelectedCampaignForAnalytics] = useState<EmailCampaign | null>(null);
   const [analyticsRecipients, setAnalyticsRecipients] = useState<CampaignRecipient[]>([]);
-  const [analyticsFilter, setAnalyticsFilter] = useState<'all' | 'opened' | 'clicked' | 'not_opened' | 'failed'>('all');
+  const [analyticsFilter, setAnalyticsFilter] = useState<'all' | 'opened' | 'clicked' | 'replied' | 'not_opened' | 'failed'>('all');
   const [analyticsSearch, setAnalyticsSearch] = useState('');
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  // Modal do Webhook do Resend
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const [webhookTestStatus, setWebhookTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [webhookTestMessage, setWebhookTestMessage] = useState<string>('');
+
+  // Modal para Registro Manual de Resposta
+  const [replyModalRecipient, setReplyModalRecipient] = useState<{ recipient: CampaignRecipient; campaignId: string } | null>(null);
+  const [manualReplySnippet, setManualReplySnippet] = useState('');
+  const [isSavingReply, setIsSavingReply] = useState(false);
 
   // Pré-visualização Desktop vs Mobile
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
@@ -93,7 +105,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   const [inlineRecipients, setInlineRecipients] = useState<Record<string, CampaignRecipient[]>>({});
   const [loadingInlineRecipients, setLoadingInlineRecipients] = useState<string | null>(null);
   const [inlineSearch, setInlineSearch] = useState('');
-  const [inlineFilter, setInlineFilter] = useState<'all' | 'opened' | 'not_opened'>('all');
+  const [inlineFilter, setInlineFilter] = useState<'all' | 'opened' | 'replied' | 'not_opened' | 'failed'>('all');
 
   const handleToggleExpand = async (campaignId: string) => {
     if (expandedCampaignId === campaignId) {
@@ -114,12 +126,77 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
     }
   };
 
-  const handleSimulateInline = async (recipientId: string, campaignId: string) => {
-    await emailCampaignService.simulateInteraction(recipientId, 'open');
+  const handleSimulateInline = async (recipientId: string, campaignId: string, type: 'open' | 'click' | 'reply' | 'delivered' = 'open') => {
+    await emailCampaignService.simulateInteraction(recipientId, type);
     const recs = await emailCampaignService.fetchCampaignRecipients(campaignId);
     setInlineRecipients(prev => ({ ...prev, [campaignId]: recs }));
     const updatedCampaigns = await emailCampaignService.fetchCampaigns();
     setCampaigns(updatedCampaigns);
+  };
+
+  const handleCopyWebhookUrl = () => {
+    const url = emailCampaignService.getWebhookUrl();
+    navigator.clipboard.writeText(url);
+    setWebhookCopied(true);
+    setTimeout(() => setWebhookCopied(false), 2500);
+  };
+
+  const handleTestWebhook = async () => {
+    setWebhookTestStatus('testing');
+    setWebhookTestMessage('');
+    try {
+      const url = emailCampaignService.getWebhookUrl();
+      const res = await fetch(url, { method: 'GET' });
+      if (res.ok) {
+        const data = await res.json();
+        setWebhookTestStatus('success');
+        setWebhookTestMessage(data.message || 'Webhook ativo e pronto para receber eventos do Resend!');
+      } else {
+        setWebhookTestStatus('error');
+        setWebhookTestMessage(`Resposta do servidor: HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      setWebhookTestStatus('error');
+      setWebhookTestMessage(err.message || 'Não foi possível conectar ao endpoint do Webhook.');
+    }
+  };
+
+  const handleOpenReplyModal = (recipient: CampaignRecipient, campaignId: string) => {
+    setReplyModalRecipient({ recipient, campaignId });
+    setManualReplySnippet(recipient.reply_snippet || '');
+  };
+
+  const handleConfirmReply = async () => {
+    if (!replyModalRecipient) return;
+    setIsSavingReply(true);
+    try {
+      await emailCampaignService.recordReply(
+        replyModalRecipient.recipient.id,
+        manualReplySnippet.trim() || 'Resposta confirmada pelo gestor'
+      );
+      // Atualizar lista inline se carregada
+      if (inlineRecipients[replyModalRecipient.campaignId]) {
+        const recs = await emailCampaignService.fetchCampaignRecipients(replyModalRecipient.campaignId);
+        setInlineRecipients(prev => ({ ...prev, [replyModalRecipient.campaignId]: recs }));
+      }
+      // Atualizar analytics se aberto
+      if (selectedCampaignForAnalytics && selectedCampaignForAnalytics.id === replyModalRecipient.campaignId) {
+        const recs = await emailCampaignService.fetchCampaignRecipients(replyModalRecipient.campaignId);
+        setAnalyticsRecipients(recs);
+      }
+      const updatedCampaigns = await emailCampaignService.fetchCampaigns();
+      setCampaigns(updatedCampaigns);
+      if (selectedCampaignForAnalytics) {
+        const upSingle = updatedCampaigns.find(c => c.id === selectedCampaignForAnalytics.id);
+        if (upSingle) setSelectedCampaignForAnalytics(upSingle);
+      }
+      setReplyModalRecipient(null);
+      setManualReplySnippet('');
+    } catch (e: any) {
+      alert('Erro ao salvar resposta: ' + e.message);
+    } finally {
+      setIsSavingReply(false);
+    }
   };
 
   // Inicialização
@@ -365,7 +442,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   };
 
   // Simular interação para testar feedback imediato
-  const handleSimulateInteraction = async (recipientId: string, type: 'open' | 'click') => {
+  const handleSimulateInteraction = async (recipientId: string, type: 'open' | 'click' | 'reply' | 'delivered' | 'bounced' = 'open') => {
     await emailCampaignService.simulateInteraction(recipientId, type);
     if (selectedCampaignForAnalytics) {
       const recs = await emailCampaignService.fetchCampaignRecipients(selectedCampaignForAnalytics.id);
@@ -416,10 +493,14 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
   // Métricas Consolidadas Globais
   const totalSentGlobal = campaigns.reduce((acc, c) => acc + (c.sent_count || 0), 0);
+  const totalDeliveredGlobal = campaigns.reduce((acc, c) => acc + (c.delivered_count || c.sent_count || 0), 0);
   const totalOpenedGlobal = campaigns.reduce((acc, c) => acc + (c.opened_count || 0), 0);
   const totalClickedGlobal = campaigns.reduce((acc, c) => acc + (c.clicked_count || 0), 0);
+  const totalRepliedGlobal = campaigns.reduce((acc, c) => acc + (c.replied_count || 0), 0);
+  const totalBouncedGlobal = campaigns.reduce((acc, c) => acc + (c.bounced_count || 0), 0);
   const globalOpenRate = totalSentGlobal > 0 ? Math.round((totalOpenedGlobal / totalSentGlobal) * 100) : 0;
   const globalClickRate = totalSentGlobal > 0 ? Math.round((totalClickedGlobal / totalSentGlobal) * 100) : 0;
+  const globalReplyRate = totalSentGlobal > 0 ? Math.round((totalRepliedGlobal / totalSentGlobal) * 100) : 0;
 
   // Filtragem de Campanhas na lista
   const filteredCampaigns = campaigns.filter(c => {
@@ -438,8 +519,9 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
     if (analyticsFilter === 'opened') return (r.open_count || 0) > 0;
     if (analyticsFilter === 'clicked') return (r.click_count || 0) > 0;
-    if (analyticsFilter === 'not_opened') return (r.open_count || 0) === 0 && r.status !== 'failed';
-    if (analyticsFilter === 'failed') return r.status === 'failed';
+    if (analyticsFilter === 'replied') return (r.reply_count || 0) > 0 || r.status === 'replied';
+    if (analyticsFilter === 'not_opened') return (r.open_count || 0) === 0 && r.status !== 'failed' && r.status !== 'bounced';
+    if (analyticsFilter === 'failed') return r.status === 'failed' || r.status === 'bounced';
     return true;
   });
 
@@ -458,13 +540,26 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                 Disparo & Campanhas de E-mail
               </h1>
               <p className="text-slate-500 text-sm mt-1">
-                Crie, dispare comunicados estilo Mailchimp e acompanhe a taxa de leitura, aberturas e cliques em tempo real.
+                Crie comunicados estilo Mailchimp e acompanhe quando foram entregues, abertos, lidos e respondidos em tempo real.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => {
+              setIsWebhookModalOpen(true);
+              setWebhookTestStatus('idle');
+              setWebhookTestMessage('');
+            }}
+            className="px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-bold transition-all text-sm flex items-center gap-2 cursor-pointer shadow-xs"
+            title="Configurar Webhook no Resend para receber aberturas e respostas em tempo real"
+          >
+            <Share2 size={16} />
+            <span>Webhook Resend</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </button>
           <Link
             to="/communication/email-templates"
             className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors text-sm flex items-center gap-2"
@@ -482,49 +577,76 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
         </div>
       </div>
 
-      {/* CARDS DE KPI / PERFORMANCE GLOBAL */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+      {/* CARDS DE KPI / PERFORMANCE GLOBAL AVANÇADA */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Enviados & Entregues */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total de Envios</p>
             <h3 className="text-2xl font-black text-slate-900 mt-1">{totalSentGlobal.toLocaleString()}</h3>
-            <p className="text-xs text-slate-500 mt-1">E-mails entregues com sucesso</p>
+            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
+              <CheckCheck size={13} className="text-blue-500" />
+              {totalDeliveredGlobal} entregues
+            </p>
           </div>
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold">
-            <Mail size={22} />
+          <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold">
+            <Mail size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+        {/* Taxa Média de Abertura / Leitura */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Taxa Média de Abertura</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Taxa de Abertura</p>
             <h3 className="text-2xl font-black text-emerald-600 mt-1">{globalOpenRate}%</h3>
-            <p className="text-xs text-slate-500 mt-1">{totalOpenedGlobal} aberturas registradas</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              <strong className="text-emerald-700 font-bold">{totalOpenedGlobal}</strong> leituras registradas
+            </p>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">
-            <Eye size={22} />
+          <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">
+            <Eye size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+        {/* Taxa de Cliques (CTR) */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Taxa de Cliques (CTR)</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Taxa de Cliques</p>
             <h3 className="text-2xl font-black text-indigo-600 mt-1">{globalClickRate}%</h3>
-            <p className="text-xs text-slate-500 mt-1">{totalClickedGlobal} cliques no botão CTA</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              <strong className="text-indigo-700 font-bold">{totalClickedGlobal}</strong> cliques no botão
+            </p>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
-            <MousePointer size={22} />
+          <div className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
+            <MousePointer size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+        {/* Respostas Recebidas */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Campanhas Criadas</p>
-            <h3 className="text-2xl font-black text-amber-600 mt-1">{campaigns.length}</h3>
-            <p className="text-xs text-slate-500 mt-1">{campaigns.filter(c => c.status === 'sent').length} disparadas</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Respondidos</p>
+            <h3 className="text-2xl font-black text-violet-600 mt-1">{totalRepliedGlobal}</h3>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              {globalReplyRate}% de engajamento
+            </p>
           </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center font-bold">
-            <BarChart3 size={22} />
+          <div className="w-11 h-11 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center font-bold">
+            <MessageSquare size={20} />
+          </div>
+        </div>
+
+        {/* Rejeições / Bounces */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rejeições / Bounces</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{totalBouncedGlobal}</h3>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              {totalBouncedGlobal === 0 ? '✨ Reputação 100%' : 'Caixas inválidas'}
+            </p>
+          </div>
+          <div className="w-11 h-11 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center font-bold">
+            <AlertTriangle size={20} />
           </div>
         </div>
       </div>
@@ -600,11 +722,14 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
           {filteredCampaigns.map(camp => {
             const openRate = camp.sent_count > 0 ? Math.round((camp.opened_count / camp.sent_count) * 100) : 0;
             const clickRate = camp.sent_count > 0 ? Math.round((camp.clicked_count / camp.sent_count) * 100) : 0;
+            const replyRate = camp.sent_count > 0 ? Math.round(((camp.replied_count || 0) / camp.sent_count) * 100) : 0;
 
             const isExpanded = expandedCampaignId === camp.id;
             const recs = inlineRecipients[camp.id] || [];
             const openedRecs = recs.filter(r => (r.open_count || 0) > 0);
-            const notOpenedRecs = recs.filter(r => (r.open_count || 0) === 0);
+            const repliedRecs = recs.filter(r => (r.reply_count || 0) > 0 || r.status === 'replied');
+            const notOpenedRecs = recs.filter(r => (r.open_count || 0) === 0 && r.status !== 'bounced' && r.status !== 'failed');
+            const bouncedRecs = recs.filter(r => r.status === 'bounced' || r.status === 'failed');
 
             return (
               <div
@@ -650,42 +775,61 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
                   {/* Centro: Métricas de Leitura & Engajamento (Mailchimp Feedback) */}
                   {camp.status === 'sent' ? (
-                    <div className="flex flex-wrap items-center gap-6 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 w-full lg:w-auto">
+                    <div className="flex flex-wrap items-center gap-4 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 w-full lg:w-auto">
                       {/* Aberturas / Leituras */}
-                      <div className="min-w-[130px]">
+                      <div className="min-w-[120px]">
                         <div className="flex items-center justify-between text-xs font-bold mb-1">
                           <span className="text-slate-600 flex items-center gap-1">
-                            <Eye size={13} className="text-emerald-500" /> Aberturas / Leituras
+                            <Eye size={13} className="text-emerald-500" /> Aberturas
                           </span>
                           <span className="text-emerald-700">{openRate}%</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                           <div 
                             className="bg-emerald-500 h-full rounded-full transition-all" 
                             style={{ width: `${Math.min(openRate, 100)}%` }}
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          <strong className="text-emerald-600">{camp.opened_count}</strong> de {camp.sent_count} abriram
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          <strong className="text-emerald-600 font-bold">{camp.opened_count}</strong> de {camp.sent_count} leram
                         </p>
                       </div>
 
                       {/* Cliques */}
-                      <div className="min-w-[120px]">
+                      <div className="min-w-[110px]">
                         <div className="flex items-center justify-between text-xs font-bold mb-1">
                           <span className="text-slate-600 flex items-center gap-1">
                             <MousePointer size={13} className="text-indigo-500" /> Cliques
                           </span>
                           <span className="text-indigo-700">{clickRate}%</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                           <div 
                             className="bg-indigo-500 h-full rounded-full transition-all" 
                             style={{ width: `${Math.min(clickRate, 100)}%` }}
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          <strong className="text-indigo-600">{camp.clicked_count}</strong> interagiram
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          <strong className="text-indigo-600 font-bold">{camp.clicked_count}</strong> interagiram
+                        </p>
+                      </div>
+
+                      {/* Respostas Recebidas */}
+                      <div className="min-w-[110px]">
+                        <div className="flex items-center justify-between text-xs font-bold mb-1">
+                          <span className="text-slate-600 flex items-center gap-1">
+                            <MessageSquare size={13} className="text-violet-500" /> Respostas
+                          </span>
+                          <span className="text-violet-700 font-bold">{camp.replied_count || 0}</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className="bg-violet-500 h-full rounded-full transition-all" 
+                            style={{ width: `${Math.min(replyRate, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          <strong className="text-violet-600 font-bold">{camp.replied_count || 0}</strong> responderam
                         </p>
                       </div>
                     </div>
@@ -746,21 +890,21 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                   </div>
                 </div>
 
-                {/* PAINEL EXPANSÍVEL: DESTINATÁRIOS E FEEDBACK DE ABERTURA POR E-MAIL */}
+                {/* PAINEL EXPANSÍVEL: DESTINATÁRIOS E FEEDBACK DE ABERTURA / RESPOSTA POR E-MAIL */}
                 {camp.status === 'sent' && isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50/80 p-6 space-y-4 animate-in fade-in duration-200">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div>
                         <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                           <Mail size={16} className="text-amber-500" />
-                          Feedback de Aberturas por E-mail
+                          Feedback de Leituras e Respostas por Destinatário
                         </h4>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {camp.sent_at ? `E-mail disparado em ${new Date(camp.sent_at).toLocaleDateString('pt-BR')} às ${new Date(camp.sent_at).toLocaleTimeString('pt-BR')}` : 'Enviado'}
                         </p>
                       </div>
 
-                      {/* Resumo de Leituras */}
+                      {/* Resumo de Leituras e Respostas */}
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="bg-white border border-slate-200 px-3 py-1 rounded-xl text-slate-700 font-semibold shadow-xs">
                           Total: <strong>{recs.length || camp.total_recipients}</strong>
@@ -768,6 +912,10 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                         <span className="bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl text-emerald-800 font-bold shadow-xs flex items-center gap-1">
                           <CheckCircle2 size={13} className="text-emerald-600" />
                           <strong>{openedRecs.length}</strong> abriram ({recs.length > 0 ? Math.round((openedRecs.length / recs.length) * 100) : 0}%)
+                        </span>
+                        <span className="bg-violet-50 border border-violet-200 px-3 py-1 rounded-xl text-violet-800 font-bold shadow-xs flex items-center gap-1">
+                          <MessageSquare size={13} className="text-violet-600" />
+                          <strong>{repliedRecs.length}</strong> responderam
                         </span>
                         <span className="bg-rose-50 border border-rose-200 px-3 py-1 rounded-xl text-rose-800 font-bold shadow-xs flex items-center gap-1">
                           <Clock size={13} className="text-rose-600" />
@@ -778,11 +926,11 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
                     {/* Barra de Filtro e Busca */}
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-xs">
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-xs overflow-x-auto w-full sm:w-auto">
                         <button
                           onClick={() => setInlineFilter('all')}
                           className={cn(
-                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap",
                             inlineFilter === 'all' ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                           )}
                         >
@@ -791,21 +939,41 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                         <button
                           onClick={() => setInlineFilter('opened')}
                           className={cn(
-                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap",
                             inlineFilter === 'opened' ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                           )}
                         >
                           🟢 Aberto ({openedRecs.length})
                         </button>
                         <button
+                          onClick={() => setInlineFilter('replied')}
+                          className={cn(
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap",
+                            inlineFilter === 'replied' ? "bg-violet-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          💬 Respondido ({repliedRecs.length})
+                        </button>
+                        <button
                           onClick={() => setInlineFilter('not_opened')}
                           className={cn(
-                            "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                            "px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap",
                             inlineFilter === 'not_opened' ? "bg-rose-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                           )}
                         >
                           ⏳ Não Aberto ({notOpenedRecs.length})
                         </button>
+                        {bouncedRecs.length > 0 && (
+                          <button
+                            onClick={() => setInlineFilter('failed')}
+                            className={cn(
+                              "px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap",
+                              inlineFilter === 'failed' ? "bg-red-600 text-white shadow-xs" : "text-red-600 hover:text-red-800"
+                            )}
+                          >
+                            🔴 Bounces ({bouncedRecs.length})
+                          </button>
+                        )}
                       </div>
 
                       <div className="relative w-full sm:w-64">
@@ -825,11 +993,11 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                            <th className="py-2.5 px-4">E-mail do Destinatário</th>
-                            <th className="py-2.5 px-4">Nome</th>
-                            <th className="py-2.5 px-4">Status de Abertura</th>
-                            <th className="py-2.5 px-4">Quando Abriu</th>
-                            <th className="py-2.5 px-4 text-right">Simular</th>
+                            <th className="py-2.5 px-4">Destinatário</th>
+                            <th className="py-2.5 px-4">Status</th>
+                            <th className="py-2.5 px-4">Quando Abriu / Leu</th>
+                            <th className="py-2.5 px-4">Quando Respondeu</th>
+                            <th className="py-2.5 px-4 text-right">Simular / Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -853,47 +1021,99 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                                                     (r.name && r.name.toLowerCase().includes(inlineSearch.toLowerCase()));
                                 if (!matchSearch) return false;
                                 if (inlineFilter === 'opened') return (r.open_count || 0) > 0;
-                                if (inlineFilter === 'not_opened') return (r.open_count || 0) === 0;
+                                if (inlineFilter === 'replied') return (r.reply_count || 0) > 0 || r.status === 'replied';
+                                if (inlineFilter === 'not_opened') return (r.open_count || 0) === 0 && r.status !== 'bounced' && r.status !== 'failed';
+                                if (inlineFilter === 'failed') return r.status === 'bounced' || r.status === 'failed';
                                 return true;
                               })
                               .map(r => (
                                 <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                                  <td className="py-2.5 px-4 font-mono font-bold text-slate-800">
-                                    {r.email}
-                                  </td>
-                                  <td className="py-2.5 px-4 text-slate-600">
-                                    {r.name || '—'}
+                                  <td className="py-2.5 px-4">
+                                    <p className="font-mono font-bold text-slate-800">{r.email}</p>
+                                    <p className="text-[11px] text-slate-400">{r.name || 'Sem nome'}</p>
                                   </td>
                                   <td className="py-2.5 px-4">
-                                    {(r.open_count || 0) > 0 ? (
+                                    {r.status === 'replied' || (r.reply_count || 0) > 0 ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                                        <MessageSquare size={12} className="text-violet-600" />
+                                        Respondido ({r.reply_count || 1}x)
+                                      </span>
+                                    ) : r.status === 'clicked' ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                        <MousePointer size={12} className="text-indigo-600" />
+                                        Clicou no CTA
+                                      </span>
+                                    ) : (r.open_count || 0) > 0 ? (
                                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        <Check size={12} className="text-emerald-600" />
+                                        <Eye size={12} className="text-emerald-600" />
                                         Aberto ({r.open_count} {r.open_count === 1 ? 'leitura' : 'leituras'})
+                                      </span>
+                                    ) : r.status === 'bounced' || r.status === 'failed' ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                        <AlertTriangle size={12} className="text-rose-600" />
+                                        Rejeitado / Bounce
+                                      </span>
+                                    ) : r.delivered_at || r.status === 'delivered' ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                        <CheckCheck size={12} className="text-blue-500" />
+                                        Entregue (não aberto)
                                       </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
                                         <Clock size={12} className="text-slate-400" />
-                                        Não aberto ainda
+                                        Enviado (aguardando leitura)
                                       </span>
                                     )}
                                   </td>
                                   <td className="py-2.5 px-4 text-slate-500">
                                     {r.opened_at ? (
-                                      <span>
-                                        {new Date(r.opened_at).toLocaleDateString('pt-BR')} às {new Date(r.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                      </span>
+                                      <div>
+                                        <span className="font-medium text-slate-700">
+                                          {new Date(r.opened_at).toLocaleDateString('pt-BR')} às {new Date(r.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        {r.open_count > 1 && (
+                                          <span className="block text-[10px] text-emerald-600 font-semibold">
+                                            Leu {r.open_count} vezes
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-300">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-600">
+                                    {r.replied_at ? (
+                                      <div>
+                                        <span className="font-medium text-violet-700">
+                                          {new Date(r.replied_at).toLocaleDateString('pt-BR')} às {new Date(r.replied_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        {r.reply_snippet && (
+                                          <p className="text-[11px] text-slate-500 italic truncate max-w-[200px]" title={r.reply_snippet}>
+                                            "{r.reply_snippet}"
+                                          </p>
+                                        )}
+                                      </div>
                                     ) : (
                                       <span className="text-slate-300">—</span>
                                     )}
                                   </td>
                                   <td className="py-2.5 px-4 text-right">
-                                    <button
-                                      onClick={() => handleSimulateInline(r.id, camp.id)}
-                                      className="px-2 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors cursor-pointer"
-                                      title="Simular que este destinatário abriu o e-mail para testar métrica"
-                                    >
-                                      +1 Abertura
-                                    </button>
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => handleSimulateInline(r.id, camp.id, 'open')}
+                                        className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200 transition-colors cursor-pointer"
+                                        title="Simular que este destinatário abriu o e-mail"
+                                      >
+                                        +1 Aberto
+                                      </button>
+                                      <button
+                                        onClick={() => handleOpenReplyModal(r, camp.id)}
+                                        className="px-2 py-1 text-[11px] font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md border border-violet-200 transition-colors cursor-pointer"
+                                        title="Registrar resposta recebida deste destinatário"
+                                      >
+                                        + Respondeu
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -1522,34 +1742,48 @@ contato@parceiro.org"
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
 
               {/* Indicadores Chave da Campanha */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-xs font-bold text-slate-400 uppercase">Enviados</p>
                   <h4 className="text-2xl font-black text-slate-800 mt-1">{selectedCampaignForAnalytics.sent_count}</h4>
-                  <p className="text-[11px] text-slate-500">100% dos contatos</p>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {selectedCampaignForAnalytics.delivered_count || selectedCampaignForAnalytics.sent_count} entregues
+                  </p>
                 </div>
 
                 <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
                   <p className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-1">
-                    <Eye size={12} /> Aberturas / Leituras
+                    <Eye size={12} /> Aberturas
                   </p>
                   <h4 className="text-2xl font-black text-emerald-700 mt-1">
                     {selectedCampaignForAnalytics.sent_count > 0 ? Math.round((selectedCampaignForAnalytics.opened_count / selectedCampaignForAnalytics.sent_count) * 100) : 0}%
                   </h4>
-                  <p className="text-[11px] text-emerald-800">
-                    {selectedCampaignForAnalytics.opened_count} pessoas leram
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    {selectedCampaignForAnalytics.opened_count} contatos leram
                   </p>
                 </div>
 
                 <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
                   <p className="text-xs font-bold text-indigo-600 uppercase flex items-center gap-1">
-                    <MousePointer size={12} /> Cliques no Link / CTA
+                    <MousePointer size={12} /> Cliques CTA
                   </p>
                   <h4 className="text-2xl font-black text-indigo-700 mt-1">
                     {selectedCampaignForAnalytics.sent_count > 0 ? Math.round((selectedCampaignForAnalytics.clicked_count / selectedCampaignForAnalytics.sent_count) * 100) : 0}%
                   </h4>
-                  <p className="text-[11px] text-indigo-800">
-                    {selectedCampaignForAnalytics.clicked_count} pessoas interagiram
+                  <p className="text-[11px] text-indigo-800 font-medium">
+                    {selectedCampaignForAnalytics.clicked_count} interagiram
+                  </p>
+                </div>
+
+                <div className="bg-violet-50/50 p-4 rounded-2xl border border-violet-100">
+                  <p className="text-xs font-bold text-violet-600 uppercase flex items-center gap-1">
+                    <MessageSquare size={12} /> Respondidos
+                  </p>
+                  <h4 className="text-2xl font-black text-violet-700 mt-1">
+                    {selectedCampaignForAnalytics.sent_count > 0 ? Math.round(((selectedCampaignForAnalytics.replied_count || 0) / selectedCampaignForAnalytics.sent_count) * 100) : 0}%
+                  </h4>
+                  <p className="text-[11px] text-violet-800 font-medium">
+                    {selectedCampaignForAnalytics.replied_count || 0} respostas
                   </p>
                 </div>
 
@@ -1558,7 +1792,17 @@ contato@parceiro.org"
                   <h4 className="text-2xl font-black text-rose-700 mt-1">
                     {Math.max(0, (selectedCampaignForAnalytics.sent_count || 0) - (selectedCampaignForAnalytics.opened_count || 0))}
                   </h4>
-                  <p className="text-[11px] text-rose-800">Contatos para reengajamento</p>
+                  <p className="text-[11px] text-rose-800 font-medium">Oportunidade</p>
+                </div>
+
+                <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200">
+                  <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
+                    <AlertTriangle size={12} className="text-slate-500" /> Bounces
+                  </p>
+                  <h4 className="text-2xl font-black text-slate-800 mt-1">
+                    {selectedCampaignForAnalytics.bounced_count || 0}
+                  </h4>
+                  <p className="text-[11px] text-slate-600 font-medium">Falhas/Rejeições</p>
                 </div>
               </div>
 
@@ -1568,7 +1812,7 @@ contato@parceiro.org"
                   <button
                     onClick={() => setAnalyticsFilter('all')}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap",
+                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
                       analyticsFilter === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
                     )}
                   >
@@ -1577,7 +1821,7 @@ contato@parceiro.org"
                   <button
                     onClick={() => setAnalyticsFilter('opened')}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap",
+                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
                       analyticsFilter === 'opened' ? "bg-white text-emerald-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
                     )}
                   >
@@ -1586,21 +1830,41 @@ contato@parceiro.org"
                   <button
                     onClick={() => setAnalyticsFilter('clicked')}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap",
+                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
                       analyticsFilter === 'clicked' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
                     )}
                   >
                     Clicaram ({analyticsRecipients.filter(r => (r.click_count || 0) > 0).length})
                   </button>
                   <button
+                    onClick={() => setAnalyticsFilter('replied')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
+                      analyticsFilter === 'replied' ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    Respondidos ({analyticsRecipients.filter(r => (r.reply_count || 0) > 0 || r.status === 'replied').length})
+                  </button>
+                  <button
                     onClick={() => setAnalyticsFilter('not_opened')}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap",
+                      "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
                       analyticsFilter === 'not_opened' ? "bg-white text-rose-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
                     )}
                   >
-                    Não Abriram ({analyticsRecipients.filter(r => (r.open_count || 0) === 0).length})
+                    Não Abriram ({analyticsRecipients.filter(r => (r.open_count || 0) === 0 && r.status !== 'failed' && r.status !== 'bounced').length})
                   </button>
+                  {analyticsRecipients.filter(r => r.status === 'failed' || r.status === 'bounced').length > 0 && (
+                    <button
+                      onClick={() => setAnalyticsFilter('failed')}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer",
+                        analyticsFilter === 'failed' ? "bg-white text-red-700 shadow-sm" : "text-red-600 hover:text-red-900"
+                      )}
+                    >
+                      Bounces ({analyticsRecipients.filter(r => r.status === 'failed' || r.status === 'bounced').length})
+                    </button>
+                  )}
                 </div>
 
                 <div className="relative w-full sm:w-64">
@@ -1615,16 +1879,16 @@ contato@parceiro.org"
                 </div>
               </div>
 
-              {/* Tabela de Destinatários e Status de Leitura */}
+              {/* Tabela de Destinatários e Status de Leitura & Resposta */}
               <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase font-black tracking-wider">
+                    <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase font-black tracking-wider text-[11px]">
                       <th className="py-3 px-4">Destinatário</th>
                       <th className="py-3 px-4">Origem</th>
-                      <th className="py-3 px-4">Status de Leitura</th>
-                      <th className="py-3 px-4">Primeira Abertura</th>
-                      <th className="py-3 px-4">Total de Leituras</th>
+                      <th className="py-3 px-4">Status Geral</th>
+                      <th className="py-3 px-4">Quando Abriu / Leu</th>
+                      <th className="py-3 px-4">Quando Respondeu</th>
                       <th className="py-3 px-4 text-right">Ação / Simulação</th>
                     </tr>
                   </thead>
@@ -1655,17 +1919,25 @@ contato@parceiro.org"
                             </span>
                           </td>
                           <td className="py-3 px-4">
-                            {r.status === 'clicked' ? (
+                            {r.status === 'replied' || (r.reply_count || 0) > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full font-bold">
+                                <MessageSquare size={11} /> Respondido ({r.reply_count || 1}x)
+                              </span>
+                            ) : r.status === 'clicked' ? (
                               <span className="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full font-bold">
                                 <MousePointer size={11} /> Clicou no CTA
                               </span>
                             ) : (r.open_count || 0) > 0 ? (
                               <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">
-                                <Eye size={11} /> Lido / Aberto
+                                <Eye size={11} /> Lido / Aberto ({r.open_count}x)
                               </span>
-                            ) : r.status === 'failed' ? (
+                            ) : r.status === 'bounced' || r.status === 'failed' ? (
                               <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full font-bold">
-                                <AlertCircle size={11} /> Falha no envio
+                                <AlertTriangle size={11} /> Bounce / Falha
+                              </span>
+                            ) : r.delivered_at || r.status === 'delivered' ? (
+                              <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full font-medium">
+                                <CheckCheck size={11} /> Entregue (não aberto)
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full font-medium">
@@ -1675,32 +1947,43 @@ contato@parceiro.org"
                           </td>
                           <td className="py-3 px-4 text-slate-600">
                             {r.opened_at ? (
-                              <>
-                                <p className="font-medium text-slate-700">{new Date(r.opened_at).toLocaleDateString('pt-BR')}</p>
-                                <p className="text-[10px] text-slate-400">{new Date(r.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                              </>
+                              <div>
+                                <p className="font-semibold text-slate-800">
+                                  {new Date(r.opened_at).toLocaleDateString('pt-BR')} às {new Date(r.opened_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                <p className="text-[10px] text-emerald-600 font-medium">
+                                  {r.open_count} {r.open_count === 1 ? 'leitura' : 'leituras'}
+                                </p>
+                              </div>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4">
-                            {(r.open_count || 0) > 0 ? (
-                              <span className="font-bold text-slate-800">
-                                {r.open_count} {r.open_count === 1 ? 'leitura' : 'leituras'}
-                              </span>
+                          <td className="py-3 px-4 text-slate-600">
+                            {r.replied_at ? (
+                              <div>
+                                <p className="font-semibold text-violet-800">
+                                  {new Date(r.replied_at).toLocaleDateString('pt-BR')} às {new Date(r.replied_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {r.reply_snippet && (
+                                  <p className="text-[11px] text-slate-500 italic max-w-[200px] truncate" title={r.reply_snippet}>
+                                    "{r.reply_snippet}"
+                                  </p>
+                                )}
+                              </div>
                             ) : (
-                              <span className="text-slate-300">0</span>
+                              <span className="text-slate-300">—</span>
                             )}
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {/* Botões para simular leitura ou clique e testar o feedback ao vivo */}
+                              {/* Botões para simular leitura, clique ou registrar resposta */}
                               <button
                                 onClick={() => handleSimulateInteraction(r.id, 'open')}
                                 title="Simular que este destinatário abriu o e-mail"
                                 className="px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200 transition-colors cursor-pointer"
                               >
-                                +1 Abertura
+                                +1 Aberto
                               </button>
                               <button
                                 onClick={() => handleSimulateInteraction(r.id, 'click')}
@@ -1708,6 +1991,13 @@ contato@parceiro.org"
                                 className="px-2 py-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-200 transition-colors cursor-pointer"
                               >
                                 +1 Clique
+                              </button>
+                              <button
+                                onClick={() => handleOpenReplyModal(r, selectedCampaignForAnalytics.id)}
+                                title="Registrar resposta recebida deste destinatário"
+                                className="px-2 py-1 text-[10px] font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md border border-violet-200 transition-colors cursor-pointer"
+                              >
+                                + Respondeu
                               </button>
                             </div>
                           </td>
@@ -1721,19 +2011,214 @@ contato@parceiro.org"
             </div>
 
             {/* Rodapé do Analytics */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck size={14} className="text-emerald-500" />
-                Rastreamento garantido por pixel 1x1 sem cache e links seguros de redirecionamento.
+                Rastreamento em tempo real via Webhook Resend e pixel 1x1 sem cache.
               </span>
               <button
                 onClick={() => setSelectedCampaignForAnalytics(null)}
-                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
               >
-                Fechar
+                Fechar Relatório
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL DE CONFIGURAÇÃO DO WEBHOOK DO RESEND */}
+      {/* ============================================================================== */}
+      {isWebhookModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full flex flex-col shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-indigo-50/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
+                  <Share2 size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">
+                    Webhook do Resend
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Receba atualizações automáticas de entregas, aberturas, cliques e respostas em tempo real.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWebhookModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* URL do Endpoint */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                  <span>URL do Endpoint (Copie para o Resend)</span>
+                  <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Ativo
+                  </span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={emailCampaignService.getWebhookUrl()}
+                    className="flex-1 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl font-mono text-xs text-slate-800 select-all focus:outline-none"
+                  />
+                  <button
+                    onClick={handleCopyWebhookUrl}
+                    className={cn(
+                      "px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs",
+                      webhookCopied
+                        ? "bg-emerald-600 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20"
+                    )}
+                  >
+                    {webhookCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {webhookCopied ? 'Copiado!' : 'Copiar URL'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Botão de Teste de Conexão */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">Testar Conexão do Endpoint</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Dispara um sinal de teste para validar se a Edge Function está respondendo.
+                  </p>
+                </div>
+                <button
+                  onClick={handleTestWebhook}
+                  disabled={webhookTestStatus === 'testing'}
+                  className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={webhookTestStatus === 'testing' ? 'animate-spin' : ''} />
+                  {webhookTestStatus === 'testing' ? 'Testando...' : 'Testar Ping'}
+                </button>
+              </div>
+
+              {webhookTestMessage && (
+                <div className={cn(
+                  "p-3 rounded-xl text-xs font-medium flex items-center gap-2",
+                  webhookTestStatus === 'success' ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-rose-50 text-rose-800 border border-rose-200"
+                )}>
+                  {webhookTestStatus === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertCircle size={16} className="text-rose-600 shrink-0" />}
+                  <span>{webhookTestMessage}</span>
+                </div>
+              )}
+
+              {/* Eventos Suportados */}
+              <div>
+                <p className="text-xs font-bold text-slate-700 mb-2">Eventos que você deve marcar no Resend:</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { name: 'email.sent', label: 'Enviado', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    { name: 'email.delivered', label: 'Entregue', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+                    { name: 'email.opened', label: 'Aberto / Lido', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                    { name: 'email.clicked', label: 'Clicou no Link', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+                    { name: 'email.bounced', label: 'Rejeitado (Bounce)', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+                    { name: 'email.complained', label: 'Spam / Queixa', color: 'bg-amber-50 text-amber-700 border-amber-200' }
+                  ].map((evt) => (
+                    <div key={evt.name} className={cn("p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between", evt.color)}>
+                      <span>{evt.label}</span>
+                      <Check size={12} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Passo a Passo */}
+              <div className="space-y-2 border-t border-slate-100 pt-4">
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Como ativar no Resend:</p>
+                <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside">
+                  <li>Acesse o painel do Resend em <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline inline-flex items-center gap-0.5">resend.com/webhooks <ExternalLink size={10} /></a>.</li>
+                  <li>Clique em <strong>"Add Webhook"</strong> no canto superior direito.</li>
+                  <li>Cole a <strong>URL do Endpoint</strong> copiada acima no campo <em>Endpoint URL</em>.</li>
+                  <li>Selecione todos os eventos listados acima (Delivered, Opened, Clicked, Bounced).</li>
+                  <li>Clique em <strong>Add</strong> para salvar. Pronto! Seus e-mails passarão a atualizar instantaneamente.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setIsWebhookModalOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Concluído
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* MODAL DE REGISTRO MANUAL DE RESPOSTA */}
+      {/* ============================================================================== */}
+      {replyModalRecipient && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-violet-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Registrar Resposta</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">{replyModalRecipient.recipient.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReplyModalRecipient(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-slate-600">
+                O apoiador <strong>{replyModalRecipient.recipient.name || replyModalRecipient.recipient.email}</strong> respondeu a esta campanha. Você pode adicionar um trecho ou anotação da resposta:
+              </p>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Trecho ou anotação da resposta:
+                </label>
+                <textarea
+                  rows={3}
+                  value={manualReplySnippet}
+                  onChange={(e) => setManualReplySnippet(e.target.value)}
+                  placeholder="Ex: 'Recebi o e-mail e gostaria de confirmar minha doação para a campanha!'"
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-violet-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setReplyModalRecipient(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReply}
+                disabled={isSavingReply}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm shadow-violet-600/20 disabled:opacity-50"
+              >
+                {isSavingReply ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
+                Confirmar Resposta
+              </button>
+            </div>
           </div>
         </div>
       )}

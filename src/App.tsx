@@ -92,7 +92,7 @@ import { WorkspaceCalendarPage } from './pages/erp/WorkspaceCalendarPage';
 import { CalendarProvider } from './contexts/CalendarContext';
 import { DonationModalProvider } from './contexts/DonationModalContext';
 
-import { isNative } from './lib/capacitor';
+import { isNative, initializeNativeApp } from './lib/capacitor';
 import { PortalLogin } from './pages/portal/PortalLogin';
 import { MobileDonorLayout } from './components/mobile/MobileDonorLayout';
 import { MobileDonorHome } from './pages/portal/mobile/MobileDonorHome';
@@ -184,6 +184,10 @@ function RootRedirect() {
 }
 
 export default function App() {
+  React.useEffect(() => {
+    initializeNativeApp();
+  }, []);
+
   return (
     <ConfirmProvider>
       <AuthProvider>

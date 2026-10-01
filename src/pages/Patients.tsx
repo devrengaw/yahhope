@@ -93,9 +93,9 @@ export function Patients() {
         )}
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="bg-white rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Toolbar */}
-        <div className="p-8 border-b border-slate-100 bg-slate-50/30">
+        <div className="p-4 sm:p-8 border-b border-slate-100 bg-slate-50/30">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
@@ -198,8 +198,56 @@ export function Patients() {
           )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {filteredPatients.map((patient) => {
+            const ret = getNextReturnDate(patient);
+            return (
+              <div
+                key={patient.id}
+                onClick={() => navigate(`/nutrition/patients/${patient.id}`)}
+                className="p-4 active:bg-emerald-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shadow-xs border border-emerald-200/50 shrink-0">
+                    {patient.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-900 text-sm truncate">{patient.name}</p>
+                      <StatusBadge status={patient.status} />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                      <span>{calculateAge(patient.dob)}</span>
+                      <span>•</span>
+                      <span className="truncate flex items-center gap-1">
+                        <MapPin size={11} className="text-emerald-500" />
+                        {patient.community}
+                      </span>
+                    </div>
+                    {ret.date !== '--' && (
+                      <p className="text-[10px] font-bold text-slate-400 mt-1">
+                        Retorno: <span className={ret.isOverdue ? "text-red-500" : "text-emerald-600 font-black"}>{ret.date}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-50 text-slate-400 shrink-0">
+                  <ChevronRight size={18} />
+                </div>
+              </div>
+            );
+          })}
+          {filteredPatients.length === 0 && (
+            <div className="p-8 text-center text-slate-400">
+              <Search size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm font-medium">Nenhuma criança encontrada.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] border-b border-slate-100">

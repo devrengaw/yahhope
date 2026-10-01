@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS email_campaigns (
   delivered_count INTEGER DEFAULT 0,
   opened_count INTEGER DEFAULT 0,
   clicked_count INTEGER DEFAULT 0,
+  replied_count INTEGER DEFAULT 0,
+  bounced_count INTEGER DEFAULT 0,
   failed_count INTEGER DEFAULT 0,
   scheduled_for TIMESTAMP WITH TIME ZONE,
   sent_at TIMESTAMP WITH TIME ZONE,
@@ -39,14 +41,19 @@ CREATE TABLE IF NOT EXISTS email_campaign_recipients (
   email TEXT NOT NULL,
   name TEXT,
   recipient_type TEXT DEFAULT 'apoiador', -- 'apoiador', 'user', 'donor', 'sponsor', 'caregiver', 'external'
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'delivered', 'opened', 'clicked', 'failed')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'delivered', 'opened', 'clicked', 'replied', 'bounced', 'failed')),
   resend_id TEXT,
   error_message TEXT,
   sent_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE,
   opened_at TIMESTAMP WITH TIME ZONE,
   open_count INTEGER DEFAULT 0,
   clicked_at TIMESTAMP WITH TIME ZONE,
   click_count INTEGER DEFAULT 0,
+  replied_at TIMESTAMP WITH TIME ZONE,
+  reply_count INTEGER DEFAULT 0,
+  reply_snippet TEXT,
+  bounced_at TIMESTAMP WITH TIME ZONE,
   user_agent TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -54,6 +61,7 @@ CREATE TABLE IF NOT EXISTS email_campaign_recipients (
 -- 3. Índices para performance de busca e rastreamento
 CREATE INDEX IF NOT EXISTS idx_campaign_recipients_cid ON email_campaign_recipients(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_recipients_email ON email_campaign_recipients(email);
+CREATE INDEX IF NOT EXISTS idx_campaign_recipients_resend ON email_campaign_recipients(resend_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_recipients_status ON email_campaign_recipients(status);
 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON email_campaigns(status);
 

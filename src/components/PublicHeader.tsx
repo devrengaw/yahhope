@@ -57,7 +57,7 @@ export function PublicHeader() {
         <aside 
           aria-label="Alerta Humanitário Urgente"
           style={{ backgroundColor: topBanner.bgColor || '#0F172A' }}
-          className="text-white text-xs md:text-sm py-2.5 px-4 sticky top-0 z-50 border-b border-white/10 shadow-md transition-all duration-300"
+          className="text-white text-xs md:text-sm py-2.5 px-4 sticky top-0 z-50 border-b border-white/10 shadow-md transition-all duration-300 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]"
         >
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
@@ -312,7 +312,7 @@ export function PublicHeader() {
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" 
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative ml-auto w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl flex flex-col z-10 overflow-y-auto">
+          <div className="relative ml-auto w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl flex flex-col z-10 overflow-y-auto pt-safe pb-safe animate-slideLeft">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <img 
                 src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" 
@@ -429,7 +429,7 @@ export function PublicHeader() {
       )}
 
       {/* 4. Sticky Floating Donate Button in Brand Orange */}
-      <aside aria-label="Acesso Rápido para Doação" className="fixed bottom-6 right-6 z-40">
+      <aside aria-label="Acesso Rápido para Doação" className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-5 sm:right-6 z-40">
         <button
           onClick={handleDonateAction}
           className="bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-3.5 rounded-full font-gotham-bold text-sm tracking-wide shadow-2xl hover:shadow-[#F49853]/40 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer"

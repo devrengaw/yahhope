@@ -187,6 +187,40 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     }
   };
 
+  const getMobileBottomNavItems = () => {
+    switch (module) {
+      case 'nutrition':
+        return [
+          { name: 'Início', path: '/nutrition', icon: LayoutDashboard },
+          { name: 'Crianças', path: '/nutrition/patients', icon: Users },
+          { name: 'Atendimento', path: '/nutrition/atendimento', icon: Stethoscope },
+          { name: 'Fila', path: '/nutrition/waiting-list', icon: ClipboardList },
+        ];
+      case 'workspace':
+        return [
+          { name: 'Início', path: '/workspace/inicio', icon: Home },
+          { name: 'Tarefas', path: '/workspace/my-tasks', icon: ClipboardList },
+          { name: 'Projetos', path: '/workspace/projects', icon: Briefcase },
+          { name: 'Agenda', path: '/workspace/calendar', icon: Calendar },
+        ];
+      case 'communication':
+        return [
+          { name: 'Início', path: '/communication', icon: LayoutDashboard },
+          { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
+          { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
+          { name: 'Disparos', path: '/communication/campaigns', icon: Send },
+        ];
+      case 'admin':
+      default:
+        return [
+          { name: 'Acessos', path: '/admin/analytics', icon: BarChart3 },
+          { name: 'Captação', path: '/admin/fundraising', icon: Target },
+          { name: 'Destaques', path: '/admin/home-highlights', icon: Sparkles },
+          { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
+        ];
+    }
+  };
+
   const theme = getThemeClasses();
 
 
@@ -207,9 +241,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         <div className="w-16 sm:w-[72px] bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
           <Link 
             to="/workspace" 
-            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
+            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", (module as string) === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
           >
-            <Home size={22} className={module === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
+            <Home size={22} className={(module as string) === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
           </Link>
           
           <div className="w-8 h-px bg-white/20 my-4 rounded-full" />
@@ -247,9 +281,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
       {/* Main Content Area containing Secondary Sidebar and Page */}
       <div className="flex-1 flex flex-col md:flex-row relative">
-        {/* Mobile Header */}
+        {/* Mobile Header with Safe Area for Notch and Status Bar */}
         <div className={cn(
-          "md:hidden p-4 flex justify-between items-center shadow-md z-20 transition-colors shrink-0",
+          "md:hidden px-4 pt-[calc(0.85rem+env(safe-area-inset-top,0px))] pb-3.5 flex justify-between items-center shadow-md z-20 transition-colors shrink-0",
           theme.mobileHeader
         )}>
           <div className="flex items-center">
@@ -257,7 +291,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell isLight={isLightSidebar} />
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Abrir Menu">
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
@@ -267,7 +301,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {module !== 'workspace' && (
           <aside
             className={cn(
-              "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-xl flex flex-col border-r",
+              "fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 shadow-2xl flex flex-col border-r pt-safe pb-safe",
             theme.sidebarBg,
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           )}
@@ -285,8 +319,8 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {/* Mobile Module Switcher */}
         {module !== 'supporter' && user?.role !== 'OBSERVER' && (
           <div className={cn("md:hidden flex items-center justify-around p-3 border-b shrink-0", theme.borderTop)}>
-            <Link to="/workspace" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'workspace' ? theme.itemActiveBg : theme.itemInactiveBg)}>
-              <Home size={22} className={module === 'workspace' ? theme.iconActive : theme.moduleName} />
+            <Link to="/workspace" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", (module as string) === 'workspace' ? theme.itemActiveBg : theme.itemInactiveBg)}>
+              <Home size={22} className={(module as string) === 'workspace' ? theme.iconActive : theme.moduleName} />
             </Link>
             {hasNutrition && (
               <Link to="/nutrition" onClick={() => setIsMobileMenuOpen(false)} className={cn("p-3 rounded-xl transition-all", module === 'nutrition' ? theme.itemActiveBg : theme.itemInactiveBg)}>
@@ -307,7 +341,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         )}
         
         <nav className="mt-4 md:mt-2 flex-1 overflow-y-auto" aria-label="Navegação Lateral">
-          {module === 'workspace' ? (
+          {(module as string) === 'workspace' ? (
             <div className="px-3 pb-4">
               <div className="mb-6">
                 <div className="flex items-center justify-between px-4 mb-2">
@@ -390,7 +424,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           ) : (
             <ul className="space-y-1 px-3">
               {navItems.map((item) => {
-                const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : module === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
+                const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
                 return (
                   <li key={item.path}>
                     <Link
@@ -411,7 +445,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           )}
         </nav>
 
-            <div className="p-4 border-t border-white/20 shrink-0">
+            <div className="p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] border-t border-white/20 shrink-0">
               <Link to="/profile" className={cn("flex items-center gap-3 w-full p-2 rounded-xl transition-colors group", theme.avatarBg)}>
                 <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden">
                   {user?.avatar_url ? (
@@ -443,11 +477,11 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         )}
 
       {/* Main Content */}
-      <main className={cn("flex-1 w-full", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
+      <main className={cn("flex-1 w-full pb-20 md:pb-0", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
         {module === 'workspace' ? (
           children
         ) : (
-          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+          <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
             {children}
           </div>
         )}
@@ -455,10 +489,49 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {module === 'supporter' && <ChatWidget />}
       </main>
       
+      {/* Mobile Bottom Navigation Bar for ERP / Internal Modules */}
+      {module !== 'supporter' && (
+        <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/80 pb-safe md:hidden shadow-lg shadow-slate-900/10">
+          <div className="flex items-center justify-around h-16 px-1">
+            {getMobileBottomNavItems().map((item) => {
+              const isActive = location.pathname === item.path || (item.path !== '/nutrition' && (item.path as string) !== '/workspace' && item.path !== '/communication' && item.path !== '/admin' && location.pathname.startsWith(item.path));
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  className={cn(
+                    "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all",
+                    isActive ? "text-[#F49853] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
+                  )}
+                >
+                  <div className={cn("p-1 rounded-lg transition-transform", isActive && "scale-110")}>
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  </div>
+                  <span className="text-[10px] tracking-tight">{item.name}</span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className={cn(
+                "flex flex-col items-center justify-center flex-1 h-14 rounded-xl transition-all",
+                isMobileMenuOpen ? "text-[#F49853] font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
+              )}
+            >
+              <div className="p-1">
+                <Menu size={20} strokeWidth={2} />
+              </div>
+              <span className="text-[10px] tracking-tight">Mais</span>
+            </button>
+          </div>
+        </nav>
+      )}
+
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-0 md:hidden transition-all duration-300"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-all duration-300"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

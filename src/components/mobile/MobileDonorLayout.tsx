@@ -60,7 +60,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none">
       {/* Mobile Top Header (Fixed with Safe Area) */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 pt-safe transition-all shadow-xs">
-        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-md md:max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo & App Tag */}
           <Link to="/portal/dashboard" className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-md shadow-amber-500/20">
@@ -104,13 +104,13 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
       </header>
 
       {/* Main Content View with padding for bottom nav */}
-      <main className="flex-1 max-w-md mx-auto w-full px-4 pt-4 pb-28">
+      <main className="flex-1 max-w-md md:max-w-2xl mx-auto w-full px-4 pt-4 pb-28">
         {children || <Outlet />}
       </main>
 
       {/* Bottom Navigation Bar (Fixed for Mobile Native Feel) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 pb-safe shadow-lg shadow-slate-900/5">
-        <div className="max-w-md mx-auto px-2 flex items-center justify-around h-16">
+        <div className="max-w-md md:max-w-2xl mx-auto px-2 flex items-center justify-around h-16">
           {navItems.map((item) => {
             const active = isActive(item.path);
             const Icon = item.icon;
@@ -145,7 +145,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
       {/* Notification Drawer / Modal */}
       {isNotifOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex justify-end">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col pt-safe animate-slideLeft">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col pt-safe pb-safe animate-slideLeft">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="text-amber-500" size={20} />
@@ -227,7 +227,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
       {/* Profile / Menu Drawer */}
       {isProfileOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex justify-end">
-          <div className="w-full max-w-sm bg-white h-full shadow-2xl flex flex-col pt-safe animate-slideLeft">
+          <div className="w-full max-w-sm bg-white h-full shadow-2xl flex flex-col pt-safe pb-safe animate-slideLeft">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-black text-slate-900 text-lg">Meu Perfil</h3>
               <button

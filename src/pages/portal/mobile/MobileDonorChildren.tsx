@@ -250,7 +250,9 @@ export function MobileDonorChildren() {
       {/* Child Detail Modal */}
       {selectedChild && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slideUp">
+          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slideUp pb-safe relative">
+            {/* Mobile drag handle */}
+            <div className="sm:hidden w-12 h-1 bg-white/50 rounded-full mx-auto absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none" />
             {/* Header Image */}
             <div className="relative h-56 w-full">
               <img
