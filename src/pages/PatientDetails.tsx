@@ -297,6 +297,9 @@ export function PatientDetails() {
   const [refWeight, setRefWeight] = useState('');
   const [refHeight, setRefHeight] = useState('');
   const [refPE, setRefPE] = useState('');
+  const [refStatus, setRefStatus] = useState('DAG');
+  const [isHospitalized, setIsHospitalized] = useState<'Sim' | 'Não'>('Não');
+  const [hospitalName, setHospitalName] = useState('');
   const [edema, setEdema] = useState<'Sim' | 'Não'>('Não');
   const [edemaLocation, setEdemaLocation] = useState('');
   const [referralReason, setReferralReason] = useState('');
@@ -600,11 +603,19 @@ export function PatientDetails() {
     setPrescriptions(prescriptions.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
-  const openReferralModal = () => {
-    setRefProfessional(user?.name || '');
-    setRefWeight(patientEvents[0]?.weight ? (patientEvents[0].weight * 1000).toString() : '');
-    setRefHeight(patientEvents[0]?.height ? patientEvents[0].height.toString() : '');
-    setRefPE(patientEvents[0]?.z_score_weight_height !== undefined ? patientEvents[0].z_score_weight_height.toString() : '');
+  const openReferralModal = (fromEvent?: { weight?: number, height?: number, zScore?: number, status?: string, professional?: string }) => {
+    const w = fromEvent?.weight ?? patientEvents[0]?.weight;
+    const h = fromEvent?.height ?? patientEvents[0]?.height;
+    const pe = fromEvent?.zScore ?? patientEvents[0]?.z_score_weight_height;
+    const st = fromEvent?.status || (patient ? patient.status : 'DAG');
+
+    setRefProfessional(fromEvent?.professional || user?.name || '');
+    setRefWeight(w ? (w * 1000).toString() : '');
+    setRefHeight(h ? h.toString() : '');
+    setRefPE(pe !== undefined && pe !== null ? pe.toString() : '');
+    setRefStatus(st || 'DAG');
+    setIsHospitalized(st === 'Internada' ? 'Sim' : 'Não');
+    setHospitalName('');
     setEdema('Não');
     setEdemaLocation('');
     setReferralReason('');
@@ -612,24 +623,50 @@ export function PatientDetails() {
     setIsReferralModalOpen(true);
   };
 
+  const handleOpenReferralFromEdit = () => {
+    const w = newWeight ? parseFloat(newWeight) : undefined;
+    const h = newHeight ? parseFloat(newHeight) : undefined;
+    const pe = zScore !== null ? zScore : undefined;
+    const st = calcStatus !== 'N/A' ? calcStatus : (patient?.status || 'DAG');
+
+    setIsModalOpen(false);
+    openReferralModal({
+      weight: w,
+      height: h,
+      zScore: pe,
+      status: st,
+      professional: professional || user?.name || ''
+    });
+  };
+
   const handlePrintReferral = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!patient) return;
     
+    const hospitalizationNotes = isHospitalized === 'Sim'
+      ? `Internada: Sim${hospitalName ? ` (${hospitalName})` : ''}`
+      : 'Internada: Não';
+
     // Save referral event
     const newEvent: ClinicalEvent = {
       id: `ref${Date.now()}`,
       patient_id: patient.id,
       event_type: 'referral',
       date: formatLocalDate(new Date()),
-      notes: `Encaminhamento: ${referralReason}${otherReason ? ' - ' + otherReason : ''}. Edema: ${edema}${edemaLocation ? ' (' + edemaLocation + ')' : ''}`,
-      weight: parseFloat(refWeight) / 1000,
-      height: parseFloat(refHeight),
-      z_score_weight_height: parseFloat(refPE),
+      notes: `Encaminhamento: ${referralReason}${otherReason ? ' - ' + otherReason : ''}. Edema: ${edema}${edemaLocation ? ' (' + edemaLocation + ')' : ''}. ${hospitalizationNotes}. Status: ${refStatus}.`,
+      weight: refWeight ? parseFloat(refWeight) / 1000 : undefined,
+      height: refHeight ? parseFloat(refHeight) : undefined,
+      z_score_weight_height: refPE ? parseFloat(refPE) : undefined,
+      nutritional_status: refStatus,
       professional: refProfessional.trim() || user?.name || 'Profissional',
       hospital_referral: true,
     };
     
     addEvent(newEvent);
+
+    updatePatient(patient.id, {
+      status: refStatus as any
+    });
     
     window.print();
     setIsReferralModalOpen(false);
@@ -1149,6 +1186,20 @@ export function PatientDetails() {
                                     Editar
                                   </button>
                                   <button
+                                    onClick={() => openReferralModal({
+                                      weight: event.weight,
+                                      height: event.height,
+                                      zScore: event.z_score_weight_height,
+                                      status: event.nutritional_status || patient.status,
+                                      professional: event.professional
+                                    })}
+                                    className="text-[10px] font-black uppercase tracking-widest text-amber-700 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 transition-all cursor-pointer flex items-center gap-1"
+                                    title="Fazer encaminhamento deste atendimento"
+                                  >
+                                    <FileText size={11} />
+                                    Encaminhar
+                                  </button>
+                                  <button
                                     onClick={() => handleDeleteEvent(event.id, event.date)}
                                     className="text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-all cursor-pointer flex items-center gap-1"
                                     title="Excluir atendimento"
@@ -1211,6 +1262,20 @@ export function PatientDetails() {
                                   title="Editar atendimento"
                                 >
                                   Editar
+                                </button>
+                                <button
+                                  onClick={() => openReferralModal({
+                                    weight: event.weight,
+                                    height: event.height,
+                                    zScore: event.z_score_weight_height,
+                                    status: event.nutritional_status || patient.status,
+                                    professional: event.professional
+                                  })}
+                                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-amber-700 hover:bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 transition-all cursor-pointer"
+                                  title="Fazer encaminhamento deste atendimento"
+                                >
+                                  <FileText size={11} />
+                                  Encaminhar
                                 </button>
                                 <button
                                   onClick={() => handleDeleteEvent(event.id, event.date)}
@@ -1342,13 +1407,24 @@ export function PatientDetails() {
               <div>
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <Stethoscope size={24} className="text-emerald-600" />
-                  {action === 'edit-last' ? 'Editar Acompanhamento Clínico' : 'Novo Acompanhamento Clínico'}
+                  {editingEventId ? 'Editar Acompanhamento Clínico' : 'Novo Acompanhamento Clínico'}
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">Paciente: {patient.name}</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenReferralFromEdit}
+                  className="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title="Fazer encaminhamento com os dados deste atendimento"
+                >
+                  <FileText size={14} className="text-amber-600" />
+                  Fazer Encaminhamento
+                </button>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
@@ -1557,21 +1633,32 @@ export function PatientDetails() {
               </form>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-3">
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-between items-center gap-3">
               <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="px-6 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+                type="button"
+                onClick={handleOpenReferralFromEdit}
+                className="bg-amber-50 text-amber-800 hover:bg-amber-100 px-4 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] border border-amber-200 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="Fazer encaminhamento com os dados desta consulta"
               >
-                Cancelar
+                <FileText size={13} className="text-amber-600" />
+                Fazer Encaminhamento
               </button>
-              
-              <div className="flex gap-2">
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsModalOpen(false)} 
+                  className="px-5 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                
                 <button 
                   type="button"
                   onClick={(e) => {
                     handleSaveEvent(e as any, true);
                   }}
-                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] border border-emerald-200 transition-all shadow-sm"
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-5 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] border border-emerald-200 transition-all shadow-sm cursor-pointer"
                 >
                   Alta do Programa
                 </button>
@@ -1579,9 +1666,9 @@ export function PatientDetails() {
                 <button 
                   type="submit" 
                   form="followup-form"
-                  className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all shadow-xl shadow-slate-900/10"
+                  className="bg-slate-900 hover:bg-black text-white px-7 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all shadow-xl shadow-slate-900/10 cursor-pointer"
                 >
-                  Concluir Atendimento
+                  {editingEventId ? 'Salvar Alterações' : 'Concluir Atendimento'}
                 </button>
               </div>
             </div>
@@ -1676,6 +1763,89 @@ export function PatientDetails() {
                   )}
                 </div>
 
+                {/* Status da Criança */}
+                <div className="space-y-2 border-t border-slate-100 pt-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-700">Status Clínico / Nutricional da Criança: *</label>
+                    <span className="text-[11px] text-slate-400">Atualiza a ficha do paciente</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {['DAG', 'DAM', 'Internada', 'Risco', 'Adequado', 'Encaminhada'].map(statusOption => (
+                      <button
+                        key={statusOption}
+                        type="button"
+                        onClick={() => {
+                          setRefStatus(statusOption);
+                          if (statusOption === 'Internada') {
+                            setIsHospitalized('Sim');
+                          }
+                        }}
+                        className={cn(
+                          "px-2.5 py-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer",
+                          refStatus === statusOption
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30"
+                        )}
+                      >
+                        {statusOption}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Situação de Internação */}
+                <div className="space-y-3 border-t border-slate-100 pt-4 bg-purple-50/50 p-4 rounded-xl border border-purple-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-600 inline-block"></span>
+                      A criança está internada? *
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="isHospitalized" 
+                          value="Não" 
+                          checked={isHospitalized === 'Não'} 
+                          onChange={() => {
+                            setIsHospitalized('Não');
+                            if (refStatus === 'Internada') setRefStatus('DAG');
+                          }} 
+                          className="text-purple-600 focus:ring-purple-500" 
+                        />
+                        <span className="text-sm font-medium text-slate-700">Não</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="isHospitalized" 
+                          value="Sim" 
+                          checked={isHospitalized === 'Sim'} 
+                          onChange={() => {
+                            setIsHospitalized('Sim');
+                            setRefStatus('Internada');
+                          }} 
+                          className="text-purple-600 focus:ring-purple-500" 
+                        />
+                        <span className="text-sm font-bold text-purple-900">Sim (Internada)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {isHospitalized === 'Sim' && (
+                    <div className="mt-3 space-y-1 animate-in fade-in duration-200">
+                      <label className="text-xs font-semibold text-purple-900">Hospital / Unidade de Saúde de Internação</label>
+                      <input 
+                        type="text" 
+                        value={hospitalName} 
+                        onChange={e => setHospitalName(e.target.value)} 
+                        placeholder="Ex: Hospital Provincial de Pemba - Enfermaria Pediátrica" 
+                        className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all shadow-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* Referral Reason */}
                 <div className="space-y-3 border-t border-slate-100 pt-4">
                   <label className="text-sm font-medium text-slate-700">Encaminhamento Para: *</label>
@@ -1688,7 +1858,21 @@ export function PatientDetails() {
                       'Outro'
                     ].map(reason => (
                       <label key={reason} className="flex items-center gap-2 cursor-pointer">
-                        <input required type="radio" name="referralReason" value={reason} checked={referralReason === reason} onChange={() => setReferralReason(reason)} className="text-emerald-600 focus:ring-emerald-500" />
+                        <input 
+                          required 
+                          type="radio" 
+                          name="referralReason" 
+                          value={reason} 
+                          checked={referralReason === reason} 
+                          onChange={() => {
+                            setReferralReason(reason);
+                            if (reason === 'Internamento para desnutrição grave') {
+                              setIsHospitalized('Sim');
+                              setRefStatus('Internada');
+                            }
+                          }} 
+                          className="text-emerald-600 focus:ring-emerald-500" 
+                        />
                         <span className="text-sm text-slate-700">{reason}</span>
                       </label>
                     ))}
@@ -1898,8 +2082,12 @@ export function PatientDetails() {
           </div>
           
           <div>
-            <p><strong>Presença de Edema:</strong> {edema}</p>
-            {edema === 'Sim' && <p><strong>Local do Edema:</strong> {edemaLocation}</p>}
+            <p><strong>Presença de Edema:</strong> {edema}{edema === 'Sim' && edemaLocation ? ` (${edemaLocation})` : ''}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 border-t border-b border-gray-300 py-3 text-sm">
+            <p><strong>Status Clínico / Nutricional:</strong> {refStatus}</p>
+            <p><strong>Criança Internada:</strong> {isHospitalized === 'Sim' ? `Sim ${hospitalName ? `(${hospitalName})` : ''}` : 'Não'}</p>
           </div>
           
           <div className="mt-8">
