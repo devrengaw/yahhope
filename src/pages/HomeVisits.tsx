@@ -3,7 +3,7 @@ import { Home, Search, Calendar, CheckCircle2, AlertCircle, ChevronRight, User, 
 import { useVisits } from '../contexts/VisitContext';
 import { usePatients } from '../contexts/PatientContext';
 import { useAtendimento } from '../contexts/AtendimentoContext';
-import { HomeVisit } from '../lib/mockData';
+import { HomeVisit, Patient } from '../lib/mockData';
 import { cn, formatLocalDate, formatDisplayDate } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
@@ -28,7 +28,15 @@ export function HomeVisits() {
 
     const result: HomeVisit[] = [];
 
+    const patientMap = new Map<string, Patient>(patients.map(p => [p.id, p]));
+
     patientVisitsMap.forEach((pVisits, patientId) => {
+      // Exclude hospitalized children
+      const pat = patientMap.get(patientId);
+      if (pat && (pat.status === 'Internada' || pat.status === 'Internado')) {
+        return;
+      }
+
       // Keep strictly the latest pending visit for this patient
       pVisits.sort((a, b) => b.date.localeCompare(a.date));
       const latest = pVisits[0];

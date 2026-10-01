@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2 } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
@@ -91,7 +91,7 @@ export function PatientDetails() {
   const { addEvent, updateEvent, deleteEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita, visits } = useVisits();
-  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos } = useAtendimento();
+  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos, removerAtendimentosPorPaciente } = useAtendimento();
   const { sendNotification } = useNotification();
   const { confirm } = useConfirm();
   const { user } = useAuth();
@@ -106,6 +106,24 @@ export function PatientDetails() {
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
+  // Hospitalization State
+  const [isHospitalizationModalOpen, setIsHospitalizationModalOpen] = useState(false);
+  const [hospHospitalName, setHospHospitalName] = useState('Hospital Geral');
+  const [hospDate, setHospDate] = useState(formatLocalDate(new Date()));
+  const [hospReason, setHospReason] = useState('Desnutrição Aguda Grave com complicações clínicas');
+  const [hospNotes, setHospNotes] = useState('');
+  const [isSavingHospitalization, setIsSavingHospitalization] = useState(false);
+
+  // Hospital Discharge State
+  const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
+  const [hospDischargeDate, setHospDischargeDate] = useState(formatLocalDate(new Date()));
+  const [hospDischargeStatus, setHospDischargeStatus] = useState<string>('DAG');
+  const [hospDischargeReturnDate, setHospDischargeReturnDate] = useState<string>(formatLocalDate(addDays(new Date(), 7)));
+  const [hospDischargeWeight, setHospDischargeWeight] = useState<string>('');
+  const [hospDischargeHeight, setHospDischargeHeight] = useState<string>('');
+  const [hospDischargeNotes, setHospDischargeNotes] = useState('');
+  const [isSavingDischarge, setIsSavingDischarge] = useState(false);
+
   // Observer Observation Modal State
   const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
   const [observationDate, setObservationDate] = useState(formatLocalDate(new Date()));
@@ -114,6 +132,7 @@ export function PatientDetails() {
   const [isSavingObservation, setIsSavingObservation] = useState(false);
   
   const patient = patients.find(p => p.id === id);
+  const isPatientHospitalized = patient?.status === 'Internada' || patient?.status === 'Internado';
   const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
     id: v.id,
     patient_id: v.patient_id,
@@ -667,9 +686,109 @@ export function PatientDetails() {
     updatePatient(patient.id, {
       status: refStatus as any
     });
+
+    if (refStatus === 'Internada' || isHospitalized === 'Sim') {
+      removerAtendimentosPorPaciente(patient.id);
+    }
     
     window.print();
     setIsReferralModalOpen(false);
+  };
+
+  const handleConfirmHospitalization = async () => {
+    if (!patient) return;
+    setIsSavingHospitalization(true);
+    try {
+      // 1. Update patient status to 'Internada'
+      updatePatient(patient.id, { status: 'Internada' });
+
+      // 2. Add clinical event registering the hospitalization
+      const notesParts = [];
+      if (hospHospitalName) notesParts.push(`Hospital: ${hospHospitalName}`);
+      if (hospReason) notesParts.push(`Motivo: ${hospReason}`);
+      if (hospNotes) notesParts.push(`Notas: ${hospNotes}`);
+
+      const newEvent: ClinicalEvent = {
+        id: `hosp_${Date.now()}`,
+        patient_id: patient.id,
+        date: hospDate,
+        weight: latestWeightEvent?.weight,
+        height: latestHeightEvent?.height,
+        muac: latestClinicalEvent?.muac,
+        nutritional_status: 'Internada',
+        notes: `[INTERNAÇÃO HOSPITALAR] ${notesParts.join(' | ')}`,
+        event_type: 'referral',
+        hospital_referral: true,
+        professional: user?.name || 'Profissional',
+      };
+
+      addEvent(newEvent);
+
+      // 3. Remove patient from consultation queue / pending appointments
+      await removerAtendimentosPorPaciente(patient.id);
+
+      sendNotification(
+        'Internação Registrada',
+        `${patient.name} foi marcada como Internada e isenta da rotina de consultas ambulatoriais.`,
+        'info'
+      );
+
+      setIsHospitalizationModalOpen(false);
+    } catch (err) {
+      console.error('Erro ao registrar internação:', err);
+    } finally {
+      setIsSavingHospitalization(false);
+    }
+  };
+
+  const handleConfirmDischarge = async () => {
+    if (!patient) return;
+    setIsSavingDischarge(true);
+    try {
+      const dischargeWeightNum = hospDischargeWeight ? parseFloat(hospDischargeWeight) : latestWeightEvent?.weight;
+      const dischargeHeightNum = hospDischargeHeight ? parseFloat(hospDischargeHeight) : latestHeightEvent?.height;
+
+      // 1. Update patient status to the discharge status
+      updatePatient(patient.id, { status: hospDischargeStatus as any });
+
+      // 2. Add clinical event registering hospital discharge
+      const newEvent: ClinicalEvent = {
+        id: `discharge_${Date.now()}`,
+        patient_id: patient.id,
+        date: hospDischargeDate,
+        weight: dischargeWeightNum,
+        height: dischargeHeightNum,
+        muac: latestClinicalEvent?.muac,
+        nutritional_status: hospDischargeStatus,
+        notes: `[ALTA HOSPITALAR] Criança recebeu alta hospitalar e retornou ao acompanhamento ambulatorial. ${hospDischargeNotes ? `Observações: ${hospDischargeNotes}` : ''}`.trim(),
+        event_type: 'acompanhamento',
+        return_date: hospDischargeReturnDate || undefined,
+        professional: user?.name || 'Profissional',
+      };
+
+      addEvent(newEvent);
+
+      // 3. Auto-schedule return consultation if return date provided
+      const today = formatLocalDate(new Date());
+      if (hospDischargeReturnDate && hospDischargeReturnDate >= today) {
+        agendarAtendimento(patient.id, patient.name, hospDischargeReturnDate);
+      }
+
+      // 4. Schedule home visit
+      agendarVisita(patient.id, hospDischargeDate);
+
+      sendNotification(
+        'Alta Hospitalar Registrada',
+        `${patient.name} recebeu alta hospitalar e retornou ao acompanhamento ambulatorial regular.`,
+        'success'
+      );
+
+      setIsDischargeModalOpen(false);
+    } catch (err) {
+      console.error('Erro ao registrar alta hospitalar:', err);
+    } finally {
+      setIsSavingDischarge(false);
+    }
   };
 
   const handleSendImpactUpdate = (e: React.FormEvent) => {
@@ -731,7 +850,7 @@ export function PatientDetails() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{patient.name}</h1>
-            <StatusBadge status={latestClinicalEvent?.nutritional_status || patient.status} />
+            <StatusBadge status={isPatientHospitalized ? 'Internada' : (latestClinicalEvent?.nutritional_status || patient.status)} />
           </div>
           <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm">
             <span>ID: {patient.registration_number}</span>
@@ -740,6 +859,43 @@ export function PatientDetails() {
           </p>
         </div>
       </div>
+
+      {/* Hospitalization Notice Banner */}
+      {isPatientHospitalized && (
+        <div className="bg-purple-50/90 border-2 border-purple-200 rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-200">
+              <Building2 size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-purple-200 text-purple-900 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg">
+                  Criança Internada no Hospital
+                </span>
+                <span className="text-xs text-purple-700 font-semibold hidden sm:inline">Isenta da rotina ambulatorial</span>
+              </div>
+              <p className="text-sm font-semibold text-purple-950 mt-1">
+                A criança encontra-se hospitalizada. As regras de consultas de retorno e presença na fila da clínica estão suspensas temporariamente.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setHospDischargeDate(formatLocalDate(new Date()));
+              setHospDischargeStatus('DAG');
+              setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
+              setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
+              setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
+              setHospDischargeNotes('');
+              setIsDischargeModalOpen(true);
+            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-200 text-sm shrink-0 active:scale-95"
+          >
+            <CheckCircle2 size={18} />
+            Registrar Alta Hospitalar
+          </button>
+        </div>
+      )}
 
       {/* Action Bar */}
       <div className="flex flex-wrap gap-3">
@@ -780,19 +936,63 @@ export function PatientDetails() {
               Enviar Atualização de Impacto
             </button>
             
-            {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
-              <button 
-                onClick={handleAddToQueue}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-              >
-                <Clock size={18} className="text-emerald-600" />
-                Colocar na Fila
-              </button>
+            {isPatientHospitalized ? (
+              <>
+                <button 
+                  onClick={() => {
+                    setHospDischargeDate(formatLocalDate(new Date()));
+                    setHospDischargeStatus('DAG');
+                    setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
+                    setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
+                    setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
+                    setHospDischargeNotes('');
+                    setIsDischargeModalOpen(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm active:scale-95"
+                >
+                  <CheckCircle2 size={18} />
+                  Registrar Alta Hospitalar
+                </button>
+                <div 
+                  className="bg-purple-50/70 text-purple-400 border border-purple-200/80 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm cursor-not-allowed select-none" 
+                  title="A criança está internada no hospital. As consultas ambulatoriais estão suspensas até a alta hospitalar."
+                >
+                  <Clock size={18} className="text-purple-400" />
+                  Fila Pausada (Internada)
+                </div>
+              </>
             ) : (
-              <div className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm">
-                <CheckCircle2 size={18} className="text-slate-400" />
-                Já está na Fila
-              </div>
+              <>
+                <button 
+                  onClick={() => {
+                    setHospDate(formatLocalDate(new Date()));
+                    setHospHospitalName('Hospital Geral');
+                    setHospReason('Desnutrição Aguda Grave com complicações clínicas');
+                    setHospNotes('');
+                    setIsHospitalizationModalOpen(true);
+                  }}
+                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                  title="Registrar que a criança foi internada no hospital"
+                >
+                  <Building2 size={18} className="text-purple-600" />
+                  Registrar Internação
+                </button>
+
+                {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
+                  <button 
+                    onClick={handleAddToQueue}
+                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                  >
+                    <Clock size={18} className="text-emerald-600" />
+                    Colocar na Fila
+                  </button>
+                ) : (
+                  <div className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm">
+                    <CheckCircle2 size={18} className="text-slate-400" />
+                    Já está na Fila
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -2051,6 +2251,251 @@ export function PatientDetails() {
                   className="flex-1 bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSavingObservation ? 'Salvando...' : 'Salvar Observação'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Internação Hospitalar */}
+      {isHospitalizationModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Registrar Internação</h3>
+                  <p className="text-xs text-slate-500 font-medium">Internação hospitalar de {patient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsHospitalizationModalOpen(false)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-xs text-purple-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-purple-800">
+                <Building2 size={14} /> Regra de Consultas e Fila Clínica:
+              </p>
+              <p className="leading-relaxed">
+                Ao registrar que a criança está internada, o status mudará para <strong>Internada</strong>. Ela sairá automaticamente da fila de consultas, não será computada em faltas nem gerará retornos pendentes enquanto estiver no hospital.
+              </p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleConfirmHospitalization(); }} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Data da Internação *
+                </label>
+                <input 
+                  type="date"
+                  value={hospDate}
+                  onChange={(e) => setHospDate(e.target.value)}
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Hospital / Unidade de Saúde *
+                </label>
+                <input 
+                  type="text"
+                  value={hospHospitalName}
+                  onChange={(e) => setHospHospitalName(e.target.value)}
+                  placeholder="Ex: Hospital Geral, Hospital Municipal, Centro Pediátrico..."
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Motivo / Diagnóstico da Internação
+                </label>
+                <input 
+                  type="text"
+                  value={hospReason}
+                  onChange={(e) => setHospReason(e.target.value)}
+                  placeholder="Ex: Desnutrição Aguda Grave com complicações, Infecção respiratória..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Observações Clínicas Adicionais
+                </label>
+                <textarea 
+                  value={hospNotes}
+                  onChange={(e) => setHospNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Anotações sobre leito, contato com familiares, parecer médico do hospital..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-medium resize-none text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsHospitalizationModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSavingHospitalization}
+                  className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-purple-700 transition-all shadow-md shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSavingHospitalization ? 'Salvando...' : 'Confirmar Internação'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Alta Hospitalar */}
+      {isDischargeModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Registrar Alta Hospitalar</h3>
+                  <p className="text-xs text-slate-500 font-medium">Retorno ao acompanhamento ambulatorial de {patient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsDischargeModalOpen(false)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                <CheckCircle2 size={14} /> Retorno à Rotina de Consultas:
+              </p>
+              <p className="leading-relaxed">
+                A criança sairá da condição de internação hospitalar e retornará ao fluxo de consultas ambulatoriais e visitas domiciliares comunitárias.
+              </p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleConfirmDischarge(); }} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Data da Alta *
+                  </label>
+                  <input 
+                    type="date"
+                    value={hospDischargeDate}
+                    onChange={(e) => setHospDischargeDate(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Status Nutricional na Alta *
+                  </label>
+                  <select
+                    value={hospDischargeStatus}
+                    onChange={(e) => setHospDischargeStatus(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-700"
+                  >
+                    <option value="DAG">DAG (Grave)</option>
+                    <option value="DAM">DAM (Moderada)</option>
+                    <option value="Risco">Risco Nutricional</option>
+                    <option value="Adequado">Adequado / Recuperado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Peso na Alta (kg)
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={hospDischargeWeight}
+                    onChange={(e) => setHospDischargeWeight(e.target.value)}
+                    placeholder={latestWeightEvent?.weight ? String(latestWeightEvent.weight) : "0.00"}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Estatura na Alta (cm)
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    value={hospDischargeHeight}
+                    onChange={(e) => setHospDischargeHeight(e.target.value)}
+                    placeholder={latestHeightEvent?.height ? String(latestHeightEvent.height) : "0.0"}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Data da Próxima Consulta Ambulatorial
+                </label>
+                <input 
+                  type="date"
+                  value={hospDischargeReturnDate}
+                  onChange={(e) => setHospDischargeReturnDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Orientações da Alta / Observações
+                </label>
+                <textarea 
+                  value={hospDischargeNotes}
+                  onChange={(e) => setHospDischargeNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Relatório de alta do hospital, orientações da equipe, medicamentos a manter..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium resize-none text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsDischargeModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSavingDischarge}
+                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSavingDischarge ? 'Salvando...' : 'Confirmar Alta'}
                 </button>
               </div>
             </form>

@@ -3,6 +3,7 @@ import { Search, CheckCircle2, Clock, UserCheck, Activity, ArrowRight, PlayCircl
 import { Link } from 'react-router-dom';
 import { useAtendimento, Atendimento } from '../contexts/AtendimentoContext';
 import { usePatients } from '../contexts/PatientContext';
+import { Patient } from '../lib/mockData';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatLocalDate, cn } from '../lib/utils';
@@ -15,10 +16,17 @@ export function Atendimentos() {
   const todayDate = formatLocalDate(today);
 
   const registeredPatientIds = new Set(patients.map(p => p.id));
+  const patientMap = new Map<string, Patient>(patients.map(p => [p.id, p]));
 
   const filteredAtendimentos = atendimentos.filter(a => {
     // Only show appointments of registered children
     if (patients.length > 0 && !registeredPatientIds.has(a.patient_id)) {
+      return false;
+    }
+
+    // Exclude hospitalized children from regular consultation queue
+    const patient = patientMap.get(a.patient_id);
+    if (patient && (patient.status === 'Internada' || patient.status === 'Internado')) {
       return false;
     }
 

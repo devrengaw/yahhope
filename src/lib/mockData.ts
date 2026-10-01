@@ -1,4 +1,4 @@
-export type NutritionalStatus = 'Adequado' | 'DAM' | 'DAG' | 'Risco' | 'Alta';
+export type NutritionalStatus = 'Adequado' | 'DAM' | 'DAG' | 'Risco' | 'Alta' | 'Internada' | 'Internado' | 'Encaminhada' | 'Encaminhado';
 
 export interface Patient {
   id: string;

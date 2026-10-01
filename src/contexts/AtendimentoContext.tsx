@@ -24,6 +24,7 @@ interface AtendimentoContextType {
   concluirAtendimento: (id: string) => Promise<void>;
   concluirAtendimentosPorPaciente: (patientId: string) => Promise<boolean>;
   removerDaFila: (id: string) => void;
+  removerAtendimentosPorPaciente: (patientId: string) => Promise<void>;
 }
 
 const AtendimentoContext = createContext<AtendimentoContextType | undefined>(undefined);
@@ -208,6 +209,15 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
     return true;
   };
 
+  const removerAtendimentosPorPaciente = async (patientId: string) => {
+    const matching = atendimentos.filter(a => a.patient_id === patientId && a.status !== 'completed');
+    if (matching.length > 0) {
+      const ids = matching.map(a => a.id);
+      setAtendimentos(prev => prev.filter(a => !ids.includes(a.id)));
+      await supabase.from('clinical_appointments').delete().in('id', ids);
+    }
+  };
+
   return (
     <AtendimentoContext.Provider value={{ 
       atendimentos, 
@@ -218,7 +228,8 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
       iniciarAtendimentoPorPaciente,
       concluirAtendimento,
       concluirAtendimentosPorPaciente,
-      removerDaFila
+      removerDaFila,
+      removerAtendimentosPorPaciente
     }}>
       {children}
     </AtendimentoContext.Provider>

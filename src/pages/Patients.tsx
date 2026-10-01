@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity } from 'lucide-react';
+import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity, Building2 } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
+import { Patient } from '../lib/mockData';
 
 export function Patients() {
   const { patients, events } = usePatients();
@@ -21,12 +22,14 @@ export function Patients() {
     return ['All', ...Array.from(list)];
   }, [patients]);
 
-  const statuses = ['All', 'Adequado', 'Risco', 'DAM', 'DAG', 'Alta'];
+  const statuses = ['All', 'Adequado', 'Risco', 'DAM', 'DAG', 'Internada', 'Alta'];
 
   const filteredPatients = patients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          p.registration_number.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
+    const matchesStatus = filterStatus === 'All' 
+      || p.status === filterStatus 
+      || (filterStatus === 'Internada' && (p.status === 'Internada' || p.status === 'Internado'));
     const matchesCommunity = filterCommunity === 'All' || p.community === filterCommunity;
     const matchesGender = filterGender === 'All' || p.gender === filterGender;
 
@@ -46,12 +49,20 @@ export function Patients() {
     filterGender !== 'All'
   ].filter(Boolean).length;
 
-  const getNextReturnDate = (patientId: string) => {
+  const getNextReturnDate = (patient: Patient) => {
+    if (patient.status === 'Internada' || patient.status === 'Internado') {
+      return {
+        date: 'Internada no Hospital',
+        isHospitalized: true,
+        isOverdue: false
+      };
+    }
+
     const patientEvents = events
-      .filter(e => e.patient_id === patientId && e.return_date)
+      .filter(e => e.patient_id === patient.id && e.return_date)
       .sort((a, b) => new Date(b.return_date!).getTime() - new Date(a.return_date!).getTime());
     
-    if (patientEvents.length === 0) return '--';
+    if (patientEvents.length === 0) return { date: '--', isHospitalized: false, isOverdue: false };
     
     // Check if the return date is in the past
     const returnDate = new Date(patientEvents[0].return_date!);
@@ -59,6 +70,7 @@ export function Patients() {
     
     return {
       date: returnDate.toLocaleDateString('pt-BR'),
+      isHospitalized: false,
       isOverdue
     };
   };
@@ -229,8 +241,16 @@ export function Patients() {
                   </td>
                   <td className="p-6 text-center">
                     {(() => {
-                      const ret = getNextReturnDate(patient.id);
-                      if (ret === '--') return <span className="text-slate-400 font-medium">--</span>;
+                      const ret = getNextReturnDate(patient);
+                      if (ret.date === '--') return <span className="text-slate-400 font-medium">--</span>;
+                      if (ret.isHospitalized) {
+                        return (
+                          <span className="px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200">
+                            <Building2 size={12} className="text-purple-600" />
+                            Internada
+                          </span>
+                        );
+                      }
                       return (
                         <span className={cn(
                           "px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-block",
