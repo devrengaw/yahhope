@@ -17,11 +17,17 @@ import {
   Search,
   Tag,
   Edit2,
-  Trash2
+  Trash2,
+  Repeat,
+  Heart,
+  Users
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
 import { CategoryModal } from '../../components/admin/finance/CategoryModal';
+import { SupportersList } from '../../components/admin/finance/SupportersList';
+import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
+import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { cn } from '../../lib/utils';
 
@@ -50,13 +56,15 @@ import { Project } from '../../lib/mockData';
 
 export function Finance() {
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'categories' | 'projects'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseModalType, setExpenseModalType] = useState<'fixed' | 'variable'>('fixed');
   const [editingCategory, setEditingCategory] = useState<TransactionCategory | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -173,6 +181,61 @@ export function Finance() {
     }
   };
 
+  const handleSaveExpense = async (newExpense: ExpensePayload) => {
+    try {
+      const payload = {
+        description: newExpense.description,
+        amount: newExpense.amount,
+        type: newExpense.type,
+        category_id: newExpense.category_id,
+        date: newExpense.date,
+        status: newExpense.status,
+        account: newExpense.account,
+        expense_type: newExpense.expense_type,
+        recurrence: newExpense.recurrence
+      };
+      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
+      if (error) throw error;
+      if (data && data[0]) {
+        setTransactions(prev => [data[0] as Transaction, ...prev]);
+      }
+    } catch (e) {
+      console.warn('Erro ao salvar despesa no Supabase, adicionando localmente:', e);
+      const localTx: Transaction = {
+        id: 'tx_' + Math.random().toString(36).substring(2, 9),
+        description: newExpense.description,
+        amount: newExpense.amount,
+        type: newExpense.type,
+        category_id: newExpense.category_id,
+        date: newExpense.date,
+        status: newExpense.status,
+        account: newExpense.account,
+        expense_type: newExpense.expense_type,
+        recurrence: newExpense.recurrence
+      };
+      setTransactions(prev => [localTx, ...prev]);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      await supabase.from('finance_transactions').delete().eq('id', id);
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } catch (e) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: 'completed' | 'pending') => {
+    const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    try {
+      await supabase.from('finance_transactions').update({ status: nextStatus }).eq('id', id);
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
+    } catch (e) {
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header */}
@@ -187,17 +250,48 @@ export function Finance() {
           <p className="text-slate-500 mt-2 font-medium">Controle centralizado de entradas, saídas e saúde fiscal do YAHope.</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold text-sm shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+          <button 
+            onClick={() => {
+              if (activeTab === 'supporters') {
+                const btn = document.querySelector('button[title="Baixar planilha de apoiadores"]') as HTMLButtonElement;
+                if (btn) btn.click();
+              } else if (activeTab === 'expenses') {
+                const btn = document.querySelector('button[title="Baixar planilha de despesas"]') as HTMLButtonElement;
+                if (btn) btn.click();
+              } else {
+                alert('Exportando extrato e relatórios financeiros...');
+              }
+            }}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold text-sm shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+          >
             <Download size={20} className="text-slate-400" />
             Relatórios
           </button>
-          <button 
-            onClick={() => activeTab === 'transactions' ? setIsTxModalOpen(true) : setIsCatModalOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
-          >
-            <Plus size={20} />
-            {activeTab === 'transactions' ? 'Novo Lançamento' : 'Nova Categoria'}
-          </button>
+
+          {activeTab === 'expenses' ? (
+            <button 
+              onClick={() => { setExpenseModalType('fixed'); setIsExpenseModalOpen(true); }}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-rose-200 hover:bg-rose-700 transition-all active:scale-95"
+            >
+              <Plus size={20} />
+              Novo Gasto Mensal
+            </button>
+          ) : activeTab === 'supporters' ? (
+            <div className="flex items-center gap-2">
+              <span className="px-5 py-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl font-black text-xs flex items-center gap-2 shadow-sm">
+                <Heart size={16} className="fill-amber-500 text-amber-500" />
+                Base de Apoiadores
+              </span>
+            </div>
+          ) : (
+            <button 
+              onClick={() => activeTab === 'transactions' ? setIsTxModalOpen(true) : setIsCatModalOpen(true)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
+            >
+              <Plus size={20} />
+              {activeTab === 'transactions' ? 'Novo Lançamento' : 'Nova Categoria'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -278,36 +372,68 @@ export function Finance() {
       {/* Main Content Area */}
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
         {/* Tabs */}
-        <div className="px-8 pt-6 flex border-b border-slate-100">
+        <div className="px-8 pt-6 flex flex-wrap border-b border-slate-100 gap-1">
           <button 
             onClick={() => setActiveTab('transactions')}
             className={cn(
-              "px-6 py-4 font-bold text-sm transition-all relative",
+              "px-5 py-4 font-bold text-sm transition-all relative",
               activeTab === 'transactions' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Transações
-            {activeTab === 'transactions' && <div className="absolute bottom-0 left-6 right-6 h-1 bg-slate-900 rounded-t-full"></div>}
+            {activeTab === 'transactions' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
           </button>
+          
+          <button 
+            onClick={() => setActiveTab('expenses')}
+            className={cn(
+              "px-5 py-4 font-bold text-sm transition-all relative flex items-center gap-2",
+              activeTab === 'expenses' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            <Repeat size={15} className={activeTab === 'expenses' ? "text-indigo-600" : "text-slate-400"} />
+            Custos Mensais
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-100">
+              Fixos & Variáveis
+            </span>
+            {activeTab === 'expenses' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-rose-600 rounded-t-full"></div>}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('supporters')}
+            className={cn(
+              "px-5 py-4 font-bold text-sm transition-all relative flex items-center gap-2",
+              activeTab === 'supporters' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            <Heart size={15} className={activeTab === 'supporters' ? "text-amber-500 fill-amber-500" : "text-slate-400"} />
+            Apoiadores Cadastrados
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+              Comunidade
+            </span>
+            {activeTab === 'supporters' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-amber-500 rounded-t-full"></div>}
+          </button>
+
           <button 
             onClick={() => setActiveTab('categories')}
             className={cn(
-              "px-6 py-4 font-bold text-sm transition-all relative",
+              "px-5 py-4 font-bold text-sm transition-all relative",
               activeTab === 'categories' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Categorias
-            {activeTab === 'categories' && <div className="absolute bottom-0 left-6 right-6 h-1 bg-slate-900 rounded-t-full"></div>}
+            {activeTab === 'categories' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
           </button>
+          
           <button 
             onClick={() => setActiveTab('projects')}
             className={cn(
-              "px-6 py-4 font-bold text-sm transition-all relative",
+              "px-5 py-4 font-bold text-sm transition-all relative",
               activeTab === 'projects' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
             )}
           >
             Projetos
-            {activeTab === 'projects' && <div className="absolute bottom-0 left-6 right-6 h-1 bg-slate-900 rounded-t-full"></div>}
+            {activeTab === 'projects' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
           </button>
         </div>
 
@@ -617,13 +743,30 @@ export function Finance() {
               )}
             </div>
           </div>
+        ) : activeTab === 'expenses' ? (
+          <MonthlyExpensesManager
+            transactions={transactions}
+            categories={categories}
+            totalIncome={stats.totalIncome}
+            onSaveExpense={handleSaveExpense}
+            onDeleteTransaction={handleDeleteTransaction}
+            onToggleStatus={handleToggleStatus}
+          />
+        ) : activeTab === 'supporters' ? (
+          <SupportersList />
         ) : null}
 
         <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex justify-between items-center px-10">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
             {activeTab === 'transactions' 
               ? `Mostrando ${filteredTransactions.length} de ${transactions.length} lançamentos`
-              : `Total de ${categories.length} categorias cadastradas`
+              : activeTab === 'expenses'
+              ? `Mostrando ${transactions.filter(t => t.type === 'expense').length} despesas mensais gerenciadas`
+              : activeTab === 'supporters'
+              ? `Base consolidada de apoiadores e padrinhos ativos`
+              : activeTab === 'categories'
+              ? `Total de ${categories.length} categorias cadastradas`
+              : `Total de ${projects.length} projetos monitorados`
             }
           </p>
           <div className="flex gap-2">
@@ -645,6 +788,14 @@ export function Finance() {
         onClose={() => { setIsCatModalOpen(false); setEditingCategory(null); }}
         onSave={handleSaveCategory}
         category={editingCategory}
+      />
+
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        onSave={handleSaveExpense}
+        categories={categories}
+        defaultExpenseType={expenseModalType}
       />
     </div>
   );
