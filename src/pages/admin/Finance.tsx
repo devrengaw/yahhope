@@ -42,6 +42,7 @@ export interface Transaction {
   account: string;
   expense_type?: 'fixed' | 'variable';
   recurrence?: 'monthly' | 'yearly' | 'none';
+  module?: string;
 }
 
 export interface TransactionCategory {

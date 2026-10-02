@@ -26,6 +26,7 @@ export interface ExpensePayload {
   due_day?: number;
   department?: string;
   notes?: string;
+  module?: string;
 }
 
 interface ExpenseModalProps {

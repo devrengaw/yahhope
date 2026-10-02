@@ -52,6 +52,7 @@ const communicationNavItems = [
   { name: 'Blog', path: '/communication/blog', icon: Newspaper },
   { name: 'Disparo de E-mails', path: '/communication/campaigns', icon: Send },
   { name: 'Templates de E-mail', path: '/communication/email-templates', icon: Mail },
+  { name: 'Custos Fixos & Variados', path: '/communication/costs', icon: DollarSign },
   { name: 'Gestão', path: '/communication/management', icon: Settings },
 ];
 
@@ -155,7 +156,10 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       permissionKey === 'nutrition-finance' ? 'finance' :
       permissionKey;
 
-    const actualKey = (module === 'nutrition' && mappedKey === 'finance') ? 'nutrition-finance' : mappedKey;
+    const actualKey = 
+      (module === 'nutrition' && (mappedKey === 'finance' || mappedKey === 'costs')) ? 'nutrition-finance' : 
+      (module === 'communication' && (mappedKey === 'costs' || mappedKey === 'finance')) ? 'communication-finance' : 
+      mappedKey;
 
     return user.permissions.includes(actualKey) || user.permissions.includes(permissionKey) || user.permissions.includes(item.path);
   });

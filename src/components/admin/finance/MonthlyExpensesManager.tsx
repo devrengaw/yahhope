@@ -46,9 +46,16 @@ export function MonthlyExpensesManager({
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
+  const [moduleFilter, setModuleFilter] = useState<'all' | 'nutrition' | 'communication' | 'global'>('all');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<'fixed' | 'variable'>('fixed');
+
+  // Detecta se existem lançamentos de múltiplos setores
+  const hasMultipleModules = useMemo(() => {
+    const modules = new Set(transactions.map(t => t.module || 'global'));
+    return modules.size > 1;
+  }, [transactions]);
 
   // Todas as despesas
   const allExpenses = useMemo(() => {
@@ -93,10 +100,11 @@ export function MonthlyExpensesManager({
 
       const matchCat = categoryFilter === 'all' || t.category_id === categoryFilter;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+      const matchModule = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
 
-      return matchType && matchSearch && matchCat && matchStatus;
+      return matchType && matchSearch && matchCat && matchStatus && matchModule;
     });
-  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter]);
+  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter]);
 
   const handleOpenModal = (type: 'fixed' | 'variable') => {
     setModalDefaultType(type);
@@ -114,12 +122,13 @@ export function MonthlyExpensesManager({
   };
 
   const handleExportCSV = () => {
-    const headers = ['Tipo de Gasto', 'Descrição', 'Categoria', 'Data / Vencimento', 'Conta', 'Valor (R$)', 'Status'];
+    const headers = ['Tipo de Gasto', 'Descrição', ...(hasMultipleModules ? ['Setor'] : []), 'Categoria', 'Data / Vencimento', 'Conta', 'Valor (R$)', 'Status'];
     const rows = filteredExpenses.map(t => {
       const cat = categories.find(c => c.id === t.category_id);
       return [
         t.expense_type === 'fixed' ? 'Fixo Recorrente' : 'Variável',
         `"${t.description}"`,
+        ...(hasMultipleModules ? [t.module === 'nutrition' ? '"Casa Nutri"' : t.module === 'communication' ? '"Comunicação"' : '"Geral"'] : []),
         `"${cat?.name || 'Sem Categoria'}"`,
         t.date,
         `"${t.account}"`,
@@ -333,6 +342,19 @@ export function MonthlyExpensesManager({
               <option value="pending">Pendentes</option>
             </select>
 
+            {hasMultipleModules && (
+              <select
+                value={moduleFilter}
+                onChange={(e) => setModuleFilter(e.target.value as any)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
+              >
+                <option value="all">Todos os Setores</option>
+                <option value="nutrition">Casa Nutri</option>
+                <option value="communication">Comunicação</option>
+                <option value="global">Geral / Global</option>
+              </select>
+            )}
+
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all active:scale-95 ml-auto lg:ml-0"
@@ -396,7 +418,19 @@ export function MonthlyExpensesManager({
 
                   {/* Descrição e Categoria */}
                   <td className="px-6 py-5">
-                    <p className="font-bold text-slate-900 text-sm">{t.description}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-900 text-sm">{t.description}</p>
+                      {hasMultipleModules && t.module && t.module !== 'global' && (
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
+                          t.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                          t.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                          "bg-slate-100 text-slate-700 border border-slate-200"
+                        )}>
+                          {t.module === 'nutrition' ? 'Casa Nutri' : t.module === 'communication' ? 'Comunicação' : t.module}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
                       {category?.name || 'Geral / Operações'}

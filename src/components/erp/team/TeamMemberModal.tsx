@@ -68,6 +68,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
         { id: 'chat', label: 'Chat' },
         { id: 'blog', label: 'Blog' },
         { id: 'email-templates', label: 'Templates de email' },
+        { id: 'communication-finance', label: 'Custos Fixos e Variados' },
         { id: 'management', label: 'Gestão' },
       ]
     },
@@ -81,6 +82,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
         { id: 'updates', label: 'Atualizações apoiador' },
         { id: 'inventory', label: 'Estoque' },
         { id: 'visits', label: 'Visitas' },
+        { id: 'nutrition-finance', label: 'Custos Fixos e Variados (Finanças)' },
         { id: 'management', label: 'Gestão' },
       ]
     },
