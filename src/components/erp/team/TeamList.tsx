@@ -1,5 +1,6 @@
-import React from 'react';
-import { TeamMember, TeamMemberRole, TeamMemberStatus, mockUserCategories } from '../../../lib/mockData';
+import React, { useState, useEffect } from 'react';
+import { TeamMember, TeamMemberRole, TeamMemberStatus } from '../../../lib/mockData';
+import { supabase } from '../../../lib/supabase';
 import { Mail, Phone, Edit2, Trash2, Send } from 'lucide-react';
 
 interface TeamListProps {
@@ -10,6 +11,13 @@ interface TeamListProps {
 }
 
 export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamListProps) {
+  const [categories, setCategories] = useState<{ id: string; name: string; color: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('user_categories').select('id, name, color').then(({ data }) => {
+      if (data) setCategories(data);
+    });
+  }, []);
   
   const getRoleBadge = (role: TeamMemberRole) => {
     switch (role) {
@@ -80,7 +88,7 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamList
                           {member.category_id && (
                             <div className="flex items-center gap-1 mt-0.5">
                               {(() => {
-                                const cat = mockUserCategories.find(c => c.id === member.category_id);
+                                const cat = categories.find(c => c.id === member.category_id);
                                 return cat ? (
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-wider ${cat.color}`}>
                                     {cat.name}

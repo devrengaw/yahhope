@@ -252,118 +252,24 @@ export async function trackPageView(path: string, customTitle?: string, userId?:
   }
 }
 
-// Gera dados semente realistas se não houver histórico para que o dashboard já nasça rico
-function generateSeedVisits(): VisitRecord[] {
-  const pages = [
-    { path: '/', title: 'Página Inicial (Home)', weight: 35 },
-    { path: '/campanha', title: 'Campanha Nutrição', weight: 22 },
-    { path: '/projetos', title: 'Projetos Sociais', weight: 14 },
-    { path: '/cadastro-apadrinhador', title: 'Cadastro de Padrinho', weight: 10 },
-    { path: '/blog', title: 'Blog & Notícias', weight: 8 },
-    { path: '/loja', title: 'Loja Solidária', weight: 6 },
-    { path: '/apoiador', title: 'Portal do Apoiador / Seja Membro', weight: 5 }
-  ];
-
-  const locations = [
-    { country: 'Brasil', city: 'São Paulo', weight: 35 },
-    { country: 'Brasil', city: 'Rio de Janeiro', weight: 15 },
-    { country: 'Angola', city: 'Luanda', weight: 18 },
-    { country: 'Angola', city: 'Benguela', weight: 7 },
-    { country: 'Portugal', city: 'Lisboa', weight: 10 },
-    { country: 'Portugal', city: 'Porto', weight: 4 },
-    { country: 'Moçambique', city: 'Maputo', weight: 5 },
-    { country: 'Estados Unidos', city: 'Miami', weight: 4 },
-    { country: 'Brasil', city: 'Belo Horizonte', weight: 2 }
-  ];
-
-  const referrers = [
-    { name: 'Instagram', weight: 38 },
-    { name: 'Google', weight: 28 },
-    { name: 'Direto', weight: 20 },
-    { name: 'WhatsApp', weight: 10 },
-    { name: 'Facebook', weight: 4 }
-  ];
-
-  const devices: { device: 'mobile' | 'desktop' | 'tablet'; weight: number }[] = [
-    { device: 'mobile', weight: 68 },
-    { device: 'desktop', weight: 27 },
-    { device: 'tablet', weight: 5 }
-  ];
-
-  const browsers = [
-    { name: 'Chrome', weight: 54 },
-    { name: 'Safari', weight: 32 },
-    { name: 'Edge', weight: 8 },
-    { name: 'Firefox', weight: 6 }
-  ];
-
-  const pickWeighted = <T extends { weight: number }>(items: T[]): T => {
-    const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-    let rand = Math.random() * totalWeight;
-    for (const item of items) {
-      if (rand < item.weight) return item;
-      rand -= item.weight;
-    }
-    return items[0];
-  };
-
-  const visits: VisitRecord[] = [];
-  const now = new Date();
-  
-  // 60 unique visitor IDs reused across visits
-  const visitorPool = Array.from({ length: 180 }, (_, i) => `v_seed_${i + 1}`);
-
-  // Generate around 850 historical visits over past 90 days
-  for (let d = 89; d >= 0; d--) {
-    const day = subDays(now, d);
-    // Slight growing trend towards recent days + weekend variations
-    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-    const baseCount = Math.floor(6 + ((90 - d) / 10) + (isWeekend ? 3 : 6));
-    const dayVisitsCount = Math.floor(baseCount * (0.8 + Math.random() * 0.5));
-
-    for (let j = 0; j < dayVisitsCount; j++) {
-      const vId = visitorPool[Math.floor(Math.random() * visitorPool.length)];
-      const page = pickWeighted(pages);
-      const loc = pickWeighted(locations);
-      const ref = pickWeighted(referrers);
-      const dev = pickWeighted(devices);
-      const brow = pickWeighted(browsers);
-
-      const hour = Math.floor(8 + Math.random() * 14); // peak during day
-      const minute = Math.floor(Math.random() * 60);
-      const visitDate = new Date(day);
-      visitDate.setHours(hour, minute, Math.floor(Math.random() * 60));
-
-      visits.push({
-        visitor_id: vId,
-        session_id: `s_seed_${vId}_${format(day, 'yyyyMMdd')}`,
-        path: page.path,
-        page_title: page.title,
-        referrer: ref.name,
-        device: dev.device,
-        browser: brow.name,
-        os: dev.device === 'mobile' ? (Math.random() > 0.5 ? 'iOS' : 'Android') : (Math.random() > 0.3 ? 'Windows' : 'macOS'),
-        country: loc.country,
-        city: loc.city,
-        created_at: visitDate.toISOString()
-      });
-    }
-  }
-
-  return visits;
-}
-
 // Carrega os dados analíticos agregados para exibição no dashboard
 export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 'all'): Promise<AnalyticsSummary> {
+  // Limpa qualquer cache de seed mock residual que tenha sido gravado anteriormente
+  try {
+    localStorage.removeItem('yah_hope_seed_visits_v1');
+  } catch {
+    // ignore
+  }
+
   let allVisits: VisitRecord[] = [];
 
-  // 1. Tenta carregar do Supabase se existir
+  // 1. Tenta carregar visitas reais do Supabase
   try {
     const { data, error } = await supabase
       .from('site_visits')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(3000);
+      .limit(5000);
       
     if (!error && data && data.length > 0) {
       allVisits = data as VisitRecord[];
@@ -372,27 +278,17 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     // ignore
   }
 
-  // 2. Se vazio ou poucas visitas, mescla com cache local e seed rica
-  let localVisits: VisitRecord[] = [];
+  // 2. Mescla com visitas reais capturadas localmente neste navegador
   try {
     const raw = localStorage.getItem(STORAGE_KEY_VISITS);
-    if (raw) localVisits = JSON.parse(raw);
+    if (raw) {
+      const localVisits: VisitRecord[] = JSON.parse(raw);
+      if (Array.isArray(localVisits)) {
+        allVisits = [...allVisits, ...localVisits];
+      }
+    }
   } catch {
     // ignore
-  }
-
-  if (allVisits.length === 0) {
-    let seedVisits: VisitRecord[] = [];
-    const seedStored = localStorage.getItem('yah_hope_seed_visits_v1');
-    if (seedStored) {
-      seedVisits = JSON.parse(seedStored);
-    } else {
-      seedVisits = generateSeedVisits();
-      localStorage.setItem('yah_hope_seed_visits_v1', JSON.stringify(seedVisits));
-    }
-    allVisits = [...localVisits, ...seedVisits];
-  } else {
-    allVisits = [...allVisits, ...localVisits];
   }
 
   // Remove duplicatas se houver
@@ -404,20 +300,26 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     return true;
   });
 
-  // Filtrar por período
+  // Filtrar por período atual
   const now = new Date();
   let startDate: Date;
+  let priorStartDate: Date;
 
   if (period === 'today') {
     startDate = startOfDay(now);
+    priorStartDate = subDays(startDate, 1);
   } else if (period === '7d') {
     startDate = subDays(now, 7);
+    priorStartDate = subDays(startDate, 7);
   } else if (period === '30d') {
     startDate = subDays(now, 30);
+    priorStartDate = subDays(startDate, 30);
   } else if (period === '90d') {
     startDate = subDays(now, 90);
+    priorStartDate = subDays(startDate, 90);
   } else {
     startDate = new Date(2020, 0, 1);
+    priorStartDate = new Date(2020, 0, 1);
   }
 
   const filteredVisits = allVisits.filter(v => {
@@ -428,26 +330,99 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
   const totalPageviews = filteredVisits.length;
   const uniqueVisitors = new Set(filteredVisits.map(v => v.visitor_id)).size;
 
-  // Carregar contagem de apoiadores/usuários reais
-  let realUsersCount = 0;
+  // Visitas do período anterior para cálculo real de crescimento
+  const priorVisits = period === 'all' ? [] : allVisits.filter(v => {
+    const vDate = parseISO(v.created_at);
+    return isAfter(vDate, priorStartDate) && !isAfter(vDate, startDate);
+  });
+  const priorPageviews = priorVisits.length;
+  const priorUniqueVisitors = new Set(priorVisits.map(v => v.visitor_id)).size;
+
+  const pageviewsGrowth = priorPageviews > 0
+    ? Number((((totalPageviews - priorPageviews) / priorPageviews) * 100).toFixed(1))
+    : (totalPageviews > 0 ? 100 : 0);
+
+  const visitorsGrowth = priorUniqueVisitors > 0
+    ? Number((((uniqueVisitors - priorUniqueVisitors) / priorUniqueVisitors) * 100).toFixed(1))
+    : (uniqueVisitors > 0 ? 100 : 0);
+
+  // Carregar usuários reais da tabela users (com contagem no período e perfis)
+  let totalRegistrations = 0;
+  let priorRegistrations = 0;
+  let userRolesList: DemographyItem[] = [];
+
   try {
-    const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
-    if (!error && count) {
-      realUsersCount = count;
-    } else {
-      const { count: spCount } = await supabase.from('sponsorships').select('*', { count: 'exact', head: true });
-      if (spCount) realUsersCount = spCount;
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, role, department, created_at');
+
+    if (usersData) {
+      // Cadastros no período atual
+      const currentPeriodUsers = period === 'all'
+        ? usersData
+        : usersData.filter(u => u.created_at && isAfter(parseISO(u.created_at), startDate));
+      totalRegistrations = currentPeriodUsers.length;
+
+      // Cadastros no período anterior
+      if (period !== 'all') {
+        const priorPeriodUsers = usersData.filter(u => {
+          if (!u.created_at) return false;
+          const uDate = parseISO(u.created_at);
+          return isAfter(uDate, priorStartDate) && !isAfter(uDate, startDate);
+        });
+        priorRegistrations = priorPeriodUsers.length;
+      }
+
+      // Distribuição real por papel/função
+      const roleCounts = new Map<string, number>();
+      usersData.forEach(u => {
+        const role = u.role || 'USER';
+        roleCounts.set(role, (roleCounts.get(role) || 0) + 1);
+      });
+
+      const roleLabels: Record<string, { label: string; color: string }> = {
+        ADMIN: { label: 'Administradores', color: '#0F172A' },
+        USER: { label: 'Apoiadores / Membros', color: '#92BF78' },
+        VOLUNTEER: { label: 'Voluntários', color: '#F49853' },
+        STAFF: { label: 'Equipe Operacional', color: '#88A1F2' },
+        COORDINATOR: { label: 'Coordenação', color: '#EBC878' },
+        NURSE: { label: 'Enfermagem', color: '#EC4899' },
+        DOCTOR: { label: 'Médicos', color: '#06B6D4' },
+        ACS: { label: 'Agentes Comunitários', color: '#10B981' },
+        SOCIAL_WORKER: { label: 'Assistentes Sociais', color: '#8B5CF6' },
+        OBSERVER: { label: 'Observadores', color: '#94A3B8' }
+      };
+
+      const totalUsers = usersData.length || 1;
+      userRolesList = Array.from(roleCounts.entries()).map(([roleKey, count]) => {
+        const meta = roleLabels[roleKey] || { label: roleKey, color: '#64748B' };
+        return {
+          name: meta.label,
+          count,
+          percentage: Number(((count / totalUsers) * 100).toFixed(1)),
+          color: meta.color
+        };
+      }).sort((a, b) => b.count - a.count);
     }
-  } catch {
-    // fallback
+  } catch (err) {
+    console.warn('Erro ao carregar usuários reais para analytics:', err);
   }
 
-  // Estimar apoiadores cadastrados no período
-  const ratio = period === 'today' ? 0.05 : period === '7d' ? 0.25 : period === '30d' ? 0.6 : 1;
-  const totalRegistrations = Math.max(Math.round(uniqueVisitors * 0.048), Math.round(realUsersCount * ratio) || 8);
-  const conversionRate = totalPageviews > 0 ? Number(((totalRegistrations / uniqueVisitors) * 100).toFixed(1)) : 0;
+  if (userRolesList.length === 0) {
+    userRolesList = [
+      { name: 'Nenhum usuário cadastrado', count: 0, percentage: 0, color: '#94A3B8' }
+    ];
+  }
 
-  // Agrupar por data (Daily trend)
+  const registrationsGrowth = priorRegistrations > 0
+    ? Number((((totalRegistrations - priorRegistrations) / priorRegistrations) * 100).toFixed(1))
+    : (totalRegistrations > 0 ? 100 : 0);
+
+  const conversionRate = uniqueVisitors > 0
+    ? Number(((totalRegistrations / uniqueVisitors) * 100).toFixed(1))
+    : 0;
+
+  // Agrupar por data (Daily trend) com dados reais
   const daysMap = new Map<string, { pageviews: number; visitorsSet: Set<string>; registrations: number }>();
   const daysSpan = period === 'today' ? 1 : period === '7d' ? 7 : period === '30d' ? 30 : 90;
 
@@ -472,17 +447,16 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
 
   const dailyTrend: DayMetric[] = Array.from(daysMap.entries()).map(([dateStr, val]) => {
     const dObj = parseISO(dateStr);
-    const dayRegs = Math.max(0, Math.round(val.visitorsSet.size * 0.05 + (Math.random() > 0.7 ? 1 : 0)));
     return {
       date: dateStr,
       formattedDate: format(dObj, period === 'today' ? 'HH:mm' : 'dd/MM', { locale: ptBR }),
       pageviews: val.pageviews,
       visitors: val.visitorsSet.size,
-      registrations: dayRegs
+      registrations: val.registrations
     };
   });
 
-  // Páginas mais acessadas
+  // Páginas mais acessadas reais
   const pageMap = new Map<string, { title: string; views: number; visitors: Set<string> }>();
   filteredVisits.forEach(v => {
     const key = v.path;
@@ -502,17 +476,10 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     }))
     .sort((a, b) => b.views - a.views);
 
-  // Demografia por Faixa Etária (baseada nos dados do público e apoiadores)
-  const ageDistribution: DemographyItem[] = [
-    { name: '18 - 24 anos', count: Math.round(uniqueVisitors * 0.16), percentage: 16, color: '#88A1F2' },
-    { name: '25 - 34 anos', count: Math.round(uniqueVisitors * 0.38), percentage: 38, color: '#92BF78' },
-    { name: '35 - 44 anos', count: Math.round(uniqueVisitors * 0.24), percentage: 24, color: '#F49853' },
-    { name: '45 - 54 anos', count: Math.round(uniqueVisitors * 0.14), percentage: 14, color: '#EBC878' },
-    { name: '55 - 64 anos', count: Math.round(uniqueVisitors * 0.06), percentage: 6, color: '#A78BFA' },
-    { name: '65+ anos', count: Math.round(uniqueVisitors * 0.02), percentage: 2, color: '#94A3B8' },
-  ];
+  // Demografia: usa a lista real de perfis de usuários cadastrados
+  const ageDistribution: DemographyItem[] = userRolesList;
 
-  // Geolocalização: Países
+  // Geolocalização: Países reais
   const countryMap = new Map<string, number>();
   filteredVisits.forEach(v => {
     const c = v.country || 'Brasil';
@@ -538,10 +505,10 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Geolocalização: Cidades
+  // Geolocalização: Cidades reais
   const cityMap = new Map<string, { country: string; count: number }>();
   filteredVisits.forEach(v => {
-    const c = v.city || 'São Paulo';
+    const c = v.city || 'Desconhecida';
     const current = cityMap.get(c) || { country: v.country || 'Brasil', count: 0 };
     current.count += 1;
     cityMap.set(c, current);
@@ -557,7 +524,7 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  // Origem de tráfego
+  // Origem de tráfego real
   const refMap = new Map<string, number>();
   filteredVisits.forEach(v => {
     const r = v.referrer || 'Direto';
@@ -582,7 +549,7 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Dispositivos
+  // Dispositivos reais
   const devMap = new Map<string, number>();
   filteredVisits.forEach(v => {
     const d = v.device || 'desktop';
@@ -609,10 +576,10 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Navegadores
+  // Navegadores reais
   const browMap = new Map<string, number>();
   filteredVisits.forEach(v => {
-    const b = v.browser || 'Chrome';
+    const b = v.browser || 'Outro';
     browMap.set(b, (browMap.get(b) || 0) + 1);
   });
 
@@ -624,17 +591,56 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
     }))
     .sort((a, b) => b.count - a.count);
 
+  // Cálculo de Rejeição (Bounce Rate) e Duração Média reais por sessão
+  const sessionTimestamps = new Map<string, number[]>();
+  filteredVisits.forEach(v => {
+    const sId = v.session_id || v.visitor_id;
+    const time = new Date(v.created_at).getTime();
+    if (!sessionTimestamps.has(sId)) {
+      sessionTimestamps.set(sId, []);
+    }
+    sessionTimestamps.get(sId)!.push(time);
+  });
+
+  const totalSessions = sessionTimestamps.size;
+  let singlePageSessions = 0;
+  let totalDurationMs = 0;
+  let multiPageSessions = 0;
+
+  sessionTimestamps.forEach(timestamps => {
+    if (timestamps.length <= 1) {
+      singlePageSessions += 1;
+    } else {
+      multiPageSessions += 1;
+      const min = Math.min(...timestamps);
+      const max = Math.max(...timestamps);
+      totalDurationMs += (max - min);
+    }
+  });
+
+  const bounceRate = totalSessions > 0
+    ? `${((singlePageSessions / totalSessions) * 100).toFixed(1)}%`
+    : '0%';
+
+  let avgDuration = '-';
+  if (multiPageSessions > 0) {
+    const avgSec = Math.round((totalDurationMs / multiPageSessions) / 1000);
+    const m = Math.floor(avgSec / 60);
+    const s = avgSec % 60;
+    avgDuration = m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
   return {
     period,
     totalPageviews,
-    pageviewsGrowth: 14.8,
+    pageviewsGrowth,
     uniqueVisitors,
-    visitorsGrowth: 12.3,
+    visitorsGrowth,
     totalRegistrations,
-    registrationsGrowth: 18.5,
+    registrationsGrowth,
     conversionRate,
-    avgDuration: '2m 48s',
-    bounceRate: '32.4%',
+    avgDuration,
+    bounceRate,
     dailyTrend,
     topPages,
     ageDistribution,
@@ -684,8 +690,8 @@ export function exportToCSV(data: AnalyticsSummary): void {
   });
   csvContent += '\n';
 
-  csvContent += '--- PERFIL DEMOGRÁFICO (FAIXA ETÁRIA) ---\n';
-  csvContent += 'Faixa Etária;Estimativa de Visitantes;% do Total\n';
+  csvContent += '--- PERFIL DOS USUÁRIOS E APOIADORES CADASTRADOS ---\n';
+  csvContent += 'Função / Papel;Quantidade de Usuários;% do Total\n';
   data.ageDistribution.forEach(a => {
     csvContent += `"${a.name}";${a.count};${a.percentage}%\n`;
   });

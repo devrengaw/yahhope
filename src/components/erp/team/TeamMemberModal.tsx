@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { TeamMember, TeamMemberRole, TeamMemberStatus, mockUserCategories } from '../../../lib/mockData';
+import { TeamMember, TeamMemberRole, TeamMemberStatus } from '../../../lib/mockData';
+import { supabase } from '../../../lib/supabase';
 
 interface TeamMemberModalProps {
   isOpen: boolean;
@@ -19,6 +20,15 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
   const [department, setDepartment] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['dashboard']);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from('user_categories').select('id, name').order('name').then(({ data }) => {
+        if (data) setCategories(data);
+      });
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (editingMember) {
@@ -254,7 +264,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white"
             >
               <option value="">Nenhuma Categoria</option>
-              {mockUserCategories.map(cat => (
+              {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>

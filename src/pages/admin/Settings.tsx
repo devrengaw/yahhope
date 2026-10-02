@@ -27,7 +27,8 @@ import { ProjectDetails } from '../../components/erp/projects/ProjectDetails';
 import { TeamSummary } from '../../components/erp/team/TeamSummary';
 import { TeamList } from '../../components/erp/team/TeamList';
 import { TeamMemberModal } from '../../components/erp/team/TeamMemberModal';
-import { mockProjects, Project, mockTeamMembers, TeamMember } from '../../lib/mockData';
+import { Project, TeamMember } from '../../lib/mockData';
+import { useProject } from '../../contexts/ProjectContext';
 import { useLocation } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -65,10 +66,8 @@ export function Settings() {
     locale: 'pt-BR'
   });
 
-  // Project State
-  const [projects, setProjects] = useState<Project[]>(
-    [...mockProjects].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-  );
+  // Project State - Carregado diretamente do Supabase via ProjectContext
+  const { projects, addProject, updateProject } = useProject();
   
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -114,21 +113,17 @@ export function Settings() {
   
   // Project Handlers
   const handleSaveProject = (newProject: Project) => {
-    const updated = [newProject, ...projects].sort((a, b) => 
-      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-    );
-    setProjects(updated);
+    addProject(newProject);
   };
 
   const handleUpdateProject = (updatedProject: Project) => {
-    const updated = projects.map(p => p.id === updatedProject.id ? updatedProject : p);
-    setProjects(updated);
+    updateProject(updatedProject.id, updatedProject);
     if (selectedProject?.id === updatedProject.id) {
       setSelectedProject(updatedProject);
     }
   };
 
-  const visibleProjects = projects.filter(p => !p.isPrivate || p.invitees.includes(CURRENT_USER_ID));
+  const visibleProjects = projects;
 
   // User Handlers
   const handleSaveMember = async (newMember: Omit<TeamMember, 'id'>) => {

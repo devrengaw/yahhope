@@ -423,40 +423,42 @@ export function AdminAnalyticsDashboard() {
           </div>
         </div>
 
-        {/* Faixa Etária dos Visitantes & Cadastrados */}
+        {/* Perfil dos Usuários e Membros Cadastrados */}
         <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                   <Users className="text-blue-500" size={22} />
-                  Perfil por Faixa Etária
+                  Perfil dos Usuários & Membros
                 </h2>
                 <p className="text-slate-500 text-xs sm:text-sm font-medium mt-0.5">
-                  Distribuição etária estimada dos visitantes e apoiadores cadastrados
+                  Distribuição real por papel e função cadastrada no sistema
                 </p>
               </div>
               <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                Demografia
+                Usuários Reais
               </span>
             </div>
 
             <div className="space-y-4">
-              {data?.ageDistribution.map(age => (
-                <div key={age.name} className="space-y-1.5">
+              {data?.ageDistribution.map(item => (
+                <div key={item.name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs sm:text-sm font-bold">
-                    <span className="text-slate-700">{age.name}</span>
+                    <span className="text-slate-700">{item.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-medium">{age.count.toLocaleString('pt-BR')} pessoas</span>
-                      <span className="text-slate-900 w-10 text-right">{age.percentage}%</span>
+                      <span className="text-slate-400 font-medium">
+                        {item.count} {item.count === 1 ? 'usuário' : 'usuários'}
+                      </span>
+                      <span className="text-slate-900 w-12 text-right">{item.percentage}%</span>
                     </div>
                   </div>
                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                     <div 
                       className="h-full rounded-full transition-all duration-500"
                       style={{ 
-                        width: `${age.percentage * 2.2}%`,
-                        backgroundColor: age.color || '#F49853'
+                        width: `${Math.min(item.percentage, 100)}%`,
+                        backgroundColor: item.color || '#F49853'
                       }}
                     />
                   </div>
@@ -468,7 +470,7 @@ export function AdminAnalyticsDashboard() {
           <div className="mt-6 p-4 rounded-2xl bg-amber-50/60 border border-amber-100 flex items-start gap-3">
             <Sparkles size={20} className="text-amber-500 shrink-0 mt-0.5" />
             <div className="text-xs text-amber-900/80 leading-relaxed">
-              <strong className="font-bold text-amber-900">Insight de Engajamento:</strong> A maior concentração de doadores e apoiadores está entre <strong>25 e 44 anos (62%)</strong>. Excelente público-alvo para campanhas de apadrinhamento recorrente.
+              <strong className="font-bold text-amber-900">Base Ativa no Sistema:</strong> Total de <strong>{data?.totalRegistrations || 0} usuário(s) e apoiador(es)</strong> cadastrado(s) no período selecionado.
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User,
   Shield, 
@@ -23,11 +23,22 @@ export function Profile() {
   
   // Profile State
   const [profileInfo, setProfileInfo] = useState({
-    name: user?.name || 'Administrador YAH Hope',
-    email: user?.email || 'gestor@yahope.org',
-    phone: '',
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: (user as any)?.phone || '',
     about: 'Atuando na gestão administrativa do projeto YAH Hope.'
   });
+
+  useEffect(() => {
+    if (user) {
+      setProfileInfo(prev => ({
+        ...prev,
+        name: user.name || prev.name,
+        email: user.email || prev.email,
+        phone: (user as any).phone || prev.phone
+      }));
+    }
+  }, [user]);
 
   // Notifications State
   const [notifications, setNotifications] = useState({

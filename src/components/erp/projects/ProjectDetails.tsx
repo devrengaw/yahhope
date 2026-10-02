@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Layout, Plus, CheckCircle2, Circle, Clock, PlayCircle, MessageSquare, DollarSign, Users, Shield, Edit3, Save, UserPlus, Trash2, Globe, Lock } from 'lucide-react';
-import { Project, ProjectTask, TaskStatus, mockTeamMembers, Priority } from '../../../lib/mockData';
+import { Project, ProjectTask, TaskStatus, Priority } from '../../../lib/mockData';
+import { supabase } from '../../../lib/supabase';
 import { ProjectTaskModal } from './ProjectTaskModal';
 import { ProjectModal } from './ProjectModal';
 
@@ -17,16 +18,23 @@ export function ProjectDetails({ project, onClose, onUpdateProject }: ProjectDet
   const [activeTab, setActiveTab] = useState<'tasks' | 'team'>('tasks');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState(project.notes || '');
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
+      if (data) setTeamMembers(data);
+    });
+  }, []);
 
   const totalCost = project.tasks.reduce((sum, task) => sum + task.cost, 0);
   const budgetProgress = (totalCost / project.budget) * 100;
 
   const getMemberInfo = (userId: string) => {
-    return mockTeamMembers.find(m => m.id === userId);
+    return teamMembers.find(m => m.id === userId);
   };
 
   const getMemberInitial = (userId: string) => {
-    return getMemberInfo(userId)?.name.charAt(0) || '?';
+    return getMemberInfo(userId)?.name?.charAt(0) || '?';
   };
 
   const handleSaveNotes = () => {
@@ -340,7 +348,7 @@ export function ProjectDetails({ project, onClose, onUpdateProject }: ProjectDet
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {mockTeamMembers.map(member => {
+                    {teamMembers.map(member => {
                       const isInvited = project.invitees.includes(member.id);
                       return (
                         <div key={member.id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isInvited ? 'border-blue-100 bg-blue-50/50' : 'border-slate-50 bg-white hover:border-slate-200'}`}>

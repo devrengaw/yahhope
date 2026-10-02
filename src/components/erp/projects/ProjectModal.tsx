@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Project, ProjectStatus, mockTeamMembers, Priority } from '../../../lib/mockData';
+import { Project, ProjectStatus, Priority } from '../../../lib/mockData';
 import { X, Lock, Globe, UserPlus, Trash2, Plus } from 'lucide-react';
 
 interface ProjectModalProps {

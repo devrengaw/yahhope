@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { X, Plus, Trash2, CheckCircle2, Circle, Lock, Globe, UserPlus, Users, AlertCircle } from 'lucide-react';
-import { ProjectTask, TaskStatus, SubTask, mockTeamMembers, Priority } from '../../../lib/mockData';
+import { ProjectTask, TaskStatus, SubTask, Priority } from '../../../lib/mockData';
 
 interface ProjectTaskModalProps {
   isOpen: boolean;
