@@ -276,6 +276,8 @@ export default function App() {
                                         <Route path="equipes/*" element={<TeamsContainer />} />
                                         <Route path="my-tasks" element={<MyTasksView />} />
                                         <Route path="search" element={<GlobalSearchView />} />
+                                        <Route path="chat/:id" element={<WorkspaceChat />} />
+                                        <Route path="dm/:id" element={<WorkspaceChat />} />
                                         <Route path="*" element={<WorkspaceViewContainer />} />
                                       </Route>
 

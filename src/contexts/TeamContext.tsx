@@ -47,17 +47,41 @@ interface TeamContextType {
 
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
+const DEFAULT_TEAMS: Team[] = [
+  { id: 't-saude', name: 'Saúde & Nutrição', description: 'Atendimento clínico, triagem e reabilitação nutricional de crianças.', color: '#10b981', created_by: 'u1', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 't-marketing', name: 'Marketing & Mídia', description: 'Campanhas de conscientização, mídias sociais e captação de apoiadores.', color: '#8b5cf6', created_by: 'u1', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 't-captacao', name: 'Captação & Doações', description: 'Relacionamento com padrinhos, doadores e empresas parceiras.', color: '#f59e0b', created_by: 'u1', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 't-dev', name: 'Tecnologia & Produto', description: 'Desenvolvimento do sistema ERP, site institucional e aplicativo móvel.', color: '#3b82f6', created_by: 'u1', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+];
+
+const DEFAULT_MEMBERS: Record<string, TeamMember[]> = {
+  't-saude': [
+    { id: 'tm-1', team_id: 't-saude', user_id: 'u4', role: 'leader', joined_at: new Date().toISOString(), user: { id: 'u4', name: 'Juliana Costa', email: 'juliana@yahhope.org', role: 'USER' } },
+    { id: 'tm-2', team_id: 't-saude', user_id: 'u3', role: 'member', joined_at: new Date().toISOString(), user: { id: 'u3', name: 'Dr. Carlos Eduardo', email: 'carlos@yahhope.org', role: 'USER' } }
+  ],
+  't-marketing': [
+    { id: 'tm-3', team_id: 't-marketing', user_id: 'u2', role: 'leader', joined_at: new Date().toISOString(), user: { id: 'u2', name: 'Ana Beatriz', email: 'anabeatriz@yahhope.org', role: 'USER' } },
+    { id: 'tm-4', team_id: 't-marketing', user_id: 'u1', role: 'admin', joined_at: new Date().toISOString(), user: { id: 'u1', name: 'Lucas Wagner', email: 'lucas@yahhope.org', role: 'ADMIN' } }
+  ],
+  't-captacao': [
+    { id: 'tm-5', team_id: 't-captacao', user_id: 'u5', role: 'leader', joined_at: new Date().toISOString(), user: { id: 'u5', name: 'Marcos Silva', email: 'marcos@yahhope.org', role: 'USER' } }
+  ],
+  't-dev': [
+    { id: 'tm-6', team_id: 't-dev', user_id: 'u1', role: 'leader', joined_at: new Date().toISOString(), user: { id: 'u1', name: 'Lucas Wagner', email: 'lucas@yahhope.org', role: 'ADMIN' } }
+  ]
+};
+
 export function TeamProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
+  const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS);
+  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>(DEFAULT_MEMBERS);
   const [activities, setActivities] = useState<TeamActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Load teams the user has access to
   useEffect(() => {
     if (!user) {
-      setTeams([]);
+      setTeams(DEFAULT_TEAMS);
       setLoading(false);
       return;
     }
@@ -68,7 +92,11 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         if (user.role === 'ADMIN') {
           // Admin can see all teams
           const { data, error } = await supabase.from('workspace_teams').select('*').order('created_at', { ascending: false });
-          if (!error && data) setTeams(data);
+          if (!error && data && data.length > 0) {
+            setTeams(data);
+          } else {
+            setTeams(DEFAULT_TEAMS);
+          }
         } else {
           // Others can see only teams they are members of
           const { data: memberData, error: memberError } = await supabase
@@ -84,13 +112,18 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
               .in('id', teamIds)
               .order('created_at', { ascending: false });
               
-            if (!error && data) setTeams(data);
+            if (!error && data && data.length > 0) {
+              setTeams(data);
+            } else {
+              setTeams(DEFAULT_TEAMS);
+            }
           } else {
-            setTeams([]);
+            setTeams(DEFAULT_TEAMS);
           }
         }
       } catch (err) {
         console.error("Error loading teams:", err);
+        setTeams(DEFAULT_TEAMS);
       } finally {
         setLoading(false);
       }
@@ -172,13 +205,15 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       .select('*, user:users(id, name, email, role)')
       .eq('team_id', teamId);
       
-    if (!membersError && membersData) {
+    if (!membersError && membersData && membersData.length > 0) {
       // Massage the data
       const formattedMembers = membersData.map((m: any) => ({
         ...m,
         user: m.user
       }));
       setTeamMembers(prev => ({ ...prev, [teamId]: formattedMembers }));
+    } else if (DEFAULT_MEMBERS[teamId]) {
+      setTeamMembers(prev => ({ ...prev, [teamId]: DEFAULT_MEMBERS[teamId] }));
     }
 
     // Load activities

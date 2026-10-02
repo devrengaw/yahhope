@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
-import { useClickUp } from '../../contexts/ClickUpContext';
+import { useClickUp, TaskPriority } from '../../contexts/ClickUpContext';
 import { 
   ChevronDown, ChevronRight, Plus, CheckCircle2, 
-  Circle, GripVertical, Filter, Settings2, Columns, Search
+  Calendar as CalendarIcon, Flag, CheckSquare, MessageSquare, 
+  Search, Filter, Layers, User as UserIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { format } from 'date-fns';
+import { WorkspaceTaskModal } from './WorkspaceTaskModal';
 
 export function WorkspaceListView() {
-  const { lists, statuses, fields, tasks, activeList, updateTaskStatus, addTask, addStatus } = useClickUp();
+  const { 
+    statuses, tasks, activeList, 
+    addTask, addStatus, updateTask,
+    selectedTask, setSelectedTask 
+  } = useClickUp();
+
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  
   const [newTaskStatusId, setNewTaskStatusId] = useState<string | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
-  
-  const [isAddingStatus, setIsAddingStatus] = useState(false);
-  const [newStatusName, setNewStatusName] = useState('');
-  const [newStatusColor, setNewStatusColor] = useState('#3b82f6');
+  const [searchFilter, setSearchFilter] = useState('');
 
   const toggleGroup = (statusId: string) => {
     setCollapsedGroups(prev => ({ ...prev, [statusId]: !prev[statusId] }));
@@ -32,214 +36,241 @@ export function WorkspaceListView() {
     }
   };
 
-  const handleAddStatus = async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newStatusName.trim()) {
-      await addStatus(activeList!, newStatusName.trim().toUpperCase(), newStatusColor);
-      setNewStatusName('');
-      setIsAddingStatus(false);
-    } else if (e.key === 'Escape') {
-      setNewStatusName('');
-      setIsAddingStatus(false);
-    }
-  };
-
   if (!activeList) return null;
 
-  const currentList = lists.find(l => l.id === activeList);
   const listStatuses = statuses.filter(s => s.list_id === activeList).sort((a, b) => a.order_index - b.order_index);
-  const listFields = fields.filter(f => f.list_id === activeList);
-  const listTasks = tasks.filter(t => t.list_id === activeList);
+  const listTasks = tasks.filter(t => {
+    if (t.list_id !== activeList) return false;
+    if (searchFilter.trim()) {
+      return t.name.toLowerCase().includes(searchFilter.toLowerCase().trim()) ||
+             t.description?.toLowerCase().includes(searchFilter.toLowerCase().trim());
+    }
+    return true;
+  });
+
+  const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
+    urgent: { label: 'Urgente', color: '#ef4444' },
+    high: { label: 'Alta', color: '#f97316' },
+    normal: { label: 'Normal', color: '#3b82f6' },
+    low: { label: 'Baixa', color: '#94a3b8' }
+  };
 
   return (
-    <div className="flex flex-col h-full bg-white relative pb-20">
-      {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 sticky top-0 bg-white z-10">
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-            <CheckCircle2 size={14} /> Status
-          </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-            Separar
-          </button>
-          <div className="w-px h-4 bg-slate-200 mx-1"></div>
-          <button className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors">
-            <Columns size={16} />
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors">
-            <Filter size={16} />
-          </button>
-          <button className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors">
-            <Settings2 size={16} />
-          </button>
-          <button className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors">
-            <Search size={16} />
-          </button>
-          <button className="flex items-center gap-2 px-4 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-            <Plus size={14} /> Tarefa
-          </button>
-        </div>
-      </div>
+    <>
+      <div className="flex flex-col h-full bg-white relative pb-20 overflow-y-auto">
+        {/* Top Toolbar */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-xs z-10">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text"
+                placeholder="Filtrar tarefas..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-700 w-48 sm:w-64"
+              />
+            </div>
+          </div>
 
-      {/* Table Content */}
-      <div className="flex-1 overflow-x-auto min-w-max px-6 py-4">
-        {listStatuses.map(status => {
-          const groupTasks = listTasks.filter(t => t.status_id === status.id);
-          const isCollapsed = collapsedGroups[status.id];
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                if (listStatuses[0]) setNewTaskStatusId(listStatuses[0].id);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-xs cursor-pointer"
+            >
+              <Plus size={14} /> Nova Tarefa
+            </button>
+          </div>
+        </div>
 
-          return (
-            <div key={status.id} className="mb-8">
-              {/* Group Header */}
-              <div className="flex items-center gap-3 mb-2 sticky left-0">
-                <button 
-                  onClick={() => toggleGroup(status.id)}
-                  className="w-5 h-5 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded transition-colors"
-                >
-                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                </button>
+        {/* Groups of Statuses */}
+        <div className="p-6 space-y-6">
+          {listStatuses.map(status => {
+            const groupTasks = listTasks.filter(t => t.status_id === status.id);
+            const isCollapsed = collapsedGroups[status.id];
+
+            return (
+              <div key={status.id} className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+                {/* Status Group Header */}
                 <div 
-                  className="flex items-center gap-2 px-2.5 py-1 rounded text-xs font-black tracking-widest uppercase text-white shadow-sm"
-                  style={{ backgroundColor: status.color }}
+                  onClick={() => toggleGroup(status.id)}
+                  className="flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 transition-colors cursor-pointer select-none border-b border-slate-200/60"
                 >
-                  {status.name}
+                  <div className="flex items-center gap-2.5">
+                    <button className="text-slate-400 hover:text-slate-700">
+                      {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                    <span 
+                      className="px-2.5 py-0.5 rounded-md text-xs font-black uppercase tracking-wider text-white shadow-xs"
+                      style={{ backgroundColor: status.color }}
+                    >
+                      {status.name}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">
+                      {groupTasks.length} {groupTasks.length === 1 ? 'tarefa' : 'tarefas'}
+                    </span>
+                  </div>
+
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNewTaskStatusId(status.id);
+                    }}
+                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                    title="Adicionar Tarefa neste status"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
-                <span className="text-xs font-bold text-slate-400">{groupTasks.length}</span>
-              </div>
 
-              {!isCollapsed && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                  {/* Table Header */}
-                  <div className="flex items-center border-b border-slate-200 bg-slate-50/50">
-                    <div className="w-12 shrink-0 border-r border-slate-200 h-10"></div>
-                    <div className="w-80 shrink-0 border-r border-slate-200 px-4 py-2.5 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                      Nome
-                    </div>
-                    {listFields.map(field => (
-                      <div key={field.id} className="w-40 shrink-0 border-r border-slate-200 px-4 py-2.5 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                        {field.name}
-                      </div>
-                    ))}
-                    <div className="w-16 shrink-0 flex items-center justify-center text-slate-400 hover:bg-slate-100 cursor-pointer transition-colors">
-                      <Plus size={14} />
-                    </div>
-                  </div>
-
-                  {/* Table Body (Tasks) */}
+                {/* Table Rows */}
+                {!isCollapsed && (
                   <div className="divide-y divide-slate-100">
-                    {groupTasks.length === 0 ? (
-                      newTaskStatusId === status.id ? (
-                        <div className="flex items-center px-12 py-2">
-                          <input 
-                            autoFocus
-                            type="text"
-                            placeholder="Nome da tarefa (pressione Enter para salvar)"
-                            value={newTaskName}
-                            onChange={(e) => setNewTaskName(e.target.value)}
-                            onKeyDown={(e) => handleAddTask(e, status.id)}
-                            onBlur={() => setNewTaskStatusId(null)}
-                            className="w-full bg-transparent text-sm text-slate-800 outline-none"
-                          />
-                        </div>
-                      ) : (
+                    {/* Header Row */}
+                    <div className="grid grid-cols-12 gap-3 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400 bg-slate-50/40">
+                      <div className="col-span-5 sm:col-span-5">Nome da Tarefa</div>
+                      <div className="col-span-2 hidden sm:block">Responsável</div>
+                      <div className="col-span-2 hidden md:block">Equipe</div>
+                      <div className="col-span-2 sm:col-span-2">Prioridade</div>
+                      <div className="col-span-3 sm:col-span-1 text-right sm:text-left">Prazo</div>
+                    </div>
+
+                    {/* Task Rows */}
+                    {groupTasks.map(task => {
+                      const totalCheck = task.checklists?.length || 0;
+                      const doneCheck = task.checklists?.filter(c => c.done).length || 0;
+                      const isOverdue = task.due_date && new Date(task.due_date).getTime() < Date.now();
+
+                      return (
                         <div 
-                          onClick={() => setNewTaskStatusId(status.id)}
-                          className="flex items-center px-12 py-3 text-sm font-medium text-slate-400 hover:bg-slate-50 cursor-pointer group transition-colors"
+                          key={task.id}
+                          onClick={() => setSelectedTask(task)}
+                          className="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-blue-50/30 transition-colors cursor-pointer group"
                         >
-                          <Plus size={14} className="mr-2 opacity-0 group-hover:opacity-100" /> Adicionar Tarefa
-                        </div>
-                      )
-                    ) : (
-                      groupTasks.map(task => (
-                        <div key={task.id} className="flex items-center hover:bg-slate-50 transition-colors group">
-                          {/* Status / Drag Handle */}
-                          <div className="w-12 shrink-0 border-r border-slate-100 h-11 flex items-center justify-center gap-1">
-                            <GripVertical size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab" />
-                            <div 
-                              className="w-3 h-3 rounded-[3px] cursor-pointer ring-2 ring-transparent hover:ring-slate-200 transition-all"
-                              style={{ backgroundColor: status.color }}
-                            ></div>
-                          </div>
-                          
-                          {/* Task Name */}
-                          <div className="w-80 shrink-0 border-r border-slate-100 px-4 py-3 text-sm font-medium text-slate-800 truncate flex items-center gap-2 group/name cursor-pointer">
-                            {task.name}
-                            <button className="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-blue-600 transition-opacity">
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded">Abrir</span>
-                            </button>
-                          </div>
-                          
-                          {/* Custom Fields */}
-                          {listFields.map(field => (
-                            <div key={field.id} className="w-40 shrink-0 border-r border-slate-100 px-4 py-3 text-sm text-slate-600 truncate">
-                              {task.custom_values?.[field.id] || '-'}
+                          {/* Name + Subtask/Comments indicator */}
+                          <div className="col-span-5 sm:col-span-5 flex items-center gap-2 min-w-0">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: status.color }} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
+                                {task.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+                                {totalCheck > 0 && (
+                                  <span className="flex items-center gap-1 font-semibold text-slate-500">
+                                    <CheckSquare size={11} /> {doneCheck}/{totalCheck}
+                                  </span>
+                                )}
+                                {(task.comments || []).length > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <MessageSquare size={11} /> {task.comments.length}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                          
-                          <div className="w-16 shrink-0 h-11"></div>
+                          </div>
+
+                          {/* Assignee */}
+                          <div className="col-span-2 hidden sm:flex items-center gap-2 min-w-0">
+                            {task.assignee_user ? (
+                              <>
+                                <img 
+                                  src={task.assignee_user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'} 
+                                  alt={task.assignee_user.name}
+                                  className="w-5 h-5 rounded-full object-cover shrink-0" 
+                                />
+                                <span className="text-xs text-slate-700 font-medium truncate">{task.assignee_user.name}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-300 italic flex items-center gap-1">
+                                <UserIcon size={12} /> Sem resp.
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Team */}
+                          <div className="col-span-2 hidden md:flex items-center min-w-0">
+                            {task.team ? (
+                              <span 
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-md truncate"
+                                style={{ backgroundColor: `${task.team.color || '#3b82f6'}15`, color: task.team.color || '#3b82f6' }}
+                              >
+                                {task.team.name}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-300">-</span>
+                            )}
+                          </div>
+
+                          {/* Priority */}
+                          <div className="col-span-2 sm:col-span-2 flex items-center gap-1">
+                            <span 
+                              className="inline-flex items-center gap-1 text-[11px] font-bold"
+                              style={{ color: priorityConfig[task.priority || 'normal'].color }}
+                            >
+                              <Flag size={11} />
+                              {priorityConfig[task.priority || 'normal'].label}
+                            </span>
+                          </div>
+
+                          {/* Due Date */}
+                          <div className="col-span-3 sm:col-span-1 text-right sm:text-left">
+                            {task.due_date ? (
+                              <span className={cn(
+                                "text-xs font-semibold",
+                                isOverdue ? "text-rose-600 font-bold" : "text-slate-500"
+                              )}>
+                                {format(new Date(task.due_date), "dd/MM")}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-300">-</span>
+                            )}
+                          </div>
                         </div>
-                      ))
-                    )}
-                  </div>
-                  
-                  {/* Add task row at bottom of group if there are tasks */}
-                  {groupTasks.length > 0 && (
-                    newTaskStatusId === status.id ? (
-                      <div className="flex items-center px-12 py-2 border-t border-slate-100 bg-slate-50">
+                      );
+                    })}
+
+                    {/* Inline Task Creation */}
+                    {newTaskStatusId === status.id && (
+                      <div className="p-3 bg-blue-50/40 border-t border-blue-200">
                         <input 
                           autoFocus
                           type="text"
-                          placeholder="Nome da tarefa (pressione Enter para salvar)"
+                          placeholder="Digite o título da tarefa e pressione Enter..."
                           value={newTaskName}
                           onChange={(e) => setNewTaskName(e.target.value)}
                           onKeyDown={(e) => handleAddTask(e, status.id)}
-                          onBlur={() => setNewTaskStatusId(null)}
-                          className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                          onBlur={() => {
+                            if (!newTaskName.trim()) setNewTaskStatusId(null);
+                          }}
+                          className="w-full px-3 py-2 text-sm bg-white rounded-xl border border-blue-400 outline-none text-slate-800 shadow-xs"
                         />
                       </div>
-                    ) : (
+                    )}
+
+                    {/* Bottom Add Task Link */}
+                    {newTaskStatusId !== status.id && (
                       <div 
                         onClick={() => setNewTaskStatusId(status.id)}
-                        className="flex items-center px-12 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors border-t border-slate-100"
+                        className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-blue-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 transition-colors"
                       >
-                        <Plus size={12} className="mr-1.5" /> Adicionar Tarefa
+                        <Plus size={14} /> Adicionar tarefa
                       </div>
-                    )
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {isAddingStatus ? (
-          <div className="flex items-center gap-2 mt-4 max-w-sm">
-            <input 
-              type="color" 
-              value={newStatusColor} 
-              onChange={e => setNewStatusColor(e.target.value)} 
-              className="w-8 h-8 rounded cursor-pointer border-0 p-0"
-            />
-            <input 
-              autoFocus
-              type="text"
-              placeholder="Nome do status e Enter..."
-              value={newStatusName}
-              onChange={e => setNewStatusName(e.target.value)}
-              onKeyDown={handleAddStatus}
-              className="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm outline-none focus:border-blue-500"
-            />
-            <button onClick={() => setIsAddingStatus(false)} className="text-slate-400 hover:text-slate-600 px-2">Cancelar</button>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setIsAddingStatus(true)}
-            className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mt-4 transition-colors"
-          >
-            <Plus size={16} /> Novo status
-          </button>
-        )}
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {/* Task Modal Drawer */}
+      <WorkspaceTaskModal 
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+      />
+    </>
   );
 }

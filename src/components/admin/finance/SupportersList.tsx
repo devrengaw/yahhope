@@ -22,152 +22,6 @@ import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
 
-// Mock resiliente caso a base ainda não tenha sido preenchida localmente
-const MOCK_SUPPORTERS: SupporterData[] = [
-  {
-    id: 'sup_1',
-    name: 'Mariana Silveira Ramos',
-    email: 'mariana.silveira@exemplo.com.br',
-    phone: '+55 11 98877-6655',
-    role: 'Padrinho',
-    status: 'active',
-    joinedAt: '2025-11-10T10:00:00Z',
-    sponsoredChildName: 'Abidemi',
-    sponsoredChildVillage: 'Aldeia de Boane',
-    totalDonated: 1850.00,
-    donationsCount: 12,
-    lastDonationDate: '2026-09-28',
-    donations: [
-      { id: 'don_101', amount: 150, date: '2026-09-28', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Abidemi' },
-      { id: 'don_102', amount: 150, date: '2026-08-28', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Abidemi' },
-      { id: 'don_103', amount: 200, date: '2026-08-10', status: 'paid', payment_method: 'pix', campaign_title: 'Campanha de Inverno e Cobertores' },
-      { id: 'don_104', amount: 150, date: '2026-07-28', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Abidemi' }
-    ]
-  },
-  {
-    id: 'sup_2',
-    name: 'Carlos Eduardo Mendes',
-    email: 'carlos.mendes@empresa.com.br',
-    phone: '+55 21 99123-4567',
-    role: 'Padrinho',
-    status: 'active',
-    joinedAt: '2025-12-05T14:30:00Z',
-    sponsoredChildName: 'Farai',
-    sponsoredChildVillage: 'Aldeia de Matola',
-    totalDonated: 2400.00,
-    donationsCount: 10,
-    lastDonationDate: '2026-09-25',
-    donations: [
-      { id: 'don_201', amount: 240, date: '2026-09-25', status: 'paid', payment_method: 'pix', campaign_title: 'Apadrinhamento & Nutrição - Farai' },
-      { id: 'don_202', amount: 240, date: '2026-08-25', status: 'paid', payment_method: 'pix', campaign_title: 'Apadrinhamento & Nutrição - Farai' },
-      { id: 'don_203', amount: 500, date: '2026-07-15', status: 'paid', payment_method: 'pix', campaign_title: 'Campanha Emergencial de Nutrição' }
-    ]
-  },
-  {
-    id: 'sup_3',
-    name: 'Dra. Beatriz Cavalcanti',
-    email: 'beatriz.cavalcanti@med.usp.br',
-    phone: '+55 11 97412-3890',
-    role: 'Padrinho',
-    status: 'active',
-    joinedAt: '2026-01-15T09:15:00Z',
-    sponsoredChildName: 'Juma',
-    sponsoredChildVillage: 'Aldeia de Boane',
-    totalDonated: 1350.00,
-    donationsCount: 9,
-    lastDonationDate: '2026-09-20',
-    donations: [
-      { id: 'don_301', amount: 150, date: '2026-09-20', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Juma' },
-      { id: 'don_302', amount: 150, date: '2026-08-20', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Juma' }
-    ]
-  },
-  {
-    id: 'sup_4',
-    name: 'Roberto Fernando Dias',
-    email: 'roberto.dias@consultoria.com',
-    phone: '+55 31 98321-7788',
-    role: 'Doador Recorrente',
-    status: 'active',
-    joinedAt: '2026-02-01T16:00:00Z',
-    totalDonated: 3200.00,
-    donationsCount: 8,
-    lastDonationDate: '2026-09-18',
-    donations: [
-      { id: 'don_401', amount: 400, date: '2026-09-18', status: 'paid', payment_method: 'pix', campaign_title: 'Fundo Geral de Sustento Nutricional' },
-      { id: 'don_402', amount: 400, date: '2026-08-18', status: 'paid', payment_method: 'pix', campaign_title: 'Fundo Geral de Sustento Nutricional' }
-    ]
-  },
-  {
-    id: 'sup_5',
-    name: 'Fernanda Oliveira Torres',
-    email: 'fernanda.torres@gmail.com',
-    phone: '+55 41 99876-1122',
-    role: 'Padrinho',
-    status: 'active',
-    joinedAt: '2026-03-12T11:45:00Z',
-    sponsoredChildName: 'Nala',
-    sponsoredChildVillage: 'Aldeia de Xai-Xai',
-    totalDonated: 1050.00,
-    donationsCount: 7,
-    lastDonationDate: '2026-09-12',
-    donations: [
-      { id: 'don_501', amount: 150, date: '2026-09-12', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Nala' },
-      { id: 'don_502', amount: 150, date: '2026-08-12', status: 'paid', payment_method: 'credit_card', campaign_title: 'Apadrinhamento Mensal - Nala' }
-    ]
-  },
-  {
-    id: 'sup_6',
-    name: 'Lucas Wagner',
-    email: 'lucas@yahhope.org',
-    phone: '+55 11 98888-0000',
-    role: 'Padrinho',
-    status: 'active',
-    joinedAt: '2025-10-01T08:00:00Z',
-    sponsoredChildName: 'Osei',
-    sponsoredChildVillage: 'Aldeia de Matola',
-    totalDonated: 4500.00,
-    donationsCount: 18,
-    lastDonationDate: '2026-10-01',
-    donations: [
-      { id: 'don_601', amount: 250, date: '2026-10-01', status: 'paid', payment_method: 'pix', campaign_title: 'Apadrinhamento e Fortalecimento Escolar - Osei' },
-      { id: 'don_602', amount: 250, date: '2026-09-01', status: 'paid', payment_method: 'pix', campaign_title: 'Apadrinhamento e Fortalecimento Escolar - Osei' }
-    ]
-  },
-  {
-    id: 'sup_7',
-    name: 'Juliana Costa e Silva',
-    email: 'juliana.costa@advocacia.com.br',
-    phone: '+55 71 99234-5566',
-    role: 'Padrinho',
-    status: 'pending',
-    joinedAt: '2026-09-15T18:00:00Z',
-    sponsoredChildName: 'Zahara',
-    sponsoredChildVillage: 'Aldeia de Boane',
-    totalDonated: 150.00,
-    donationsCount: 2,
-    lastDonationDate: '2026-09-15',
-    donations: [
-      { id: 'don_701', amount: 150, date: '2026-09-15', status: 'paid', payment_method: 'pix', campaign_title: 'Primeiro Mês de Apadrinhamento - Zahara' },
-      { id: 'don_702', amount: 150, date: '2026-10-02', status: 'pending', payment_method: 'pix', campaign_title: 'Apadrinhamento Mensal - Zahara' }
-    ]
-  },
-  {
-    id: 'sup_8',
-    name: 'Paulo Henrique Nogueira',
-    email: 'paulo.nogueira@techsolucoes.com',
-    phone: '+55 19 98765-4321',
-    role: 'Doador Pontual',
-    status: 'inactive',
-    joinedAt: '2025-08-20T14:00:00Z',
-    totalDonated: 600.00,
-    donationsCount: 3,
-    lastDonationDate: '2026-04-10',
-    donations: [
-      { id: 'don_801', amount: 200, date: '2026-04-10', status: 'paid', payment_method: 'credit_card', campaign_title: 'Campanha de Páscoa Solidária' }
-    ]
-  }
-];
-
 export function SupportersList() {
   const [supporters, setSupporters] = useState<SupporterData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -179,7 +33,6 @@ export function SupportersList() {
   const fetchSupporters = async () => {
     setIsLoading(true);
     try {
-      // 1. Buscar usuários com perfil de apoiador / patrocinador
       const [usersRes, sponsorshipsRes, donationsRes] = await Promise.all([
         supabase.from('users').select('*').order('created_at', { ascending: false }),
         supabase.from('sponsorships').select('*, children(id, name, address)'),
@@ -190,79 +43,81 @@ export function SupportersList() {
       const dbSponsorships = sponsorshipsRes.data || [];
       const dbDonations = donationsRes.data || [];
 
-      // Mapear apoiadores a partir do banco
-      const mappedSupporters: SupporterData[] = [];
-
-      // Dicionário de doações por email
-      const donationsByEmail = new Map<string, any[]>();
-      dbDonations.forEach(d => {
-        if (d.donor_email) {
-          const email = d.donor_email.toLowerCase().trim();
-          if (!donationsByEmail.has(email)) donationsByEmail.set(email, []);
-          donationsByEmail.get(email)!.push(d);
-        }
+      // Mapear usuários por email e id
+      const usersByEmail = new Map<string, any>();
+      dbUsers.forEach(u => {
+        if (u.email) usersByEmail.set(u.email.toLowerCase().trim(), u);
       });
 
-      // Dicionário de apadrinhamentos por sponsor_id
+      // Mapear apadrinhamentos por sponsor_id
       const sponsorshipsBySponsor = new Map<string, any>();
       dbSponsorships.forEach(sp => {
         if (sp.sponsor_id) sponsorshipsBySponsor.set(sp.sponsor_id, sp);
       });
 
-      // Usuários que são apoiadores (role SPONSOR, USER com doações ou apadrinhamentos)
-      dbUsers.forEach(u => {
-        const uEmail = (u.email || '').toLowerCase().trim();
-        const userDonations = donationsByEmail.get(uEmail) || [];
-        const sponsorship = sponsorshipsBySponsor.get(u.id);
-
-        const isSponsorRole = u.role === 'SPONSOR' || u.role === 'PADRINHO';
-        const hasSponsorship = !!sponsorship;
-        const hasDonations = userDonations.length > 0;
-
-        // Considera apoiador se tiver o papel ou se tiver doado / apadrinhado
-        if (isSponsorRole || hasSponsorship || hasDonations) {
-          const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
-          const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
-          const lastDonation = userDonations[0];
-
-          mappedSupporters.push({
-            id: u.id,
-            name: u.name || u.email?.split('@')[0] || 'Apoiador',
-            email: u.email || '',
-            phone: u.phone || undefined,
-            avatar: u.avatar || undefined,
-            role: hasSponsorship ? 'Padrinho' : isSponsorRole ? 'Padrinho' : 'Doador Recorrente',
-            status: u.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
-            joinedAt: u.created_at || new Date().toISOString(),
-            sponsoredChildName: sponsorship?.children?.name || undefined,
-            sponsoredChildVillage: sponsorship?.children?.address || undefined,
-            totalDonated,
-            donationsCount: userDonations.length,
-            lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
-            donations: userDonations.map((d: any) => ({
-              id: d.id,
-              amount: Number(d.amount) || 0,
-              date: (d.paid_at || d.created_at)?.split('T')[0] || new Date().toISOString().split('T')[0],
-              status: d.status || 'paid',
-              payment_method: d.payment_method || 'pix',
-              campaign_title: 'Doação YAH Hope'
-            }))
-          });
+      // Agrupar doações por email do doador
+      const donationsByEmail = new Map<string, any[]>();
+      dbDonations.forEach(d => {
+        const email = (d.donor_email || d.email || '').toLowerCase().trim();
+        if (email) {
+          if (!donationsByEmail.has(email)) donationsByEmail.set(email, []);
+          donationsByEmail.get(email)!.push(d);
         }
       });
 
-      // Se a base real tiver dados, une com os mocks garantindo visual rico e representativo
-      if (mappedSupporters.length > 0) {
-        // Remove duplicatas se o mock tiver mesmo email
-        const existingEmails = new Set(mappedSupporters.map(m => m.email.toLowerCase()));
-        const uniqueMocks = MOCK_SUPPORTERS.filter(m => !existingEmails.has(m.email.toLowerCase()));
-        setSupporters([...mappedSupporters, ...uniqueMocks]);
-      } else {
-        setSupporters(MOCK_SUPPORTERS);
+      // Lista consolidada de emails únicos
+      const allEmails = new Set([...donationsByEmail.keys(), ...usersByEmail.keys()]);
+      const mappedSupporters: SupporterData[] = [];
+
+      for (const email of allEmails) {
+        const user = usersByEmail.get(email);
+        const userDonations = donationsByEmail.get(email) || [];
+        const sponsorship = user ? sponsorshipsBySponsor.get(user.id) : null;
+
+        const isSponsorRole = user?.role === 'SPONSOR' || user?.role === 'PADRINHO';
+        const hasSponsorship = !!sponsorship;
+        const hasDonations = userDonations.length > 0;
+
+        // Se não tiver doações nem apadrinhamento nem papel de apoiador, ignora
+        if (!hasDonations && !hasSponsorship && !isSponsorRole) {
+          continue;
+        }
+
+        const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
+        const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+        const lastDonation = userDonations[0];
+        const donorName = user?.name || lastDonation?.donor_name || email.split('@')[0];
+
+        mappedSupporters.push({
+          id: user?.id || `donor_${email}`,
+          name: donorName,
+          email: email,
+          phone: user?.phone || lastDonation?.donor_phone || undefined,
+          avatar: user?.avatar || undefined,
+          role: hasSponsorship ? 'Padrinho' : isSponsorRole ? 'Padrinho' : 'Doador Recorrente',
+          status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
+          joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
+          sponsoredChildName: sponsorship?.children?.name || undefined,
+          sponsoredChildVillage: sponsorship?.children?.address || undefined,
+          totalDonated,
+          donationsCount: paidDonations.length,
+          lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
+          donations: userDonations.map((d: any) => ({
+            id: d.id,
+            amount: Number(d.amount) || 0,
+            date: (d.paid_at || d.created_at)?.split('T')[0] || new Date().toISOString().split('T')[0],
+            status: d.status || 'paid',
+            payment_method: d.payment_method || 'pix',
+            campaign_title: d.campaign_title || 'Doação YAH Hope'
+          }))
+        });
       }
+
+      mappedSupporters.sort((a, b) => b.totalDonated - a.totalDonated);
+      setSupporters(mappedSupporters);
     } catch (err) {
-      console.warn('Erro ao consultar apoiadores no banco, utilizando dados integrados:', err);
-      setSupporters(MOCK_SUPPORTERS);
+      console.error('Erro ao consultar apoiadores reais no banco:', err);
+      setSupporters([]);
     } finally {
       setIsLoading(false);
     }
@@ -521,7 +376,7 @@ export function SupportersList() {
               <th className="px-6 py-4">Modalidade / Papel</th>
               <th className="px-6 py-4">Criança Apadrinhada</th>
               <th className="px-6 py-4">Data Cadastro</th>
-              <th className="px-6 py-4 text-right">Total Contribuído</th>
+              <th className="px-6 py-4 text-right">Total Efetivamente Doado</th>
               <th className="px-6 py-4 text-center">Status</th>
               <th className="px-6 py-4 text-center">Ações</th>
             </tr>
@@ -596,13 +451,13 @@ export function SupportersList() {
                   {new Date(s.joinedAt).toLocaleDateString('pt-BR')}
                 </td>
 
-                {/* Total Contribuído */}
+                {/* Total Efetivamente Doado */}
                 <td className="px-6 py-5 text-right">
                   <p className="text-sm font-black text-emerald-600">
                     R$ {s.totalDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[10px] text-slate-400 font-bold">
-                    {s.donationsCount} doações
+                    {s.donationsCount} {s.donationsCount === 1 ? 'doação paga' : 'doações pagas'}
                   </p>
                 </td>
 

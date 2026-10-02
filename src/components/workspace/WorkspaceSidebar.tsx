@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useClickUp } from '../../contexts/ClickUpContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
@@ -15,7 +16,13 @@ interface WorkspaceSidebarProps {
 }
 
 export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSidebarProps = {}) {
-  const { spaces, lists, channels, addChannel, activeSpace, activeList, setActiveSpace, setActiveList, addSpace, deleteSpace, updateSpace, addList, deleteList, updateList } = useClickUp();
+  const { user } = useAuth();
+  const { 
+    spaces, lists, channels, addChannel, 
+    activeSpace, activeList, setActiveSpace, setActiveList, 
+    addSpace, deleteSpace, updateSpace, addList, deleteList, updateList,
+    systemUsers 
+  } = useClickUp();
   const { confirm } = useConfirm();
   const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({ 's1': true });
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -139,8 +146,27 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
         {/* Mensagens Diretas */}
         <div className="p-3 border-b border-white/20">
           <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest px-2 mb-2">Mensagens Diretas</h3>
-          <div className="px-2 text-xs italic text-white/60">
-            Nenhuma conversa ativa
+          <div className="space-y-0.5">
+            {systemUsers.filter(u => u.id !== user?.id).slice(0, 4).map(member => (
+              <NavLink
+                key={member.id}
+                to={`/workspace/dm/${member.id}`}
+                className={({ isActive }) => cn(
+                  "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-all duration-300 group",
+                  isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
+                )}
+              >
+                <div className="relative shrink-0">
+                  <img 
+                    src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'} 
+                    alt={member.name}
+                    className="w-5 h-5 rounded-full object-cover" 
+                  />
+                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full ring-1 ring-white" />
+                </div>
+                <span className="text-xs truncate">{member.name}</span>
+              </NavLink>
+            ))}
           </div>
         </div>
 
@@ -155,7 +181,7 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
                 isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
               )}
             >
-              <Briefcase size={16} className="text-white/70" /> Projetos
+              <Briefcase size={16} className="text-white/70" /> Projetos & Módulos
             </NavLink>
             <NavLink
               to="/workspace/equipes"
@@ -181,8 +207,15 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
         {/* Espaços (ClickUp) */}
         <div className="p-3">
           <div className="flex items-center justify-between px-2 mb-2 group">
-            <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer hover:text-white">Espaços (ClickUp)</h3>
-            <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors">
+            <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer hover:text-white">Espaços & Módulos</h3>
+            <button 
+              onClick={() => {
+                const name = window.prompt('Nome do novo Espaço / Módulo:');
+                if (name) addSpace(name, '#3b82f6', 'layout');
+              }}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors cursor-pointer"
+              title="Adicionar Espaço"
+            >
               <Plus size={14} />
             </button>
           </div>

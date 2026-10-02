@@ -23,7 +23,6 @@ import { cn } from '../../lib/utils';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
-import { ProjectRepasseModal, RepassePayload } from '../../components/admin/finance/ProjectRepasseModal';
 import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCostsAccessModal';
 import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -43,7 +42,6 @@ export function NutritionFinance() {
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseModalType, setExpenseModalType] = useState<'fixed' | 'variable'>('fixed');
-  const [isRepasseModalOpen, setIsRepasseModalOpen] = useState(false);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -143,43 +141,6 @@ export function NutritionFinance() {
     }
   };
 
-  const handleSaveRepasse = async (repasse: RepassePayload) => {
-    try {
-      const incomeCat = categories.find(c => c.type === 'income');
-      const payload = {
-        description: repasse.description,
-        amount: repasse.amount,
-        type: 'income',
-        category_id: repasse.category_id || incomeCat?.id,
-        date: repasse.date,
-        status: 'completed',
-        account: repasse.account,
-        notes: repasse.notes,
-        module: 'nutrition'
-      };
-      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
-      if (error) throw error;
-      if (data && data[0]) {
-        setTransactions(prev => [data[0] as Transaction, ...prev]);
-      }
-    } catch (e) {
-      console.warn('Erro ao salvar repasse no Supabase, adicionando localmente:', e);
-      const localTx: Transaction = {
-        id: 'tx_nutri_repasse_' + Math.random().toString(36).substring(2, 9),
-        description: repasse.description,
-        amount: repasse.amount,
-        type: 'income',
-        category_id: repasse.category_id || categories.find(c => c.type === 'income')?.id || '',
-        date: repasse.date,
-        status: 'completed',
-        account: repasse.account,
-        notes: repasse.notes,
-        module: 'nutrition'
-      };
-      setTransactions(prev => [localTx, ...prev]);
-    }
-  };
-
   const handleDeleteTransaction = async (id: string) => {
     try {
       await supabase.from('finance_transactions').delete().eq('id', id);
@@ -235,16 +196,6 @@ export function NutritionFinance() {
                 Quem Tem Acesso
               </button>
             )}
-
-            {/* Registrar Repasse Recebido */}
-            <button
-              onClick={() => setIsRepasseModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-emerald-600 hover:bg-emerald-50 text-emerald-800 rounded-2xl font-bold text-xs shadow-sm transition-all active:scale-95"
-              title="Registrar repasse orçamentário transferido para a Casa Nutri"
-            >
-              <Send size={15} className="text-emerald-600" />
-              + Registrar Repasse
-            </button>
 
             {/* Novo Gasto */}
             <button 
@@ -447,16 +398,6 @@ export function NutritionFinance() {
           )}
 
         </div>
-
-        {/* Modal de Registro de Repasse */}
-        <ProjectRepasseModal
-          isOpen={isRepasseModalOpen}
-          onClose={() => setIsRepasseModalOpen(false)}
-          onSave={handleSaveRepasse}
-          defaultModule="nutrition"
-          lockModule={true}
-          categories={categories}
-        />
 
         <TransactionModal 
           isOpen={isTxModalOpen}

@@ -155,7 +155,7 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter }: Supporte
           {/* Cards de Resumo Financeiro do Apoiador */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Contribuído</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Efetivamente Doado</p>
               <p className="text-2xl font-black text-emerald-600">
                 R$ {supporter.totalDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>

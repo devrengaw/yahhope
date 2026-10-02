@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { Send, Hash, Paperclip, Smile, Image as ImageIcon, MoreVertical, Phone, Video, UserPlus, X, File as FileIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useClickUp } from '../../contexts/ClickUpContext';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 
@@ -11,12 +12,14 @@ export function WorkspaceChat() {
   const location = useLocation();
   const { user } = useAuth();
   const { channels, addMemberToChannel, messages, sendMessage } = useWorkspace();
+  const { systemUsers } = useClickUp();
   
   const isDirectMessage = location.pathname.includes('/dm/');
-  const currentChannel = channels.find(c => c.id === id);
-  const title = isDirectMessage ? (id === '1' ? 'Ana Júlia' : id === '2' ? 'Carlos S.' : 'Usuário') : (currentChannel?.name || id || 'geral');
+  const currentChannel = channels.find(c => c.id === id || c.name === id);
+  const targetUser = isDirectMessage ? systemUsers.find(u => u.id === id) : null;
+  const title = isDirectMessage ? (targetUser?.name || 'Conversa Direta') : (currentChannel?.name || id || 'geral');
 
-  const channelMessages = messages.filter(m => m.channelId === (isDirectMessage ? `dm-${id}` : id || 'geral'));
+  const channelMessages = messages.filter(m => m.channelId === (isDirectMessage ? `dm-${id}` : (currentChannel?.id || id || 'geral')));
 
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<{ type: 'image' | 'file'; file: File; url: string }[]>([]);
@@ -66,7 +69,7 @@ export function WorkspaceChat() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
     const files = e.target.files;
     if (files) {
-      const newAttachments = Array.from(files).map(file => ({
+      const newAttachments = Array.from(files).map((file: File) => ({
         type,
         file,
         url: URL.createObjectURL(file) // temporary URL for preview
