@@ -514,11 +514,17 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
           ]);
         }
 
-        // Auto-select first active space & list if not set
+        // Auto-select first active space & list if not set, or synchronize activeList
         if (!activeSpace && dbSpaces[0]) {
           setActiveSpace(dbSpaces[0].id);
           const firstList = dbLists.find(l => l.space_id === dbSpaces[0].id);
           if (firstList) setActiveList(firstList.id);
+        } else if (activeSpace) {
+          const currentListValid = dbLists.some(l => l.id === activeList && l.space_id === activeSpace);
+          if (!currentListValid) {
+            const firstList = dbLists.find(l => l.space_id === activeSpace);
+            setActiveList(firstList ? firstList.id : null);
+          }
         }
       }
     } catch (e) {

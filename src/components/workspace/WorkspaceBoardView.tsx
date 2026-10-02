@@ -29,6 +29,11 @@ export function WorkspaceBoardView() {
   if (!activeList) return null;
 
   const listStatuses = statuses.filter(s => s.list_id === activeList).sort((a, b) => a.order_index - b.order_index);
+  const effectiveStatuses = listStatuses.length > 0 ? listStatuses : [
+    { id: `default-todo-${activeList}`, list_id: activeList, name: 'A FAZER', color: '#94a3b8', order_index: 0 },
+    { id: `default-progress-${activeList}`, list_id: activeList, name: 'EM ANDAMENTO', color: '#3b82f6', order_index: 1 },
+    { id: `default-done-${activeList}`, list_id: activeList, name: 'CONCLUÍDO', color: '#10b981', order_index: 2 }
+  ];
   const listTasks = tasks.filter(t => t.list_id === activeList);
 
   const handleAddTask = async (e: React.KeyboardEvent, statusId: string) => {
@@ -92,8 +97,12 @@ export function WorkspaceBoardView() {
   return (
     <>
       <div className="flex-1 flex overflow-x-auto p-6 gap-6 bg-slate-100/70 items-start h-full">
-        {listStatuses.map(status => {
-          const groupTasks = listTasks.filter(t => t.status_id === status.id);
+        {effectiveStatuses.map(status => {
+          const groupTasks = listTasks.filter(t => {
+            if (t.status_id === status.id) return true;
+            if (!effectiveStatuses.some(s => s.id === t.status_id) && status === effectiveStatuses[0]) return true;
+            return false;
+          });
           const isDraggingOver = dragOverStatusId === status.id;
 
           return (

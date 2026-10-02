@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { useClickUp } from '../../contexts/ClickUpContext';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useClickUp, CU_Space } from '../../contexts/ClickUpContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -17,6 +17,7 @@ interface WorkspaceSidebarProps {
 
 export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSidebarProps = {}) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { 
     spaces, lists, channels, addChannel, 
     activeSpace, activeList, setActiveSpace, setActiveList, 
@@ -34,6 +35,40 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
 
   const toggleSpace = (id: string) => {
     setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSelectSpace = (space: CU_Space) => {
+    // Open/expand the space
+    setExpandedSpaces(prev => ({ ...prev, [space.id]: true }));
+    setActiveSpace(space.id);
+
+    // Pick first list in space or clear if none
+    const spaceLists = lists.filter(l => l.space_id === space.id);
+    if (spaceLists.length > 0) {
+      if (!spaceLists.some(l => l.id === activeList)) {
+        setActiveList(spaceLists[0].id);
+      }
+    } else {
+      setActiveList(null);
+    }
+
+    if (location.pathname !== '/workspace') {
+      navigate('/workspace');
+    }
+
+    onClose?.();
+  };
+
+  const handleSelectList = (spaceId: string, listId: string) => {
+    setExpandedSpaces(prev => ({ ...prev, [spaceId]: true }));
+    setActiveSpace(spaceId);
+    setActiveList(listId);
+
+    if (location.pathname !== '/workspace') {
+      navigate('/workspace');
+    }
+
+    onClose?.();
   };
 
   return (
@@ -249,23 +284,35 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
               return (
                 <div key={space.id}>
                   <div 
-                    onClick={() => {
-                      toggleSpace(space.id);
-                      setActiveSpace(space.id);
-                    }}
+                    onClick={() => handleSelectSpace(space)}
                     className={cn(
                       "flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer transition-colors group",
-                      activeSpace === space.id && !activeList && location.pathname === '/workspace' ? "bg-black/10 font-bold" : "hover:bg-white/10"
+                      activeSpace === space.id && location.pathname === '/workspace' ? "bg-black/15 font-bold" : "hover:bg-white/10"
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <div onClick={(e) => { e.stopPropagation(); toggleSpace(space.id); }} className="w-4 h-4 flex items-center justify-center hover:bg-white/20 rounded text-white/70">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          toggleSpace(space.id); 
+                        }} 
+                        className="w-4 h-4 flex items-center justify-center hover:bg-white/20 rounded text-white/70 shrink-0 cursor-pointer"
+                        title={isExpanded ? "Recolher listas" : "Expandir listas"}
+                      >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </div>
-                      <div className="w-4 h-4 rounded text-white flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: space.color || '#3b82f6' }}>
+                      <div 
+                        className="w-4 h-4 rounded text-white flex items-center justify-center text-[10px] font-bold shrink-0" 
+                        style={{ backgroundColor: space.color || '#3b82f6' }}
+                      >
                         {space.name.charAt(0)}
                       </div>
-                      <span className={cn("text-sm truncate", activeSpace === space.id && !activeList && location.pathname === '/workspace' ? "font-bold text-white" : "font-medium text-white/90")}>{space.name}</span>
+                      <span className={cn(
+                        "text-sm truncate", 
+                        activeSpace === space.id && location.pathname === '/workspace' ? "font-bold text-white" : "font-medium text-white/90"
+                      )}>
+                        {space.name}
+                      </span>
                     </div>
                     <div className="relative flex items-center">
                       <button 
@@ -313,13 +360,10 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
                       {spaceLists.map(list => (
                         <div 
                           key={list.id}
-                          onClick={() => {
-                            setActiveSpace(space.id);
-                            setActiveList(list.id);
-                          }}
+                          onClick={() => handleSelectList(space.id, list.id)}
                           className={cn(
                             "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors group",
-                            activeList === list.id && location.pathname === '/workspace' ? "bg-white/20 text-white font-bold" : "text-white/80 hover:bg-white/10 font-medium"
+                            activeList === list.id && location.pathname === '/workspace' ? "bg-white/20 text-white font-bold shadow-xs" : "text-white/80 hover:bg-white/10 font-medium"
                           )}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -382,6 +426,9 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
                                 addList(space.id, newListName.trim());
                                 setNewListSpaceId(null);
                                 setNewListName('');
+                                if (location.pathname !== '/workspace') {
+                                  navigate('/workspace');
+                                }
                               } else if (e.key === 'Escape') {
                                 setNewListSpaceId(null);
                                 setNewListName('');
@@ -416,9 +463,14 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
           <button 
             onClick={() => {
               const name = window.prompt('Nome do novo Espaço:');
-              if (name) addSpace(name, '#3b82f6', 'layout');
+              if (name && name.trim()) {
+                addSpace(name.trim(), '#3b82f6', 'layout');
+                if (location.pathname !== '/workspace') {
+                  navigate('/workspace');
+                }
+              }
             }}
-            className="w-full mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-medium"
+            className="w-full mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-medium cursor-pointer"
           >
             <Plus size={14} /> Novo Espaço
           </button>

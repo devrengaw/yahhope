@@ -39,6 +39,11 @@ export function WorkspaceListView() {
   if (!activeList) return null;
 
   const listStatuses = statuses.filter(s => s.list_id === activeList).sort((a, b) => a.order_index - b.order_index);
+  const effectiveStatuses = listStatuses.length > 0 ? listStatuses : [
+    { id: `default-todo-${activeList}`, list_id: activeList, name: 'A FAZER', color: '#94a3b8', order_index: 0 },
+    { id: `default-progress-${activeList}`, list_id: activeList, name: 'EM ANDAMENTO', color: '#3b82f6', order_index: 1 },
+    { id: `default-done-${activeList}`, list_id: activeList, name: 'CONCLUÍDO', color: '#10b981', order_index: 2 }
+  ];
   const listTasks = tasks.filter(t => {
     if (t.list_id !== activeList) return false;
     if (searchFilter.trim()) {
@@ -87,8 +92,12 @@ export function WorkspaceListView() {
 
         {/* Groups of Statuses */}
         <div className="p-6 space-y-6">
-          {listStatuses.map(status => {
-            const groupTasks = listTasks.filter(t => t.status_id === status.id);
+          {effectiveStatuses.map(status => {
+            const groupTasks = listTasks.filter(t => {
+              if (t.status_id === status.id) return true;
+              if (!effectiveStatuses.some(s => s.id === t.status_id) && status === effectiveStatuses[0]) return true;
+              return false;
+            });
             const isCollapsed = collapsedGroups[status.id];
 
             return (
