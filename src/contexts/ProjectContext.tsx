@@ -55,6 +55,16 @@ export const canUserAccessProject = (project: Project, u: any): boolean => {
   return false;
 };
 
+export const generateSafeUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const defaultColumns: ColumnDefinition[] = [
   { id: 'c1', name: 'Status', type: 'status', options: ['Todo', 'Working on it', 'Stuck', 'Done'] },
   { id: 'c2', name: 'Owner', type: 'people' },
@@ -199,7 +209,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addProject = async (project: Project) => {
-    const finalId = project.id || `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const finalId = project.id || generateSafeUUID();
     const newProject: Project = {
       ...project,
       id: finalId,
@@ -408,7 +418,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addTask = async (projectId: string, task: ProjectTask) => {
-    const finalTaskId = task.id || `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const finalTaskId = task.id || generateSafeUUID();
     const fullTask: ProjectTask = { ...task, id: finalTaskId };
 
     setRawProjects(prev => {

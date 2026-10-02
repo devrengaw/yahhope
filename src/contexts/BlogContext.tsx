@@ -10,22 +10,31 @@ export interface BlogPost {
   author: string;
   date: string;
   published_at?: string;
-  status: 'published' | 'draft' | 'hidden' | 'scheduled';
+  status: 'published' | 'draft' | 'hidden' | 'scheduled' | 'review' | 'trash';
   category: string;
   image: string;
   featured_home?: boolean;
   highlight_type?: 'photo' | 'split';
   highlight_color?: string;
+  // Metrics
+  views_count?: number;
+  reads_count?: number;
+  likes_count?: number;
+  shares_count?: number;
+  comments_count?: number;
+  translations?: string[];
+  has_unpublished_changes?: boolean;
+  deleted_at?: string;
 }
 
 export const DEFAULT_BLOG_POSTS: BlogPost[] = [
   {
     id: 'post-1',
-    title: 'Casa Nutri: Resgatando 9 Crianças em Nampula',
+    title: 'O propósito de uma ilha',
     excerpt: 'Nosso centro nutricional acolhe crianças em estado crítico de vulnerabilidade alimentar, fornecendo dietas balanceadas e assistência médica contínua.',
     content: `
       <p>Na província de Nampula, em Moçambique, a desnutrição infantil severa é uma das maiores ameaças ao desenvolvimento e sobrevivência de crianças em seus primeiros anos de vida.</p>
-      <p>A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos 9 crianças da curva crítica de desnutrição.</p>
+      <p>A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos crianças da curva crítica de desnutrição.</p>
       <h3>Impacto Direto</h3>
       <ul>
         <li>Mais de 1.800 refeições terapêuticas distribuídas a cada mês.</li>
@@ -34,82 +43,151 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
       </ul>
       <p>Cada sorriso devolvido representa o futuro que renasce em solo fértil de esperança e solidariedade.</p>
     `,
-    author: 'Equipe de Nutrição YAH Hope',
-    date: '2025-09-15',
+    author: 'YAH Hope',
+    date: '2024-03-25',
     status: 'published',
     category: 'Nutrição & Saúde Infantil',
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
     featured_home: true,
     highlight_type: 'photo',
-    highlight_color: '#92BF78'
+    highlight_color: '#92BF78',
+    views_count: 47,
+    reads_count: 32,
+    likes_count: 4,
+    shares_count: 2,
+    comments_count: 0,
+    translations: ['pt']
   },
   {
     id: 'post-2',
-    title: 'Bolsas Universitárias: Da Vulnerabilidade ao Diploma',
-    excerpt: 'Custeio acadêmico e mentoria para jovens capacitados concluírem a faculdade e liderarem suas comunidades.',
+    title: 'Um problema crônico',
+    excerpt: 'Compreendendo as raízes históricas e estruturais das dificuldades alimentares e como a capacitação comunitária rompe ciclos geracionais.',
     content: `
-      <p>O acesso ao ensino superior em Moçambique é um privilégio restrito a poucos. Jovens brilhantes de comunidades vulneráveis frequentemente são forçados a interromper seus estudos por falta de recursos para mensalidades, livros e transporte.</p>
-      <p>O programa de Bolsas Universitárias da YAH Hope planeja custear a graduação integral e oferecer mentoria para estudantes em cursos estratégicos para o desenvolvimento local, como Enfermagem, Administração e Pedagogia.</p>
-      <h3>Educação como Ferramenta de Libertação</h3>
-      <p>Além da bolsa financeira, cada jovem receberá acompanhamento pessoal para inserção no mercado de trabalho e capacitação de liderança para retornarem e multiplicarem o impacto em suas comunidades.</p>
+      <p>O acesso à água potável e nutrição digna em Moçambique continua sendo um desafio para milhões de famílias vulneráveis.</p>
+      <p>Nossa missão atua não somente no socorro emergencial imediato, mas no empoderamento sustentável da comunidade com poços artesianos e hortas agroecológicas.</p>
+      <h3>Passos para a Sustentabilidade</h3>
+      <p>A educação sanitária e a autonomia familiar garantem que as conquistas nutricionais de hoje permaneçam amanhã.</p>
     `,
-    author: 'Coordenação Acadêmica',
-    date: '2025-09-18',
+    author: 'Carolina Simionato',
+    date: '2024-01-16',
     status: 'published',
-    category: 'Educação Superior',
+    category: 'Tudo sobre Moçambique',
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
-    featured_home: false, // Inativo na Home: "nao tem os jovens universitarios ainda"
+    featured_home: false,
     highlight_type: 'split',
-    highlight_color: '#88A1F2'
+    highlight_color: '#88A1F2',
+    views_count: 23,
+    reads_count: 18,
+    likes_count: 7,
+    shares_count: 3,
+    comments_count: 0,
+    translations: ['pt']
   },
   {
     id: 'post-3',
-    title: 'Oficinas de Costura & Hortas para Mães',
-    excerpt: 'Capacitação profissional e fomento à agricultura familiar para que mães gerem renda própria e sustentem suas famílias com dignidade.',
+    title: 'Você tem a firme certeza?',
+    excerpt: 'Uma reflexão sobre fé em ação prática, generosidade com propósito e o chamado individual para transformar a dor do próximo em esperança.',
     content: `
-      <p>A autonomia financeira feminina é o pilar mais sólido para erradicar a fome de forma perene. Quando uma mãe adquire uma profissão, toda a sua família é transformada.</p>
-      <p>Através das nossas oficinas de costura industrial e implantação de hortas comunitárias orgânicas, mais de 30 mulheres já aprenderam técnicas produtivas e estão vendendo seus produtos nos mercados locais.</p>
+      <p>A compaixão que não se move em direção ao necessitado permanece apenas como um belo sentimento. O Evangelho vivo se manifesta no prato de comida e no remédio entregue.</p>
+      <p>Quando nos perguntamos sobre o impacto da nossa vida, o padrão não é quanto acumulamos, mas quantas vidas puderam respirar aliviadas pela nossa presença.</p>
     `,
-    author: 'Geração de Renda YAH Hope',
-    date: '2025-09-20',
+    author: 'Carolina Simionato',
+    date: '2023-11-18',
     status: 'published',
-    category: 'Autonomia & Renda',
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
-    featured_home: true,
-    highlight_type: 'photo',
-    highlight_color: '#EBC878'
+    category: 'Pense e reflita',
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
+    featured_home: false,
+    highlight_type: 'split',
+    highlight_color: '#EBC878',
+    views_count: 15,
+    reads_count: 11,
+    likes_count: 3,
+    shares_count: 1,
+    comments_count: 0,
+    translations: ['pt']
   },
   {
     id: 'post-4',
-    title: 'Ação Humanitária: Cuidado Integral e Fé Prática',
-    excerpt: 'Levando esperança, suprimentos emergenciais e amparo espiritual para famílias em situação de vulnerabilidade extrema.',
+    title: 'O início',
+    excerpt: 'Relato dos primeiros passos da YAH Hope nas aldeias de Nampula, os desafios do acolhimento e as sementes que germinaram.',
     content: `
-      <p>Em momentos de crise climática e escassez, a resposta humanitária precisa ser imediata, calorosa e abrangente. Nossas equipes atuam na linha de frente distribuindo água potável, roupas e cestas alimentares.</p>
+      <p>Chegar em uma nova comunidade exige respeito, escuta atenta e vínculo sincero. Antes de qualquer projeto, sentamos com os anciãos e as mães locais.</p>
+      <p>Foi a partir desse diálogo que entendemos as urgências: nutrição infantil, capacitação profissional e acesso à água limpa.</p>
     `,
-    author: 'Missões & Socorro',
-    date: '2025-09-21',
+    author: 'Carolina Simionato',
+    date: '2023-11-18',
     status: 'published',
-    category: 'Ação Social',
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
+    category: 'Viagens',
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
     featured_home: true,
     highlight_type: 'photo',
-    highlight_color: '#F49853'
+    highlight_color: '#F49853',
+    views_count: 38,
+    reads_count: 26,
+    likes_count: 4,
+    shares_count: 4,
+    comments_count: 0,
+    translations: ['pt']
   },
   {
     id: 'post-5',
-    title: 'Saúde Preventiva e Higiene Familiar',
-    excerpt: 'Visitas domiciliares periódicas, distribuição de kits de higiene e acompanhamento médico básico preventivo em comunidades de Nampula.',
+    title: 'Um pouco sobre Moçambique',
+    excerpt: 'Cultura, resiliência e as histórias humanas por trás das paisagens e da nossa frente de atuação humanitária.',
     content: `
-      <p>A prevenção de doenças infecciosas e parasitárias começa com o acesso à água limpa, hábitos de higiene e diagnóstico precoce nas aldeias.</p>
+      <p>Moçambique é uma terra de rica herança cultural, acolhimento caloroso e pessoas extraordinariamente resilientes.</p>
+      <p>Cada comunidade possui um potencial gigantesco que precisa apenas de suporte para florescer com autonomia e dignidade.</p>
     `,
-    author: 'Saúde Comunitária',
-    date: '2025-09-22',
+    author: 'Carolina Simionato',
+    date: '2023-11-18',
     status: 'published',
-    category: 'Saúde Comunitária',
+    category: 'Tudo sobre Moçambique',
     image: '/login_bg_real.jpg',
     featured_home: true,
     highlight_type: 'split',
-    highlight_color: '#92BF78'
+    highlight_color: '#92BF78',
+    has_unpublished_changes: true,
+    views_count: 23,
+    reads_count: 16,
+    likes_count: 5,
+    shares_count: 2,
+    comments_count: 0,
+    translations: ['pt']
+  },
+  {
+    id: 'post-draft-1',
+    title: 'Relatório Trimestral de Nutrição Comunitária',
+    excerpt: 'Análise de métricas dos primeiros 90 dias de atendimento na Casa Nutri e próximos passos de expansão.',
+    content: '<p>Rascunho de relatório técnico detalhando evolução de peso e altura...</p>',
+    author: 'Equipe Médica YAH Hope',
+    date: '2024-04-10',
+    status: 'draft',
+    category: 'Nutrição & Saúde Infantil',
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
+    featured_home: false,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
+    comments_count: 0,
+    translations: ['pt']
+  },
+  {
+    id: 'post-draft-2',
+    title: 'Oficinas de Empreendedorismo Feminino: Fase 2',
+    excerpt: 'Planejamento para abertura de novas turmas de corte, costura e gestão de pequenos negócios.',
+    content: '<p>Esboço preliminar de cronograma para os próximos módulos...</p>',
+    author: 'Carolina Simionato',
+    date: '2024-04-02',
+    status: 'draft',
+    category: 'Autonomia & Renda',
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
+    featured_home: false,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
+    comments_count: 0,
+    translations: ['pt']
   }
 ];
 
@@ -119,13 +197,20 @@ interface BlogContextType {
   addPost: (post: Omit<BlogPost, 'id' | 'date'>) => Promise<BlogPost>;
   updatePost: (id: string, post: Partial<BlogPost>) => Promise<void>;
   deletePost: (id: string) => Promise<void>;
+  moveToTrash: (id: string) => Promise<void>;
+  restoreFromTrash: (id: string) => Promise<void>;
+  bulkUpdateStatus: (ids: string[], status: BlogPost['status']) => Promise<void>;
   toggleFeaturedHome: (id: string) => Promise<boolean>;
+  incrementViews: (id: string) => Promise<void>;
+  incrementReads: (id: string) => Promise<void>;
+  toggleLike: (id: string) => Promise<boolean>;
+  incrementShares: (id: string) => Promise<void>;
   resetBlogToDefaults: () => Promise<void>;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
-const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v2';
+const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v3';
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
@@ -181,7 +266,15 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
             image: p.image || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
             featured_home: p.featured_home === true,
             highlight_type: p.highlight_type || 'split',
-            highlight_color: p.highlight_color || '#F49853'
+            highlight_color: p.highlight_color || '#F49853',
+            views_count: p.views_count ?? 0,
+            reads_count: p.reads_count ?? 0,
+            likes_count: p.likes_count ?? 0,
+            shares_count: p.shares_count ?? 0,
+            comments_count: p.comments_count ?? 0,
+            translations: p.translations || ['pt'],
+            has_unpublished_changes: p.has_unpublished_changes === true,
+            deleted_at: p.deleted_at
           })));
         }
       } catch {
@@ -217,7 +310,13 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       ...postData,
       id: newId,
       date: new Date().toISOString().split('T')[0],
-      featured_home: postData.featured_home || false
+      featured_home: postData.featured_home || false,
+      views_count: 0,
+      reads_count: 0,
+      likes_count: 0,
+      shares_count: 0,
+      comments_count: 0,
+      translations: postData.translations || ['pt']
     };
 
     setPosts(prev => [newPost, ...prev]);
@@ -256,7 +355,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
     if (updatedPost) {
       const p = updatedPost as BlogPost;
-      if (p.featured_home) {
+      if (p.featured_home && p.status === 'published') {
         await syncBlogPostHighlight({
           id: p.id,
           title: p.title,
@@ -278,7 +377,23 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const deletePost = async (id: string) => {
+  const moveToTrash = async (id: string) => {
+    await updatePost(id, {
+      status: 'trash',
+      deleted_at: new Date().toISOString(),
+      featured_home: false
+    });
+    await removeBlogPostHighlight(id);
+  };
+
+  const restoreFromTrash = async (id: string) => {
+    await updatePost(id, {
+      status: 'draft',
+      deleted_at: undefined
+    });
+  };
+
+  const deletePermanently = async (id: string) => {
     setPosts(prev => prev.filter(p => p.id !== id));
     await removeBlogPostHighlight(id);
 
@@ -287,12 +402,33 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  // Toggle "Colocar no destaque" button directly
+  const bulkUpdateStatus = async (ids: string[], status: BlogPost['status']) => {
+    setPosts(prev => prev.map(p => {
+      if (ids.includes(p.id)) {
+        return {
+          ...p,
+          status,
+          deleted_at: status === 'trash' ? new Date().toISOString() : undefined,
+          featured_home: status === 'trash' ? false : p.featured_home
+        };
+      }
+      return p;
+    }));
+
+    for (const id of ids) {
+      if (status === 'trash') {
+        await removeBlogPostHighlight(id);
+      }
+      try {
+        await supabase.from('blog_posts').update({ status }).eq('id', id);
+      } catch {}
+    }
+  };
+
   const toggleFeaturedHome = async (id: string): Promise<boolean> => {
     const post = posts.find(p => p.id === id);
     if (!post) return false;
 
-    // Check if currently highlighted either on post or in highlights context
     const currentIsHighlighted = post.featured_home === true || isBlogPostHighlighted(id);
     const nextState = !currentIsHighlighted;
 
@@ -317,6 +453,99 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     return nextState;
   };
 
+  // Metrics tracking methods
+  const incrementViews = async (id: string) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, views_count: (p.views_count || 0) + 1 };
+      }
+      return p;
+    }));
+
+    try {
+      const p = posts.find(item => item.id === id);
+      if (p) {
+        await supabase
+          .from('blog_posts')
+          .update({ views_count: (p.views_count || 0) + 1 })
+          .eq('id', id);
+      }
+    } catch {}
+  };
+
+  const incrementReads = async (id: string) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, reads_count: (p.reads_count || 0) + 1 };
+      }
+      return p;
+    }));
+
+    try {
+      const p = posts.find(item => item.id === id);
+      if (p) {
+        await supabase
+          .from('blog_posts')
+          .update({ reads_count: (p.reads_count || 0) + 1 })
+          .eq('id', id);
+      }
+    } catch {}
+  };
+
+  const toggleLike = async (id: string): Promise<boolean> => {
+    const key = `yah_blog_liked_${id}`;
+    const alreadyLiked = localStorage.getItem(key) === 'true';
+    const nextLiked = !alreadyLiked;
+
+    if (nextLiked) {
+      localStorage.setItem(key, 'true');
+    } else {
+      localStorage.removeItem(key);
+    }
+
+    setPosts(prev => prev.map(p => {
+      if (p.id === id) {
+        const currentLikes = p.likes_count || 0;
+        const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+        return { ...p, likes_count: newLikes };
+      }
+      return p;
+    }));
+
+    try {
+      const p = posts.find(item => item.id === id);
+      if (p) {
+        const currentLikes = p.likes_count || 0;
+        const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+        await supabase
+          .from('blog_posts')
+          .update({ likes_count: newLikes })
+          .eq('id', id);
+      }
+    } catch {}
+
+    return nextLiked;
+  };
+
+  const incrementShares = async (id: string) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, shares_count: (p.shares_count || 0) + 1 };
+      }
+      return p;
+    }));
+
+    try {
+      const p = posts.find(item => item.id === id);
+      if (p) {
+        await supabase
+          .from('blog_posts')
+          .update({ shares_count: (p.shares_count || 0) + 1 })
+          .eq('id', id);
+      }
+    } catch {}
+  };
+
   const resetBlogToDefaults = async () => {
     setPosts(DEFAULT_BLOG_POSTS);
     try {
@@ -330,8 +559,15 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       loading,
       addPost,
       updatePost,
-      deletePost,
+      deletePost: deletePermanently,
+      moveToTrash,
+      restoreFromTrash,
+      bulkUpdateStatus,
       toggleFeaturedHome,
+      incrementViews,
+      incrementReads,
+      toggleLike,
+      incrementShares,
       resetBlogToDefaults
     }}>
       {children}

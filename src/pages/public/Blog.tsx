@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { useBlog, BlogPost } from '../../contexts/BlogContext';
 import { 
@@ -12,20 +12,24 @@ import {
   Clock, 
   Check, 
   Bookmark,
-  Sparkles
+  Sparkles,
+  Eye,
+  BookOpen
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 
 export function Blog() {
-  const { posts } = useBlog();
+  const { posts, incrementViews, incrementReads, toggleLike, incrementShares } = useBlog();
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
 
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [copied, setCopied] = useState(false);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
 
-  // Check if URL has ?post=post-id or route /blog/:id
+  // Sync selectedPost with URL (?post=... or /blog/:id)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const targetId = id || params.get('post');
@@ -38,6 +42,7 @@ export function Blog() {
       );
       if (found) {
         setSelectedPost(found);
+        setHasLiked(localStorage.getItem(`yah_blog_liked_${found.id}`) === 'true');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         setSelectedPost(null);
@@ -46,6 +51,51 @@ export function Blog() {
       setSelectedPost(null);
     }
   }, [location.search, id, posts]);
+
+  // Track Views & Reads when an article is opened
+  useEffect(() => {
+    if (!selectedPost) return;
+
+    const postId = selectedPost.id;
+    const viewKey = `yah_viewed_${postId}`;
+    const readKey = `yah_read_${postId}`;
+
+    // 1. Register View once per session
+    if (!sessionStorage.getItem(viewKey)) {
+      sessionStorage.setItem(viewKey, 'true');
+      incrementViews(postId);
+    }
+
+    // 2. Register Read after 15 seconds or scroll past 60%
+    let readRegistered = !!sessionStorage.getItem(readKey);
+
+    const markAsRead = () => {
+      if (!readRegistered) {
+        readRegistered = true;
+        sessionStorage.setItem(readKey, 'true');
+        incrementReads(postId);
+      }
+    };
+
+    const timer = setTimeout(markAsRead, 15000);
+
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollHeight > 0) {
+        const scrollPercent = (window.scrollY / scrollHeight) * 100;
+        if (scrollPercent >= 60) {
+          markAsRead();
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [selectedPost?.id]);
 
   const publishedPosts = posts.filter(p => p.status === 'published');
 
@@ -61,16 +111,38 @@ export function Blog() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    if (!selectedPost) return;
     try {
-      navigator.clipboard.writeText(window.location.href);
+      incrementShares(selectedPost.id);
+      if (navigator.share) {
+        await navigator.share({
+          title: selectedPost.title,
+          text: selectedPost.excerpt,
+          url: window.location.href,
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    } catch {
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {}
+    }
+  };
+
+  const handleToggleLike = async () => {
+    if (!selectedPost || isLiking) return;
+    setIsLiking(true);
+    const nowLiked = await toggleLike(selectedPost.id);
+    setHasLiked(nowLiked);
+    setIsLiking(false);
   };
 
   // ==========================================
-  // DEDICATED FULL ARTICLE PAGE (NOT A MODAL)
+  // DEDICATED FULL ARTICLE PAGE
   // ==========================================
   if (selectedPost) {
     const relatedPosts = publishedPosts.filter(p => p.id !== selectedPost.id).slice(0, 3);
@@ -116,14 +188,31 @@ export function Blog() {
               <span>Voltar para todas as matérias</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleShare}
-              className="inline-flex items-center gap-2 text-xs font-gotham-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 py-2 px-3.5 sm:px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
-              <span>{copied ? 'Link Copiado!' : 'Compartilhar'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Like Button in Header */}
+              <button
+                type="button"
+                onClick={handleToggleLike}
+                className={`inline-flex items-center gap-1.5 text-xs font-gotham-bold py-2 px-3.5 rounded-xl border shadow-xs transition-all cursor-pointer ${
+                  hasLiked 
+                    ? 'bg-rose-50 text-rose-600 border-rose-200' 
+                    : 'bg-white text-slate-600 border-slate-200/80 hover:text-rose-600'
+                }`}
+              >
+                <Heart size={14} className={hasLiked ? "fill-rose-500 text-rose-500" : ""} />
+                <span>{selectedPost.likes_count ?? 0}</span>
+              </button>
+
+              {/* Share Button in Header */}
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center gap-2 text-xs font-gotham-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 py-2 px-3.5 sm:px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
+                <span>{copied ? 'Link Copiado!' : 'Compartilhar'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Dedicated Article Document */}
@@ -158,6 +247,7 @@ export function Blog() {
                   {selectedPost.title}
                 </h1>
 
+                {/* Metadata & Engagement Metrics */}
                 <div className="flex items-center gap-4 text-xs text-white/80 font-mono mt-4 flex-wrap">
                   <span className="flex items-center gap-1.5">
                     <Calendar size={13} /> {selectedPost.date}
@@ -167,8 +257,12 @@ export function Blog() {
                     <User size={13} /> {selectedPost.author}
                   </span>
                   <span>•</span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock size={13} /> Leitura completa
+                  <span className="flex items-center gap-1.5 text-white/90">
+                    <Eye size={13} /> {selectedPost.views_count ?? 0} visualizações
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1.5 text-white/90">
+                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} leituras
                   </span>
                 </div>
               </div>
@@ -186,9 +280,9 @@ export function Blog() {
 
               {/* Story Content */}
               <div className="text-slate-800 text-base sm:text-lg leading-relaxed font-gotham-regular space-y-5">
-                {selectedPost.content.includes('<p>') || selectedPost.content.includes('<br>') ? (
+                {selectedPost.content.includes('<p>') || selectedPost.content.includes('<br>') || selectedPost.content.includes('<img') ? (
                   <div 
-                    className="prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-heading prose-headings:font-bold prose-a:text-[#F49853]"
+                    className="prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-heading prose-headings:font-bold prose-a:text-[#F49853] prose-img:rounded-2xl prose-img:mx-auto prose-img:shadow-sm"
                     dangerouslySetInnerHTML={{ __html: selectedPost.content }}
                   />
                 ) : (
@@ -196,6 +290,51 @@ export function Blog() {
                     {selectedPost.content}
                   </div>
                 )}
+              </div>
+
+              {/* Reader Action Bar (Like and Share) */}
+              <div className="py-6 border-y border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleToggleLike}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-gotham-bold text-sm transition-all cursor-pointer shadow-xs active:scale-95 ${
+                      hasLiked
+                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                        : 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600'
+                    }`}
+                  >
+                    <Heart size={18} className={hasLiked ? "fill-rose-500 text-rose-500" : ""} />
+                    <span>{hasLiked ? 'Você curtiu' : 'Curtir este artigo'}</span>
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-xs font-mono text-slate-700">
+                      {selectedPost.likes_count ?? 0}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-bold text-sm transition-all cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Share2 size={16} />
+                    <span>Compartilhar</span>
+                    {selectedPost.shares_count ? (
+                      <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-xs font-mono text-slate-700">
+                        {selectedPost.shares_count}
+                      </span>
+                    ) : null}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+                  <span className="flex items-center gap-1">
+                    <Eye size={13} /> {selectedPost.views_count ?? 0} visualizações
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} pessoas leram
+                  </span>
+                </div>
               </div>
 
               {/* Support Call to Action Box */}
@@ -282,9 +421,20 @@ export function Blog() {
                         {rel.excerpt}
                       </p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1">
-                      <span>Ler história</span>
-                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-gotham-bold">
+                      <div className="flex items-center gap-3 text-slate-400 font-mono text-[11px]">
+                        <span className="flex items-center gap-1">
+                          <Eye size={12} /> {rel.views_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Heart size={12} /> {rel.likes_count ?? 0}
+                        </span>
+                      </div>
+                      <span className="text-[#F49853] flex items-center gap-1">
+                        Ler história
+                        <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                      </span>
                     </div>
                   </article>
                 ))}
@@ -364,9 +514,21 @@ export function Blog() {
                 {/* Content Box */}
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-2 font-mono">
-                      <Calendar size={13} />
-                      <span>{post.date}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar size={13} />
+                        <span>{post.date}</span>
+                      </div>
+
+                      {/* Views & Likes Badges in Card */}
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex items-center gap-1 text-slate-500" title="Visualizações">
+                          <Eye size={12} /> {post.views_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1 text-slate-500" title="Curtidas">
+                          <Heart size={12} className={post.likes_count ? "fill-rose-500 text-rose-500" : ""} /> {post.likes_count ?? 0}
+                        </span>
+                      </div>
                     </div>
 
                     <h2 className="text-lg sm:text-xl font-heading font-bold text-slate-900 group-hover:text-[#F49853] transition-colors leading-snug line-clamp-2">
@@ -382,6 +544,10 @@ export function Blog() {
                     <span className="group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
                       Ler matéria completa
                       <ArrowRight size={13} />
+                    </span>
+
+                    <span className="text-slate-400 font-mono text-[11px] font-normal flex items-center gap-1">
+                      <BookOpen size={12} /> {post.reads_count ?? 0} leram
                     </span>
                   </div>
                 </div>

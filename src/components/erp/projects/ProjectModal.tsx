@@ -4,6 +4,7 @@ import { Project, ProjectStatus, Priority } from '../../../lib/mockData';
 import { X, Lock, Globe, UserPlus, Trash2, Plus } from 'lucide-react';
 
 import { useAuth } from '../../../contexts/AuthContext';
+import { generateSafeUUID } from '../../../contexts/ProjectContext';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
     if (!name || !startDate) return;
 
     onSave({
-      id: initialProject?.id || `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: initialProject?.id || generateSafeUUID(),
       name,
       description,
       status,

@@ -9,7 +9,7 @@ import {
   MessageSquare, Star, X, Settings, GripVertical,
   PlusCircle, Download, Share2, User
 } from 'lucide-react';
-import { useProjects } from '../../contexts/ProjectContext';
+import { useProjects, generateSafeUUID } from '../../contexts/ProjectContext';
 import { Project, ProjectTask, ColumnDefinition, ColumnType } from '../../lib/mockData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,7 +47,7 @@ export function CommProjects() {
     const name = (e.currentTarget as any).projectName.value;
     const desc = (e.currentTarget as any).projectDesc.value;
     const project: Project = {
-      id: `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateSafeUUID(),
       name,
       description: desc,
       status: 'planning',

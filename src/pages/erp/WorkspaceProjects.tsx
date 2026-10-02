@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClickUp } from '../../contexts/ClickUpContext';
 import { useTeam } from '../../contexts/TeamContext';
-import { useProjects } from '../../contexts/ProjectContext';
+import { useProjects, generateSafeUUID } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   Briefcase, FolderKanban, Plus, CheckCircle2, Clock, 
@@ -87,7 +87,7 @@ export function WorkspaceProjects() {
     if (!newModProjName.trim()) return;
 
     const newProject: Project = {
-      id: `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateSafeUUID(),
       name: newModProjName.trim(),
       description: newModProjDesc.trim(),
       status: 'planning',
