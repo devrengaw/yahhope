@@ -5,58 +5,45 @@ import {
   TrendingUp, 
   TrendingDown, 
   Wallet, 
-  ArrowUpRight, 
-  ArrowDownRight, 
+  ArrowDownRight,
   Filter, 
   Download, 
   Calendar, 
   Layers, 
   CheckCircle2, 
   Clock, 
-  MoreVertical, 
   Search, 
   Tag, 
-  Edit2, 
-  Trash2, 
-  Users,
   Repeat,
   ShieldCheck,
-  Heart
+  Send
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
-import { CategoryModal } from '../../components/admin/finance/CategoryModal';
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
+import { ProjectRepasseModal, RepassePayload } from '../../components/admin/finance/ProjectRepasseModal';
 import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCostsAccessModal';
 import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
 
-interface NutritionStaff {
-  id: string;
-  name: string;
-  role: string;
-  cost_aid_amount: number;
-  status: 'active' | 'inactive';
-}
-
 export function NutritionFinance() {
   const { user } = useAuth();
   const { confirm } = useConfirm();
   const isMasterAdmin = user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'contato@yahhope.com';
 
-  const [activeTab, setActiveTab] = useState<'expenses' | 'transactions' | 'planning' | 'staff'>('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'transactions' | 'planning'>('expenses');
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
-  const [staff, setStaff] = useState<NutritionStaff[]>([]);
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseModalType, setExpenseModalType] = useState<'fixed' | 'variable'>('fixed');
+  const [isRepasseModalOpen, setIsRepasseModalOpen] = useState(false);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,14 +51,12 @@ export function NutritionFinance() {
 
   const fetchData = async () => {
     try {
-      const [txRes, catRes, staffRes] = await Promise.all([
+      const [txRes, catRes] = await Promise.all([
         supabase.from('finance_transactions').select('*').eq('module', 'nutrition').order('date', { ascending: false }),
-        supabase.from('finance_categories').select('*').order('name', { ascending: true }),
-        supabase.from('nutrition_staff').select('*').order('name', { ascending: true })
+        supabase.from('finance_categories').select('*').order('name', { ascending: true })
       ]);
       if (txRes.data) setTransactions(txRes.data);
       if (catRes.data) setCategories(catRes.data);
-      if (staffRes.data) setStaff(staffRes.data);
     } catch (e) {
       console.error('Error fetching nutrition finance data:', e);
     }
@@ -82,7 +67,6 @@ export function NutritionFinance() {
 
     const channels = supabase.channel('nutrition-finance-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_transactions', filter: 'module=eq.nutrition' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'nutrition_staff' }, () => fetchData())
       .subscribe();
 
     return () => {
@@ -94,16 +78,16 @@ export function NutritionFinance() {
     const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     const fixedExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'fixed').reduce((acc, t) => acc + t.amount, 0);
-    const totalCostAid = staff.filter(s => s.status === 'active').reduce((acc, s) => acc + (s.cost_aid_amount || 0), 0);
+    const variableExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'variable').reduce((acc, t) => acc + t.amount, 0);
     
     return {
-      totalIncome: income,
+      totalIncome: income, // Valor total repassado ao projeto
       totalExpense: expense,
-      balance: income - expense,
       fixedExpense,
-      totalCostAid
+      variableExpense,
+      balance: income - expense
     };
-  }, [transactions, staff]);
+  }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -152,7 +136,45 @@ export function NutritionFinance() {
         status: newExpense.status,
         account: newExpense.account,
         expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence
+        recurrence: newExpense.recurrence,
+        module: 'nutrition'
+      };
+      setTransactions(prev => [localTx, ...prev]);
+    }
+  };
+
+  const handleSaveRepasse = async (repasse: RepassePayload) => {
+    try {
+      const incomeCat = categories.find(c => c.type === 'income');
+      const payload = {
+        description: repasse.description,
+        amount: repasse.amount,
+        type: 'income',
+        category_id: repasse.category_id || incomeCat?.id,
+        date: repasse.date,
+        status: 'completed',
+        account: repasse.account,
+        notes: repasse.notes,
+        module: 'nutrition'
+      };
+      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
+      if (error) throw error;
+      if (data && data[0]) {
+        setTransactions(prev => [data[0] as Transaction, ...prev]);
+      }
+    } catch (e) {
+      console.warn('Erro ao salvar repasse no Supabase, adicionando localmente:', e);
+      const localTx: Transaction = {
+        id: 'tx_nutri_repasse_' + Math.random().toString(36).substring(2, 9),
+        description: repasse.description,
+        amount: repasse.amount,
+        type: 'income',
+        category_id: repasse.category_id || categories.find(c => c.type === 'income')?.id || '',
+        date: repasse.date,
+        status: 'completed',
+        account: repasse.account,
+        notes: repasse.notes,
+        module: 'nutrition'
       };
       setTransactions(prev => [localTx, ...prev]);
     }
@@ -214,69 +236,90 @@ export function NutritionFinance() {
               </button>
             )}
 
-            {activeTab === 'expenses' ? (
-              <button 
-                onClick={() => { setExpenseModalType('fixed'); setIsExpenseModalOpen(true); }}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95"
-              >
-                <Plus size={20} />
-                Novo Gasto Nutrição
-              </button>
-            ) : (
-              <button 
-                onClick={() => setIsTxModalOpen(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
-              >
-                <Plus size={20} />
-                Nova Transação
-              </button>
-            )}
+            {/* Registrar Repasse Recebido */}
+            <button
+              onClick={() => setIsRepasseModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-emerald-600 hover:bg-emerald-50 text-emerald-800 rounded-2xl font-bold text-xs shadow-sm transition-all active:scale-95"
+              title="Registrar repasse orçamentário transferido para a Casa Nutri"
+            >
+              <Send size={15} className="text-emerald-600" />
+              + Registrar Repasse
+            </button>
+
+            {/* Novo Gasto */}
+            <button 
+              onClick={() => { setExpenseModalType('fixed'); setIsExpenseModalOpen(true); }}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95"
+            >
+              <Plus size={20} />
+              Novo Gasto Nutrição
+            </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-xl shadow-emerald-50">
+        {/* Stats Cards (3 Colunas - Sem RH/Voluntários) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Valor Repassado para o Projeto */}
+          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-xl shadow-emerald-50/60 hover:border-emerald-200 transition-all">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><TrendingUp size={24} /></div>
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                Repasse Finanças
+              </span>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total de Receitas</p>
-            <p className="text-2xl font-black text-slate-900 mt-1">R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Valor Repassado ao Projeto</p>
+            <p className="text-3xl font-black text-slate-900 mt-1">
+              R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 font-bold mt-2">
+              Recursos transferidos pela gestão financeira
+            </p>
           </div>
           
-          <div className="bg-white p-6 rounded-3xl border border-rose-100 shadow-xl shadow-rose-50">
+          {/* Despesas da Nutrição */}
+          <div className="bg-white p-6 rounded-3xl border border-rose-100 shadow-xl shadow-rose-50/60 hover:border-rose-200 transition-all">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-rose-50 rounded-2xl text-rose-600"><TrendingDown size={24} /></div>
+              <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                {transactions.filter(t => t.type === 'expense').length} itens
+              </span>
             </div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Despesas Nutrição</p>
-            <p className="text-2xl font-black text-slate-900 mt-1">R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-50">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Wallet size={24} /></div>
-            </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Saldo do Setor</p>
-            <p className={cn("text-2xl font-black mt-1", stats.balance >= 0 ? "text-slate-900" : "text-rose-600")}>
-              R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <p className="text-3xl font-black text-slate-900 mt-1">
+              R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 font-bold mt-2">
+              Custos fixos recorrentes e gastos variáveis
             </p>
           </div>
 
-          <div className="bg-emerald-950 p-6 rounded-3xl shadow-xl shadow-emerald-900/10 text-white relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-white/10 rounded-2xl text-emerald-400"><Users size={24} /></div>
-              </div>
-              <p className="text-emerald-200 text-xs font-bold uppercase tracking-widest">Custo de Equipe / Mês</p>
-              <p className="text-2xl font-black mt-1">R$ {stats.totalCostAid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          {/* Saldo Disponível no Setor */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-50/60 hover:border-slate-200 transition-all">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Wallet size={24} /></div>
+              <span className={cn(
+                "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider",
+                stats.balance >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+              )}>
+                {stats.balance >= 0 ? 'Superávit' : 'Déficit'}
+              </span>
             </div>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Saldo Disponível no Setor</p>
+            <p className={cn("text-3xl font-black mt-1", stats.balance >= 0 ? "text-slate-900" : "text-rose-600")}>
+              R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 font-bold mt-2">
+              Repasses recebidos menos despesas efetuadas
+            </p>
           </div>
+
         </div>
 
         {/* Content Box */}
         <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
           
-          {/* Tabs */}
+          {/* Tabs (Sem RH e Voluntários) */}
           <div className="px-8 pt-6 flex flex-wrap border-b border-slate-100 gap-1">
             <button 
               onClick={() => setActiveTab('expenses')}
@@ -313,17 +356,6 @@ export function NutritionFinance() {
             >
               Planejamento
               {activeTab === 'planning' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('staff')}
-              className={cn(
-                "px-5 py-4 font-bold text-sm transition-all relative",
-                activeTab === 'staff' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              RH e Voluntários
-              {activeTab === 'staff' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
             </button>
           </div>
 
@@ -377,7 +409,7 @@ export function NutritionFinance() {
                             <p className="font-bold text-slate-900 uppercase text-sm">{t.description}</p>
                             <div className="flex items-center gap-2 mt-1 text-[10px] font-bold text-slate-400">
                               <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
-                              {category?.name || 'Sem categoria'}
+                              {category?.name || (t.type === 'income' ? 'Repasse Financeiro' : 'Sem categoria')}
                             </div>
                           </td>
                           <td className="px-8 py-4">
@@ -385,7 +417,7 @@ export function NutritionFinance() {
                               "px-3 py-1 rounded-lg text-[10px] font-black uppercase w-fit border",
                               t.type === 'income' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
                             )}>
-                              {t.type === 'income' ? 'Receita' : t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
+                              {t.type === 'income' ? 'Repasse Recebido' : t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
                             </span>
                           </td>
                           <td className="px-8 py-4 text-right">
@@ -405,52 +437,26 @@ export function NutritionFinance() {
                 </table>
               </div>
             </div>
-          ) : activeTab === 'planning' ? (
+          ) : (
             <div className="p-8">
               <h3 className="text-xl font-bold text-slate-900 mb-6">Orçamento e Planejamento</h3>
               <div className="bg-slate-50 p-6 rounded-2xl text-center text-slate-500 font-medium">
-                Funcionalidade de planejamento orçamentário detalhado integrado aos custos fixos e variáveis.
-              </div>
-            </div>
-          ) : (
-            <div className="p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-slate-900">Equipe de Nutrição & Voluntários</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {staff.map(s => (
-                  <div key={s.id} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold text-xl">
-                        {s.name.charAt(0)}
-                      </div>
-                      <span className={cn(
-                        "px-2 py-1 rounded text-[10px] font-bold uppercase",
-                        s.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
-                      )}>
-                        {s.status}
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-slate-900">{s.name}</h4>
-                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1 mb-4">{s.role}</p>
-                    
-                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ajuda de Custo</span>
-                      <span className="text-lg font-black text-slate-900">R$ {(s.cost_aid_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                ))}
-                {staff.length === 0 && (
-                  <div className="col-span-full p-12 text-center text-slate-500 bg-slate-50 rounded-2xl">
-                    Nenhum membro cadastrado.
-                  </div>
-                )}
+                Funcionalidade de planejamento orçamentário detalhado integrado aos custos fixos e variáveis da Casa Nutri.
               </div>
             </div>
           )}
 
         </div>
+
+        {/* Modal de Registro de Repasse */}
+        <ProjectRepasseModal
+          isOpen={isRepasseModalOpen}
+          onClose={() => setIsRepasseModalOpen(false)}
+          onSave={handleSaveRepasse}
+          defaultModule="nutrition"
+          lockModule={true}
+          categories={categories}
+        />
 
         <TransactionModal 
           isOpen={isTxModalOpen}
