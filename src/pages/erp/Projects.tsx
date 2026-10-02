@@ -29,29 +29,12 @@ export function Projects({ workspaceMode = false }: { workspaceMode?: boolean })
     }
   };
 
+  const [moduleFilter, setModuleFilter] = useState<'all' | 'admin' | 'communication'>('all');
+
   const visibleProjects = projects.filter(p => {
-    // Check if user is participating
-    const isInvitee = p.invitees.includes(user?.id || '') || p.invitees.includes(user?.name || '');
-    let isAssigned = false;
-    if (!isInvitee) {
-      const peopleColumns = (p.columns || []).filter(c => c.type === 'people').map(c => c.id);
-      isAssigned = p.tasks.some(t => {
-        return peopleColumns.some(colId => {
-          const assigned = t.values?.[colId] || [];
-          return assigned.includes(user?.id) || assigned.includes(user?.name);
-        });
-      });
-    }
-    
-    const isParticipating = isInvitee || isAssigned;
-
-    if (workspaceMode) {
-      return isParticipating;
-    }
-
-    // In global mode (admin), show all non-private projects OR private projects the user participates in
-    if (!p.isPrivate) return true;
-    return isParticipating;
+    if (moduleFilter === 'admin') return p.module === 'admin' || !p.module;
+    if (moduleFilter === 'communication') return p.module === 'communication' || p.category === 'Comunicação';
+    return true;
   });
 
   return (
@@ -96,6 +79,34 @@ export function Projects({ workspaceMode = false }: { workspaceMode?: boolean })
             Novo Projeto
           </button>
         </div>
+      </div>
+
+      {/* Module Filters */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setModuleFilter('all')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            moduleFilter === 'all' ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Todos ({projects.length})
+        </button>
+        <button
+          onClick={() => setModuleFilter('admin')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            moduleFilter === 'admin' ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Administrativo ({projects.filter(p => p.module === 'admin' || !p.module).length})
+        </button>
+        <button
+          onClick={() => setModuleFilter('communication')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            moduleFilter === 'communication' ? 'bg-purple-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Comunicação ({projects.filter(p => p.module === 'communication' || p.category === 'Comunicação').length})
+        </button>
       </div>
 
       <ProjectSummary projects={visibleProjects} />

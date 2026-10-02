@@ -1,20 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, ArrowRight, MapPin, CheckCircle, Clock } from 'lucide-react';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
-import { useDonationModal } from '../../contexts/DonationModalContext';
 import { YAHHopeProject } from '../../lib/mockData';
 import { SEO } from '../../components/common/SEO';
+import { ProjectDetailModal } from '../../components/public/ProjectDetailModal';
 
 export function LocalProjects() {
   const { projects } = useWebsiteProjects();
-  const { openDonationModal } = useDonationModal();
+  const [selectedProject, setSelectedProject] = useState<YAHHopeProject | null>(null);
+
+  // Permite abrir um projeto diretamente via hash da URL (#proj-1)
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && projects.length > 0) {
+      const found = projects.find(p => p.id === hash);
+      if (found) setSelectedProject(found);
+    }
+  }, [projects]);
 
   const activeProjects = projects.filter(p => p.status === 'active');
   const plannedProjects = projects.filter(p => p.status === 'planned');
   const completedProjects = projects.filter(p => p.status === 'completed');
 
   const ProjectCard: React.FC<{ project: YAHHopeProject }> = ({ project }) => (
-    <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 group flex flex-col h-full">
+    <div 
+      onClick={() => setSelectedProject(project)}
+      className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 group flex flex-col h-full cursor-pointer hover:-translate-y-1"
+    >
       <div className="h-64 overflow-hidden relative">
         <img 
           src={project.image_url} 
@@ -39,30 +51,20 @@ export function LocalProjects() {
             {project.status === 'planned' && <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Clock size={12} /> Planejado</span>}
             {project.status === 'completed' && <span className="bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><CheckCircle size={12} /> Concluído</span>}
           </div>
-          <h3 className="text-2xl font-black text-white leading-tight">{project.title}</h3>
+          <h3 className="text-2xl font-black text-white leading-tight group-hover:text-amber-200 transition-colors">{project.title}</h3>
         </div>
       </div>
       <div className="p-8 flex flex-col flex-grow">
         <p className="text-slate-500 leading-relaxed mb-8 flex-grow">{project.description}</p>
         <button 
           type="button"
-          onClick={() => {
-            if (project.link && project.link.startsWith('http')) {
-              window.open(project.link, '_blank');
-              return;
-            }
-            openDonationModal({
-              title: project.title,
-              category: project.category,
-              tagColor: project.tag_color,
-              imageUrl: project.image_url,
-              description: project.description,
-              link: project.link && project.link !== '/projetos' ? project.link : '/campanha',
-            });
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedProject(project);
           }}
           className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn cursor-pointer"
         >
-          <span className="font-bold text-sm tracking-tight">Saiba como apoiar</span>
+          <span className="font-bold text-sm tracking-tight">Conhecer projeto & apoiar</span>
           <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
         </button>
       </div>
@@ -150,6 +152,13 @@ export function LocalProjects() {
           <p className="text-slate-500 text-lg">Em breve divulgaremos as novas iniciativas locais da YAH Hope.</p>
         </div>
       )}
+
+      {/* Modal Imersivo de Apresentação do Projeto */}
+      <ProjectDetailModal 
+        project={selectedProject} 
+        isOpen={Boolean(selectedProject)} 
+        onClose={() => setSelectedProject(null)} 
+      />
     </div>
   );
 }

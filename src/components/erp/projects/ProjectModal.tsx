@@ -3,6 +3,8 @@ import { supabase } from '../../../lib/supabase';
 import { Project, ProjectStatus, Priority } from '../../../lib/mockData';
 import { X, Lock, Globe, UserPlus, Trash2, Plus } from 'lucide-react';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -11,8 +13,10 @@ interface ProjectModalProps {
 }
 
 export function ProjectModal({ isOpen, onClose, onSave, initialProject }: ProjectModalProps) {
+  const { user } = useAuth();
   const [name, setName] = useState(initialProject?.name || '');
   const [description, setDescription] = useState(initialProject?.description || '');
+  const [module, setModule] = useState<'admin' | 'communication' | 'workspace'>(initialProject?.module || 'admin');
   const [status, setStatus] = useState<ProjectStatus>(initialProject?.status || 'planning');
   const [progress, setProgress] = useState(initialProject?.progress?.toString() || '0');
   const [budget, setBudget] = useState(initialProject?.budget?.toString() || '');
@@ -41,19 +45,23 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
     if (!name || !startDate) return;
 
     onSave({
-      id: initialProject?.id || Math.random().toString(36).substring(2, 9),
+      id: initialProject?.id || `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       name,
       description,
       status,
-      progress: parseInt(progress),
+      progress: parseInt(progress) || 0,
       start_date: startDate,
       end_date: endDate,
       budget: budget ? parseFloat(budget) : 0,
       isPrivate,
       invitees,
-      category,
+      category: category || 'Geral',
       priority,
       enablePortalUpdates,
+      created_by: initialProject?.created_by || user?.id || user?.email || 'admin',
+      created_by_name: initialProject?.created_by_name || user?.name || user?.email || 'Administrador',
+      module,
+      columns: initialProject?.columns,
       tasks: initialProject?.tasks || []
     });
     
@@ -117,7 +125,19 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Módulo</label>
+              <select
+                value={module}
+                onChange={e => setModule(e.target.value as any)}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white font-semibold text-slate-800"
+              >
+                <option value="admin">Administrativo</option>
+                <option value="communication">Comunicação</option>
+                <option value="workspace">Workspace</option>
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
               <input

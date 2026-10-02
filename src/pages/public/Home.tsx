@@ -435,7 +435,7 @@ export function Home() {
                         </h3>
                         {item.snippet && (
                           <p className="text-xs text-slate-500 mt-2 font-gotham-light line-clamp-3 leading-relaxed">
-                            {item.snippet}
+                            {item.snippet.replace(/<[^>]*>/g, '').trim()}
                           </p>
                         )}
                       </div>
@@ -825,13 +825,26 @@ export function Home() {
             <div className="p-6 sm:p-8 space-y-5 font-gotham-regular">
               {readingHighlight.snippet && (
                 <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-100/80 text-slate-700 text-sm sm:text-base font-gotham-light leading-relaxed italic">
-                  "{readingHighlight.snippet}"
+                  "{readingHighlight.snippet.replace(/<[^>]*>/g, '').trim()}"
                 </div>
               )}
 
-              <div className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-gotham-regular">
-                {readingHighlight.content || readingHighlight.snippet}
-              </div>
+              {readingHighlight.content ? (
+                /<[a-z][\s\S]*>/i.test(readingHighlight.content) ? (
+                  <div 
+                    className="text-slate-700 text-sm sm:text-base leading-relaxed font-gotham-regular space-y-4 [&>p]:leading-relaxed [&>p]:mb-3 [&>h3]:text-lg [&>h3]:font-heading [&>h3]:font-bold [&>h3]:text-slate-900 [&>h3]:mt-5 [&>h3]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-1 [&>ul]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:space-y-1 [&>ol]:mb-3 [&>li]:leading-relaxed [&>a]:text-[#F49853] [&>a]:underline [&>strong]:font-gotham-bold"
+                    dangerouslySetInnerHTML={{ __html: readingHighlight.content }}
+                  />
+                ) : (
+                  <div className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-gotham-regular">
+                    {readingHighlight.content}
+                  </div>
+                )
+              ) : readingHighlight.snippet ? (
+                <div className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-gotham-regular">
+                  {readingHighlight.snippet.replace(/<[^>]*>/g, '').trim()}
+                </div>
+              ) : null}
 
               {/* Action Buttons */}
               <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">

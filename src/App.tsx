@@ -240,14 +240,14 @@ export default function App() {
                                               <Routes>
                                                 <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
                                                 <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
-                                                <Route path="/home-highlights" element={<HomeHighlightsManager />} />
-                                                <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
-                                                <Route path="/top-banner" element={<TopBannerManager />} />
+                                                <Route path="/home-highlights" element={<Navigate to="/communication/home-highlights" replace />} />
+                                                <Route path="/impact-metrics" element={<Navigate to="/communication/impact-metrics" replace />} />
+                                                <Route path="/top-banner" element={<Navigate to="/communication/top-banner" replace />} />
                                                 <Route path="/impact-feed" element={<ImpactFeedManager />} />
                                                 <Route path="/messages" element={<SupporterMessages />} />
                                                 <Route path="/gifts" element={<GiftManager />} />
                                                 <Route path="/fundraising" element={<FundraisingManager />} />
-                                              <Route path="/projects" element={<Settings />} />
+                                                <Route path="/projects" element={<Projects />} />
                                               <Route path="/local-projects" element={<Settings />} />
                                               <Route path="/users" element={<Settings />} />
                                               <Route path="/finance" element={<AdminFinance />} />
@@ -287,6 +287,9 @@ export default function App() {
                                           <Layout module="communication">
                                             <Routes>
                                               <Route path="/" element={<CommDashboard />} />
+                                              <Route path="/top-banner" element={<TopBannerManager />} />
+                                              <Route path="/home-highlights" element={<HomeHighlightsManager />} />
+                                              <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
                                               <Route path="/projects" element={<CommProjects />} />
                                               <Route path="/chat" element={<CommChat />} />
                                               <Route path="/blog" element={<CommBlogAdmin />} />

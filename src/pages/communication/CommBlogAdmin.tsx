@@ -146,7 +146,7 @@ export function CommBlogAdmin() {
         </div>
         <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
           <Link
-            to="/admin/home-highlights"
+            to="/communication/home-highlights"
             className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-orange-50 text-[#F49853] hover:bg-orange-100 border border-orange-200 transition-all flex items-center gap-1.5"
             title="Ir para o Gerenciador de Destaques da Home"
           >

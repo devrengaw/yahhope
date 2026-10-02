@@ -1,39 +1,133 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Project, mockProjects, ProjectTask, ColumnDefinition, ColumnType, PersonalActivity } from '../lib/mockData';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { Project, ProjectTask, ColumnDefinition, ColumnType, PersonalActivity } from '../lib/mockData';
 import { supabase } from '../lib/supabase';
-
 import { useAuth } from './AuthContext';
+
+const LOCAL_STORAGE_PROJECTS_KEY = 'yah_hope_projects_v2';
+const LOCAL_STORAGE_ACTIVITIES_KEY = 'yah_hope_activities_v2';
+
+export const isSuperAdminUser = (u: any): boolean => {
+  if (!u) return false;
+  const role = (u.role || '').toUpperCase();
+  const email = (u.email || '').toLowerCase();
+  return role === 'ADMIN' || role === 'MASTER' || email === 'contato@yahhope.com';
+};
+
+export const canUserAccessProject = (project: Project, u: any): boolean => {
+  if (!u) return false;
+  if (isSuperAdminUser(u)) return true;
+
+  const uId = String(u.id || '');
+  const uEmail = String(u.email || '').toLowerCase();
+  const uName = String(u.name || '').toLowerCase();
+
+  const pCreator = String(project.created_by || '');
+  const pCreatorLower = pCreator.toLowerCase();
+
+  // Created by user id or email
+  if (pCreator && (pCreator === uId || pCreatorLower === uEmail)) return true;
+  // Created by user name
+  if (uName && project.created_by_name && project.created_by_name.toLowerCase() === uName) return true;
+
+  // Invitees
+  const invitees = Array.isArray(project.invitees) ? project.invitees : [];
+  if (
+    invitees.includes(uId) || 
+    (u.name && invitees.includes(u.name)) || 
+    (u.email && invitees.some((inv: string) => String(inv).toLowerCase() === uEmail))
+  ) {
+    return true;
+  }
+
+  // Assigned to any task
+  const peopleCols = (project.columns || []).filter(c => c.type === 'people').map(c => c.id);
+  const isAssigned = (project.tasks || []).some(t => {
+    return peopleCols.some(colId => {
+      const assigned = t.values?.[colId] || [];
+      return Array.isArray(assigned) && (assigned.includes(uId) || (u.name && assigned.includes(u.name)));
+    });
+  });
+  if (isAssigned) return true;
+
+  // Fallback for legacy projects without creator that aren't private
+  if (!project.created_by && !project.isPrivate) return true;
+
+  return false;
+};
+
+const defaultColumns: ColumnDefinition[] = [
+  { id: 'c1', name: 'Status', type: 'status', options: ['Todo', 'Working on it', 'Stuck', 'Done'] },
+  { id: 'c2', name: 'Owner', type: 'people' },
+  { id: 'c3', name: 'Timeline', type: 'date' },
+];
 
 interface ProjectContextType {
   projects: Project[];
+  rawProjects: Project[];
   activities: PersonalActivity[];
-  addProject: (project: Project) => void;
-  updateProject: (id: string, updates: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
+  isLoaded: boolean;
+  addProject: (project: Project) => Promise<void>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   
   // Activity operations
   addActivity: (activity: PersonalActivity) => void;
   deleteActivity: (id: string) => void;
   
   // Column operations
-  addColumn: (projectId: string, column: ColumnDefinition) => void;
-  updateColumn: (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => void;
-  deleteColumn: (projectId: string, columnId: string) => void;
+  addColumn: (projectId: string, column: ColumnDefinition) => Promise<void>;
+  updateColumn: (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => Promise<void>;
+  deleteColumn: (projectId: string, columnId: string) => Promise<void>;
   
   // Task operations
-  addTask: (projectId: string, task: ProjectTask) => void;
-  updateTask: (projectId: string, taskId: string, updates: Partial<ProjectTask>) => void;
-  updateTaskValue: (projectId: string, taskId: string, columnId: string, value: any) => void;
-  deleteTask: (projectId: string, taskId: string) => void;
+  addTask: (projectId: string, task: ProjectTask) => Promise<void>;
+  updateTask: (projectId: string, taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
+  updateTaskValue: (projectId: string, taskId: string, columnId: string, value: any) => Promise<void>;
+  deleteTask: (projectId: string, taskId: string) => Promise<void>;
+
+  canAccessProject: (project: Project) => boolean;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activities, setActivities] = useState<PersonalActivity[]>([]);
+  const [rawProjects, setRawProjects] = useState<Project[]>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_PROJECTS_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [activities, setActivities] = useState<PersonalActivity[]>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_ACTIVITIES_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [isLoaded, setIsLoaded] = useState(false);
   const { user } = useAuth();
+
+  // Save to local storage whenever rawProjects changes
+  const saveProjectsToStorage = (updated: Project[]) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_PROJECTS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error saving projects to localStorage', e);
+    }
+  };
+
+  const saveActivitiesToStorage = (updated: PersonalActivity[]) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_ACTIVITIES_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error saving activities to localStorage', e);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -43,216 +137,325 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProjects = async () => {
     try {
-      const { data: projData } = await supabase.from('projects').select('*');
+      const { data: projData, error: projErr } = await supabase.from('projects').select('*');
       const { data: taskData } = await supabase.from('project_tasks').select('*');
       
-      const hasAdminPerm = user?.role === 'ADMIN' || user?.permissions.includes('management');
-      
-      if (projData) {
-        let filteredProjData = projData;
-        if (!hasAdminPerm && user) {
-          // Filtrar projetos: só vê se for não-privado (opcional) ou se estiver na lista de invitees
-          filteredProjData = projData.filter(p => {
-            const invitees = Array.isArray(p.invitees) ? p.invitees : [];
-            return !p.is_private || invitees.includes(user.name) || invitees.includes(user.id);
-          });
-        }
-
-        const formattedProjects: Project[] = filteredProjData.map(p => {
+      if (!projErr && projData && Array.isArray(projData)) {
+        const formattedProjects: Project[] = projData.map(p => {
           const pTasks = taskData ? taskData.filter(t => t.project_id === p.id) : [];
           
           return {
             id: p.id,
             name: p.name,
             description: p.description || '',
-            status: p.status as any,
-            progress: 0,
+            status: p.status as any || 'planning',
+            progress: p.progress || 0,
             start_date: p.start_date || '',
             end_date: p.end_date || '',
             budget: p.budget || 0,
-            isPrivate: false,
-            category: 'Geral',
-            priority: 'medium',
+            isPrivate: !!p.is_private,
+            category: p.category || 'Geral',
+            priority: p.priority as any || 'medium',
             invitees: Array.isArray(p.invitees) ? p.invitees : [],
-            columns: Array.isArray(p.columns) ? p.columns : [],
+            columns: Array.isArray(p.columns) && p.columns.length > 0 ? p.columns : defaultColumns,
+            module: (p.module as any) || 'admin',
+            created_by: p.created_by,
+            created_by_name: p.created_by_name,
+            notes: p.notes,
+            enablePortalUpdates: p.enable_portal_updates,
             tasks: pTasks.map(t => ({
               id: t.id,
               title: t.title,
               description: t.description || '',
-              status: t.status as any,
+              status: t.status as any || 'todo',
               cost: t.cost || 0,
               subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
               invitees: Array.isArray(t.invitees) ? t.invitees : [],
-              priority: t.priority as any,
+              priority: t.priority as any || 'medium',
               values: t.values || {}
             }))
           };
         });
-        setProjects(formattedProjects);
+
+        // Merge with local projects that might not yet be synced to Supabase
+        setRawProjects(prev => {
+          const remoteIds = new Set(formattedProjects.map(p => p.id));
+          const localOnly = prev.filter(p => !remoteIds.has(p.id));
+          const merged = [...formattedProjects, ...localOnly];
+          saveProjectsToStorage(merged);
+          return merged;
+        });
+      } else {
+        // Supabase table may not exist or error returned; preserve local cache
+        if (projErr) {
+          console.warn('Supabase projects table query returned error (using local storage cache):', projErr.message);
+        }
       }
       setIsLoaded(true);
     } catch (e) {
-      console.error('Error fetching projects', e);
+      console.warn('Error fetching projects from Supabase, keeping cached projects:', e);
+      setIsLoaded(true);
     }
   };
 
   const addProject = async (project: Project) => {
-    const tempId = project.id || Math.random().toString();
-    setProjects(prev => [...prev, { ...project, id: tempId }]);
+    const finalId = project.id || `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newProject: Project = {
+      ...project,
+      id: finalId,
+      created_by: project.created_by || user?.id || user?.email || 'admin',
+      created_by_name: project.created_by_name || user?.name || user?.email || 'Administrador',
+      module: project.module || 'admin',
+      columns: project.columns && project.columns.length > 0 ? project.columns : defaultColumns,
+      tasks: project.tasks || []
+    };
 
-    const { data } = await supabase.from('projects').insert({
-      name: project.name,
-      description: project.description,
-      status: project.status,
-      start_date: project.start_date || null,
-      end_date: project.end_date || null,
-      budget: project.budget
-    }).select().single();
+    setRawProjects(prev => {
+      const updated = [newProject, ...prev];
+      saveProjectsToStorage(updated);
+      return updated;
+    });
 
-    if (data) {
-      setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p));
-      
-      // Integração com Finanças: se tiver orçamento, cria um lançamento de despesa pendente
-      if (project.budget && project.budget > 0) {
+    // Try Supabase insert
+    try {
+      const { data, error } = await supabase.from('projects').insert({
+        id: newProject.id,
+        name: newProject.name,
+        description: newProject.description,
+        status: newProject.status,
+        progress: newProject.progress || 0,
+        start_date: newProject.start_date || null,
+        end_date: newProject.end_date || null,
+        budget: newProject.budget || 0,
+        is_private: newProject.isPrivate || false,
+        category: newProject.category || 'Geral',
+        priority: newProject.priority || 'medium',
+        invitees: newProject.invitees || [],
+        columns: newProject.columns,
+        module: newProject.module,
+        created_by: newProject.created_by,
+        created_by_name: newProject.created_by_name,
+        notes: newProject.notes || '',
+        enable_portal_updates: newProject.enablePortalUpdates || false
+      }).select().single();
+
+      if (!error && data) {
+        // Persist initial tasks if any
+        if (newProject.tasks && newProject.tasks.length > 0) {
+          for (const t of newProject.tasks) {
+            await supabase.from('project_tasks').insert({
+              id: t.id,
+              project_id: data.id,
+              title: t.title,
+              description: t.description || '',
+              status: t.status,
+              priority: t.priority,
+              cost: t.cost || 0,
+              subtasks: t.subtasks || [],
+              invitees: t.invitees || [],
+              values: t.values || {}
+            });
+          }
+        }
+      }
+
+      // Finance integration if budget > 0
+      if (newProject.budget && newProject.budget > 0) {
         await supabase.from('finance_transactions').insert({
-          description: `Orçamento: ${project.name}`,
-          amount: project.budget,
+          description: `Orçamento: ${newProject.name}`,
+          amount: newProject.budget,
           type: 'expense',
-          date: project.start_date || new Date().toISOString(),
+          date: newProject.start_date || new Date().toISOString(),
           status: 'pending',
           account: 'Banco YAH Hope',
           expense_type: 'variable'
         });
       }
+    } catch (e) {
+      console.warn('Could not insert project into Supabase, safely kept in localStorage:', e);
     }
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-    if (id.length > 10) {
+    setRawProjects(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, ...updates } : p);
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
       await supabase.from('projects').update({
         name: updates.name,
         description: updates.description,
         status: updates.status,
+        progress: updates.progress,
         start_date: updates.start_date || null,
         end_date: updates.end_date || null,
         budget: updates.budget,
+        is_private: updates.isPrivate,
+        category: updates.category,
+        priority: updates.priority,
         invitees: updates.invitees,
-        columns: updates.columns
+        columns: updates.columns,
+        module: updates.module,
+        notes: updates.notes,
+        enable_portal_updates: updates.enablePortalUpdates
       }).eq('id', id);
+    } catch (e) {
+      console.warn('Could not update project in Supabase:', e);
     }
   };
 
   const deleteProject = async (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
-    if (id.length > 10) {
+    setRawProjects(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
       await supabase.from('projects').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Could not delete project in Supabase:', e);
     }
   };
 
   const addActivity = (activity: PersonalActivity) => {
-    setActivities(prev => [activity, ...prev]);
+    setActivities(prev => {
+      const updated = [activity, ...prev];
+      saveActivitiesToStorage(updated);
+      return updated;
+    });
   };
 
   const deleteActivity = (id: string) => {
-    setActivities(prev => prev.filter(a => a.id !== id));
+    setActivities(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      saveActivitiesToStorage(updated);
+      return updated;
+    });
   };
 
   const addColumn = async (projectId: string, column: ColumnDefinition) => {
     let updatedColumns: ColumnDefinition[] = [];
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        updatedColumns = [...(p.columns || []), column];
-        return { ...p, columns: updatedColumns };
-      }
-      return p;
-    }));
-    if (projectId.length > 10) {
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId) {
+          updatedColumns = [...(p.columns || []), column];
+          return { ...p, columns: updatedColumns };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
       await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    } catch (e) {
+      console.warn('Could not update columns in Supabase:', e);
     }
   };
 
   const updateColumn = async (projectId: string, columnId: string, updates: Partial<ColumnDefinition>) => {
     let updatedColumns: ColumnDefinition[] = [];
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId && p.columns) {
-        updatedColumns = p.columns.map(c => c.id === columnId ? { ...c, ...updates } : c);
-        return { ...p, columns: updatedColumns };
-      }
-      return p;
-    }));
-    if (projectId.length > 10 && updatedColumns.length > 0) {
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId && p.columns) {
+          updatedColumns = p.columns.map(c => c.id === columnId ? { ...c, ...updates } : c);
+          return { ...p, columns: updatedColumns };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
       await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    } catch (e) {
+      console.warn('Could not update columns in Supabase:', e);
     }
   };
 
   const deleteColumn = async (projectId: string, columnId: string) => {
     let updatedColumns: ColumnDefinition[] = [];
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId && p.columns) {
-        updatedColumns = p.columns.filter(c => c.id !== columnId);
-        return {
-          ...p,
-          columns: updatedColumns,
-          tasks: p.tasks.map(t => {
-            const newValues = { ...t.values };
-            delete newValues[columnId];
-            return { ...t, values: newValues };
-          })
-        };
-      }
-      return p;
-    }));
-    if (projectId.length > 10) {
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId && p.columns) {
+          updatedColumns = p.columns.filter(c => c.id !== columnId);
+          return {
+            ...p,
+            columns: updatedColumns,
+            tasks: p.tasks.map(t => {
+              const newValues = { ...t.values };
+              delete newValues[columnId];
+              return { ...t, values: newValues };
+            })
+          };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
       await supabase.from('projects').update({ columns: updatedColumns }).eq('id', projectId);
+    } catch (e) {
+      console.warn('Could not delete column in Supabase:', e);
     }
   };
 
   const addTask = async (projectId: string, task: ProjectTask) => {
-    const tempId = task.id || Math.random().toString();
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return { ...p, tasks: [...(p.tasks || []), { ...task, id: tempId }] };
-      }
-      return p;
-    }));
+    const finalTaskId = task.id || `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const fullTask: ProjectTask = { ...task, id: finalTaskId };
 
-    if (projectId.length > 10) {
-      const { data } = await supabase.from('project_tasks').insert({
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId) {
+          return { ...p, tasks: [...(p.tasks || []), fullTask] };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    try {
+      await supabase.from('project_tasks').insert({
+        id: fullTask.id,
         project_id: projectId,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        cost: task.cost,
-        subtasks: task.subtasks || [],
-        invitees: task.invitees || [],
-        values: task.values || {}
-      }).select().single();
-
-      if (data) {
-        setProjects(prev => prev.map(p => {
-          if (p.id === projectId) {
-            return { ...p, tasks: p.tasks.map(t => t.id === tempId ? { ...t, id: data.id } : t) };
-          }
-          return p;
-        }));
-      }
+        title: fullTask.title,
+        description: fullTask.description || '',
+        status: fullTask.status,
+        priority: fullTask.priority,
+        cost: fullTask.cost || 0,
+        subtasks: fullTask.subtasks || [],
+        invitees: fullTask.invitees || [],
+        values: fullTask.values || {}
+      });
+    } catch (e) {
+      console.warn('Could not insert task in Supabase:', e);
     }
   };
 
   const updateTask = async (projectId: string, taskId: string, updates: Partial<ProjectTask>) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          tasks: p.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
-        };
-      }
-      return p;
-    }));
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            tasks: p.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
+          };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
 
-    if (taskId.length > 10) {
+    try {
       await supabase.from('project_tasks').update({
         title: updates.title,
         description: updates.description,
@@ -263,56 +466,89 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         invitees: updates.invitees,
         values: updates.values
       }).eq('id', taskId);
+    } catch (e) {
+      console.warn('Could not update task in Supabase:', e);
     }
   };
 
   const updateTaskValue = async (projectId: string, taskId: string, columnId: string, value: any) => {
     let updatedValues = {};
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          tasks: p.tasks.map(t => {
-            if (t.id === taskId) {
-              if (columnId === 'title') {
-                return { ...t, title: value };
-              } else {
-                updatedValues = { ...t.values, [columnId]: value };
-                return { ...t, values: updatedValues };
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            tasks: p.tasks.map(t => {
+              if (t.id === taskId) {
+                if (columnId === 'title') {
+                  return { ...t, title: value };
+                } else {
+                  updatedValues = { ...t.values, [columnId]: value };
+                  return { ...t, values: updatedValues };
+                }
               }
-            }
-            return t;
-          })
-        };
-      }
-      return p;
-    }));
+              return t;
+            })
+          };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
     
-    if (taskId.length > 10) {
-      await supabase.from('project_tasks').update({ values: updatedValues }).eq('id', taskId);
+    try {
+      if (columnId === 'title') {
+        await supabase.from('project_tasks').update({ title: value }).eq('id', taskId);
+      } else {
+        await supabase.from('project_tasks').update({ values: updatedValues }).eq('id', taskId);
+      }
+    } catch (e) {
+      console.warn('Could not update task value in Supabase:', e);
     }
   };
 
   const deleteTask = async (projectId: string, taskId: string) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          tasks: p.tasks.filter(t => t.id !== taskId)
-        };
-      }
-      return p;
-    }));
+    setRawProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            tasks: p.tasks.filter(t => t.id !== taskId)
+          };
+        }
+        return p;
+      });
+      saveProjectsToStorage(updated);
+      return updated;
+    });
     
-    if (taskId.length > 10) {
+    try {
       await supabase.from('project_tasks').delete().eq('id', taskId);
+    } catch (e) {
+      console.warn('Could not delete task in Supabase:', e);
     }
   };
 
+  const canAccessProject = (project: Project): boolean => {
+    return canUserAccessProject(project, user);
+  };
+
+  // Expose projects filtered by access rules (Super Admin sees all, creators see theirs)
+  const accessibleProjects = useMemo(() => {
+    if (!user) return [];
+    if (isSuperAdminUser(user)) {
+      return rawProjects;
+    }
+    return rawProjects.filter(p => canUserAccessProject(p, user));
+  }, [rawProjects, user]);
+
   return (
     <ProjectContext.Provider value={{ 
-      projects, 
+      projects: accessibleProjects, 
+      rawProjects,
       activities,
+      isLoaded,
       addProject, 
       updateProject, 
       deleteProject,
@@ -324,7 +560,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       addTask, 
       updateTask, 
       updateTaskValue,
-      deleteTask 
+      deleteTask,
+      canAccessProject
     }}>
       {children}
     </ProjectContext.Provider>

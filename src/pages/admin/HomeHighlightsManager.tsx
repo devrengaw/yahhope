@@ -263,14 +263,14 @@ export function HomeHighlightsManager() {
           <span>Carrossel de Destaques</span>
         </div>
         <Link
-          to="/admin/impact-metrics"
+          to="/communication/impact-metrics"
           className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors flex items-center gap-1.5"
         >
           <BarChart3 size={14} />
           <span>Cards de Impacto & Resultados</span>
         </Link>
         <Link
-          to="/admin/top-banner"
+          to="/communication/top-banner"
           className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors flex items-center gap-1.5"
         >
           <Megaphone size={14} />
@@ -1072,17 +1072,26 @@ export function HomeHighlightsManager() {
             <div className="p-6 sm:p-8 space-y-4">
               {previewStoryItem.snippet && (
                 <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-100 text-slate-700 text-sm font-medium leading-relaxed italic">
-                  "{previewStoryItem.snippet}"
+                  "{previewStoryItem.snippet.replace(/<[^>]*>/g, '').trim()}"
                 </div>
               )}
 
-              <div className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-3 font-normal whitespace-pre-line">
-                {previewStoryItem.content || (
-                  <p className="text-slate-400 italic">
-                    Nenhum conteúdo detalhado cadastrado ainda para este destaque.
-                  </p>
-                )}
-              </div>
+              {previewStoryItem.content ? (
+                /<[a-z][\s\S]*>/i.test(previewStoryItem.content) ? (
+                  <div 
+                    className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-3 font-normal [&>p]:leading-relaxed [&>p]:mb-2 [&>h3]:text-base [&>h3]:font-bold [&>h3]:mt-3 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-1 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:space-y-1 [&>a]:text-[#F49853]"
+                    dangerouslySetInnerHTML={{ __html: previewStoryItem.content }}
+                  />
+                ) : (
+                  <div className="text-slate-700 text-sm sm:text-base leading-relaxed space-y-3 font-normal whitespace-pre-line">
+                    {previewStoryItem.content}
+                  </div>
+                )
+              ) : (
+                <p className="text-slate-400 italic">
+                  Nenhum conteúdo detalhado cadastrado ainda para este destaque.
+                </p>
+              )}
 
               {/* Destination info */}
               <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">

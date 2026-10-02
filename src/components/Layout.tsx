@@ -30,9 +30,6 @@ const workspaceNavItems = [
 
 const adminNavItems = [
   { name: 'Dashboard de Acessos', path: '/admin/analytics', icon: BarChart3 },
-  { name: 'Aviso do Topo', path: '/admin/top-banner', icon: Megaphone },
-  { name: 'Destaques Home', path: '/admin/home-highlights', icon: Sparkles },
-  { name: 'Cards de Impacto', path: '/admin/impact-metrics', icon: BarChart3 },
   { name: 'Feed de Impacto', path: '/admin/impact-feed', icon: TrendingUp },
   { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
   { name: 'Captação', path: '/admin/fundraising', icon: Target },
@@ -47,6 +44,9 @@ const adminNavItems = [
 
 const communicationNavItems = [
   { name: 'Dashboard', path: '/communication', icon: LayoutDashboard },
+  { name: 'Aviso do Topo', path: '/communication/top-banner', icon: Megaphone },
+  { name: 'Destaques Home', path: '/communication/home-highlights', icon: Sparkles },
+  { name: 'Cards de Impacto', path: '/communication/impact-metrics', icon: BarChart3 },
   { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
   { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
   { name: 'Blog', path: '/communication/blog', icon: Newspaper },
@@ -113,7 +113,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     Boolean(user?.permissions && user.permissions.some(p => nutritionPermissions.includes(p)));
 
   // Comunicação: Admin ou quem possui permissões de comunicação
-  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication'];
+  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication', 'top-banner', 'home-highlights', 'impact-metrics'];
   const hasCommunication = 
     isAdmin || 
     Boolean(user?.permissions && user.permissions.some(p => communicationPermissions.includes(p)));
@@ -284,7 +284,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         return [
           { name: 'Acessos', path: '/admin/analytics', icon: BarChart3 },
           { name: 'Captação', path: '/admin/fundraising', icon: Target },
-          { name: 'Destaques', path: '/admin/home-highlights', icon: Sparkles },
+          { name: 'Financeiro', path: '/admin/finance', icon: DollarSign },
           { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
         ];
     }

@@ -38,6 +38,8 @@ export function CommProjects() {
     fetchUsers();
   }, []);
 
+  const [moduleFilter, setModuleFilter] = useState<'all' | 'communication' | 'admin'>('all');
+
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   const handleCreateProject = (e: React.FormEvent) => {
@@ -45,7 +47,7 @@ export function CommProjects() {
     const name = (e.currentTarget as any).projectName.value;
     const desc = (e.currentTarget as any).projectDesc.value;
     const project: Project = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: `proj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       name,
       description: desc,
       status: 'planning',
@@ -57,6 +59,9 @@ export function CommProjects() {
       category: 'Comunicação',
       priority: 'medium',
       invitees: user ? [user.id] : [],
+      created_by: user?.id || user?.email || 'admin',
+      created_by_name: user?.name || user?.email || 'Administrador',
+      module: 'communication',
       columns: [
         { id: 'c1', name: 'Status', type: 'status', options: ['Todo', 'Working on it', 'Stuck', 'Done'] },
         { id: 'c2', name: 'Owner', type: 'people' },
@@ -168,69 +173,160 @@ export function CommProjects() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {projects.map((project) => (
-          <div 
-            key={project.id}
-            onClick={() => setSelectedProjectId(project.id)}
-            className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all cursor-pointer group relative overflow-hidden flex flex-col h-full border-b-8 border-b-transparent hover:border-b-indigo-600"
-          >
-            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-1000 opacity-50" />
-            
-            <div className="relative z-10 flex flex-col h-full">
-              <div className="flex justify-between items-start mb-8">
-                <div className="w-16 h-16 bg-white shadow-xl shadow-indigo-500/10 text-indigo-600 rounded-3xl flex items-center justify-center font-black text-2xl border border-indigo-50 group-hover:scale-110 transition-transform">
-                  {project.name.charAt(0)}
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className={cn(
-                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                    project.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                    project.status === 'planning' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'
-                  )}>
-                    {project.status === 'active' ? 'Em Curso' : project.status === 'planning' ? 'Planejamento' : 'Pausado'}
-                  </span>
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-black text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors leading-tight">{project.name}</h3>
-              <p className="text-sm text-slate-400 font-medium line-clamp-3 mb-8 leading-relaxed">
-                {project.description}
-              </p>
-
-              <div className="mt-auto space-y-6 pt-8 border-t border-slate-50">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                  <span className="text-slate-400">Progresso do Workflow</span>
-                  <span className="text-indigo-600">{project.progress}%</span>
-                </div>
-                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                  <div 
-                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-lg shadow-indigo-200"
-                    style={{ width: `${project.progress}%` }}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">
-                          {String.fromCharCode(64 + i)}
-                        </div>
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Equipe</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
-                    <Layers size={14} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{project.tasks.length} Entregáveis</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Module Filters */}
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+        <button
+          onClick={() => setModuleFilter('all')}
+          className={cn(
+            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all",
+            moduleFilter === 'all' 
+              ? "bg-indigo-600 text-white shadow-sm" 
+              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          )}
+        >
+          Todos ({projects.length})
+        </button>
+        <button
+          onClick={() => setModuleFilter('communication')}
+          className={cn(
+            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all",
+            moduleFilter === 'communication' 
+              ? "bg-purple-600 text-white shadow-sm" 
+              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          )}
+        >
+          Comunicação ({projects.filter(p => p.module === 'communication' || p.category === 'Comunicação').length})
+        </button>
+        <button
+          onClick={() => setModuleFilter('admin')}
+          className={cn(
+            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all",
+            moduleFilter === 'admin' 
+              ? "bg-blue-600 text-white shadow-sm" 
+              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          )}
+        >
+          Administrativo ({projects.filter(p => p.module === 'admin' && p.category !== 'Comunicação').length})
+        </button>
       </div>
+
+      {projects.filter(p => {
+        if (moduleFilter === 'communication') return p.module === 'communication' || p.category === 'Comunicação';
+        if (moduleFilter === 'admin') return p.module === 'admin' && p.category !== 'Comunicação';
+        return true;
+      }).length === 0 ? (
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-12 text-center max-w-lg mx-auto shadow-sm space-y-4">
+          <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Briefcase size={32} />
+          </div>
+          <h3 className="text-xl font-black text-slate-800">Nenhum projeto encontrado</h3>
+          <p className="text-sm text-slate-500 font-medium">
+            Você ainda não possui projetos nesta categoria. Clique no botão "Novo Projeto" acima para criar um fluxo de trabalho.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {projects
+            .filter(p => {
+              if (moduleFilter === 'communication') return p.module === 'communication' || p.category === 'Comunicação';
+              if (moduleFilter === 'admin') return p.module === 'admin' && p.category !== 'Comunicação';
+              return true;
+            })
+            .map((project) => {
+              const isSuperAdmin = user?.role === 'ADMIN' || user?.role === 'MASTER' || user?.email?.toLowerCase() === 'contato@yahhope.com';
+              const isCreator = project.created_by === user?.id || project.created_by?.toLowerCase() === user?.email?.toLowerCase();
+              const canDelete = isSuperAdmin || isCreator;
+
+              return (
+                <div 
+                  key={project.id}
+                  onClick={() => setSelectedProjectId(project.id)}
+                  className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all cursor-pointer group relative overflow-hidden flex flex-col h-full border-b-8 border-b-transparent hover:border-b-indigo-600"
+                >
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full -mr-20 -mt-20 group-hover:scale-150 transition-transform duration-1000 opacity-50" />
+                  
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="w-16 h-16 bg-white shadow-xl shadow-indigo-500/10 text-indigo-600 rounded-3xl flex items-center justify-center font-black text-2xl border border-indigo-50 group-hover:scale-110 transition-transform">
+                        {project.name.charAt(0)}
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                            project.module === 'communication' || project.category === 'Comunicação' 
+                              ? "bg-purple-50 text-purple-600 border-purple-100" 
+                              : "bg-blue-50 text-blue-600 border-blue-100"
+                          )}>
+                            {project.module === 'communication' || project.category === 'Comunicação' ? 'Comunicação' : 'Admin'}
+                          </span>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                            project.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                            project.status === 'planning' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'
+                          )}>
+                            {project.status === 'active' ? 'Em Curso' : project.status === 'planning' ? 'Planejamento' : 'Pausado'}
+                          </span>
+                        </div>
+                        {canDelete && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Deseja realmente excluir o projeto "${project.name}"?`)) {
+                                deleteProject(project.id);
+                              }
+                            }}
+                            className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Excluir Projeto"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <h3 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors leading-tight">{project.name}</h3>
+                    
+                    {project.created_by_name && (
+                      <p className="text-[11px] font-bold text-slate-400 mb-3">
+                        Criado por: <span className="text-slate-600">{project.created_by_name}</span>
+                      </p>
+                    )}
+
+                    <p className="text-sm text-slate-400 font-medium line-clamp-3 mb-8 leading-relaxed">
+                      {project.description || 'Sem descrição cadastrada.'}
+                    </p>
+
+                    <div className="mt-auto space-y-6 pt-8 border-t border-slate-50">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                        <span className="text-slate-400">Progresso do Workflow</span>
+                        <span className="text-indigo-600">{project.progress}%</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                        <div 
+                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-lg shadow-indigo-200"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold text-slate-400">
+                            Início: {project.start_date || 'A definir'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                          <Layers size={14} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">{(project.tasks || []).length} Entregáveis</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       {/* New Project Modal */}
       {showNewProjectModal && (

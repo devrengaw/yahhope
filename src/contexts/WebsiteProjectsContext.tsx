@@ -22,7 +22,20 @@ export function WebsiteProjectsProvider({ children }: { children: React.ReactNod
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((p: any) => {
+            const def = mockYAHHopeProjects.find(m => m.id === p.id);
+            return {
+              ...def,
+              ...p,
+              full_description: p.full_description || def?.full_description || '',
+              location: p.location || def?.location || '',
+              coordinator: p.coordinator || def?.coordinator || '',
+              beneficiaries_target: p.beneficiaries_target || def?.beneficiaries_target || '',
+              beneficiaries_reached: p.beneficiaries_reached || def?.beneficiaries_reached || '',
+              gallery_images: p.gallery_images || def?.gallery_images || [],
+              admin_notes: p.admin_notes || def?.admin_notes || '',
+            };
+          });
         }
       }
     } catch (e) {
@@ -58,11 +71,19 @@ export function WebsiteProjectsProvider({ children }: { children: React.ReactNod
             id: p.id,
             title: p.title,
             description: p.description || '',
+            full_description: p.full_description || '',
             category: p.category || 'Geral',
             tag_color: p.tag_color || '#F49853',
             link: p.link || '/projetos',
             status: p.status || 'active',
             image_url: p.image_url || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
+            location: p.location || '',
+            coordinator: p.coordinator || '',
+            beneficiaries_target: p.beneficiaries_target || '',
+            beneficiaries_reached: p.beneficiaries_reached || '',
+            gallery_images: Array.isArray(p.gallery_images) ? p.gallery_images : [],
+            admin_notes: p.admin_notes || '',
+            start_date: p.start_date || '',
             created_at: p.created_at || new Date().toISOString(),
             order: p.order || 0
           })));

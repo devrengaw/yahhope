@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Globe, CheckCircle, Clock, Heart, RotateCcw, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Globe, CheckCircle, Clock, Heart, RotateCcw, ExternalLink, CheckCircle2, BookOpen, MapPin, Lock, Image as ImageIcon } from 'lucide-react';
 import { YAHHopeProject } from '../../lib/mockData';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { LocalProjectModal } from './LocalProjectModal';
@@ -149,7 +149,35 @@ export function LocalProjectsSettings() {
             <div className="p-6 flex flex-col flex-grow justify-between">
               <div>
                 <h3 className="font-bold text-base text-slate-900 mb-2 leading-snug line-clamp-2">{project.title}</h3>
-                <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed font-light">{project.description}</p>
+                <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed font-light mb-3">{project.description}</p>
+
+                {/* Badges de recursos cadastrados */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {project.location && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium" title={`Polo: ${project.location}`}>
+                      <MapPin size={11} className="text-amber-500" />
+                      <span className="truncate max-w-[120px]">{project.location}</span>
+                    </span>
+                  )}
+                  {project.full_description && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-100" title="Possui história rica detalhada">
+                      <BookOpen size={11} />
+                      História Completa
+                    </span>
+                  )}
+                  {project.gallery_images && project.gallery_images.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-100" title={`${project.gallery_images.length} fotos na galeria`}>
+                      <ImageIcon size={11} />
+                      {project.gallery_images.length} fotos
+                    </span>
+                  )}
+                  {project.admin_notes && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-semibold border border-amber-200" title="Possui anotações internas confidenciais">
+                      <Lock size={10} className="text-amber-600" />
+                      Nota Interna
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100">
@@ -159,14 +187,14 @@ export function LocalProjectsSettings() {
                 <div className="flex items-center gap-1">
                   <button 
                     onClick={() => handleEdit(project)}
-                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
                     title="Editar projeto"
                   >
                     <Edit2 size={16} />
                   </button>
                   <button 
                     onClick={() => handleDelete(project.id, project.title)}
-                    className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                    className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                     title="Excluir projeto"
                   >
                     <Trash2 size={16} />
