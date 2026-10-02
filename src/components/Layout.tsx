@@ -573,9 +573,6 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               </div>
             ) : (
               <div>
-                <p className={cn("px-2 mb-2 text-[10px] font-black uppercase tracking-wider", theme.roleText)}>
-                  Itens do Módulo ({navItems.length})
-                </p>
                 <ul className="space-y-1">
                   {navItems.map((item) => {
                     const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
