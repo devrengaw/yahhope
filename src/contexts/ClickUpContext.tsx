@@ -155,15 +155,6 @@ interface ClickUpContextType {
 
 const ClickUpContext = createContext<ClickUpContextType | undefined>(undefined);
 
-// Initial Rich Mock Data
-const MOCK_SYSTEM_USERS: SystemUser[] = [
-  { id: 'u1', name: 'Lucas Wagner', email: 'lucas@yahhope.org', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', role: 'ADMIN', department: 'Diretoria' },
-  { id: 'u2', name: 'Ana Beatriz', email: 'anabeatriz@yahhope.org', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', role: 'STAFF', department: 'Comunicação' },
-  { id: 'u3', name: 'Dr. Carlos Eduardo', email: 'carlos@yahhope.org', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', role: 'DOCTOR', department: 'Saúde' },
-  { id: 'u4', name: 'Juliana Costa', email: 'juliana@yahhope.org', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', role: 'COORDINATOR', department: 'Nutrição' },
-  { id: 'u5', name: 'Marcos Silva', email: 'marcos@yahhope.org', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', role: 'VOLUNTEER', department: 'Captação' }
-];
-
 const MOCK_SPACES: CU_Space[] = [
   { id: 's-nutricao', name: 'Nutrição Infantil', color: '#10b981', icon: 'Heart', module: 'nutricao' },
   { id: 's-comunicacao', name: 'Comunicação & Redes', color: '#8b5cf6', icon: 'MessageSquare', module: 'comunicacao' },
@@ -208,9 +199,6 @@ const MOCK_TASKS: CU_Task[] = [
     description: 'Medição de peso, altura e circunferência braquial de 15 novas crianças cadastradas na comunidade de Dondo.',
     status_id: 'st-n-2',
     priority: 'urgent',
-    assignee: 'u4',
-    assignee_id: 'u4',
-    assignee_user: MOCK_SYSTEM_USERS[3],
     team_id: 't-saude',
     team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
     due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
@@ -221,24 +209,7 @@ const MOCK_TASKS: CU_Task[] = [
       { id: 'ck-3', text: 'Conferir suplementos vitamínicos em estoque', done: false },
       { id: 'ck-4', text: 'Registrar histórico no app móvel', done: false }
     ],
-    comments: [
-      {
-        id: 'cm-1',
-        user_id: 'u1',
-        user_name: 'Lucas Wagner',
-        user_avatar: MOCK_SYSTEM_USERS[0].avatar,
-        text: 'A equipe de ACS já está em campo avisando as famílias para o atendimento de amanhã.',
-        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
-      },
-      {
-        id: 'cm-2',
-        user_id: 'u4',
-        user_name: 'Juliana Costa',
-        user_avatar: MOCK_SYSTEM_USERS[3].avatar,
-        text: 'Excelente! Os kits de sachês nutricionais já foram separados pelo estoque.',
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString()
-      }
-    ],
+    comments: [],
     order_index: 0
   },
   {
@@ -248,9 +219,6 @@ const MOCK_TASKS: CU_Task[] = [
     description: 'Entregar pacotes de tratamento para crianças em desnutrição moderada (DAM) e orientar as mães sobre a dosagem diária.',
     status_id: 'st-n-1',
     priority: 'high',
-    assignee: 'u3',
-    assignee_id: 'u3',
-    assignee_user: MOCK_SYSTEM_USERS[2],
     team_id: 't-saude',
     team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
     due_date: new Date(Date.now() + 86400000 * 4).toISOString(),
@@ -269,9 +237,6 @@ const MOCK_TASKS: CU_Task[] = [
     description: 'Criança completou o ciclo de 90 dias com recuperação total de peso e índice eutrófico.',
     status_id: 'st-n-4',
     priority: 'normal',
-    assignee: 'u4',
-    assignee_id: 'u4',
-    assignee_user: MOCK_SYSTEM_USERS[3],
     team_id: 't-saude',
     team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
     due_date: new Date(Date.now() - 86400000).toISOString(),
@@ -291,9 +256,6 @@ const MOCK_TASKS: CU_Task[] = [
     description: 'Post educativo de 6 lâminas mostrando desde a triagem das crianças até a distribuição dos alimentos e alta médica.',
     status_id: 'st-c-2',
     priority: 'high',
-    assignee: 'u2',
-    assignee_id: 'u2',
-    assignee_user: MOCK_SYSTEM_USERS[1],
     team_id: 't-marketing',
     team: { id: 't-marketing', name: 'Marketing & Mídia', color: '#8b5cf6' },
     due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
@@ -304,16 +266,7 @@ const MOCK_TASKS: CU_Task[] = [
       { id: 'ck-43', text: 'Revisão ortográfica e legendas', done: false },
       { id: 'ck-44', text: 'Agendamento no estúdio de criação', done: false }
     ],
-    comments: [
-      {
-        id: 'cm-41',
-        user_id: 'u2',
-        user_name: 'Ana Beatriz',
-        user_avatar: MOCK_SYSTEM_USERS[1].avatar,
-        text: 'Layouts prontos na pasta de assets! Aguardando validação final.',
-        created_at: new Date(Date.now() - 3600000).toISOString()
-      }
-    ],
+    comments: [],
     order_index: 0
   },
   {
@@ -323,9 +276,6 @@ const MOCK_TASKS: CU_Task[] = [
     description: 'Implementar movimentação de cards estilo Trello e ClickUp entre as colunas de status.',
     status_id: 'st-d-3',
     priority: 'urgent',
-    assignee: 'u1',
-    assignee_id: 'u1',
-    assignee_user: MOCK_SYSTEM_USERS[0],
     team_id: 't-dev',
     team: { id: 't-dev', name: 'Tecnologia & Produto', color: '#3b82f6' },
     due_date: new Date().toISOString(),
@@ -357,7 +307,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   const [fields, setFields] = useState<CU_CustomField[]>([]);
   const [tasks, setTasks] = useState<CU_Task[]>([]);
   const [channels, setChannels] = useState<CU_Channel[]>([]);
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>(MOCK_SYSTEM_USERS);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
@@ -407,18 +357,37 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         supabase.from('workspace_teams').select('id, name, color')
       ]);
 
-      // Process Users
-      let loadedUsers = MOCK_SYSTEM_USERS;
+      // Process Users from DB
+      let loadedUsers: SystemUser[] = [];
       if (resUsers.status === 'fulfilled' && resUsers.value.data && resUsers.value.data.length > 0) {
-        loadedUsers = resUsers.value.data.map(u => ({
+        loadedUsers = resUsers.value.data.map((u: any) => ({
           id: u.id,
-          name: u.name || 'Sem Nome',
+          name: u.name || (u.email ? u.email.split('@')[0] : 'Usuário'),
           email: u.email || '',
-          avatar: u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`,
+          avatar: u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=random`,
           role: u.role,
           department: u.department
         }));
+      } else if (user) {
+        loadedUsers = [{
+          id: user.id,
+          name: user.name || (user.email ? user.email.split('@')[0] : 'Você'),
+          email: user.email || '',
+          avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`,
+          role: user.role
+        }];
       }
+
+      if (user && !loadedUsers.some(u => u.id === user.id || (user.email && u.email === user.email))) {
+        loadedUsers.push({
+          id: user.id,
+          name: user.name || (user.email ? user.email.split('@')[0] : 'Você'),
+          email: user.email || '',
+          avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`,
+          role: user.role
+        });
+      }
+
       setSystemUsers(loadedUsers);
 
       // Process Teams mapping

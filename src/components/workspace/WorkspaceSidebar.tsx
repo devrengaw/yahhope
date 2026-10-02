@@ -147,26 +147,34 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
         <div className="p-3 border-b border-white/20">
           <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest px-2 mb-2">Mensagens Diretas</h3>
           <div className="space-y-0.5">
-            {systemUsers.filter(u => u.id !== user?.id).slice(0, 4).map(member => (
-              <NavLink
-                key={member.id}
-                to={`/workspace/dm/${member.id}`}
-                className={({ isActive }) => cn(
-                  "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-all duration-300 group",
-                  isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
-                )}
-              >
-                <div className="relative shrink-0">
-                  <img 
-                    src={member.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'} 
-                    alt={member.name}
-                    className="w-5 h-5 rounded-full object-cover" 
-                  />
-                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full ring-1 ring-white" />
-                </div>
-                <span className="text-xs truncate">{member.name}</span>
-              </NavLink>
-            ))}
+            {systemUsers
+              .filter(u => u.id !== user?.id && (!user?.email || u.email !== user?.email))
+              .map(member => (
+                <NavLink
+                  key={member.id}
+                  to={`/workspace/dm/${member.id}`}
+                  className={({ isActive }) => cn(
+                    "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-all duration-300 group",
+                    isActive ? "bg-black/10 font-bold" : "text-white hover:bg-white/10 font-medium"
+                  )}
+                >
+                  <div className="relative shrink-0">
+                    <img 
+                      src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=random`} 
+                      alt={member.name}
+                      className="w-5 h-5 rounded-full object-cover" 
+                    />
+                    <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full ring-1 ring-white" />
+                  </div>
+                  <span className="text-xs truncate">{member.name}</span>
+                </NavLink>
+              ))}
+
+            {systemUsers.filter(u => u.id !== user?.id && (!user?.email || u.email !== user?.email)).length === 0 && (
+              <div className="px-2 text-xs italic text-white/60">
+                Nenhum outro usuário cadastrado
+              </div>
+            )}
           </div>
         </div>
 
