@@ -93,25 +93,35 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   }, []);
 
   const isAdmin = user?.role === 'ADMIN';
-  const hasWorkspace = user?.role !== 'OBSERVER';
 
-  const hasNutrition = 
+  // Workspace: Admin e membros com perfil de equipe/projeto (exceto Apoiador e Observador)
+  const hasWorkspace = 
     isAdmin || 
-    ['USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER'].includes(user?.role || '') ||
-    Boolean(user?.permissions && user.permissions.some(p => ['patients', 'attendance', 'inventory', 'management', 'updates', 'visits', 'dashboard', 'nutrition'].includes(p)));
-
-  const hasCommunication = 
-    isAdmin || 
-    ['USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'COORDINATOR'].includes(user?.role || '') ||
-    Boolean(user?.permissions && user.permissions.some(p => ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication'].includes(p)));
-
-  const hasAdmin = 
-    isAdmin || 
-    (user?.role === 'USER' && (
+    (user?.role !== 'OBSERVER' && user?.role !== 'SPONSOR' && (
       !user?.permissions || 
       user.permissions.length === 0 || 
-      user.permissions.some(p => ['settings', 'impact-feed', 'messages', 'gifts', 'fundraising', 'store', 'local-projects', 'users', 'admin', 'finance', 'analytics', 'all'].includes(p))
+      user.permissions.some(p => ['workspace', 'projects', 'team', 'calendar', 'tasks', 'my-tasks', 'inicio', 'inbox', 'dashboard', 'all'].includes(p))
     ));
+
+  // Nutrição Infantil: Admin, Observador, funções clínicas ou permissões de nutrição
+  const nutritionPermissions = ['patients', 'attendance', 'waiting-list', 'inventory', 'visits', 'atendimento', 'nutrition', 'nutrition-finance', 'updates'];
+  const hasNutrition = 
+    isAdmin || 
+    user?.role === 'OBSERVER' ||
+    ['STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR'].includes(user?.role || '') ||
+    Boolean(user?.permissions && user.permissions.some(p => nutritionPermissions.includes(p)));
+
+  // Comunicação: Admin ou quem possui permissões de comunicação
+  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication'];
+  const hasCommunication = 
+    isAdmin || 
+    Boolean(user?.permissions && user.permissions.some(p => communicationPermissions.includes(p)));
+
+  // Administração: Admin ou usuário com permissões administrativas explícitas
+  const adminPermissions = ['settings', 'impact-feed', 'fundraising', 'store', 'local-projects', 'users', 'finance', 'analytics', 'top-banner', 'home-highlights', 'impact-metrics', 'gifts', 'admin'];
+  const hasAdmin = 
+    isAdmin || 
+    Boolean(user?.permissions && user.permissions.some(p => adminPermissions.includes(p)));
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
@@ -288,15 +298,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
       
-      {/* Primary Sidebar - Workspaces */}
+      {/* Primary Sidebar - Workspaces & Módulos no PC */}
       {module !== 'supporter' && user?.role !== 'OBSERVER' && (
         <div className="w-16 sm:w-[72px] bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
-          <Link 
-            to="/workspace" 
-            className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", (module as string) === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
-          >
-            <Home size={22} className={(module as string) === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
-          </Link>
+          {hasWorkspace && (
+            <Link 
+              to="/workspace" 
+              title="Meu Workspace"
+              className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", (module as string) === 'workspace' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
+            >
+              <Home size={22} className={(module as string) === 'workspace' ? '' : 'group-hover:scale-110 transition-transform'} />
+            </Link>
+          )}
           
           <div className="w-8 h-px bg-white/20 my-4 rounded-full" />
           
@@ -304,6 +317,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             {hasNutrition && (
               <Link 
                 to="/nutrition" 
+                title="Nutrição Infantil"
                 className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'nutrition' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <Activity size={22} className={module === 'nutrition' ? '' : 'group-hover:scale-110 transition-transform'} />
@@ -313,6 +327,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             {hasCommunication && (
               <Link 
                 to="/communication" 
+                title="Comunicação"
                 className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'communication' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <MessageSquare size={22} className={module === 'communication' ? '' : 'group-hover:scale-110 transition-transform'} />
@@ -322,6 +337,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             {hasAdmin && (
               <Link 
                 to="/admin" 
+                title="Administração"
                 className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'admin' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <Settings size={22} className={module === 'admin' ? '' : 'group-hover:scale-110 transition-transform'} />
@@ -413,9 +429,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
           </div>
 
-          {/* Seletor de Módulos (Mobile) com Nomes e Ícones Claros */}
+          {/* Seletor de Módulos (Apenas Mobile - no PC fica apenas na barra lateral cinza) */}
           {module !== 'supporter' && user?.role !== 'OBSERVER' && (
-            <div className={cn("p-3 border-b shrink-0", theme.borderTop)}>
+            <div className={cn("md:hidden p-3 border-b shrink-0", theme.borderTop)}>
               <div className="flex items-center justify-between mb-2 px-1">
                 <p className={cn("text-[10px] font-black uppercase tracking-wider", theme.roleText)}>
                   Módulos do Sistema
