@@ -72,6 +72,7 @@ function formatPtDate(dateStr: string | undefined): string {
 export function CommBlogAdmin() {
   const { 
     posts, 
+    loading,
     addPost, 
     updatePost, 
     deletePost, 
@@ -79,6 +80,7 @@ export function CommBlogAdmin() {
     restoreFromTrash, 
     bulkUpdateStatus, 
     toggleFeaturedHome, 
+    syncWithSupabase,
     resetBlogToDefaults 
   } = useBlog();
 
@@ -317,6 +319,19 @@ export function CommBlogAdmin() {
             <Sparkles size={14} />
             <span>Destaques da Home</span>
           </Link>
+
+          <button
+            onClick={async () => {
+              await syncWithSupabase();
+              showToast('Banco de dados sincronizado em tempo real!');
+            }}
+            disabled={loading}
+            className="px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Sincronizar posts e métricas do Supabase"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin text-blue-600" : ""} />
+            <span>{loading ? 'Sincronizando...' : 'Sincronizar'}</span>
+          </button>
 
           <button
             onClick={async () => {

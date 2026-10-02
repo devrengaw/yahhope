@@ -205,6 +205,7 @@ interface BlogContextType {
   incrementReads: (id: string) => Promise<void>;
   toggleLike: (id: string) => Promise<boolean>;
   incrementShares: (id: string) => Promise<void>;
+  syncWithSupabase: () => Promise<void>;
   resetBlogToDefaults: () => Promise<void>;
 }
 
@@ -232,7 +233,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
   const [loading, setLoading] = useState(false);
 
-  // Sync to localStorage
+  // Sync to localStorage as client cache
   useEffect(() => {
     try {
       localStorage.setItem(BLOG_STORAGE_KEY, JSON.stringify(posts));
@@ -241,68 +242,83 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     }
   }, [posts]);
 
-  // Sync with Supabase if table exists
-  useEffect(() => {
-    let isMounted = true;
-    async function loadFromSupabase() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('blog_posts')
-          .select('*')
-          .order('date', { ascending: false });
+  // Main loader: Connect directly to Supabase and subscribe to Realtime events
+  const loadFromSupabase = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .order('date', { ascending: false });
 
-        if (!error && data && data.length > 0 && isMounted) {
-          setPosts(data.map(p => ({
-            id: p.id,
-            title: p.title,
-            excerpt: p.excerpt || '',
-            content: p.content || '',
-            author: p.author || 'Admin',
-            date: p.date || new Date().toISOString().split('T')[0],
-            published_at: p.published_at,
-            status: p.status || 'published',
-            category: p.category || 'Geral',
-            image: p.image || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-            featured_home: p.featured_home === true,
-            highlight_type: p.highlight_type || 'split',
-            highlight_color: p.highlight_color || '#F49853',
-            views_count: p.views_count ?? 0,
-            reads_count: p.reads_count ?? 0,
-            likes_count: p.likes_count ?? 0,
-            shares_count: p.shares_count ?? 0,
-            comments_count: p.comments_count ?? 0,
-            translations: p.translations || ['pt'],
-            has_unpublished_changes: p.has_unpublished_changes === true,
-            deleted_at: p.deleted_at
-          })));
-        }
-      } catch {
-        // Fallback to local storage state
-      } finally {
-        if (isMounted) setLoading(false);
+      if (!error && data && data.length > 0) {
+        setPosts(data.map(p => ({
+          id: p.id,
+          title: p.title,
+          excerpt: p.excerpt || '',
+          content: p.content || '',
+          author: p.author || 'YAH Hope',
+          date: p.date || new Date().toISOString().split('T')[0],
+          published_at: p.published_at,
+          status: p.status || 'published',
+          category: p.category || 'Geral',
+          image: p.image || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
+          featured_home: p.featured_home === true,
+          highlight_type: p.highlight_type || 'split',
+          highlight_color: p.highlight_color || '#F49853',
+          views_count: p.views_count ?? 0,
+          reads_count: p.reads_count ?? 0,
+          likes_count: p.likes_count ?? 0,
+          shares_count: p.shares_count ?? 0,
+          comments_count: p.comments_count ?? 0,
+          translations: p.translations || ['pt'],
+          has_unpublished_changes: p.has_unpublished_changes === true,
+          deleted_at: p.deleted_at
+        })));
+      } else if (!error && (!data || data.length === 0)) {
+        // Table exists in Supabase but is empty: Seed it automatically with real posts!
+        await supabase.from('blog_posts').upsert(DEFAULT_BLOG_POSTS);
+        setPosts(DEFAULT_BLOG_POSTS);
       }
+    } catch (err) {
+      console.warn('Could not load blog posts from Supabase, using local cache:', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadFromSupabase();
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === BLOG_STORAGE_KEY && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) {
-            setPosts(parsed);
-          }
-        } catch {}
-      }
-    };
+    // Supabase Realtime channel: Listen to live changes (INSERT, UPDATE, DELETE)
+    const channel = supabase.channel('blog-posts-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blog_posts' }, (payload) => {
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          const updated = payload.new as any;
+          setPosts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+        } else if (payload.eventType === 'INSERT' && payload.new) {
+          const inserted = payload.new as any;
+          setPosts(prev => {
+            if (prev.some(p => p.id === inserted.id)) return prev;
+            return [inserted, ...prev];
+          });
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          const deleted = payload.old as any;
+          setPosts(prev => prev.filter(p => p.id !== deleted.id));
+        } else {
+          loadFromSupabase();
+        }
+      })
+      .subscribe();
 
-    window.addEventListener('storage', handleStorageChange);
     return () => {
-      isMounted = false;
-      window.removeEventListener('storage', handleStorageChange);
+      supabase.removeChannel(channel);
     };
   }, []);
+
+  const syncWithSupabase = async () => {
+    await loadFromSupabase();
+  };
 
   const addPost = async (postData: Omit<BlogPost, 'id' | 'date'>): Promise<BlogPost> => {
     const newId = `post-${Date.now().toString(36)}`;
@@ -337,7 +353,9 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await supabase.from('blog_posts').insert([newPost]);
-    } catch {}
+    } catch (err) {
+      console.error('Error inserting post into Supabase:', err);
+    }
 
     return newPost;
   };
@@ -374,7 +392,9 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await supabase.from('blog_posts').update(updatedFields).eq('id', id);
-    } catch {}
+    } catch (err) {
+      console.error('Error updating post in Supabase:', err);
+    }
   };
 
   const moveToTrash = async (id: string) => {
@@ -399,7 +419,9 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await supabase.from('blog_posts').delete().eq('id', id);
-    } catch {}
+    } catch (err) {
+      console.error('Error deleting post from Supabase:', err);
+    }
   };
 
   const bulkUpdateStatus = async (ids: string[], status: BlogPost['status']) => {
@@ -453,7 +475,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     return nextState;
   };
 
-  // Metrics tracking methods
+  // Real atomic metrics tracking methods connected directly to Supabase
   const incrementViews = async (id: string) => {
     setPosts(prev => prev.map(p => {
       if (p.id === id) {
@@ -463,14 +485,20 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     }));
 
     try {
-      const p = posts.find(item => item.id === id);
-      if (p) {
-        await supabase
-          .from('blog_posts')
-          .update({ views_count: (p.views_count || 0) + 1 })
-          .eq('id', id);
-      }
-    } catch {}
+      const { data } = await supabase
+        .from('blog_posts')
+        .select('views_count')
+        .eq('id', id)
+        .maybeSingle();
+
+      const nextVal = (data?.views_count ?? 0) + 1;
+      await supabase
+        .from('blog_posts')
+        .update({ views_count: nextVal })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error incrementing views in Supabase:', err);
+    }
   };
 
   const incrementReads = async (id: string) => {
@@ -482,14 +510,20 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     }));
 
     try {
-      const p = posts.find(item => item.id === id);
-      if (p) {
-        await supabase
-          .from('blog_posts')
-          .update({ reads_count: (p.reads_count || 0) + 1 })
-          .eq('id', id);
-      }
-    } catch {}
+      const { data } = await supabase
+        .from('blog_posts')
+        .select('reads_count')
+        .eq('id', id)
+        .maybeSingle();
+
+      const nextVal = (data?.reads_count ?? 0) + 1;
+      await supabase
+        .from('blog_posts')
+        .update({ reads_count: nextVal })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error incrementing reads in Supabase:', err);
+    }
   };
 
   const toggleLike = async (id: string): Promise<boolean> => {
@@ -513,16 +547,21 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     }));
 
     try {
-      const p = posts.find(item => item.id === id);
-      if (p) {
-        const currentLikes = p.likes_count || 0;
-        const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
-        await supabase
-          .from('blog_posts')
-          .update({ likes_count: newLikes })
-          .eq('id', id);
-      }
-    } catch {}
+      const { data } = await supabase
+        .from('blog_posts')
+        .select('likes_count')
+        .eq('id', id)
+        .maybeSingle();
+
+      const currentLikes = data?.likes_count ?? 0;
+      const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+      await supabase
+        .from('blog_posts')
+        .update({ likes_count: newLikes })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error updating likes in Supabase:', err);
+    }
 
     return nextLiked;
   };
@@ -536,21 +575,30 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     }));
 
     try {
-      const p = posts.find(item => item.id === id);
-      if (p) {
-        await supabase
-          .from('blog_posts')
-          .update({ shares_count: (p.shares_count || 0) + 1 })
-          .eq('id', id);
-      }
-    } catch {}
+      const { data } = await supabase
+        .from('blog_posts')
+        .select('shares_count')
+        .eq('id', id)
+        .maybeSingle();
+
+      const nextVal = (data?.shares_count ?? 0) + 1;
+      await supabase
+        .from('blog_posts')
+        .update({ shares_count: nextVal })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error incrementing shares in Supabase:', err);
+    }
   };
 
   const resetBlogToDefaults = async () => {
     setPosts(DEFAULT_BLOG_POSTS);
     try {
       localStorage.setItem(BLOG_STORAGE_KEY, JSON.stringify(DEFAULT_BLOG_POSTS));
-    } catch {}
+      await supabase.from('blog_posts').upsert(DEFAULT_BLOG_POSTS);
+    } catch (err) {
+      console.error('Error resetting blog in Supabase:', err);
+    }
   };
 
   return (
@@ -568,6 +616,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       incrementReads,
       toggleLike,
       incrementShares,
+      syncWithSupabase,
       resetBlogToDefaults
     }}>
       {children}

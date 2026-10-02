@@ -93,6 +93,7 @@ export interface CU_Task {
   comments: CU_Comment[];
   custom_values?: Record<string, string>;
   order_index: number;
+  created_by?: string;
   created_at?: string;
 }
 
@@ -194,104 +195,10 @@ const MOCK_STATUSES: CU_Status[] = [
   { id: 'st-d-4', list_id: 'l-desenvolvimento', name: 'CONCLUÍDO', color: '#10b981', order_index: 3 }
 ];
 
-const MOCK_TASKS: CU_Task[] = [
-  {
-    id: 't-1',
-    list_id: 'l-pacientes',
-    name: 'Avaliação Antropométrica - Lote 12',
-    description: 'Medição de peso, altura e circunferência braquial de 15 novas crianças cadastradas na comunidade de Dondo.',
-    status_id: 'st-n-2',
-    priority: 'urgent',
-    team_id: 't-saude',
-    team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
-    due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
-    tags: ['Triagem', 'Urgente', 'Nutrição'],
-    checklists: [
-      { id: 'ck-1', text: 'Separar fitas métricas e balanças calibradas', done: true },
-      { id: 'ck-2', text: 'Imprimir fichas de prontuário clínico', done: true },
-      { id: 'ck-3', text: 'Conferir suplementos vitamínicos em estoque', done: false },
-      { id: 'ck-4', text: 'Registrar histórico no app móvel', done: false }
-    ],
-    comments: [],
-    order_index: 0
-  },
-  {
-    id: 't-2',
-    list_id: 'l-pacientes',
-    name: 'Distribuição dos Suplementos Terapêuticos',
-    description: 'Entregar pacotes de tratamento para crianças em desnutrição moderada (DAM) e orientar as mães sobre a dosagem diária.',
-    status_id: 'st-n-1',
-    priority: 'high',
-    team_id: 't-saude',
-    team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
-    due_date: new Date(Date.now() + 86400000 * 4).toISOString(),
-    tags: ['Distribuição', 'Estoque'],
-    checklists: [
-      { id: 'ck-21', text: 'Conferir validade dos lotes', done: true },
-      { id: 'ck-22', text: 'Assinatura dos termos de recebimento pelas mães', done: false }
-    ],
-    comments: [],
-    order_index: 1
-  },
-  {
-    id: 't-3',
-    list_id: 'l-pacientes',
-    name: 'Alta Nutricional - Paciente Mariazinha',
-    description: 'Criança completou o ciclo de 90 dias com recuperação total de peso e índice eutrófico.',
-    status_id: 'st-n-4',
-    priority: 'normal',
-    team_id: 't-saude',
-    team: { id: 't-saude', name: 'Saúde & Nutrição', color: '#10b981' },
-    due_date: new Date(Date.now() - 86400000).toISOString(),
-    tags: ['Alta', 'Sucesso'],
-    checklists: [
-      { id: 'ck-31', text: 'Emitir certificado de alta', done: true },
-      { id: 'ck-32', text: 'Foto comemorativa com consentimento', done: true },
-      { id: 'ck-33', text: 'Enviar relatório para apadrinhador', done: true }
-    ],
-    comments: [],
-    order_index: 0
-  },
-  {
-    id: 't-4',
-    list_id: 'l-redes',
-    name: 'Carrossel: Como funciona o Centro Nutricional',
-    description: 'Post educativo de 6 lâminas mostrando desde a triagem das crianças até a distribuição dos alimentos e alta médica.',
-    status_id: 'st-c-2',
-    priority: 'high',
-    team_id: 't-marketing',
-    team: { id: 't-marketing', name: 'Marketing & Mídia', color: '#8b5cf6' },
-    due_date: new Date(Date.now() + 86400000 * 3).toISOString(),
-    tags: ['Instagram', 'Design', 'Conteúdo'],
-    checklists: [
-      { id: 'ck-41', text: 'Roteiro e copy aprovados', done: true },
-      { id: 'ck-42', text: 'Criação dos layouts no Figma', done: true },
-      { id: 'ck-43', text: 'Revisão ortográfica e legendas', done: false },
-      { id: 'ck-44', text: 'Agendamento no estúdio de criação', done: false }
-    ],
-    comments: [],
-    order_index: 0
-  },
-  {
-    id: 't-5',
-    list_id: 'l-desenvolvimento',
-    name: 'Quadro Kanban Drag & Drop no Workspace',
-    description: 'Implementar movimentação de cards estilo Trello e ClickUp entre as colunas de status.',
-    status_id: 'st-d-3',
-    priority: 'urgent',
-    team_id: 't-dev',
-    team: { id: 't-dev', name: 'Tecnologia & Produto', color: '#3b82f6' },
-    due_date: new Date().toISOString(),
-    tags: ['ClickUp', 'Frontend', 'Kanban'],
-    checklists: [
-      { id: 'ck-51', text: 'Suporte a Drag & Drop nativo', done: true },
-      { id: 'ck-52', text: 'Modal detalhado com checklists e comentários', done: true },
-      { id: 'ck-53', text: 'Integração com canais e equipes', done: true }
-    ],
-    comments: [],
-    order_index: 0
-  }
-];
+const STORAGE_KEY_TASKS = 'yah_hope_clickup_tasks_v3';
+
+// Mock tasks eliminated: tasks must be real and created by the user or fetched from DB
+const MOCK_TASKS: CU_Task[] = [];
 
 const MOCK_CHANNELS: CU_Channel[] = [
   { id: 'c-geral', name: 'geral', description: 'Canal aberto para avisos e comunicados da organização' },
@@ -308,10 +215,33 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   const [lists, setLists] = useState<CU_List[]>([]);
   const [statuses, setStatuses] = useState<CU_Status[]>([]);
   const [fields, setFields] = useState<CU_CustomField[]>([]);
-  const [tasks, setTasks] = useState<CU_Task[]>([]);
+  const [tasks, setTasks] = useState<CU_Task[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_TASKS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Filter out any legacy mock tasks that might be cached
+          return parsed.filter(t => !['t-1', 't-2', 't-3', 't-4', 't-5'].includes(t.id));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse cached tasks:', e);
+    }
+    return [];
+  });
   const [channels, setChannels] = useState<CU_Channel[]>([]);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync tasks state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+    } catch (e) {
+      console.error('Failed to sync tasks to localStorage:', e);
+    }
+  }, [tasks]);
 
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
   const [activeList, setActiveList] = useState<string | null>(null);
@@ -405,13 +335,13 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       const dbSpaces = resSpaces.status === 'fulfilled' ? resSpaces.value.data : null;
 
       if (!dbSpaces || dbSpaces.length === 0) {
-        // Fallback to rich mock data
+        // Fallback to rich mock data for navigation structure only
         setSpaces(MOCK_SPACES);
         setFolders([]);
         setLists(MOCK_LISTS);
         setStatuses(MOCK_STATUSES);
         setFields([]);
-        setTasks(MOCK_TASKS);
+        // Tasks remain real (from cache or empty), never mock
         setChannels(MOCK_CHANNELS);
 
         if (!activeSpace) {
@@ -444,7 +374,11 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         // Process Tasks
         if (resTasks.status === 'fulfilled' && resTasks.value.data && resTasks.value.data.length > 0) {
           const parsedTasks: CU_Task[] = resTasks.value.data.map(t => {
-            const assigneeUser = loadedUsers.find(u => u.id === (t.assignee_id || t.assignee));
+            const assigneeUser = loadedUsers.find(u => 
+              u.id === (t.assignee_id || t.assignee) ||
+              (t.assignee && u.name && u.name.toLowerCase() === t.assignee.toLowerCase()) ||
+              (t.assignee && u.email && u.email.toLowerCase() === t.assignee.toLowerCase())
+            );
             const team = t.team_id ? teamsMap[t.team_id] : undefined;
             return {
               id: t.id,
@@ -464,12 +398,45 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
               comments: Array.isArray(t.comments) ? t.comments : [],
               custom_values: t.custom_values || {},
               order_index: t.order_index ?? 0,
+              created_by: t.created_by,
               created_at: t.created_at
             };
           });
-          setTasks(parsedTasks);
+
+          // Merge any locally created tasks with temp ID 't-' not yet in DB
+          const saved = localStorage.getItem(STORAGE_KEY_TASKS);
+          let localUnsynced: CU_Task[] = [];
+          if (saved) {
+            try {
+              const localParsed: CU_Task[] = JSON.parse(saved);
+              if (Array.isArray(localParsed)) {
+                localUnsynced = localParsed.filter(lt => 
+                  lt.id.startsWith('t-') && 
+                  !['t-1','t-2','t-3','t-4','t-5'].includes(lt.id) &&
+                  !parsedTasks.some(pt => pt.id === lt.id)
+                );
+              }
+            } catch {}
+          }
+          const merged = [...localUnsynced, ...parsedTasks];
+          setTasks(merged);
         } else {
-          setTasks(MOCK_TASKS);
+          // No tasks in DB. Keep local offline tasks or empty, NEVER mock tasks!
+          const saved = localStorage.getItem(STORAGE_KEY_TASKS);
+          if (saved) {
+            try {
+              const localParsed: CU_Task[] = JSON.parse(saved);
+              if (Array.isArray(localParsed)) {
+                setTasks(localParsed.filter(t => !['t-1','t-2','t-3','t-4','t-5'].includes(t.id)));
+              } else {
+                setTasks([]);
+              }
+            } catch {
+              setTasks([]);
+            }
+          } else {
+            setTasks([]);
+          }
         }
 
         // Channels (Deduplicated by normalized name)
@@ -533,7 +500,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       setSpaces(MOCK_SPACES);
       setLists(MOCK_LISTS);
       setStatuses(MOCK_STATUSES);
-      setTasks(MOCK_TASKS);
+      // Never set mock tasks here
       setChannels([
         { id: 'c-geral', name: 'geral', description: 'Canal de comunicação geral para todas as equipes' },
         { id: 'c-projetos', name: 'projetos', description: 'Discussão e alinhamento de novos projetos e entregas' }
@@ -647,7 +614,11 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
 
   const addTask = async (list_id: string, name: string, status_id: string, options: Partial<CU_Task> = {}): Promise<CU_Task | null> => {
     const tempId = 't-' + Math.random().toString(36).substring(2, 9);
-    const assigneeUser = options.assignee_id ? systemUsers.find(u => u.id === options.assignee_id) : undefined;
+    const assigneeUser = options.assignee_id 
+      ? systemUsers.find(u => u.id === options.assignee_id) 
+      : options.assignee 
+        ? systemUsers.find(u => u.id === options.assignee || u.name === options.assignee || u.email === options.assignee)
+        : undefined;
 
     const newTask: CU_Task = {
       id: tempId,
@@ -657,8 +628,8 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       status_id,
       priority: options.priority || 'normal',
       assignee: options.assignee || options.assignee_id,
-      assignee_id: options.assignee_id,
-      assignee_user: assigneeUser,
+      assignee_id: options.assignee_id || options.assignee,
+      assignee_user: assigneeUser || options.assignee_user,
       team_id: options.team_id,
       team: options.team,
       due_date: options.due_date,
@@ -667,30 +638,40 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       comments: options.comments || [],
       custom_values: options.custom_values || {},
       order_index: options.order_index ?? 0,
+      created_by: options.created_by || user?.id || user?.email,
       created_at: new Date().toISOString()
     };
 
     setTasks(prev => [newTask, ...prev]);
 
     try {
-      const { data, error } = await supabase.from('clickup_tasks').insert([{
-        list_id,
-        name,
-        description: newTask.description,
-        status_id,
-        priority: newTask.priority,
-        assignee_id: newTask.assignee_id,
-        team_id: newTask.team_id,
-        due_date: newTask.due_date,
-        tags: newTask.tags,
-        checklists: newTask.checklists,
-        comments: newTask.comments,
-        order_index: newTask.order_index
-      }]).select().single();
+      const isUuid = (val?: string | null) => !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-      if (!error && data) {
-        setTasks(prev => prev.map(t => t.id === tempId ? { ...newTask, id: data.id } : t));
-        return { ...newTask, id: data.id };
+      if (isUuid(list_id)) {
+        const payload: Record<string, any> = {
+          list_id,
+          name: newTask.name,
+          description: newTask.description,
+          priority: newTask.priority,
+          order_index: newTask.order_index,
+          tags: newTask.tags,
+          checklists: newTask.checklists,
+          comments: newTask.comments
+        };
+
+        if (isUuid(status_id)) payload.status_id = status_id;
+        if (isUuid(newTask.assignee_id)) payload.assignee_id = newTask.assignee_id;
+        if (isUuid(newTask.team_id)) payload.team_id = newTask.team_id;
+        if (newTask.due_date) payload.due_date = newTask.due_date;
+
+        const { data, error } = await supabase.from('clickup_tasks').insert([payload]).select().single();
+
+        if (!error && data) {
+          setTasks(prev => prev.map(t => t.id === tempId ? { ...newTask, id: data.id } : t));
+          return { ...newTask, id: data.id };
+        } else if (error) {
+          console.warn('Supabase task insert fallback to local state:', error);
+        }
       }
     } catch (err) {
       console.log('Using local state for addTask');

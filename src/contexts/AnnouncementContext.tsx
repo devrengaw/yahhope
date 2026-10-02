@@ -7,71 +7,124 @@ export interface Announcement {
   content: string;
   date: string;
   author: string;
-  targetTeam: string; // e.g. 'Comunicação', 'Saúde', 'Todos'
+  targetTeam: string; // e.g. 'Comunicação', 'Saúde', 'Todos', 'Geral'
 }
 
 interface AnnouncementContextType {
   announcements: Announcement[];
-  addAnnouncement: (announcement: Announcement) => void;
-  deleteAnnouncement: (id: string) => void;
+  addAnnouncement: (announcement: Announcement) => Promise<void>;
+  deleteAnnouncement: (id: string) => Promise<void>;
 }
 
 const AnnouncementContext = createContext<AnnouncementContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_announcements';
+const STORAGE_KEY = 'yah_hope_announcements_v2';
 
 export function AnnouncementProvider({ children }: { children: React.ReactNode }) {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const saveToStorage = (items: Announcement[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {
+      console.warn('Could not save announcements to localStorage', e);
+    }
+  };
 
   useEffect(() => {
     fetchAnnouncements();
 
-    const sub = supabase.channel('announcements_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
-        fetchAnnouncements();
-      })
-      .subscribe();
+    try {
+      const sub = supabase.channel('announcements_updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+          fetchAnnouncements();
+        })
+        .subscribe();
 
-    return () => { supabase.removeChannel(sub); };
+      return () => { supabase.removeChannel(sub); };
+    } catch (e) {
+      console.warn('Realtime subscription not available for announcements', e);
+    }
   }, []);
 
   const fetchAnnouncements = async () => {
-    const { data } = await supabase.from('announcements').select('*').order('date', { ascending: false });
-    if (data) {
-      setAnnouncements(data.map(a => ({
-        id: a.id,
-        title: a.title,
-        content: a.content,
-        date: a.date,
-        author: a.author_name,
-        targetTeam: a.targetTeam || 'Todos' // backward compat mapping
-      })));
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const formatted = data.map(a => ({
+          id: a.id,
+          title: a.title,
+          content: a.content,
+          date: a.date,
+          author: a.author_name || a.author || 'Administrador',
+          targetTeam: a.targetTeam || 'Todos'
+        }));
+        setAnnouncements(formatted);
+        saveToStorage(formatted);
+      }
+    } catch (e) {
+      console.warn('Error fetching announcements from Supabase, keeping cached:', e);
     }
   };
 
   const addAnnouncement = async (announcement: Announcement) => {
-    const tempId = Math.random().toString();
-    setAnnouncements(prev => [{ ...announcement, id: tempId }, ...prev]);
+    const tempId = announcement.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ann_${Date.now()}`);
+    const newNotice = { ...announcement, id: tempId };
 
-    const { data } = await supabase.from('announcements').insert([{
-      title: announcement.title,
-      content: announcement.content,
-      date: announcement.date,
-      type: 'info',
-      priority: 'normal',
-      author_id: 'unknown',
-      author_name: announcement.author,
-      targetTeam: announcement.targetTeam
-    }]).select().single();
-    
-    if (data) {
-      setAnnouncements(prev => prev.map(a => a.id === tempId ? { ...a, id: data.id } : a));
+    setAnnouncements(prev => {
+      const updated = [newNotice, ...prev];
+      saveToStorage(updated);
+      return updated;
+    });
+
+    try {
+      const { data } = await supabase.from('announcements').insert([{
+        id: newNotice.id,
+        title: newNotice.title,
+        content: newNotice.content,
+        date: newNotice.date || new Date().toISOString(),
+        type: 'info',
+        priority: 'normal',
+        author_id: 'unknown',
+        author_name: newNotice.author,
+        targetTeam: newNotice.targetTeam
+      }]).select().single();
+      
+      if (data) {
+        setAnnouncements(prev => {
+          const updated = prev.map(a => a.id === tempId ? { ...a, id: data.id } : a);
+          saveToStorage(updated);
+          return updated;
+        });
+      }
+    } catch (e) {
+      console.warn('Could not insert announcement into Supabase, saved to localStorage:', e);
     }
   };
 
   const deleteAnnouncement = async (id: string) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
-    await supabase.from('announcements').delete().eq('id', id);
+    setAnnouncements(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      saveToStorage(updated);
+      return updated;
+    });
+
+    try {
+      await supabase.from('announcements').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Could not delete announcement in Supabase:', e);
+    }
   };
 
   return (

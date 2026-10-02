@@ -9,7 +9,7 @@ interface TopNavProps {
 }
 
 export function WorkspaceTopNav({ activeView, setActiveView }: TopNavProps) {
-  const { spaces, lists, activeSpace, activeList } = useClickUp();
+  const { spaces, lists, activeSpace, activeList, systemUsers } = useClickUp();
 
   const currentSpace = spaces.find(s => s.id === activeSpace);
   const currentList = lists.find(l => l.id === activeList);
@@ -44,7 +44,9 @@ export function WorkspaceTopNav({ activeView, setActiveView }: TopNavProps) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Users size={16} /> <span className="font-medium">Equipe</span>
-            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">4</span>
+            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+              {systemUsers.length || 2}
+            </span>
           </div>
           <button className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors">
             <Share2 size={16} /> Compartilhar
