@@ -8,6 +8,7 @@ export interface WorkspaceChannel {
   description: string;
   isPrivate: boolean;
   members: string[]; // array of user emails/names
+  created_by?: string;
 }
 
 export interface WorkspaceMessage {
@@ -24,6 +25,8 @@ export interface WorkspaceMessage {
 interface WorkspaceContextType {
   channels: WorkspaceChannel[];
   addChannel: (channel: Omit<WorkspaceChannel, 'id'>) => Promise<void>;
+  updateChannel: (id: string, updates: Partial<WorkspaceChannel>) => Promise<void>;
+  deleteChannel: (id: string) => Promise<void>;
   addMemberToChannel: (channelId: string, member: string) => Promise<void>;
   messages: WorkspaceMessage[];
   sendMessage: (message: Omit<WorkspaceMessage, 'id' | 'timestamp'>) => Promise<void>;
@@ -69,21 +72,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       })
       .subscribe();
 
-    // Subscribe to new channels
+    // Subscribe to channel updates
     const channelSubscription = supabase
       .channel('public:workspace_channels')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workspace_channels' }, payload => {
-        const newCh = payload.new;
-        setChannels(prev => {
-          if (prev.find(c => c.id === newCh.id)) return prev;
-          return [...prev, {
-            id: newCh.id,
-            name: newCh.name,
-            description: newCh.description || '',
-            isPrivate: newCh.is_private || false,
-            members: [] // We fetch members separately if needed
-          }];
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_channels' }, () => {
+        fetchWorkspaceData();
       })
       .subscribe();
 
@@ -111,14 +104,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
       if (membersError) throw membersError;
 
-      // Map channels
-      const formattedChannels: WorkspaceChannel[] = (channelsData || []).map(ch => ({
-        id: ch.id,
-        name: ch.name,
-        description: ch.description || '',
-        isPrivate: ch.is_private,
-        members: (membersData || []).filter(m => m.channel_id === ch.id).map(m => m.user_email)
-      }));
+      // Map channels (deduplicated by normalized name)
+      const seenNames = new Set<string>();
+      const formattedChannels: WorkspaceChannel[] = [];
+      for (const ch of (channelsData || [])) {
+        const clean = (ch.name || '').toLowerCase().trim();
+        if (!clean || seenNames.has(clean)) continue;
+        seenNames.add(clean);
+        formattedChannels.push({
+          id: ch.id,
+          name: clean,
+          description: ch.description || '',
+          isPrivate: ch.is_private || false,
+          created_by: ch.created_by,
+          members: (membersData || []).filter(m => m.channel_id === ch.id).map(m => m.user_email)
+        });
+      }
 
       // Fetch Messages
       const { data: messagesData, error: messagesError } = await supabase
@@ -226,8 +227,35 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateChannel = async (id: string, updates: Partial<WorkspaceChannel>) => {
+    setChannels(prev => prev.map(c => (c.id === id || c.name === id) ? { ...c, ...updates } : c));
+    try {
+      await supabase.from('workspace_channels').update({
+        ...(updates.name ? { name: updates.name.toLowerCase().trim().replace(/\s+/g, '-') } : {}),
+        ...(updates.description !== undefined ? { description: updates.description } : {}),
+        ...(updates.isPrivate !== undefined ? { is_private: updates.isPrivate } : {})
+      }).or(`id.eq.${id},name.eq.${id}`);
+    } catch (e) {
+      console.error('Failed to update channel in DB', e);
+    }
+  };
+
+  const deleteChannel = async (channelIdOrName: string) => {
+    const target = channels.find(c => c.id === channelIdOrName || c.name === channelIdOrName);
+    const idToDelete = target ? target.id : channelIdOrName;
+    const nameToDelete = target ? target.name : channelIdOrName;
+
+    setChannels(prev => prev.filter(c => c.id !== idToDelete && c.name !== nameToDelete));
+    try {
+      await supabase.from('workspace_messages').delete().or(`channel_id.eq.${idToDelete},channel_id.eq.${nameToDelete}`);
+      await supabase.from('workspace_channels').delete().or(`id.eq.${idToDelete},name.eq.${nameToDelete}`);
+    } catch (e) {
+      console.error('Failed to delete channel from DB', e);
+    }
+  };
+
   return (
-    <WorkspaceContext.Provider value={{ channels, addChannel, addMemberToChannel, messages, sendMessage, loading }}>
+    <WorkspaceContext.Provider value={{ channels, addChannel, updateChannel, deleteChannel, addMemberToChannel, messages, sendMessage, loading }}>
       {children}
     </WorkspaceContext.Provider>
   );

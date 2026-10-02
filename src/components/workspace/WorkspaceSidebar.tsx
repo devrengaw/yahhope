@@ -122,14 +122,17 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
             <button 
               onClick={() => {
                 const name = window.prompt('Nome do canal:');
-                if (name) addChannel(name.toLowerCase().replace(/\s+/g, '-'));
+                if (name && name.trim()) {
+                  addChannel(name.trim().toLowerCase().replace(/\s+/g, '-'));
+                }
               }}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors"
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/70 transition-colors cursor-pointer"
+              title="Criar novo canal"
             >
               <Plus size={14} />
             </button>
           </div>
-          {channels.map(channel => (
+          {Array.from(new Map(channels.map(c => [c.name.toLowerCase().trim(), c])).values()).map(channel => (
             <NavLink
               key={channel.id}
               to={`/workspace/chat/${channel.name}`}
@@ -148,7 +151,12 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
           <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest px-2 mb-2">Mensagens Diretas</h3>
           <div className="space-y-0.5">
             {systemUsers
-              .filter(u => u.id !== user?.id && (!user?.email || u.email !== user?.email))
+              .filter(u => {
+                if (!u) return false;
+                if (user?.id && u.id === user.id) return false;
+                if (user?.email && u.email && u.email.toLowerCase().trim() === user.email.toLowerCase().trim()) return false;
+                return true;
+              })
               .map(member => (
                 <NavLink
                   key={member.id}
@@ -170,7 +178,12 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
                 </NavLink>
               ))}
 
-            {systemUsers.filter(u => u.id !== user?.id && (!user?.email || u.email !== user?.email)).length === 0 && (
+            {systemUsers.filter(u => {
+              if (!u) return false;
+              if (user?.id && u.id === user.id) return false;
+              if (user?.email && u.email && u.email.toLowerCase().trim() === user.email.toLowerCase().trim()) return false;
+              return true;
+            }).length === 0 && (
               <div className="px-2 text-xs italic text-white/60">
                 Nenhum outro usuário cadastrado
               </div>

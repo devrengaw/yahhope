@@ -1,25 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { Send, Hash, Paperclip, Smile, Image as ImageIcon, MoreVertical, Phone, Video, UserPlus, X, File as FileIcon } from 'lucide-react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  Send, Hash, Paperclip, Smile, Image as ImageIcon, MoreVertical, 
+  UserPlus, X, File as FileIcon, Edit3, Trash2, ShieldAlert 
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useClickUp } from '../../contexts/ClickUpContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 
 export function WorkspaceChat() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { channels, addMemberToChannel, messages, sendMessage } = useWorkspace();
-  const { systemUsers } = useClickUp();
+  const { confirm, alert: showAlert } = useConfirm();
+  
+  const { 
+    channels, 
+    updateChannel, 
+    deleteChannel, 
+    systemUsers 
+  } = useClickUp();
+  const { messages, sendMessage, addMemberToChannel } = useWorkspace();
   
   const isDirectMessage = location.pathname.includes('/dm/');
-  const currentChannel = channels.find(c => c.id === id || c.name === id);
+  const currentChannel = channels.find(c => c.id === id || c.name.toLowerCase() === id?.toLowerCase());
   const targetUser = isDirectMessage ? systemUsers.find(u => u.id === id) : null;
   const title = isDirectMessage ? (targetUser?.name || 'Conversa Direta') : (currentChannel?.name || id || 'geral');
 
-  const channelMessages = messages.filter(m => m.channelId === (isDirectMessage ? `dm-${id}` : (currentChannel?.id || id || 'geral')));
+  const targetChannelId = currentChannel?.id || id || 'geral';
+  const channelMessages = messages.filter(m => {
+    if (isDirectMessage) {
+      return m.channelId === `dm-${id}`;
+    }
+    return (
+      m.channelId === targetChannelId || 
+      m.channelId === id || 
+      (currentChannel && m.channelId === currentChannel.name)
+    );
+  });
 
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<{ type: 'image' | 'file'; file: File; url: string }[]>([]);
@@ -27,6 +49,24 @@ export function WorkspaceChat() {
   const [newMemberName, setNewMemberName] = useState('');
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [showEmojis, setShowEmojis] = useState(false);
+
+  // Channel menu and edit states
+  const [channelMenuOpen, setChannelMenuOpen] = useState(false);
+  const [isEditChannelModalOpen, setIsEditChannelModalOpen] = useState(false);
+  const [editChannelName, setEditChannelName] = useState('');
+  const [editChannelDescription, setEditChannelDescription] = useState('');
+
+  // Permissions: only admin or the user who created the channel
+  const isAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'MASTER';
+  const isCreator = Boolean(
+    currentChannel?.created_by && (
+      currentChannel.created_by === user?.id ||
+      currentChannel.created_by === user?.email ||
+      currentChannel.created_by.toLowerCase().trim() === user?.email?.toLowerCase().trim() ||
+      currentChannel.created_by.toLowerCase().trim() === user?.name?.toLowerCase().trim()
+    )
+  );
+  const canManageChannel = !isDirectMessage && (isAdmin || isCreator);
 
   useEffect(() => {
     if (isAddMemberModalOpen) {
@@ -52,10 +92,12 @@ export function WorkspaceChat() {
     e.preventDefault();
     if (!message.trim() && attachments.length === 0) return;
 
+    const channelDestination = isDirectMessage ? `dm-${id}` : (currentChannel?.name || id || 'geral');
+
     sendMessage({
-      channelId: isDirectMessage ? `dm-${id}` : id || 'geral',
+      channelId: channelDestination,
       sender: user?.name || 'Você',
-      avatar: user?.avatar || 'https://i.pravatar.cc/150?u=3',
+      avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=random`,
       text: message,
       isMe: true,
       attachments: attachments.map(a => ({ type: a.type, url: a.url, name: a.file.name }))
@@ -88,6 +130,65 @@ export function WorkspaceChat() {
 
   const emojis = ['😀', '😂', '🥰', '👍', '🙏', '🎉', '🔥', '👀', '💡', '✅'];
 
+  const handleDeleteChannel = async () => {
+    setChannelMenuOpen(false);
+    if (!currentChannel) return;
+
+    if (currentChannel.name.toLowerCase() === 'geral') {
+      await showAlert('Ação não permitida', 'O canal principal #geral é protegido e não pode ser excluído.');
+      return;
+    }
+
+    if (!canManageChannel) {
+      await showAlert('Permissão negada', 'Apenas administradores ou o criador deste canal podem excluí-lo.');
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Excluir canal #${currentChannel.name}`,
+      message: `Tem certeza que deseja excluir o canal #${currentChannel.name}? Todas as mensagens deste canal serão excluídas permanentemente. Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir Canal',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (confirmed) {
+      await deleteChannel(currentChannel.id);
+      navigate('/workspace/chat/geral');
+    }
+  };
+
+  const handleUpdateChannel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentChannel) return;
+
+    const cleanName = editChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!cleanName) {
+      await showAlert('Nome inválido', 'O nome do canal não pode ficar vazio.');
+      return;
+    }
+
+    // Check if another channel already has this name
+    const nameExists = channels.some(
+      c => c.id !== currentChannel.id && c.name.toLowerCase().trim() === cleanName
+    );
+    if (nameExists) {
+      await showAlert('Nome em uso', `Já existe outro canal com o nome #${cleanName}. Escolha outro nome.`);
+      return;
+    }
+
+    await updateChannel(currentChannel.id, {
+      name: cleanName,
+      description: editChannelDescription.trim()
+    });
+
+    setIsEditChannelModalOpen(false);
+
+    if (cleanName !== currentChannel.name) {
+      navigate(`/workspace/chat/${cleanName}`);
+    }
+  };
+
   const renderTextWithFormatting = (text: string) => {
     // Basic markdown parsing for bold and italic
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|__.*?__|_.*?_)/g);
@@ -107,7 +208,11 @@ export function WorkspaceChat() {
         <div className="flex items-center gap-3">
           {isDirectMessage ? (
             <div className="relative">
-              <img src={`https://i.pravatar.cc/150?u=${id}`} alt={title} className="w-10 h-10 rounded shadow-sm" />
+              <img 
+                src={targetUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(title)}&background=random`} 
+                alt={title} 
+                className="w-10 h-10 rounded-full shadow-sm object-cover" 
+              />
               <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white"></div>
             </div>
           ) : (
@@ -121,21 +226,73 @@ export function WorkspaceChat() {
               {title}
             </h2>
             <p className="text-sm text-slate-500">
-              {isDirectMessage ? 'Ativo agora' : currentChannel?.description || 'Canal principal para comunicações'}
+              {isDirectMessage ? (targetUser?.email || 'Conversa direta') : (currentChannel?.description || 'Canal principal para comunicações')}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-4 text-slate-400">
+        <div className="flex items-center gap-2 text-slate-400">
           {!isDirectMessage && (
-            <button onClick={() => setIsAddMemberModalOpen(true)} className="hover:text-blue-600 transition-colors tooltip-target" data-tooltip="Adicionar pessoas">
-              <UserPlus size={20} />
+            <button 
+              onClick={() => setIsAddMemberModalOpen(true)} 
+              className="p-2 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer" 
+              title="Adicionar pessoas"
+            >
+              <UserPlus size={18} />
             </button>
           )}
-          <button className="hover:text-blue-600 transition-colors tooltip-target" data-tooltip="Chamada de áudio"><Phone size={20} /></button>
-          <button className="hover:text-blue-600 transition-colors tooltip-target" data-tooltip="Chamada de vídeo"><Video size={20} /></button>
-          <div className="w-px h-6 bg-slate-200 mx-1"></div>
-          <button className="hover:text-slate-600 transition-colors"><MoreVertical size={20} /></button>
+
+          {!isDirectMessage && (
+            <div className="relative">
+              <button 
+                onClick={() => setChannelMenuOpen(prev => !prev)} 
+                className="p-2 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                title="Opções do canal"
+              >
+                <MoreVertical size={18} />
+              </button>
+
+              {channelMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-30" 
+                    onClick={() => setChannelMenuOpen(false)} 
+                  />
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                    {canManageChannel ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            setChannelMenuOpen(false);
+                            setEditChannelName(currentChannel?.name || '');
+                            setEditChannelDescription(currentChannel?.description || '');
+                            setIsEditChannelModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left font-medium cursor-pointer"
+                        >
+                          <Edit3 size={15} className="text-slate-500" />
+                          <span>Editar Canal</span>
+                        </button>
+                        <div className="h-px bg-slate-100 my-1" />
+                        <button
+                          onClick={handleDeleteChannel}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left font-medium cursor-pointer"
+                        >
+                          <Trash2 size={15} className="text-red-500" />
+                          <span>Excluir Canal</span>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-slate-500 flex items-start gap-2 bg-slate-50">
+                        <ShieldAlert size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                        <span>Apenas administradores ou o criador deste canal podem editá-lo ou excluí-lo.</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -154,7 +311,7 @@ export function WorkspaceChat() {
             <div key={msg.id} className={cn("flex group", isConsecutive ? "mt-1" : "mt-4")}>
               {!isConsecutive ? (
                 <div className="w-10 h-10 shrink-0 mr-3">
-                  <img src={msg.avatar} alt={msg.sender} className="w-full h-full rounded shadow-sm" />
+                  <img src={msg.avatar} alt={msg.sender} className="w-full h-full rounded shadow-sm object-cover" />
                 </div>
               ) : (
                 <div className="w-10 mr-3 shrink-0 text-right opacity-0 group-hover:opacity-100 transition-opacity">
@@ -178,10 +335,15 @@ export function WorkspaceChat() {
                         att.type === 'image' ? (
                           <img key={i} src={att.url} alt={att.name} className="max-w-[200px] rounded-lg border border-slate-200 shadow-sm" />
                         ) : (
-                          <div key={i} className="flex items-center gap-2 p-2 bg-slate-100 rounded-lg border border-slate-200 text-sm">
-                            <FileIcon size={16} className="text-slate-500" />
-                            <span className="text-blue-600 hover:underline cursor-pointer">{att.name}</span>
-                          </div>
+                          <a 
+                            key={i} 
+                            href={att.url} 
+                            download={att.name} 
+                            className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm text-blue-600 hover:bg-slate-50 shadow-sm"
+                          >
+                            <FileIcon size={16} />
+                            <span className="truncate max-w-[150px]">{att.name}</span>
+                          </a>
                         )
                       ))}
                     </div>
@@ -195,24 +357,24 @@ export function WorkspaceChat() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white shrink-0 relative">
-        {/* Attachments Preview */}
+      <div className="p-3 md:p-4 bg-white border-t border-slate-200">
+        {/* Attachments preview */}
         {attachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {attachments.map((att, idx) => (
-              <div key={idx} className="relative group">
+          <div className="flex gap-2 mb-2 p-2 bg-slate-50 rounded-lg overflow-x-auto">
+            {attachments.map((att, index) => (
+              <div key={index} className="relative group shrink-0">
                 {att.type === 'image' ? (
-                  <div className="w-16 h-16 rounded border border-slate-200 overflow-hidden">
-                    <img src={att.url} alt="preview" className="w-full h-full object-cover" />
-                  </div>
+                  <img src={att.url} alt="preview" className="h-16 w-16 object-cover rounded border border-slate-200" />
                 ) : (
-                  <div className="h-16 px-3 rounded border border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-600 truncate max-w-[120px]">
-                    {att.file.name}
+                  <div className="h-16 w-16 bg-white border border-slate-200 rounded flex flex-col items-center justify-center p-1 text-center">
+                    <FileIcon size={20} className="text-slate-400 mb-1" />
+                    <span className="text-[10px] text-slate-500 truncate w-full">{att.file.name}</span>
                   </div>
                 )}
-                <button 
-                  onClick={() => removeAttachment(idx)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X size={12} />
                 </button>
@@ -221,40 +383,46 @@ export function WorkspaceChat() {
           </div>
         )}
 
-        {/* Emoji Picker Popover */}
+        {/* Emoji picker simple panel */}
         {showEmojis && (
-          <div className="absolute bottom-full right-4 mb-2 bg-white border border-slate-200 rounded-lg shadow-lg p-2 z-10 w-64">
-            <div className="flex flex-wrap gap-1">
-              {emojis.map(emoji => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => {
-                    setMessage(prev => prev + emoji);
-                    setShowEmojis(false);
-                  }}
-                  className="text-xl p-1.5 hover:bg-slate-100 rounded transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+          <div className="mb-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm flex gap-2">
+            {emojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setMessage(prev => prev + emoji)}
+                className="text-lg hover:bg-slate-100 p-1 rounded transition-colors"
+              >
+                {emoji}
+              </button>
+            ))}
           </div>
         )}
 
-        <form onSubmit={handleSend} className="border border-slate-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 overflow-hidden bg-white">
-          <div className="px-2 md:px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1 md:gap-2 text-slate-500 overflow-x-auto">
-            <input type="file" ref={fileInputRef} hidden onChange={(e) => handleFileChange(e, 'file')} multiple />
-            <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'image')} multiple />
-            
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors"><Paperclip size={18} /></button>
-            <button type="button" onClick={() => imageInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors"><ImageIcon size={18} /></button>
+        <form onSubmit={handleSend} className="border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all bg-white overflow-hidden shadow-xs">
+          {/* Format Toolbar */}
+          <div className="flex items-center gap-1 p-1.5 border-b border-slate-100 bg-slate-50/50 text-slate-500">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={(e) => handleFileChange(e, 'file')} 
+              className="hidden" 
+            />
+            <input 
+              type="file" 
+              ref={imageInputRef} 
+              accept="image/*" 
+              onChange={(e) => handleFileChange(e, 'image')} 
+              className="hidden" 
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors" title="Anexar arquivo"><Paperclip size={18} /></button>
+            <button type="button" onClick={() => imageInputRef.current?.click()} className="p-1 hover:bg-slate-200 rounded transition-colors" title="Inserir imagem"><ImageIcon size={18} /></button>
             <div className="w-px h-4 bg-slate-300 mx-1"></div>
             <button type="button" onClick={() => insertFormatting('**')} className="text-sm font-bold p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Negrito">B</button>
             <button type="button" onClick={() => insertFormatting('*')} className="text-sm italic p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Itálico">I</button>
             <button type="button" onClick={() => insertFormatting('__')} className="text-sm underline p-1 hover:bg-slate-200 rounded transition-colors tooltip-target hidden sm:block" data-tooltip="Sublinhado">U</button>
             <div className="w-px h-4 bg-slate-300 mx-1 hidden sm:block"></div>
-            <button type="button" onClick={() => setShowEmojis(!showEmojis)} className="p-1 hover:bg-slate-200 rounded transition-colors"><Smile size={18} /></button>
+            <button type="button" onClick={() => setShowEmojis(!showEmojis)} className="p-1 hover:bg-slate-200 rounded transition-colors" title="Emojis"><Smile size={18} /></button>
           </div>
           <div className="flex items-end">
             <textarea
@@ -274,7 +442,7 @@ export function WorkspaceChat() {
               <button 
                 type="button" 
                 onClick={() => setShowEmojis(!showEmojis)}
-                className={cn("p-1 rounded transition-colors", showEmojis ? "text-blue-600 bg-blue-50" : "hover:text-slate-600")}
+                className={cn("p-1 rounded transition-colors cursor-pointer", showEmojis ? "text-blue-600 bg-blue-50" : "hover:text-slate-600")}
               >
                 <Smile size={20} />
               </button>
@@ -282,8 +450,8 @@ export function WorkspaceChat() {
                 type="submit" 
                 disabled={!message.trim() && attachments.length === 0}
                 className={cn(
-                  "p-1.5 rounded transition-colors",
-                  message.trim() || attachments.length > 0 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-slate-100 text-slate-300"
+                  "p-1.5 rounded transition-colors cursor-pointer",
+                  message.trim() || attachments.length > 0 ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm" : "bg-slate-100 text-slate-300 cursor-not-allowed"
                 )}
               >
                 <Send size={18} />
@@ -298,13 +466,86 @@ export function WorkspaceChat() {
         </div>
       </div>
 
+      {/* Edit Channel Modal */}
+      {isEditChannelModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Hash size={18} />
+                </div>
+                <h3 className="font-bold text-slate-800 text-lg">Editar Canal</h3>
+              </div>
+              <button 
+                onClick={() => setIsEditChannelModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateChannel} className="space-y-4 mt-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nome do Canal
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">#</span>
+                  <input
+                    type="text"
+                    value={editChannelName}
+                    onChange={(e) => setEditChannelName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                    placeholder="ex: avisos-importantes"
+                    required
+                    className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Nomes devem conter letras minúsculas e hifens.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Descrição (opcional)
+                </label>
+                <textarea
+                  value={editChannelDescription}
+                  onChange={(e) => setEditChannelDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Qual é o propósito deste canal?"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditChannelModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add Member Modal */}
       {isAddMemberModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Adicionar pessoas a #{title}</h3>
-              <button onClick={() => setIsAddMemberModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsAddMemberModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X size={20} />
               </button>
             </div>
@@ -325,7 +566,7 @@ export function WorkspaceChat() {
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => setIsAddMemberModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg"
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -338,7 +579,7 @@ export function WorkspaceChat() {
                     }
                   }}
                   disabled={!newMemberName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
                 >
                   Adicionar
                 </button>

@@ -21,6 +21,7 @@ export interface CU_Channel {
   name: string;
   description?: string;
   team_id?: string;
+  created_by?: string;
 }
 
 export interface CU_List {
@@ -148,6 +149,8 @@ interface ClickUpContextType {
   deleteStatus: (id: string) => Promise<void>;
 
   addChannel: (name: string, description?: string, team_id?: string) => Promise<void>;
+  updateChannel: (id: string, updates: Partial<CU_Channel>) => Promise<void>;
+  deleteChannel: (id: string) => Promise<void>;
   
   loading: boolean;
   refreshData: () => Promise<void>;
@@ -353,7 +356,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         supabase.from('clickup_custom_fields').select('*'),
         supabase.from('clickup_tasks').select('*'),
         supabase.from('workspace_channels').select('*'),
-        supabase.from('users').select('id, name, email, avatar, role, department'),
+        supabase.from('users').select('*'),
         supabase.from('workspace_teams').select('id, name, color')
       ]);
 
@@ -365,8 +368,8 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
           name: u.name || (u.email ? u.email.split('@')[0] : 'Usuário'),
           email: u.email || '',
           avatar: u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=random`,
-          role: u.role,
-          department: u.department
+          role: u.role || 'USER',
+          department: u.department || ''
         }));
       } else if (user) {
         loadedUsers = [{
@@ -469,11 +472,46 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
           setTasks(MOCK_TASKS);
         }
 
-        // Channels
+        // Channels (Deduplicated by normalized name)
         if (resChannels.status === 'fulfilled' && resChannels.value.data && resChannels.value.data.length > 0) {
-          setChannels(resChannels.value.data);
+          const seen = new Set<string>();
+          const uniqueChannels: CU_Channel[] = [];
+          const duplicateIds: string[] = [];
+
+          for (const ch of resChannels.value.data) {
+            const cleanName = (ch.name || '').toLowerCase().trim();
+            if (!cleanName) continue;
+            if (!seen.has(cleanName)) {
+              seen.add(cleanName);
+              uniqueChannels.push({
+                id: ch.id,
+                name: cleanName,
+                description: ch.description || '',
+                team_id: ch.team_id,
+                created_by: ch.created_by
+              });
+            } else {
+              duplicateIds.push(ch.id);
+            }
+          }
+
+          setChannels(uniqueChannels);
+
+          // Clean up duplicate channel records from database in the background
+          if (duplicateIds.length > 0) {
+            supabase
+              .from('workspace_channels')
+              .delete()
+              .in('id', duplicateIds)
+              .then(({ error }) => {
+                if (!error) console.log(`Deduplicated: removed ${duplicateIds.length} duplicate channels`);
+              });
+          }
         } else {
-          setChannels(MOCK_CHANNELS);
+          setChannels([
+            { id: 'c-geral', name: 'geral', description: 'Canal de comunicação geral para todas as equipes' },
+            { id: 'c-projetos', name: 'projetos', description: 'Discussão e alinhamento de novos projetos e entregas' }
+          ]);
         }
 
         // Auto-select first active space & list if not set
@@ -490,7 +528,10 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       setLists(MOCK_LISTS);
       setStatuses(MOCK_STATUSES);
       setTasks(MOCK_TASKS);
-      setChannels(MOCK_CHANNELS);
+      setChannels([
+        { id: 'c-geral', name: 'geral', description: 'Canal de comunicação geral para todas as equipes' },
+        { id: 'c-projetos', name: 'projetos', description: 'Discussão e alinhamento de novos projetos e entregas' }
+      ]);
       if (!activeSpace) setActiveSpace(MOCK_SPACES[0].id);
       if (!activeList) setActiveList(MOCK_LISTS[0].id);
     } finally {
@@ -838,17 +879,90 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   };
 
   const addChannel = async (name: string, description?: string, team_id?: string) => {
+    const cleanName = name.toLowerCase().trim().replace(/\s+/g, '-');
+    if (!cleanName) return;
+
+    if (channels.some(c => c.name.toLowerCase().trim() === cleanName)) {
+      alert(`Já existe um canal com o nome #${cleanName}`);
+      return;
+    }
+
+    const creator = user?.id || user?.email || user?.name || '';
     const tempId = 'c-' + Math.random().toString(36).substring(2, 7);
-    const newChan: CU_Channel = { id: tempId, name, description, team_id };
+    const newChan: CU_Channel = { id: tempId, name: cleanName, description, team_id, created_by: creator };
     setChannels(prev => [...prev, newChan]);
 
     try {
-      const { data, error } = await supabase.from('workspace_channels').insert([{ name, description, team_id }]).select().single();
+      let { data, error } = await supabase
+        .from('workspace_channels')
+        .insert([{ name: cleanName, description, team_id, created_by: creator }])
+        .select()
+        .single();
+
+      if (error && error.message?.includes('created_by')) {
+        const fallback = await supabase
+          .from('workspace_channels')
+          .insert([{ name: cleanName, description, team_id }])
+          .select()
+          .single();
+        data = fallback.data;
+        error = fallback.error;
+      }
+
       if (!error && data) {
-        setChannels(prev => prev.map(c => c.id === tempId ? data : c));
+        setChannels(prev => prev.map(c => c.id === tempId ? { ...data, name: (data.name || cleanName).toLowerCase().trim() } : c));
       }
     } catch (err) {
       console.log('Using local state for addChannel');
+    }
+  };
+
+  const updateChannel = async (id: string, updates: Partial<CU_Channel>) => {
+    const cleanUpdates = {
+      ...updates,
+      ...(updates.name ? { name: updates.name.toLowerCase().trim().replace(/\s+/g, '-') } : {})
+    };
+
+    setChannels(prev => prev.map(c => (c.id === id || c.name === id) ? { ...c, ...cleanUpdates } : c));
+
+    try {
+      const { error } = await supabase
+        .from('workspace_channels')
+        .update(cleanUpdates)
+        .eq('id', id);
+
+      if (error) {
+        await supabase
+          .from('workspace_channels')
+          .update(cleanUpdates)
+          .eq('name', id);
+      }
+    } catch (err) {
+      console.error('Error updating channel in DB:', err);
+    }
+  };
+
+  const deleteChannel = async (channelIdOrName: string) => {
+    const target = channels.find(c => c.id === channelIdOrName || c.name === channelIdOrName);
+    const idToDelete = target ? target.id : channelIdOrName;
+    const nameToDelete = target ? target.name : channelIdOrName;
+
+    setChannels(prev => prev.filter(c => c.id !== idToDelete && c.name !== nameToDelete));
+
+    try {
+      // Delete associated messages
+      await supabase
+        .from('workspace_messages')
+        .delete()
+        .or(`channel_id.eq.${idToDelete},channel_id.eq.${nameToDelete}`);
+
+      // Delete channel
+      await supabase
+        .from('workspace_channels')
+        .delete()
+        .or(`id.eq.${idToDelete},name.eq.${nameToDelete}`);
+    } catch (err) {
+      console.error('Error deleting channel in DB:', err);
     }
   };
 
@@ -888,6 +1002,8 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       updateStatus,
       deleteStatus,
       addChannel,
+      updateChannel,
+      deleteChannel,
       loading,
       refreshData: fetchWorkspaceData
     }}>
