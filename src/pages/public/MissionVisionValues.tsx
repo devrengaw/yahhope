@@ -5,14 +5,16 @@ import {
   ArrowRight, 
   Target, 
   Eye, 
-  Cross, 
-  MessageCircle, 
-  Scale, 
-  Sparkles, 
-  Users2, 
   ShieldCheck, 
+  Sparkles, 
+  HeartHandshake, 
+  Flame, 
   Sprout, 
-  GraduationCap
+  Award, 
+  Sun,
+  Users2, 
+  Scale, 
+  FileCheck
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 import { useDonationModal } from '../../contexts/DonationModalContext';
@@ -20,42 +22,48 @@ import { useDonationModal } from '../../contexts/DonationModalContext';
 export function MissionVisionValues() {
   const { openDonationModal } = useDonationModal();
 
-  const valuePillars = [
+  const values = [
     {
-      icon: Cross,
-      title: 'Exemplo',
-      subtitle: 'Cristo no Centro',
-      description: 'Acreditamos e seguimos o maior exemplo de todos, Jesus.',
-      accentColor: 'text-[#F49853]',
-      bgLight: 'bg-orange-50 border-orange-200/80',
-      badgeColor: 'bg-orange-100 text-[#F49853]'
+      icon: HeartHandshake,
+      title: 'Dignidade Humana Inegociável',
+      tag: 'Princípio Central',
+      color: 'bg-orange-50 text-[#F49853] border-orange-100',
+      description: 'Toda vida humana possui valor intrínseco, sagrado e imensurável, independentemente de etnia, crença ou condição socioeconômica. Cada projeto nosso visa restaurar a honra e o respeito devido a cada indivíduo.'
     },
     {
-      icon: Heart,
-      title: 'Amor',
-      subtitle: 'Doação Incondicional',
-      description: 'Amamos o próximo sem esperar nada em troca.',
-      accentColor: 'text-rose-500',
-      bgLight: 'bg-rose-50 border-rose-200/80',
-      badgeColor: 'bg-rose-100 text-rose-600'
+      icon: Flame,
+      title: 'Amor em Ação (Fé Prática)',
+      tag: 'Ação Real',
+      color: 'bg-rose-50 text-rose-600 border-rose-100',
+      description: 'A verdadeira compaixão não se limita a discursos ou boas intenções; ela se materializa no campo, no cuidado com o faminto, no socorro à criança desnutrida e na prontidão para servir aos que mais sofrem.'
     },
     {
-      icon: MessageCircle,
-      title: 'Comunicação',
-      subtitle: 'Verdade & Clareza',
-      description: 'Prezamos por uma comunicação transparente.',
-      accentColor: 'text-blue-500',
-      bgLight: 'bg-blue-50 border-blue-200/80',
-      badgeColor: 'bg-blue-100 text-blue-600'
+      icon: ShieldCheck,
+      title: 'Integridade & Rigor Ético',
+      tag: 'Transparência',
+      color: 'bg-blue-50 text-blue-600 border-blue-100',
+      description: 'Administramos cada recurso confiado à YAH Hope com transparência absoluta, auditoria contínua e prestação de contas clara para nossos mantenedores, parceiros e a sociedade.'
     },
     {
-      icon: Scale,
-      title: 'Justiça',
-      subtitle: 'Defesa do Próximo',
-      description: 'Lutamos para promover dignidade ao nosso semelhante.',
-      accentColor: 'text-emerald-600',
-      bgLight: 'bg-emerald-50 border-emerald-200/80',
-      badgeColor: 'bg-emerald-100 text-emerald-700'
+      icon: Sprout,
+      title: 'Desenvolvimento Sustentável',
+      tag: 'Emancipação',
+      color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+      description: 'Não geramos relações de dependência. Desenvolvemos capacidades locais com água potável, formação acadêmica e hortas comunitárias para que as populações conquistem sua própria autonomia.'
+    },
+    {
+      icon: Award,
+      title: 'Excelência & Cuidado Integral',
+      tag: 'Padrão Ouro',
+      color: 'bg-amber-50 text-amber-600 border-amber-100',
+      description: 'Acreditamos que quem vive em vulnerabilidade merece o que há de melhor. Empregamos rigor técnico em protocolos de nutrição clínica, saneamento e atendimento comunitário humanizado.'
+    },
+    {
+      icon: Sun,
+      title: 'Esperança Inabalável & Resiliência',
+      tag: 'Superação',
+      color: 'bg-purple-50 text-purple-600 border-purple-100',
+      description: 'Não recuamos diante de cenários considerados impossíveis. Acreditamos firmemente no poder da perseverança para transformar terras áridas em nascentes de vida e futuro.'
     }
   ];
 
@@ -63,8 +71,8 @@ export function MissionVisionValues() {
     <div className="min-h-screen bg-white">
       <SEO 
         title="Missão, Visão e Valores | YAH Hope"
-        description="Conheça a Missão, Visão e os 4 Pilares de Valores da YAH Hope: Exemplo, Amor, Comunicação e Justiça no combate à vulnerabilidade e promoção da dignidade humana."
-        keywords="missão YAH Hope, visão YAH Hope, valores YAH Hope, dignidade humana, Jesus exemplo, amor ao próximo, comunicação transparente, justiça social"
+        description="Conheça a missão humanitária, a visão de futuro e os valores inegociáveis que regem as ações da YAH Hope no combate à desnutrição e na promoção da dignidade humana."
+        keywords="missão YAH Hope, visão YAH Hope, valores humanitários, ética na ONG, princípios YAH Hope"
         canonical="https://yahhope.org/missao-visao-valores"
       />
 
@@ -83,7 +91,7 @@ export function MissionVisionValues() {
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-slate-300 font-gotham-light leading-relaxed max-w-3xl mx-auto mb-10">
-            O alicerce que guia nossas unidades, capacita líderes locais e direciona cada ação de transformação humana e comunitária.
+            Conheça os princípios inabaláveis que direcionam cada projeto em campo, cada acolhimento de criança desnutrida e a gestão ética de cada recurso confiado à YAH Hope.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -98,7 +106,7 @@ export function MissionVisionValues() {
               onClick={() => openDonationModal()}
               className="bg-[#F49853] hover:bg-[#e0853d] text-white px-7 py-3.5 rounded-full font-gotham-bold text-sm tracking-wide shadow-lg hover:shadow-[#F49853]/40 transition-all flex items-center gap-2 cursor-pointer"
             >
-              <span>Apoiar Esta Missão</span>
+              <span>Apoiar Esta Causa</span>
               <Heart size={16} className="fill-white" />
             </button>
           </div>
@@ -180,55 +188,52 @@ export function MissionVisionValues() {
         </div>
       </section>
 
-      {/* 3. Nossos Valores - Embasados em 4 Pilares */}
+      {/* 3. Nossos Valores Fundamentais */}
       <section className="py-20 md:py-28 bg-slate-50 font-gotham-regular">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              Princípios Fundamentais
+              Princípios Inegociáveis
             </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black text-slate-900 tracking-tight mb-4">
               Nossos Valores
             </h2>
-            <p className="text-slate-600 text-base md:text-lg font-gotham-regular">
-              Os nossos valores estão embasados em <strong className="text-slate-900 font-gotham-bold">4 pilares</strong> essenciais:
+            <p className="text-slate-500 text-sm sm:text-base font-gotham-light">
+              Estes são os valores que forjam nosso caráter institucional, orientam nossas decisões orçamentárias e fundamentam cada contato humano.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {valuePillars.map((pillar, idx) => {
-              const IconComp = pillar.icon;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {values.map((val, idx) => {
+              const IconComp = val.icon;
               return (
                 <div 
                   key={idx}
-                  className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group"
+                  className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-6">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${pillar.bgLight} ${pillar.accentColor} group-hover:scale-110 transition-transform`}>
-                        <IconComp size={28} />
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${val.color} group-hover:scale-105 transition-transform`}>
+                        <IconComp size={26} />
                       </div>
-                      <span className={`text-[10px] font-gotham-bold uppercase tracking-widest px-3 py-1 rounded-full ${pillar.badgeColor}`}>
-                        Pilar #{idx + 1}
+                      <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                        {val.tag}
                       </span>
                     </div>
 
-                    <h3 className="text-2xl font-heading font-black text-slate-900 mb-1 group-hover:text-[#F49853] transition-colors">
-                      {pillar.title}
+                    <h3 className="text-xl font-heading font-bold text-slate-900 mb-3 group-hover:text-[#F49853] transition-colors">
+                      {val.title}
                     </h3>
-                    <span className="text-xs font-gotham-bold text-slate-400 block mb-4">
-                      {pillar.subtitle}
-                    </span>
 
-                    <p className="text-base text-slate-700 font-gotham-regular leading-relaxed">
-                      {pillar.description}
+                    <p className="text-sm text-slate-600 font-gotham-light leading-relaxed">
+                      {val.description}
                     </p>
                   </div>
 
                   <div className="pt-6 mt-6 border-t border-slate-100 flex items-center gap-2 text-xs font-gotham-bold text-slate-400">
-                    <span className="w-2 h-2 rounded-full bg-[#F49853]"></span>
-                    <span>YAH Hope • {pillar.title}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#F49853]"></span>
+                    <span>Pilar de Conduta #{idx + 1}</span>
                   </div>
                 </div>
               );
@@ -238,7 +243,7 @@ export function MissionVisionValues() {
         </div>
       </section>
 
-      {/* 4. Como Tornamos Isso Realidade em Campo */}
+      {/* 4. Compromissos Éticos e Governança */}
       <section className="py-20 bg-white font-gotham-regular">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-slate-900 text-white rounded-[2.5rem] p-8 sm:p-14 lg:p-16">
@@ -246,55 +251,55 @@ export function MissionVisionValues() {
               
               <div className="lg:col-span-5 space-y-4">
                 <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block">
-                  Da Teoria à Prática
+                  Governança & Prestação de Contas
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-heading font-black leading-tight">
-                  Como vivemos esses valores em cada unidade?
+                  Como praticamos nossos valores no dia a dia?
                 </h2>
                 <p className="text-slate-300 font-gotham-light text-sm sm:text-base leading-relaxed">
-                  Para que a transformação seja real e duradoura, capacitamos os próprios moradores para serem os protagonistas da mudança em suas vilas e cidades.
+                  Valores precisam se traduzir em processos auditáveis e práticas transparentes. Garantimos que a confiança dos doadores seja honrada em cada detalhe operacional.
                 </p>
               </div>
 
               <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
                 
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-[#F49853] flex items-center justify-center mb-4">
-                    <Users2 size={20} />
+                  <div className="w-10 h-10 rounded-xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center mb-4">
+                    <Scale size={20} />
                   </div>
-                  <h4 className="font-gotham-bold text-white text-base mb-2">Liderança Local Ativa</h4>
+                  <h4 className="font-gotham-bold text-white text-base mb-2">Auditoria e Compliance</h4>
                   <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                    Treinamos líderes comunitários para aprender, ensinar e coordenar as unidades com autonomia cultural.
+                    Registros contábeis detalhados e demonstrativos periódicos para garantir a conformidade estatutária e legal.
                   </p>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
-                    <Sprout size={20} />
+                    <Users2 size={20} />
                   </div>
-                  <h4 className="font-gotham-bold text-white text-base mb-2">Autossustentabilidade</h4>
+                  <h4 className="font-gotham-bold text-white text-base mb-2">Respeito às Culturas Locais</h4>
                   <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                    Atividades socioeconômicas e estruturas independentes que garantem o futuro das próximas gerações.
+                    Não impomos soluções externas. Planejamos e executamos os projetos em conjunto com líderes e voluntários locais.
                   </p>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
                   <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
-                    <ShieldCheck size={20} />
+                    <FileCheck size={20} />
                   </div>
-                  <h4 className="font-gotham-bold text-white text-base mb-2">Transparência Total</h4>
+                  <h4 className="font-gotham-bold text-white text-base mb-2">Comunicação Dignificante</h4>
                   <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                    Comunicação aberta e prestação de contas com rigor ético a cada mantenedor e parceiro.
+                    Rejeitamos o sensacionalismo de dor. Retratamos crianças e famílias assistidas sempre com respeito e dignidade.
                   </p>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-4">
-                    <GraduationCap size={20} />
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4">
+                    <Heart size={20} />
                   </div>
-                  <h4 className="font-gotham-bold text-white text-base mb-2">Educação e Futuro</h4>
+                  <h4 className="font-gotham-bold text-white text-base mb-2">Foco no Beneficiário</h4>
                   <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                    Apoio escolar e bolsas universitárias para equipar mentes e abrir portas para o amanhã.
+                    Otimizamos custos administrativos para que a esmagadora maioria dos fundos vá diretamente para o campo e a nutrição.
                   </p>
                 </div>
 
@@ -309,13 +314,13 @@ export function MissionVisionValues() {
       <section className="py-20 bg-slate-50 text-center font-gotham-regular">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <span className="text-[#F49853] font-gotham-bold text-xs uppercase tracking-widest block mb-3">
-            Faça Parte Desta Transformação
+            Conecte-se com Esse Propósito
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black text-slate-900 mb-6">
-            Junte-se a nós para promover a dignidade humana.
+            Ajude-nos a levar esses valores para mais comunidades.
           </h2>
           <p className="text-slate-600 font-gotham-light text-base md:text-lg mb-8 max-w-2xl mx-auto">
-            Seja através de contribuições mensais, apadrinhamento ou parcerias, você ajuda a capacitar líderes locais e salvar vidas da desnutrição.
+            Cada nova criança acolhida, cada poço aberto e cada bolsa concedida representa a materialização prática da nossa missão.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <button

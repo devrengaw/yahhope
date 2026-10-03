@@ -224,9 +224,23 @@ export function PublicHeader() {
                 </button>
                 <div className="absolute top-full left-0 w-64 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Nampula (Moçambique)</Link></li>
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Ações Sociais no Brasil</Link></li>
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Novas Frentes Comunitárias</Link></li>
+                    <li>
+                      <Link to="/projetos?regiao=mocambique" className="flex items-center justify-between hover:text-[#F49853] hover:translate-x-1 transition-all">
+                        <span>Nampula (Moçambique)</span>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-gotham-medium">Campo</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/projetos?regiao=brasil" className="flex items-center justify-between hover:text-[#F49853] hover:translate-x-1 transition-all">
+                        <span>Brasil (Sede & Expansão)</span>
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-gotham-medium">Base</span>
+                      </Link>
+                    </li>
+                    <li className="pt-2 border-t border-slate-100">
+                      <Link to="/projetos" className="block text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] transition-colors">
+                        Ver Visão Geral & Frentes →
+                      </Link>
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -409,8 +423,9 @@ export function PublicHeader() {
                 </button>
                 {activeMobileSubmenu === 'reach' && (
                   <div className="pl-4 py-2 space-y-2 text-xs font-gotham-regular text-slate-600 border-l-2 border-[#F49853]/30 ml-2">
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Nampula (Moçambique)</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Ações Sociais no Brasil</Link>
+                    <Link to="/projetos?regiao=mocambique" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Nampula (Moçambique)</Link>
+                    <Link to="/projetos?regiao=brasil" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Brasil (Sede & Expansão)</Link>
+                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 font-gotham-bold text-[#F49853]">Ver Todos os Projetos →</Link>
                   </div>
                 )}
               </div>
