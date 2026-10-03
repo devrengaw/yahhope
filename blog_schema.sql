@@ -222,10 +222,21 @@ VALUES
     '["pt"]'::jsonb
   )
 ON CONFLICT (id) DO UPDATE SET
+  title = EXCLUDED.title,
+  excerpt = EXCLUDED.excerpt,
+  content = EXCLUDED.content,
+  author = EXCLUDED.author,
+  date = EXCLUDED.date,
+  image = EXCLUDED.image,
+  status = EXCLUDED.status,
+  category = EXCLUDED.category,
+  featured_home = EXCLUDED.featured_home,
+  highlight_type = EXCLUDED.highlight_type,
+  highlight_color = EXCLUDED.highlight_color,
   views_count = EXCLUDED.views_count,
   reads_count = EXCLUDED.reads_count,
   likes_count = EXCLUDED.likes_count,
   shares_count = EXCLUDED.shares_count,
   comments_count = EXCLUDED.comments_count,
-  category = EXCLUDED.category,
-  translations = EXCLUDED.translations;
+  translations = EXCLUDED.translations,
+  updated_at = NOW();

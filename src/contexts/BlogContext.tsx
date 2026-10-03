@@ -211,7 +211,7 @@ interface BlogContextType {
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
-const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v3';
+const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v4';
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
@@ -222,7 +222,10 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const hasOldMockups = parsed.some(p => p.id === 'post-1' && p.title.toLowerCase().includes('casa nutri'));
+          if (!hasOldMockups) {
+            return parsed;
+          }
         }
       }
     } catch (e) {

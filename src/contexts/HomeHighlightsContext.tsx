@@ -21,16 +21,16 @@ export const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
   {
     id: 1,
     type: 'photo',
-    title: 'Casa Nutri: Resgatando 9 Crianças em Nampula',
+    title: 'O propósito de uma ilha',
     category: 'Nutrição & Saúde Infantil',
     location: 'Moçambique',
-    snippet: 'Acompanhamento terapêutico e nutricional para 9 crianças recuperarem peso e saúde com dignidade.',
+    snippet: 'Nosso centro nutricional acolhe crianças em estado crítico de vulnerabilidade alimentar, fornecendo dietas balanceadas e assistência médica contínua.',
     content: `Na província de Nampula, em Moçambique, a desnutrição infantil severa é uma das maiores ameaças ao desenvolvimento e sobrevivência de crianças em seus primeiros anos de vida.
 
-A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos 9 crianças da curva crítica de desnutrição.
+A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos crianças da curva crítica de desnutrição.
 
-Principais frentes de atuação:
-• Refeições terapêuticas e acompanhamento nutricional contínuo.
+Impacto Direto:
+• Mais de 1.800 refeições terapêuticas distribuídas a cada mês.
 • Recuperação do peso ideal e fortalecimento imunológico.
 • Acompanhamento médico e psicológico com a família.
 
@@ -45,52 +45,50 @@ Cada sorriso devolvido representa o futuro que renasce em solo fértil de espera
   {
     id: 2,
     type: 'split',
-    title: 'Bolsas Universitárias: Da Vulnerabilidade ao Diploma',
-    category: 'Educação Superior',
+    title: 'Um problema crônico',
+    category: 'Tudo sobre Moçambique',
     location: 'Moçambique',
-    snippet: 'Custeio acadêmico e mentoria para que 5 jovens capacitados concluam a faculdade e liderem suas comunidades.',
-    content: `O acesso ao ensino superior em Moçambique é um privilégio restrito a poucos. Jovens brilhantes de comunidades vulneráveis frequentemente são forçados a interromper seus estudos por falta de recursos para mensalidades, livros e transporte.
+    snippet: 'Compreendendo as raízes históricas e estruturais das dificuldades alimentares e como a capacitação comunitária rompe ciclos geracionais.',
+    content: `O acesso à água potável e nutrição digna em Moçambique continua sendo um desafio para milhões de famílias vulneráveis.
 
-O programa de Bolsas Universitárias da YAH Hope está custeando a graduação integral e oferecendo mentoria para estudantes em cursos estratégicos para o desenvolvimento local, como Enfermagem, Administração e Pedagogia.
+Nossa missão atua não somente no socorro emergencial imediato, mas no empoderamento sustentável da comunidade com poços artesianos e hortas agroecológicas.
 
-Além da bolsa financeira, cada jovem recebe acompanhamento pessoal para inserção no mercado de trabalho e capacitação de liderança para retornarem e multiplicarem o impacto em suas comunidades.`,
+A educação sanitária e a autonomia familiar garantem que as conquistas nutricionais de hoje permaneçam amanhã.`,
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
     link: '/blog?post=post-2',
     color: '#88A1F2',
-    active: false, // Inativo: "nao tem os jovens universitarios ainda"
+    active: false,
     order: 2,
     blogPostId: 'post-2'
   },
   {
     id: 3,
     type: 'photo',
-    title: 'Oficinas de Costura & Hortas para Mães',
-    category: 'Autonomia & Renda',
+    title: 'Você tem a firme certeza?',
+    category: 'Pense e reflita',
     location: 'Moçambique',
-    snippet: 'Capacitação profissional e fomento à agricultura familiar para que mães gerem renda própria e sustentem suas famílias com dignidade.',
-    content: `A autonomia financeira feminina é o pilar mais sólido para erradicar a fome de forma perene. Quando uma mãe adquire uma profissão, toda a sua família é transformada.
+    snippet: 'Uma reflexão sobre fé em ação prática, generosidade com propósito e o chamado individual para transformar a dor do próximo em esperança.',
+    content: `A compaixão que não se move em direção ao necessitado permanece apenas como um belo sentimento. O Evangelho vivo se manifesta no prato de comida e no remédio entregue.
 
-Através das nossas oficinas de costura industrial e implantação de hortas comunitárias orgânicas, mais de 30 mulheres já aprenderam técnicas produtivas e estão vendendo seus produtos nos mercados locais.
-
-O projeto fornece máquinas de costura, sementes selecionadas e treinamento em gestão de pequenos negócios familiares para garantir sustentabilidade a longo prazo.`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
+Quando nos perguntamos sobre o impacto da nossa vida, o padrão não é quanto acumulamos, mas quantas vidas puderam respirar aliviadas pela nossa presença.`,
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
     link: '/blog?post=post-3',
     color: '#EBC878',
-    active: true,
+    active: false,
     order: 3,
     blogPostId: 'post-3'
   },
   {
     id: 4,
     type: 'photo',
-    title: 'Ação Humanitária: Cuidado Integral e Fé Prática',
-    category: 'Ação Social',
-    location: 'Brasil & Moçambique',
-    snippet: 'Levando esperança, suprimentos emergenciais e amparo espiritual para famílias em situação de vulnerabilidade extrema.',
-    content: `Em momentos de crise climática e escassez, a resposta humanitária precisa ser imediata, calorosa e abrangente. Nossas equipes atuam na linha de frente distribuindo água potável, roupas, cobertores e cestas alimentares completas.
+    title: 'O início',
+    category: 'Viagens',
+    location: 'Moçambique',
+    snippet: 'Relato dos primeiros passos da YAH Hope nas aldeias de Nampula, os desafios do acolhimento e as sementes que germinaram.',
+    content: `Chegar em uma nova comunidade exige respeito, escuta atenta e vínculo sincero. Antes de qualquer projeto, sentamos com os anciãos e as mães locais.
 
-Mais do que auxílio material, levamos acolhimento humano, oração e amparo espiritual para restaurar a dignidade e a esperança de famílias que perderam tudo em enchentes e secas severas.`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
+Foi a partir desse diálogo que entendemos as urgências: nutrição infantil, capacitação profissional e acesso à água limpa.`,
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
     link: '/blog?post=post-4',
     color: '#F49853',
     active: true,
@@ -100,13 +98,13 @@ Mais do que auxílio material, levamos acolhimento humano, oração e amparo esp
   {
     id: 5,
     type: 'split',
-    title: 'Saúde Preventiva e Higiene Familiar',
-    category: 'Saúde Comunitária',
+    title: 'Um pouco sobre Moçambique',
+    category: 'Tudo sobre Moçambique',
     location: 'Nampula',
-    snippet: 'Visitas domiciliares periódicas, distribuição de kits de higiene e acompanhamento médico básico preventivo em comunidades de Nampula.',
-    content: `A prevenção de doenças infecciosas e parasitárias começa com o acesso à água limpa, hábitos de higiene e diagnóstico precoce nas aldeias.
+    snippet: 'Cultura, resiliência e as histórias humanas por trás das paisagens e da nossa frente de atuação humanitária.',
+    content: `Moçambique é uma terra de rica herança cultural, acolhimento caloroso e pessoas extraordinariamente resilientes.
 
-Nossos agentes de saúde comunitária realizam visitas domiciliares periódicas em Nampula, distribuindo kits familiares de higiene, pastilhas de cloro para desinfecção de poços e promovendo palestras práticas sobre saneamento básico e prevenção da malária.`,
+Cada comunidade possui um potencial gigantesco que precisa apenas de suporte para florescer com autonomia e dignidade.`,
     image: '/login_bg_real.jpg',
     link: '/blog?post=post-5',
     color: '#92BF78',
@@ -143,7 +141,7 @@ interface HomeHighlightsContextType {
 
 const HomeHighlightsContext = createContext<HomeHighlightsContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_home_highlights_v3';
+const STORAGE_KEY = 'yah_hope_home_highlights_v4';
 
 export function HomeHighlightsProvider({ children }: { children: React.ReactNode }) {
   const [highlights, setHighlights] = useState<HomeHighlightItem[]>(() => {
@@ -152,7 +150,10 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const hasOldMockups = parsed.some(h => String(h.title).toLowerCase().includes('casa nutri'));
+          if (!hasOldMockups) {
+            return parsed;
+          }
         }
       }
     } catch (e) {
