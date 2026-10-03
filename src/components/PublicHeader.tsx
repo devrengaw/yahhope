@@ -126,7 +126,7 @@ export function PublicHeader() {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 shrink-0">
               <img 
-                src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" 
+                src="/logo-black.png" 
                 alt="YAH Hope" 
                 className="h-10 md:h-12 w-auto object-contain"
               />
@@ -349,7 +349,7 @@ export function PublicHeader() {
           <div className="relative ml-auto w-full max-w-xs sm:max-w-sm bg-white h-full shadow-2xl flex flex-col z-10 overflow-y-auto pt-safe pb-safe animate-slideLeft">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <img 
-                src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" 
+                src="/logo-black.png" 
                 alt="YAH Hope Logo" 
                 className="h-8 w-auto object-contain"
               />
