@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { 
   Heart, 
   ArrowRight, 
-  Sparkles, 
   ShieldCheck, 
   Users, 
   MapPin, 
@@ -42,11 +41,6 @@ export function AboutUs() {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#F49853] text-xs font-gotham-bold uppercase tracking-widest mb-6">
-              <Sparkles size={14} />
-              <span>Conheça a YAH Hope</span>
-            </div>
-
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-heading font-black tracking-tight leading-tight text-white mb-6">
               Guardiões da <br className="hidden sm:inline" />
               <span className="text-[#F49853]">Dignidade Humana</span>
@@ -168,9 +162,6 @@ export function AboutUs() {
             
             {/* Left Column: MANI-FESTO Title */}
             <div className="lg:col-span-5 text-left">
-              <span className="text-xs font-gotham-bold uppercase tracking-widest text-slate-900/80 bg-white/30 backdrop-blur-xs px-3 py-1 rounded-full inline-block mb-4">
-                Nossa Declaração Oficial
-              </span>
               <h2 className="text-6xl sm:text-7xl md:text-8xl lg:text-8xl xl:text-9xl font-heading font-black text-white uppercase tracking-tight leading-[0.88] select-none drop-shadow-md">
                 MANI-<br />FESTO
               </h2>
