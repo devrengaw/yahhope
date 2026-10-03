@@ -265,6 +265,42 @@ button, a, nav, [role="button"], input[type="button"], input[type="submit"] {
   animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Blog Content Tables & Formatting */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0.875rem;
+  border: 1px solid #e2e8f0;
+  margin: 1.5rem 0;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
 
+.table-container table,
+.prose table {
+  width: 100%;
+  min-width: 450px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
 
+.table-container th,
+.prose th {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+}
 
+.table-container td,
+.prose td {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.table-container tr:nth-child(even) td {
+  background-color: #fcfdfe;
+}

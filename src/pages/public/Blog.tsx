@@ -280,7 +280,7 @@ export function Blog() {
 
               {/* Story Content */}
               <div className="text-slate-800 text-base sm:text-lg leading-relaxed font-gotham-regular space-y-5">
-                {selectedPost.content.includes('<p>') || selectedPost.content.includes('<br>') || selectedPost.content.includes('<img') ? (
+                {selectedPost.content.includes('<p>') || selectedPost.content.includes('<br>') || selectedPost.content.includes('<img') || selectedPost.content.includes('<table') || /<[a-z][\s\S]*>/i.test(selectedPost.content) ? (
                   <div 
                     className="prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-heading prose-headings:font-bold prose-a:text-[#F49853] prose-img:rounded-2xl prose-img:mx-auto prose-img:shadow-sm"
                     dangerouslySetInnerHTML={{ __html: selectedPost.content }}

@@ -67,16 +67,29 @@ export function MonthlyExpensesManager({
     const fixedExpenses = allExpenses.filter(t => t.expense_type === 'fixed');
     const variableExpenses = allExpenses.filter(t => t.expense_type === 'variable');
 
-    const totalFixed = fixedExpenses.reduce((acc, t) => acc + t.amount, 0);
+    // Total nominal dos contratos fixos cadastrados
+    const totalFixedNominal = fixedExpenses.reduce((acc, t) => acc + t.amount, 0);
+
+    // Custo mensal estrutural equivalente (amortizado: bimestral /2, trimestral /3, semestral /6, anual /12)
+    const monthlyEquivalentFixed = fixedExpenses.reduce((acc, t) => {
+      const rec = t.recurrence || 'monthly';
+      if (rec === 'bimonthly') return acc + (t.amount / 2);
+      if (rec === 'quarterly') return acc + (t.amount / 3);
+      if (rec === 'semiannual') return acc + (t.amount / 6);
+      if (rec === 'yearly') return acc + (t.amount / 12);
+      return acc + t.amount;
+    }, 0);
+
     const totalVariable = variableExpenses.reduce((acc, t) => acc + t.amount, 0);
-    const totalExpense = totalFixed + totalVariable;
+    const totalExpense = monthlyEquivalentFixed + totalVariable;
 
     // Percentual de cobertura do custo fixo pelas receitas totais
-    const fixedCoverage = totalFixed > 0 ? (totalIncome / totalFixed) * 100 : 100;
+    const fixedCoverage = monthlyEquivalentFixed > 0 ? (totalIncome / monthlyEquivalentFixed) * 100 : 100;
     const balance = totalIncome - totalExpense;
 
     return {
-      totalFixed,
+      totalFixed: monthlyEquivalentFixed,
+      totalFixedNominal,
       totalVariable,
       totalExpense,
       fixedCount: fixedExpenses.length,
@@ -459,8 +472,12 @@ export function MonthlyExpensesManager({
                         )}
                       </span>
                       {t.recurrence && t.recurrence !== 'none' && (
-                        <span className="text-[10px] font-bold text-slate-400 uppercase pl-1">
-                          Recorrência {t.recurrence === 'monthly' ? 'Mensal' : 'Anual'}
+                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md uppercase tracking-wider w-fit">
+                          {t.recurrence === 'monthly' ? 'Mensal' : 
+                           t.recurrence === 'bimonthly' ? 'Bimestral' :
+                           t.recurrence === 'quarterly' ? 'Trimestral' :
+                           t.recurrence === 'semiannual' ? 'Semestral' :
+                           t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
                         </span>
                       )}
                     </div>
@@ -476,6 +493,11 @@ export function MonthlyExpensesManager({
                     <p className="text-base font-black text-rose-600 tracking-tight">
                       - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
+                    {isFixed && t.recurrence && t.recurrence !== 'monthly' && t.recurrence !== 'none' && (
+                      <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
+                        ~ R$ {(t.amount / (t.recurrence === 'bimonthly' ? 2 : t.recurrence === 'quarterly' ? 3 : t.recurrence === 'semiannual' ? 6 : 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      </p>
+                    )}
                   </td>
 
                   {/* Ações */}

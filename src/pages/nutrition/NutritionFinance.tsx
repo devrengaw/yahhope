@@ -364,12 +364,23 @@ export function NutritionFinance() {
                             </div>
                           </td>
                           <td className="px-8 py-4">
-                            <span className={cn(
-                              "px-3 py-1 rounded-lg text-[10px] font-black uppercase w-fit border",
-                              t.type === 'income' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
-                            )}>
-                              {t.type === 'income' ? 'Repasse Recebido' : t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className={cn(
+                                "px-3 py-1 rounded-lg text-[10px] font-black uppercase w-fit border",
+                                t.type === 'income' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
+                              )}>
+                                {t.type === 'income' ? 'Repasse Recebido' : t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
+                              </span>
+                              {t.type === 'expense' && t.expense_type === 'fixed' && t.recurrence && t.recurrence !== 'none' && (
+                                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded uppercase tracking-wider w-fit">
+                                  {t.recurrence === 'monthly' ? 'Mensal' : 
+                                   t.recurrence === 'bimonthly' ? 'Bimestral' :
+                                   t.recurrence === 'quarterly' ? 'Trimestral' :
+                                   t.recurrence === 'semiannual' ? 'Semestral' :
+                                   t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-8 py-4 text-right">
                             <p className={cn("text-lg font-black", t.type === 'income' ? "text-emerald-600" : "text-rose-600")}>

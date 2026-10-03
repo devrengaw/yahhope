@@ -44,7 +44,7 @@ export interface Transaction {
   status: 'pending' | 'completed';
   account: string;
   expense_type?: 'fixed' | 'variable';
-  recurrence?: 'monthly' | 'yearly' | 'none';
+  recurrence?: 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
   module?: string;
 }
 
@@ -658,9 +658,15 @@ export function Finance() {
                               </span>
                             )}
                             {t.recurrence && t.recurrence !== 'none' && (
-                              <div className="flex items-center gap-1 text-slate-400">
-                                <Calendar size={12} />
-                                <span className="text-[10px] font-bold uppercase">{t.recurrence}</span>
+                              <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50/70 px-2 py-0.5 rounded-md w-fit">
+                                <Calendar size={11} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">
+                                  {t.recurrence === 'monthly' ? 'Mensal' :
+                                   t.recurrence === 'bimonthly' ? 'Bimestral' :
+                                   t.recurrence === 'quarterly' ? 'Trimestral' :
+                                   t.recurrence === 'semiannual' ? 'Semestral' :
+                                   t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
+                                </span>
                               </div>
                             )}
                           </div>

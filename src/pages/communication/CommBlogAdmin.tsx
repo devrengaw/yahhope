@@ -6,7 +6,6 @@ import {
   Edit2, 
   Trash2, 
   Eye, 
-  EyeOff, 
   CheckCircle2, 
   AlertCircle, 
   X, 
@@ -16,7 +15,6 @@ import {
   Star, 
   Sparkles,
   ExternalLink,
-  RotateCcw,
   Share2,
   Heart,
   MessageSquare,
@@ -79,9 +77,7 @@ export function CommBlogAdmin() {
     moveToTrash, 
     restoreFromTrash, 
     bulkUpdateStatus, 
-    toggleFeaturedHome, 
-    syncWithSupabase,
-    resetBlogToDefaults 
+    toggleFeaturedHome
   } = useBlog();
 
   const { confirm } = useConfirm();
@@ -101,20 +97,11 @@ export function CommBlogAdmin() {
   const [showCoverUrlInput, setShowCoverUrlInput] = useState(false);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Blog general visibility
-  const [isBlogClosed, setIsBlogClosed] = useState(() => localStorage.getItem('yah_blog_closed') === 'true');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const handleToggleBlog = () => {
-    const newState = !isBlogClosed;
-    setIsBlogClosed(newState);
-    localStorage.setItem('yah_blog_closed', String(newState));
-    window.dispatchEvent(new Event('storage'));
   };
 
   // Tab counts
@@ -311,6 +298,13 @@ export function CommBlogAdmin() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+          {loading && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-200/60">
+              <RefreshCw size={12} className="animate-spin text-blue-500" />
+              <span>Sincronizando...</span>
+            </div>
+          )}
+
           <Link
             to="/communication/home-highlights"
             className="px-3.5 py-2 rounded-xl font-bold text-xs bg-orange-50 text-[#F49853] hover:bg-orange-100 border border-orange-200 transition-all flex items-center gap-1.5"
@@ -319,43 +313,6 @@ export function CommBlogAdmin() {
             <Sparkles size={14} />
             <span>Destaques da Home</span>
           </Link>
-
-          <button
-            onClick={async () => {
-              await syncWithSupabase();
-              showToast('Banco de dados sincronizado em tempo real!');
-            }}
-            disabled={loading}
-            className="px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-            title="Sincronizar posts e métricas do Supabase"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin text-blue-600" : ""} />
-            <span>{loading ? 'Sincronizando...' : 'Sincronizar'}</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              if (await confirm('Deseja restaurar as matérias e métricas padrão da YAH Hope?')) {
-                await resetBlogToDefaults();
-                showToast('Artigos padrão restaurados!');
-              }
-            }}
-            className="px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-            title="Restaurar artigos padrão"
-          >
-            <RotateCcw size={14} />
-            <span>Padrões</span>
-          </button>
-
-          <button
-            onClick={handleToggleBlog}
-            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all text-xs cursor-pointer ${
-              isBlogClosed ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-            }`}
-          >
-            {isBlogClosed ? <Eye size={14} /> : <EyeOff size={14} />}
-            {isBlogClosed ? 'Ativar Blog' : 'Ocultar Blog'}
-          </button>
 
           <button 
             onClick={() => { 

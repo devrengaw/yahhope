@@ -13,6 +13,8 @@ import {
 import { TransactionCategory } from '../../../pages/admin/Finance';
 import { cn } from '../../../lib/utils';
 
+export type RecurrenceType = 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
+
 export interface ExpensePayload {
   description: string;
   amount: number;
@@ -22,7 +24,7 @@ export interface ExpensePayload {
   status: 'pending' | 'completed';
   account: string;
   expense_type: 'fixed' | 'variable';
-  recurrence: 'monthly' | 'yearly' | 'none';
+  recurrence: RecurrenceType;
   due_day?: number;
   department?: string;
   notes?: string;
@@ -50,7 +52,7 @@ export function ExpenseModal({
   const [categoryId, setCategoryId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDay, setDueDay] = useState(10);
-  const [recurrence, setRecurrence] = useState<'monthly' | 'yearly' | 'none'>('monthly');
+  const [recurrence, setRecurrence] = useState<RecurrenceType>('monthly');
   const [account, setAccount] = useState('Conta Principal');
   const [status, setStatus] = useState<'pending' | 'completed'>('completed');
   const [department, setDepartment] = useState('Operações & Nutrição');
@@ -73,6 +75,18 @@ export function ExpenseModal({
 
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
+  // Amortização mensal estimada quando semestral/anual/etc.
+  const getMonthlyAmortization = () => {
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) return null;
+    if (recurrence === 'bimonthly') return val / 2;
+    if (recurrence === 'quarterly') return val / 3;
+    if (recurrence === 'semiannual') return val / 6;
+    if (recurrence === 'yearly') return val / 12;
+    return null;
+  };
+  const monthlyAmortization = getMonthlyAmortization();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description || !amount || !categoryId || !account) return;
@@ -84,14 +98,14 @@ export function ExpenseModal({
         amount: parseFloat(amount),
         type: 'expense',
         category_id: categoryId,
-        date: expenseType === 'fixed' 
+        date: expenseType === 'fixed' && recurrence === 'monthly'
           ? `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
           : date,
         status,
         account,
         expense_type: expenseType,
         recurrence: expenseType === 'fixed' ? recurrence : 'none',
-        due_day: expenseType === 'fixed' ? dueDay : undefined,
+        due_day: expenseType === 'fixed' && recurrence === 'monthly' ? dueDay : undefined,
         department,
         notes
       });
@@ -121,10 +135,10 @@ export function ExpenseModal({
               <span className="p-2 bg-rose-500 text-white rounded-xl shadow-md shadow-rose-500/20">
                 <DollarSign size={20} />
               </span>
-              Lançar Gasto Mensal
+              Lançar Despesa
             </h2>
             <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">
-              Classifique entre compromisso fixo ou despesa variável
+              Classifique o tipo de gasto e a periodicidade do pagamento
             </p>
           </div>
           <button 
@@ -154,7 +168,7 @@ export function ExpenseModal({
               )}
             >
               <Repeat size={14} className={expenseType === 'fixed' ? "text-amber-400" : ""} />
-              Gasto Fixo Mensal
+              Gasto Fixo Recorrente
             </button>
             <button
               type="button"
@@ -170,9 +184,59 @@ export function ExpenseModal({
               )}
             >
               <Clock size={14} />
-              Gasto Variável
+              Gasto Variável / Pontual
             </button>
           </div>
+
+          {/* Opções de Periodicidade de Pagamento (Quando Gasto Fixo) */}
+          {expenseType === 'fixed' && (
+            <div className="space-y-2 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/80 animate-in fade-in duration-300">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-indigo-950">
+                Periodicidade do Pagamento
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { key: 'monthly', label: 'Mensal', hint: '1x/mês' },
+                  { key: 'bimonthly', label: 'Bimestral', hint: 'A cada 2m' },
+                  { key: 'quarterly', label: 'Trimestral', hint: 'A cada 3m' },
+                  { key: 'semiannual', label: 'Semestral', hint: 'A cada 6m' },
+                  { key: 'yearly', label: 'Anual', hint: '1x/ano' },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setRecurrence(item.key as RecurrenceType)}
+                    className={cn(
+                      "py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center border",
+                      recurrence === item.key
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
+                    )}
+                  >
+                    <span>{item.label}</span>
+                    <span className={cn(
+                      "text-[9px] font-medium mt-0.5",
+                      recurrence === item.key ? "text-indigo-100" : "text-slate-400"
+                    )}>
+                      {item.hint}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {monthlyAmortization !== null && (
+                <div className="mt-2.5 pt-2 border-t border-indigo-100 flex items-center justify-between text-xs text-indigo-900 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    Custo mensal equivalente amortizado:
+                  </span>
+                  <strong className="font-black text-indigo-700">
+                    ~ R$ {monthlyAmortization.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Dica descritiva do tipo */}
           <div className={cn(
@@ -183,11 +247,11 @@ export function ExpenseModal({
           )}>
             {expenseType === 'fixed' ? (
               <p>
-                <strong>Compromisso Recorrente:</strong> Aluguéis, salários, energia, internet e outros custos que ocorrem com frequência mensal ou anual.
+                <strong>Compromisso Recorrente:</strong> Aluguéis, salários, energia, internet, licenças de software ou contratos com pagamentos mensais, semestrais ou anuais.
               </p>
             ) : (
               <p>
-                <strong>Despesa Variável / Flutuante:</strong> Compras de urgência, manutenção pontual, medicamentos de emergência ou despesas operacionais deste mês.
+                <strong>Despesa Variável / Flutuante:</strong> Compras de urgência, manutenção pontual, medicamentos de emergência ou despesas operacionais pontuais deste período.
               </p>
             )}
           </div>
@@ -204,7 +268,7 @@ export function ExpenseModal({
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={expenseType === 'fixed' ? "Ex: Aluguel da Casa Nutri Boane" : "Ex: Insumos de emergência e transporte"}
+                placeholder={expenseType === 'fixed' ? "Ex: Aluguel da Casa Nutri, Assinatura Servidor, Folha de Pessoal..." : "Ex: Insumos de emergência, conserto hidráulico..."}
                 className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-slate-500/5 focus:border-slate-300 transition-all"
                 required
               />
@@ -214,7 +278,7 @@ export function ExpenseModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                  Valor Estimado (R$)
+                  Valor {expenseType === 'fixed' && recurrence !== 'monthly' ? `do Pagamento (${recurrence === 'semiannual' ? 'Semestral' : recurrence === 'yearly' ? 'Anual' : recurrence === 'quarterly' ? 'Trimestral' : 'Bimestral'})` : 'Estimado'} (R$)
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
@@ -231,7 +295,7 @@ export function ExpenseModal({
                 </div>
               </div>
 
-              {expenseType === 'fixed' ? (
+              {expenseType === 'fixed' && recurrence === 'monthly' ? (
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
                     Dia do Vencimento Mensal
@@ -253,7 +317,7 @@ export function ExpenseModal({
               ) : (
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                    Data da Despesa
+                    {expenseType === 'fixed' ? 'Data do Próximo Pagamento' : 'Data da Despesa'}
                   </label>
                   <input
                     type="date"

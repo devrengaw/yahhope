@@ -4,6 +4,7 @@ import {
   Italic, 
   Underline, 
   List, 
+  ListOrdered,
   Smile, 
   ChevronDown, 
   AlignLeft, 
@@ -14,7 +15,12 @@ import {
   Upload, 
   Link2, 
   Loader2,
-  X
+  X,
+  Table as TableIcon,
+  Plus,
+  Trash2,
+  Columns,
+  Rows
 } from 'lucide-react';
 import { uploadBlogImage } from '../../lib/imageUpload';
 
@@ -28,6 +34,19 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableCols, setTableCols] = useState(3);
+  const [hoverRows, setHoverRows] = useState(3);
+  const [hoverCols, setHoverCols] = useState(3);
+  const [tableWithHeader, setTableWithHeader] = useState(true);
+  const [currentTableContext, setCurrentTableContext] = useState<{
+    table: HTMLTableElement;
+    row: HTMLTableRowElement | null;
+    cell: HTMLTableCellElement | null;
+    rowIndex: number;
+    colIndex: number;
+  } | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [activeFont, setActiveFont] = useState('Inter');
@@ -166,6 +185,172 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     setShowImageModal(false);
   };
 
+  const checkTableContext = () => {
+    saveSelection();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      setCurrentTableContext(null);
+      return;
+    }
+    let node: Node | null = sel.anchorNode;
+    let cell: HTMLTableCellElement | null = null;
+    let row: HTMLTableRowElement | null = null;
+    let table: HTMLTableElement | null = null;
+
+    while (node && node !== editorRef.current) {
+      if (node.nodeName === 'TD' || node.nodeName === 'TH') {
+        cell = node as HTMLTableCellElement;
+      }
+      if (node.nodeName === 'TR') {
+        row = node as HTMLTableRowElement;
+      }
+      if (node.nodeName === 'TABLE') {
+        table = node as HTMLTableElement;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (table) {
+      const rowIndex = row ? row.rowIndex : -1;
+      const colIndex = cell ? cell.cellIndex : -1;
+      setCurrentTableContext({ table, row, cell, rowIndex, colIndex });
+    } else {
+      setCurrentTableContext(null);
+    }
+  };
+
+  const insertTable = (rows: number, cols: number, withHeader: boolean) => {
+    const validRows = Math.max(1, Math.min(20, rows));
+    const validCols = Math.max(1, Math.min(10, cols));
+
+    let html = `<div class="table-container my-4 overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">`;
+    html += `<table style="width: 100%; border-collapse: collapse; min-width: 450px; font-size: 0.875rem;">`;
+
+    if (withHeader) {
+      html += `<thead><tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">`;
+      for (let c = 1; c <= validCols; c++) {
+        html += `<th style="padding: 10px 14px; text-align: left; font-weight: 700; color: #1e293b; border: 1px solid #e2e8f0;">Coluna ${c}</th>`;
+      }
+      html += `</tr></thead>`;
+    }
+
+    html += `<tbody>`;
+    const bodyRows = withHeader ? Math.max(1, validRows - 1) : validRows;
+    for (let r = 1; r <= bodyRows; r++) {
+      html += `<tr style="border-bottom: 1px solid #f1f5f9;">`;
+      for (let c = 1; c <= validCols; c++) {
+        html += `<td style="padding: 10px 14px; color: #334155; border: 1px solid #e2e8f0;">Item ${r}.${c}</td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div><p><br></p>`;
+
+    insertHtmlAtCursor(html);
+    setShowTableModal(false);
+  };
+
+  const insertRowInTable = (table: HTMLTableElement, targetRow: HTMLTableRowElement | null) => {
+    const colCount = table.rows[0]?.cells.length || 3;
+    const newRow = document.createElement('tr');
+    newRow.style.borderBottom = '1px solid #f1f5f9';
+    for (let c = 0; c < colCount; c++) {
+      const td = document.createElement('td');
+      td.style.padding = '10px 14px';
+      td.style.color = '#334155';
+      td.style.border = '1px solid #e2e8f0';
+      td.innerHTML = 'Novo item';
+      newRow.appendChild(td);
+    }
+    if (targetRow && targetRow.parentNode) {
+      if (targetRow.nextSibling) {
+        targetRow.parentNode.insertBefore(newRow, targetRow.nextSibling);
+      } else {
+        targetRow.parentNode.appendChild(newRow);
+      }
+    } else {
+      const tbody = table.querySelector('tbody') || table;
+      tbody.appendChild(newRow);
+    }
+    handleInput();
+    setShowTableModal(false);
+  };
+
+  const insertColumnInTable = (table: HTMLTableElement, targetColIndex: number) => {
+    for (let i = 0; i < table.rows.length; i++) {
+      const r = table.rows[i];
+      const isHeaderRow = r.parentNode?.nodeName === 'THEAD' || r.cells[0]?.nodeName === 'TH';
+      const cell = document.createElement(isHeaderRow ? 'th' : 'td');
+      if (isHeaderRow) {
+        cell.style.padding = '10px 14px';
+        cell.style.fontWeight = '700';
+        cell.style.color = '#1e293b';
+        cell.style.border = '1px solid #e2e8f0';
+        cell.style.textAlign = 'left';
+        cell.textContent = `Coluna ${r.cells.length + 1}`;
+      } else {
+        cell.style.padding = '10px 14px';
+        cell.style.color = '#334155';
+        cell.style.border = '1px solid #e2e8f0';
+        cell.innerHTML = 'Novo dado';
+      }
+      if (targetColIndex >= 0 && targetColIndex < r.cells.length) {
+        const refCell = r.cells[targetColIndex];
+        if (refCell.nextSibling) {
+          r.insertBefore(cell, refCell.nextSibling);
+        } else {
+          r.appendChild(cell);
+        }
+      } else {
+        r.appendChild(cell);
+      }
+    }
+    handleInput();
+    setShowTableModal(false);
+  };
+
+  const deleteRowInTable = (table: HTMLTableElement, targetRow: HTMLTableRowElement | null) => {
+    if (targetRow) {
+      targetRow.remove();
+      if (table.rows.length === 0) {
+        const container = table.closest('.table-container');
+        if (container) container.remove();
+        else table.remove();
+      }
+      handleInput();
+      setShowTableModal(false);
+    }
+  };
+
+  const deleteColumnInTable = (table: HTMLTableElement, targetColIndex: number) => {
+    if (targetColIndex >= 0) {
+      for (let i = 0; i < table.rows.length; i++) {
+        const r = table.rows[i];
+        if (r.cells[targetColIndex]) {
+          r.cells[targetColIndex].remove();
+        }
+      }
+      if (table.rows[0]?.cells.length === 0) {
+        const container = table.closest('.table-container');
+        if (container) container.remove();
+        else table.remove();
+      }
+      handleInput();
+      setShowTableModal(false);
+    }
+  };
+
+  const deleteEntireTable = (table: HTMLTableElement) => {
+    const container = table.closest('.table-container');
+    if (container) {
+      container.remove();
+    } else {
+      table.remove();
+    }
+    handleInput();
+    setShowTableModal(false);
+  };
+
   const fonts = ['Inter', 'Poppins', 'Kanit', 'Optima', 'Roboto', 'Merriweather', 'Monospace'];
   const sizes = ['12px', '14px', '16px', '20px', '24px', '32px'];
   const emojis = [
@@ -292,6 +477,9 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-2 hover:bg-white hover:text-indigo-600 rounded-lg text-slate-500 transition-all border border-transparent hover:border-slate-200" title="Lista com Marcadores">
           <List size={17} />
         </button>
+        <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2 hover:bg-white hover:text-indigo-600 rounded-lg text-slate-500 transition-all border border-transparent hover:border-slate-200" title="Lista Numerada">
+          <ListOrdered size={17} />
+        </button>
 
         {/* Upload Image Button */}
         <div className="relative">
@@ -300,6 +488,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
             onClick={() => {
               saveSelection();
               setShowImageModal(!showImageModal);
+              setShowTableModal(false);
             }}
             className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-600 transition-all border border-indigo-100 bg-white flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer"
             title="Inserir Foto no Texto"
@@ -371,6 +560,247 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
           )}
         </div>
 
+        {/* Table Button & Dropdown */}
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={() => {
+              checkTableContext();
+              setShowTableModal(!showTableModal);
+              setShowImageModal(false);
+            }}
+            className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-600 transition-all border border-indigo-100 bg-white flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer"
+            title="Criar e Gerenciar Tabelas"
+          >
+            <TableIcon size={16} className="text-indigo-600" />
+            <span className="hidden sm:inline">Tabela</span>
+            <ChevronDown size={12} className="text-slate-400" />
+          </button>
+
+          {showTableModal && (
+            <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 w-72 sm:w-84 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <TableIcon size={14} className="text-indigo-600" /> 
+                  {currentTableContext ? 'Gerenciar Tabela' : 'Inserir Tabela'}
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setShowTableModal(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* If cursor is inside a table, show quick contextual operations */}
+              {currentTableContext && (
+                <div className="mb-4 pb-3 border-b border-slate-100 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Opções da Tabela Selecionada
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => insertRowInTable(currentTableContext.table, currentTableContext.row)}
+                      className="px-2.5 py-1.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-200 cursor-pointer text-left"
+                    >
+                      <Rows size={13} className="text-indigo-500 shrink-0" />
+                      <span>+ Linha</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertColumnInTable(currentTableContext.table, currentTableContext.colIndex)}
+                      className="px-2.5 py-1.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-200 cursor-pointer text-left"
+                    >
+                      <Columns size={13} className="text-indigo-500 shrink-0" />
+                      <span>+ Coluna</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteRowInTable(currentTableContext.table, currentTableContext.row)}
+                      className="px-2.5 py-1.5 bg-rose-50/50 hover:bg-rose-100/70 text-rose-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-rose-200 cursor-pointer text-left"
+                    >
+                      <Trash2 size={13} className="text-rose-500 shrink-0" />
+                      <span>Excluir Linha</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteColumnInTable(currentTableContext.table, currentTableContext.colIndex)}
+                      className="px-2.5 py-1.5 bg-rose-50/50 hover:bg-rose-100/70 text-rose-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-rose-200 cursor-pointer text-left"
+                    >
+                      <Trash2 size={13} className="text-rose-500 shrink-0" />
+                      <span>Excluir Coluna</span>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteEntireTable(currentTableContext.table)}
+                    className="w-full mt-1 px-2.5 py-1.5 bg-rose-100/60 hover:bg-rose-200/80 text-rose-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Excluir Tabela Inteira</span>
+                  </button>
+
+                  <div className="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
+                    Ou criar nova tabela abaixo
+                  </div>
+                </div>
+              )}
+
+              {/* Grid Selector */}
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="text-slate-600 font-semibold">Tamanho:</span>
+                    <span className="font-mono text-xs font-bold text-indigo-600">
+                      {hoverRows} × {hoverCols} {tableWithHeader ? '(com cabeçalho)' : ''}
+                    </span>
+                  </div>
+                  <div 
+                    className="grid grid-cols-6 gap-1 p-2 bg-slate-50 border border-slate-200 rounded-xl w-max mx-auto"
+                    onMouseLeave={() => {
+                      setHoverRows(tableRows);
+                      setHoverCols(tableCols);
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5].map((r) => (
+                      <div key={r} className="flex gap-1">
+                        {[1, 2, 3, 4, 5, 6].map((c) => {
+                          const isHighlighted = r <= hoverRows && c <= hoverCols;
+                          return (
+                            <div
+                              key={c}
+                              onMouseEnter={() => {
+                                setHoverRows(r);
+                                setHoverCols(c);
+                              }}
+                              onClick={() => {
+                                setTableRows(r);
+                                setTableCols(c);
+                                insertTable(r, c, tableWithHeader);
+                              }}
+                              className={`w-5 h-5 rounded-sm border transition-all cursor-pointer ${
+                                isHighlighted 
+                                  ? 'bg-indigo-500 border-indigo-600 shadow-2xs' 
+                                  : 'bg-white border-slate-200 hover:border-slate-400'
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Numeric Controls */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">Linhas</label>
+                    <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.max(1, tableRows - 1);
+                          setTableRows(val);
+                          setHoverRows(val);
+                        }}
+                        className="px-2.5 py-1.5 text-slate-500 hover:bg-slate-200 font-bold text-xs"
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="number" 
+                        min={1} 
+                        max={20}
+                        value={tableRows}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                          setTableRows(val);
+                          setHoverRows(val);
+                        }}
+                        className="w-full text-center text-xs font-bold bg-white py-1.5 focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.min(20, tableRows + 1);
+                          setTableRows(val);
+                          setHoverRows(val);
+                        }}
+                        className="px-2.5 py-1.5 text-slate-500 hover:bg-slate-200 font-bold text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">Colunas</label>
+                    <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.max(1, tableCols - 1);
+                          setTableCols(val);
+                          setHoverCols(val);
+                        }}
+                        className="px-2.5 py-1.5 text-slate-500 hover:bg-slate-200 font-bold text-xs"
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="number" 
+                        min={1} 
+                        max={10}
+                        value={tableCols}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                          setTableCols(val);
+                          setHoverCols(val);
+                        }}
+                        className="w-full text-center text-xs font-bold bg-white py-1.5 focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.min(10, tableCols + 1);
+                          setTableCols(val);
+                          setHoverCols(val);
+                        }}
+                        className="px-2.5 py-1.5 text-slate-500 hover:bg-slate-200 font-bold text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Header Checkbox */}
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+                  <input 
+                    type="checkbox"
+                    checked={tableWithHeader}
+                    onChange={(e) => setTableWithHeader(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>Linha de cabeçalho destacada</span>
+                </label>
+
+                {/* Submit button */}
+                <button
+                  type="button"
+                  onClick={() => insertTable(tableRows, tableCols, tableWithHeader)}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-indigo-600/20"
+                >
+                  <Plus size={14} />
+                  <span>Inserir Tabela ({tableRows} × {tableCols})</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Emoji Picker */}
         <div className="relative">
           <button 
@@ -408,7 +838,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         onBlur={saveSelection}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
-        className="min-h-[420px] p-8 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl"
+        className="min-h-[420px] p-8 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100/90 [&_th]:p-2.5 [&_th]:font-bold [&_th]:text-slate-800 [&_td]:border [&_td]:border-slate-200 [&_td]:p-2.5 [&_td]:text-slate-700 [&_.table-container]:overflow-x-auto [&_.table-container]:my-4 [&_.table-container]:rounded-xl [&_.table-container]:border [&_.table-container]:border-slate-200"
         style={{ fontFamily: activeFont, fontSize: activeSize }}
       />
     </div>

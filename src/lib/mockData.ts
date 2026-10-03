@@ -129,7 +129,7 @@ export interface Transaction {
   status: 'pending' | 'completed';
   account: string;
   expense_type?: 'fixed' | 'variable';
-  recurrence?: 'monthly' | 'yearly' | 'none';
+  recurrence?: 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
 }
 
 export type ColumnType = 'text' | 'number' | 'date' | 'status' | 'people' | 'file' | 'link' | 'phone' | 'location' | 'dropdown' | 'timeline' | 'notes' | 'value';

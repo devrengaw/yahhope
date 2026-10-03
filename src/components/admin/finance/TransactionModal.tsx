@@ -18,7 +18,7 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
   const [account, setAccount] = useState('Conta Principal');
   const [status, setStatus] = useState<'pending' | 'completed'>('completed');
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable'>('variable');
-  const [recurrence, setRecurrence] = useState<'monthly' | 'yearly' | 'none'>('none');
+  const [recurrence, setRecurrence] = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none'>('none');
 
   if (!isOpen) return null;
 
@@ -166,15 +166,18 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
 
                 {expenseType === 'fixed' && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Recorrência</label>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Periodicidade do Pagamento</label>
                     <select
                       value={recurrence}
                       onChange={e => setRecurrence(e.target.value as any)}
                       className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-all bg-white"
                     >
-                      <option value="none">Apenas uma vez</option>
-                      <option value="monthly">Mensal</option>
-                      <option value="yearly">Anual</option>
+                      <option value="none">Apenas uma vez (Não recorrente)</option>
+                      <option value="monthly">Mensal (1x por mês)</option>
+                      <option value="bimonthly">Bimestral (A cada 2 meses)</option>
+                      <option value="quarterly">Trimestral (A cada 3 meses)</option>
+                      <option value="semiannual">Semestral (A cada 6 meses)</option>
+                      <option value="yearly">Anual (1x por ano)</option>
                     </select>
                   </div>
                 )}

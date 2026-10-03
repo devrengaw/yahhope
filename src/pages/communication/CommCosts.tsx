@@ -61,12 +61,22 @@ export function CommCosts() {
   const stats = useMemo(() => {
     const fixedExpenses = transactions.filter(t => t.type === 'expense' && t.expense_type === 'fixed');
     const variableExpenses = transactions.filter(t => t.type === 'expense' && t.expense_type === 'variable');
-    const totalFixed = fixedExpenses.reduce((acc, t) => acc + t.amount, 0);
+    
+    // Custo mensal estrutural amortizado
+    const monthlyEquivalentFixed = fixedExpenses.reduce((acc, t) => {
+      const rec = t.recurrence || 'monthly';
+      if (rec === 'bimonthly') return acc + (t.amount / 2);
+      if (rec === 'quarterly') return acc + (t.amount / 3);
+      if (rec === 'semiannual') return acc + (t.amount / 6);
+      if (rec === 'yearly') return acc + (t.amount / 12);
+      return acc + t.amount;
+    }, 0);
+
     const totalVariable = variableExpenses.reduce((acc, t) => acc + t.amount, 0);
-    const totalExpense = totalFixed + totalVariable;
+    const totalExpense = monthlyEquivalentFixed + totalVariable;
 
     return {
-      totalFixed,
+      totalFixed: monthlyEquivalentFixed,
       totalVariable,
       totalExpense,
       fixedCount: fixedExpenses.length,
@@ -105,7 +115,8 @@ export function CommCosts() {
         status: newExpense.status,
         account: newExpense.account,
         expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence
+        recurrence: newExpense.recurrence,
+        module: 'communication'
       };
       setTransactions(prev => [localTx, ...prev]);
     }

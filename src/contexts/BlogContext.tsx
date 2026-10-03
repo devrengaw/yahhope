@@ -255,7 +255,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         .order('date', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        setPosts(data.map(p => ({
+        const loadedPosts = data.map(p => ({
           id: p.id,
           title: p.title,
           excerpt: p.excerpt || '',
@@ -277,7 +277,24 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
           translations: p.translations || ['pt'],
           has_unpublished_changes: p.has_unpublished_changes === true,
           deleted_at: p.deleted_at
-        })));
+        }));
+        setPosts(loadedPosts);
+
+        // Auto-sync featured posts to Home Highlights seamlessly
+        const featuredPosts = loadedPosts.filter(p => p.featured_home && p.status === 'published');
+        for (const fp of featuredPosts) {
+          syncBlogPostHighlight({
+            id: fp.id,
+            title: fp.title,
+            category: fp.category,
+            snippet: fp.excerpt,
+            content: fp.content,
+            image: fp.image,
+            highlight_type: fp.highlight_type || 'split',
+            highlight_color: fp.highlight_color || '#F49853',
+            active: true
+          }).catch(() => {});
+        }
       } else if (!error && (!data || data.length === 0)) {
         // Table exists in Supabase but is empty: Seed it automatically with real posts!
         await supabase.from('blog_posts').upsert(DEFAULT_BLOG_POSTS);
@@ -314,8 +331,28 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       })
       .subscribe();
 
+    // Auto-sync on window focus or visibility change
+    const handleFocus = () => {
+      loadFromSupabase();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadFromSupabase();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Periodic automatic background sync every 30 seconds
+    const interval = setInterval(() => {
+      loadFromSupabase();
+    }, 30000);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
     };
   }, []);
 

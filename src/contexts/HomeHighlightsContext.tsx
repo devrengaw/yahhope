@@ -17,24 +17,34 @@ export interface HomeHighlightItem {
   blogPostId?: string;
 }
 
+export const isMockupHighlight = (h: { title?: string; snippet?: string }) => {
+  const t = (h.title || '').toLowerCase();
+  const s = (h.snippet || '').toLowerCase();
+  return (
+    t.includes('costura') ||
+    t.includes('hortas') ||
+    t.includes('saúde preventiva') ||
+    t.includes('saude preventiva') ||
+    t.includes('bolsas universitárias') ||
+    t.includes('bolsas universitarias') ||
+    t.includes('ação humanitária: cuidado') ||
+    t.includes('acao humanitaria: cuidado') ||
+    t.includes('casa nutri: resgatando') ||
+    s.includes('costura') ||
+    s.includes('kits de higiene') ||
+    s.includes('visitas domiciliares periódicas')
+  );
+};
+
 export const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
   {
-    id: 1,
+    id: 'highlight-post-1',
     type: 'photo',
     title: 'O propósito de uma ilha',
     category: 'Nutrição & Saúde Infantil',
     location: 'Moçambique',
     snippet: 'Nosso centro nutricional acolhe crianças em estado crítico de vulnerabilidade alimentar, fornecendo dietas balanceadas e assistência médica contínua.',
-    content: `Na província de Nampula, em Moçambique, a desnutrição infantil severa é uma das maiores ameaças ao desenvolvimento e sobrevivência de crianças em seus primeiros anos de vida.
-
-A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos crianças da curva crítica de desnutrição.
-
-Impacto Direto:
-• Mais de 1.800 refeições terapêuticas distribuídas a cada mês.
-• Recuperação do peso ideal e fortalecimento imunológico.
-• Acompanhamento médico e psicológico com a família.
-
-Cada sorriso devolvido representa o futuro que renasce em solo fértil de esperança e solidariedade.`,
+    content: `<p>Na província de Nampula, em Moçambique, a desnutrição infantil severa é uma das maiores ameaças ao desenvolvimento e sobrevivência de crianças em seus primeiros anos de vida.</p><p>A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos crianças da curva crítica de desnutrição.</p><h3>Impacto Direto</h3><ul><li>Mais de 1.800 refeições terapêuticas distribuídas a cada mês.</li><li>Recuperação do peso ideal e fortalecimento imunológico.</li><li>Acompanhamento médico e psicológico com a família.</li></ul><p>Cada sorriso devolvido representa o futuro que renasce em solo fértil de esperança e solidariedade.</p>`,
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
     link: '/blog?post=post-1',
     color: '#92BF78',
@@ -43,73 +53,33 @@ Cada sorriso devolvido representa o futuro que renasce em solo fértil de espera
     blogPostId: 'post-1'
   },
   {
-    id: 2,
-    type: 'split',
-    title: 'Um problema crônico',
-    category: 'Tudo sobre Moçambique',
-    location: 'Moçambique',
-    snippet: 'Compreendendo as raízes históricas e estruturais das dificuldades alimentares e como a capacitação comunitária rompe ciclos geracionais.',
-    content: `O acesso à água potável e nutrição digna em Moçambique continua sendo um desafio para milhões de famílias vulneráveis.
-
-Nossa missão atua não somente no socorro emergencial imediato, mas no empoderamento sustentável da comunidade com poços artesianos e hortas agroecológicas.
-
-A educação sanitária e a autonomia familiar garantem que as conquistas nutricionais de hoje permaneçam amanhã.`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
-    link: '/blog?post=post-2',
-    color: '#88A1F2',
-    active: false,
-    order: 2,
-    blogPostId: 'post-2'
-  },
-  {
-    id: 3,
-    type: 'photo',
-    title: 'Você tem a firme certeza?',
-    category: 'Pense e reflita',
-    location: 'Moçambique',
-    snippet: 'Uma reflexão sobre fé em ação prática, generosidade com propósito e o chamado individual para transformar a dor do próximo em esperança.',
-    content: `A compaixão que não se move em direção ao necessitado permanece apenas como um belo sentimento. O Evangelho vivo se manifesta no prato de comida e no remédio entregue.
-
-Quando nos perguntamos sobre o impacto da nossa vida, o padrão não é quanto acumulamos, mas quantas vidas puderam respirar aliviadas pela nossa presença.`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
-    link: '/blog?post=post-3',
-    color: '#EBC878',
-    active: false,
-    order: 3,
-    blogPostId: 'post-3'
-  },
-  {
-    id: 4,
+    id: 'highlight-post-4',
     type: 'photo',
     title: 'O início',
     category: 'Viagens',
-    location: 'Moçambique',
+    location: 'Brasil & Moçambique',
     snippet: 'Relato dos primeiros passos da YAH Hope nas aldeias de Nampula, os desafios do acolhimento e as sementes que germinaram.',
-    content: `Chegar em uma nova comunidade exige respeito, escuta atenta e vínculo sincero. Antes de qualquer projeto, sentamos com os anciãos e as mães locais.
-
-Foi a partir desse diálogo que entendemos as urgências: nutrição infantil, capacitação profissional e acesso à água limpa.`,
+    content: `<p>Chegar em uma nova comunidade exige respeito, escuta atenta e vínculo sincero. Antes de qualquer projeto, sentamos com os anciãos e as mães locais.</p><p>Foi a partir desse diálogo que entendemos as urgências: nutrição infantil, capacitação profissional e acesso à água limpa.</p>`,
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
     link: '/blog?post=post-4',
     color: '#F49853',
     active: true,
-    order: 4,
+    order: 2,
     blogPostId: 'post-4'
   },
   {
-    id: 5,
+    id: 'highlight-post-5',
     type: 'split',
     title: 'Um pouco sobre Moçambique',
     category: 'Tudo sobre Moçambique',
     location: 'Nampula',
     snippet: 'Cultura, resiliência e as histórias humanas por trás das paisagens e da nossa frente de atuação humanitária.',
-    content: `Moçambique é uma terra de rica herança cultural, acolhimento caloroso e pessoas extraordinariamente resilientes.
-
-Cada comunidade possui um potencial gigantesco que precisa apenas de suporte para florescer com autonomia e dignidade.`,
+    content: `<p>Moçambique é uma terra de rica herança cultural, acolhimento caloroso e pessoas extraordinariamente resilientes.</p><p>Cada comunidade possui um potencial gigantesco que precisa apenas de suporte para florescer com autonomia e dignidade.</p>`,
     image: '/login_bg_real.jpg',
     link: '/blog?post=post-5',
     color: '#92BF78',
     active: true,
-    order: 5,
+    order: 3,
     blogPostId: 'post-5'
   }
 ];
@@ -141,18 +111,22 @@ interface HomeHighlightsContextType {
 
 const HomeHighlightsContext = createContext<HomeHighlightsContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_home_highlights_v4';
+const STORAGE_KEY = 'yah_hope_home_highlights_v5';
 
 export function HomeHighlightsProvider({ children }: { children: React.ReactNode }) {
   const [highlights, setHighlights] = useState<HomeHighlightItem[]>(() => {
     try {
+      localStorage.removeItem('yah_hope_home_highlights_v1');
+      localStorage.removeItem('yah_hope_home_highlights_v2');
+      localStorage.removeItem('yah_hope_home_highlights_v3');
+      localStorage.removeItem('yah_hope_home_highlights_v4');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasOldMockups = parsed.some(h => String(h.title).toLowerCase().includes('casa nutri'));
-          if (!hasOldMockups) {
-            return parsed;
+          const cleaned = parsed.filter(h => !isMockupHighlight(h));
+          if (cleaned.length > 0) {
+            return cleaned;
           }
         }
       }
@@ -186,20 +160,35 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
           .order('order', { ascending: true });
 
         if (!error && data && data.length > 0 && isMounted) {
-          setHighlights(data.map(item => ({
-            id: item.id,
-            type: item.type || 'photo',
-            title: item.title,
-            category: item.category,
-            location: item.location,
-            snippet: item.snippet || '',
-            content: item.content || '',
-            image: item.image,
-            link: item.link || '/projetos',
-            color: item.color || '#F49853',
-            active: item.active !== false,
-            order: item.order || 0
-          })));
+          // Detect and purge mockup rows from Supabase
+          const mockupItems = data.filter((item: any) => isMockupHighlight(item));
+          if (mockupItems.length > 0) {
+            const mockupIds = mockupItems.map((item: any) => item.id);
+            try {
+              await supabase.from('home_highlights').delete().in('id', mockupIds);
+            } catch {}
+          }
+
+          const validItems = data.filter((item: any) => !isMockupHighlight(item));
+          if (validItems.length > 0) {
+            setHighlights(validItems.map(item => ({
+              id: item.id,
+              type: item.type || 'photo',
+              title: item.title,
+              category: item.category,
+              location: item.location || 'Moçambique',
+              snippet: item.snippet || '',
+              content: item.content || '',
+              image: item.image,
+              link: item.link || (item.blog_post_id ? `/blog?post=${item.blog_post_id}` : '/blog'),
+              color: item.color || '#F49853',
+              active: item.active !== false,
+              order: item.order || 0,
+              blogPostId: item.blog_post_id || item.blogPostId
+            })));
+          } else {
+            setHighlights(DEFAULT_HIGHLIGHTS);
+          }
         }
       } catch (err) {
         // Fallback to local storage state
