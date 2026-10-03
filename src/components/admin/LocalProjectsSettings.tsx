@@ -4,6 +4,7 @@ import { YAHHopeProject } from '../../lib/mockData';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { LocalProjectModal } from './LocalProjectModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { cn } from '../../lib/utils';
 
 export function LocalProjectsSettings() {
   const { projects, addProject, updateProject, deleteProject, resetToDefaults } = useWebsiteProjects();
@@ -154,8 +155,16 @@ export function LocalProjectsSettings() {
                 {/* Badges de recursos cadastrados */}
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {project.location && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium" title={`Polo: ${project.location}`}>
-                      <MapPin size={11} className="text-amber-500" />
+                    <span 
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border",
+                        project.location.toLowerCase().includes('brasil') || project.location.toLowerCase().includes('são paulo')
+                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
+                      )} 
+                      title={`Polo: ${project.location}`}
+                    >
+                      <span>{project.location.toLowerCase().includes('brasil') || project.location.toLowerCase().includes('são paulo') ? '🇧🇷' : '🇲🇿'}</span>
                       <span className="truncate max-w-[120px]">{project.location}</span>
                     </span>
                   )}

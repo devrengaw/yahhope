@@ -34,14 +34,19 @@ export function LocalProjects() {
     }
   }, [projects]);
 
+  const isBrazilProject = (p: YAHHopeProject) => {
+    const loc = (p.location || '').toLowerCase();
+    return loc.includes('brasil') || loc.includes('brazil') || loc.includes('são paulo') || loc.includes('sao paulo');
+  };
+
   // Filtragem de projetos de acordo com a região selecionada
   const filteredProjects = projects.filter(p => {
     if (activeRegion === 'todos') return true;
     if (activeRegion === 'mocambique') {
-      return !p.location?.toLowerCase().includes('brasil');
+      return !isBrazilProject(p);
     }
     if (activeRegion === 'brasil') {
-      return p.location?.toLowerCase().includes('brasil');
+      return isBrazilProject(p);
     }
     return true;
   });
@@ -151,7 +156,7 @@ export function LocalProjects() {
             <span className={`text-[10px] px-2 py-0.5 rounded-full ${
               activeRegion === 'mocambique' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
-              {projects.filter(p => !p.location?.toLowerCase().includes('brasil')).length}
+              {projects.filter(p => !isBrazilProject(p)).length}
             </span>
           </button>
           <button
@@ -164,6 +169,13 @@ export function LocalProjects() {
           >
             <span>🇧🇷</span>
             <span>Brasil (Sede & Expansão)</span>
+            {projects.filter(isBrazilProject).length > 0 && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                activeRegion === 'brasil' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {projects.filter(isBrazilProject).length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -183,7 +195,7 @@ export function LocalProjects() {
             </div>
             <div className="bg-white px-5 py-3 rounded-2xl shadow-xs border border-amber-100 text-center shrink-0">
               <span className="block text-2xl font-black text-[#F49853]">
-                {projects.filter(p => !p.location?.toLowerCase().includes('brasil')).length}
+                {projects.filter(p => !isBrazilProject(p)).length}
               </span>
               <span className="text-[11px] text-slate-500 font-gotham-medium">Projetos em Andamento</span>
             </div>
