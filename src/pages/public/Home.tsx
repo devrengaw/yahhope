@@ -383,28 +383,39 @@ export function Home() {
         <section className="-mt-24 sm:-mt-28 lg:-mt-36 relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
           <div className="relative">
             
-            {/* Navigation Arrows on Left and Right of Carousel */}
-            <button
-              onClick={handlePrevSlide}
-              className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-              aria-label="Slide anterior"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={handleNextSlide}
-              className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-              aria-label="Próximo slide"
-            >
-              <ChevronRight size={20} />
-            </button>
+            {/* Navigation Arrows on Left and Right of Carousel (only if more than 1 item) */}
+            {carouselItems.length > 1 && (
+              <>
+                <button
+                  onClick={handlePrevSlide}
+                  className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                  aria-label="Slide anterior"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={handleNextSlide}
+                  className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                  aria-label="Próximo slide"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
 
             {/* Cards Row: Responsive Multi-Card Carousel */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 font-gotham-regular">
+            <div className={cn(
+              "grid gap-5 sm:gap-6 font-gotham-regular",
+              carouselItems.length === 1 && "grid-cols-1 max-w-xl mx-auto",
+              carouselItems.length === 2 && "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto",
+              carouselItems.length >= 3 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            )}>
               
-              {/* Show active slice cards starting from carouselIndex */}
-              {Array.from({ length: Math.min(carouselItems.length, 3) }, (_, i) => i).map((offset) => {
-                const item = carouselItems[(carouselIndex + offset) % carouselItems.length];
+              {/* Show distinct cards without triplicating or duplicating when count < 3 */}
+              {(carouselItems.length <= 3 
+                ? carouselItems 
+                : Array.from({ length: 3 }, (_, i) => carouselItems[(carouselIndex + i) % carouselItems.length])
+              ).map((item, offset) => {
                 if (!item) return null;
                 
                 if (item.type === 'split') {
@@ -492,19 +503,21 @@ export function Home() {
 
             </div>
 
-            {/* Dots Indicator */}
-            <div className="flex justify-center items-center gap-2 mt-6">
-              {carouselItems.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCarouselIndex(idx)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    carouselIndex === idx ? 'w-6 bg-[#F49853]' : 'w-2 bg-slate-300 hover:bg-slate-400'
-                  }`}
-                  aria-label={`Slide ${idx + 1}`}
-                />
-              ))}
-            </div>
+            {/* Dots Indicator (only if more than 1 item) */}
+            {carouselItems.length > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-6">
+                {carouselItems.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCarouselIndex(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      carouselIndex === idx ? 'w-6 bg-[#F49853]' : 'w-2 bg-slate-300 hover:bg-slate-400'
+                    }`}
+                    aria-label={`Slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
 
           </div>
         </section>
