@@ -48,7 +48,7 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     status: 'published',
     category: 'Nutrição & Saúde Infantil',
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-    featured_home: true,
+    featured_home: false,
     highlight_type: 'photo',
     highlight_color: '#92BF78',
     views_count: 0,
@@ -119,7 +119,7 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     status: 'published',
     category: 'Viagens',
     image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
-    featured_home: true,
+    featured_home: false,
     highlight_type: 'photo',
     highlight_color: '#F49853',
     views_count: 0,
@@ -142,7 +142,7 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     status: 'published',
     category: 'Tudo sobre Moçambique',
     image: '/login_bg_real.jpg',
-    featured_home: true,
+    featured_home: false,
     highlight_type: 'split',
     highlight_color: '#92BF78',
     has_unpublished_changes: false,
@@ -193,8 +193,9 @@ interface BlogContextType {
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
-const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v6';
+const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v7';
 const METRICS_ZEROED_FLAG = 'yah_hope_blog_metrics_zeroed_2026_v1';
+const RESET_FEATURED_FLAG = 'yah_hope_blog_featured_reset_v2';
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
@@ -207,7 +208,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       'yah_hope_blog_posts_v2',
       'yah_hope_blog_posts_v3',
       'yah_hope_blog_posts_v4',
-      'yah_hope_blog_posts_v5'
+      'yah_hope_blog_posts_v5',
+      'yah_hope_blog_posts_v6'
     ].forEach(k => {
       try { localStorage.removeItem(k); } catch {}
     });
@@ -219,6 +221,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(p => ({
             ...p,
+            featured_home: false,
             views_count: 0,
             reads_count: 0,
             likes_count: 0,
@@ -248,6 +251,14 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   const loadFromSupabase = async () => {
     try {
       setLoading(true);
+
+      // One-time reset of old initial featured_home flags in Supabase
+      if (localStorage.getItem(RESET_FEATURED_FLAG) !== 'true') {
+        localStorage.setItem(RESET_FEATURED_FLAG, 'true');
+        try {
+          await supabase.from('blog_posts').update({ featured_home: false }).neq('id', '');
+        } catch {}
+      }
 
       // Auto-zero metrics in Supabase if not yet performed
       if (localStorage.getItem(METRICS_ZEROED_FLAG) !== 'true') {
@@ -313,6 +324,12 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
             highlight_color: fp.highlight_color || '#F49853',
             active: true
           }).catch(() => {});
+        }
+
+        // Clean up highlights for any post that is NOT featured
+        const unfeaturedPosts = loadedPosts.filter(p => !p.featured_home || p.status !== 'published');
+        for (const ufp of unfeaturedPosts) {
+          removeBlogPostHighlight(ufp.id).catch(() => {});
         }
       } else if (!error && (!data || data.length === 0)) {
         // Table exists in Supabase but is empty: Seed it automatically with real posts!

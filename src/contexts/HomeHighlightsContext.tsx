@@ -66,53 +66,7 @@ export const deduplicateHighlights = (items: HomeHighlightItem[]): HomeHighlight
 };
 
 
-export const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
-  {
-    id: 'highlight-post-1',
-    type: 'photo',
-    title: 'O propósito de uma ilha',
-    category: 'Nutrição & Saúde Infantil',
-    location: 'Moçambique',
-    snippet: 'Nosso centro nutricional acolhe crianças em estado crítico de vulnerabilidade alimentar, fornecendo dietas balanceadas e assistência médica contínua.',
-    content: `<p>Na província de Nampula, em Moçambique, a desnutrição infantil severa é uma das maiores ameaças ao desenvolvimento e sobrevivência de crianças em seus primeiros anos de vida.</p><p>A Casa Nutri nasceu para transformar essa realidade. Com acompanhamento clínico semanal, introdução alimentar fortificada e educação nutricional para as mães, resgatamos crianças da curva crítica de desnutrição.</p><h3>Impacto Direto</h3><ul><li>Mais de 1.800 refeições terapêuticas distribuídas a cada mês.</li><li>Recuperação do peso ideal e fortalecimento imunológico.</li><li>Acompanhamento médico e psicológico com a família.</li></ul><p>Cada sorriso devolvido representa o futuro que renasce em solo fértil de esperança e solidariedade.</p>`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-    link: '/blog?post=post-1',
-    color: '#92BF78',
-    active: true,
-    order: 1,
-    blogPostId: 'post-1'
-  },
-  {
-    id: 'highlight-post-4',
-    type: 'photo',
-    title: 'O início',
-    category: 'Viagens',
-    location: 'Brasil & Moçambique',
-    snippet: 'Relato dos primeiros passos da YAH Hope nas aldeias de Nampula, os desafios do acolhimento e as sementes que germinaram.',
-    content: `<p>Chegar em uma nova comunidade exige respeito, escuta atenta e vínculo sincero. Antes de qualquer projeto, sentamos com os anciãos e as mães locais.</p><p>Foi a partir desse diálogo que entendemos as urgências: nutrição infantil, capacitação profissional e acesso à água limpa.</p>`,
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
-    link: '/blog?post=post-4',
-    color: '#F49853',
-    active: true,
-    order: 2,
-    blogPostId: 'post-4'
-  },
-  {
-    id: 'highlight-post-5',
-    type: 'split',
-    title: 'Um pouco sobre Moçambique',
-    category: 'Tudo sobre Moçambique',
-    location: 'Nampula',
-    snippet: 'Cultura, resiliência e as histórias humanas por trás das paisagens e da nossa frente de atuação humanitária.',
-    content: `<p>Moçambique é uma terra de rica herança cultural, acolhimento caloroso e pessoas extraordinariamente resilientes.</p><p>Cada comunidade possui um potencial gigantesco que precisa apenas de suporte para florescer com autonomia e dignidade.</p>`,
-    image: '/login_bg_real.jpg',
-    link: '/blog?post=post-5',
-    color: '#92BF78',
-    active: true,
-    order: 3,
-    blogPostId: 'post-5'
-  }
-];
+export const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [];
 
 interface HomeHighlightsContextType {
   highlights: HomeHighlightItem[];
@@ -141,7 +95,7 @@ interface HomeHighlightsContextType {
 
 const HomeHighlightsContext = createContext<HomeHighlightsContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_home_highlights_v6';
+const STORAGE_KEY = 'yah_hope_home_highlights_v7';
 
 export function HomeHighlightsProvider({ children }: { children: React.ReactNode }) {
   const [highlights, setHighlights] = useState<HomeHighlightItem[]>(() => {
@@ -151,20 +105,18 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
       localStorage.removeItem('yah_hope_home_highlights_v3');
       localStorage.removeItem('yah_hope_home_highlights_v4');
       localStorage.removeItem('yah_hope_home_highlights_v5');
+      localStorage.removeItem('yah_hope_home_highlights_v6');
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const deduplicated = deduplicateHighlights(parsed);
-          if (deduplicated.length > 0) {
-            return deduplicated;
-          }
+        if (Array.isArray(parsed)) {
+          return deduplicateHighlights(parsed);
         }
       }
     } catch (e) {
       console.warn('Failed to parse highlights from localStorage', e);
     }
-    return DEFAULT_HIGHLIGHTS;
+    return [];
   });
 
   const [loading, setLoading] = useState(false);

@@ -60,7 +60,7 @@ export function Home() {
   // Dynamic Carousel Cards managed via Admin Panel (/admin/home-highlights)
   const { highlights } = useHomeHighlights();
   const activeHighlights = highlights.filter(h => h.active !== false);
-  const carouselItems = activeHighlights.length > 0 ? activeHighlights : highlights;
+  const carouselItems = activeHighlights;
 
   // Dynamic Impact Metrics managed via Admin Panel (/admin/impact-metrics)
   const { activeMetrics: impactMetrics } = useImpactMetrics();
@@ -379,34 +379,77 @@ export function Home() {
       </section>
 
       {/* 5. Smaller Overlapping Carousel in YAH Hope Visual Style */}
-      <section className="-mt-24 sm:-mt-28 lg:-mt-36 relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-        <div className="relative">
-          
-          {/* Navigation Arrows on Left and Right of Carousel */}
-          <button
-            onClick={handlePrevSlide}
-            className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-            aria-label="Slide anterior"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            onClick={handleNextSlide}
-            className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-            aria-label="Próximo slide"
-          >
-            <ChevronRight size={20} />
-          </button>
-
-          {/* Cards Row: Responsive Multi-Card Carousel */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 font-gotham-regular">
+      {carouselItems.length > 0 && (
+        <section className="-mt-24 sm:-mt-28 lg:-mt-36 relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
+          <div className="relative">
             
-            {/* Show active slice cards starting from carouselIndex */}
-            {carouselItems.length > 0 && Array.from({ length: Math.min(carouselItems.length, 3) }, (_, i) => i).map((offset) => {
-              const item = carouselItems[(carouselIndex + offset) % carouselItems.length];
-              if (!item) return null;
+            {/* Navigation Arrows on Left and Right of Carousel */}
+            <button
+              onClick={handlePrevSlide}
+              className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+              aria-label="Slide anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={handleNextSlide}
+              className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/95 hover:bg-white text-[#F49853] shadow-xl border border-orange-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+              aria-label="Próximo slide"
+            >
+              <ChevronRight size={20} />
+            </button>
+
+            {/* Cards Row: Responsive Multi-Card Carousel */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 font-gotham-regular">
               
-              if (item.type === 'split') {
+              {/* Show active slice cards starting from carouselIndex */}
+              {Array.from({ length: Math.min(carouselItems.length, 3) }, (_, i) => i).map((offset) => {
+                const item = carouselItems[(carouselIndex + offset) % carouselItems.length];
+                if (!item) return null;
+                
+                if (item.type === 'split') {
+                  return (
+                    <Link
+                      key={`${item.id}-${offset}`}
+                      to={item.link}
+                      onClick={(e) => {
+                        if (item.content) {
+                          e.preventDefault();
+                          setReadingHighlight(item);
+                        }
+                      }}
+                      className="bg-white rounded-2xl overflow-hidden shadow-2xl border border-orange-100 flex flex-col sm:flex-row h-72 sm:h-64 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl group cursor-pointer"
+                    >
+                      <div className="w-full sm:w-1/2 h-36 sm:h-full relative overflow-hidden bg-slate-900 shrink-0">
+                        <img 
+                          src={item.image} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                      <div className="w-full sm:w-1/2 p-4 sm:p-5 flex flex-col justify-between">
+                        <div>
+                          {/* YAH Hope Palette Accent Line */}
+                          <div className="w-8 h-1 rounded-full mb-2" style={{ backgroundColor: item.color || '#F49853' }}></div>
+                          <h3 className="font-heading font-bold text-slate-900 text-sm sm:text-base leading-snug line-clamp-3 group-hover:text-[#F49853] transition-colors">
+                            {item.title}
+                          </h3>
+                          {item.snippet && (
+                            <p className="text-xs text-slate-500 mt-2 font-gotham-light line-clamp-3 leading-relaxed">
+                              {item.snippet.replace(/<[^>]*>/g, '').trim()}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-gotham-bold pt-2" style={{ color: item.color || '#F49853' }}>
+                          <span>Ler história completa</span>
+                          <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                }
+
+                // Photo Card with Overlay & Text
                 return (
                   <Link
                     key={`${item.id}-${offset}`}
@@ -417,96 +460,55 @@ export function Home() {
                         setReadingHighlight(item);
                       }
                     }}
-                    className="bg-white rounded-2xl overflow-hidden shadow-2xl border border-orange-100 flex flex-col sm:flex-row h-72 sm:h-64 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl group cursor-pointer"
+                    className="relative rounded-2xl overflow-hidden shadow-2xl h-72 sm:h-64 flex flex-col justify-end p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl group border border-orange-100/40 cursor-pointer"
                   >
-                    <div className="w-full sm:w-1/2 h-36 sm:h-full relative overflow-hidden bg-slate-900 shrink-0">
-                      <img 
-                        src={item.image} 
-                        alt={item.title} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                    <div className="w-full sm:w-1/2 p-4 sm:p-5 flex flex-col justify-between">
-                      <div>
-                        {/* YAH Hope Palette Accent Line */}
-                        <div className="w-8 h-1 rounded-full mb-2" style={{ backgroundColor: item.color || '#F49853' }}></div>
-                        <h3 className="font-heading font-bold text-slate-900 text-sm sm:text-base leading-snug line-clamp-3 group-hover:text-[#F49853] transition-colors">
-                          {item.title}
-                        </h3>
-                        {item.snippet && (
-                          <p className="text-xs text-slate-500 mt-2 font-gotham-light line-clamp-3 leading-relaxed">
-                            {item.snippet.replace(/<[^>]*>/g, '').trim()}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-[11px] font-gotham-bold pt-2" style={{ color: item.color || '#F49853' }}>
-                        <span>Ler história completa</span>
-                        <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                    <img 
+                      src={item.image} 
+                      alt={item.title} 
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                    
+                    <div className="relative z-10 text-white">
+                      {/* YAH Hope Palette Accent Line */}
+                      <div className="w-8 h-1 rounded-full mb-2" style={{ backgroundColor: item.color || '#F49853' }}></div>
+                      <h3 className="font-heading font-bold text-sm sm:text-base leading-snug text-white group-hover:text-orange-200 transition-colors line-clamp-3">
+                        {item.title}
+                      </h3>
+                      <div className="flex items-center justify-between text-[11px] font-gotham-bold mt-2" style={{ color: item.color || '#EBC878' }}>
+                        <div className="flex items-center gap-1.5">
+                          <span>{item.category}</span>
+                          <span className="text-white/40">•</span>
+                          <span>{item.location}</span>
+                        </div>
+                        <span className="text-white/70 group-hover:text-white flex items-center gap-0.5 transition-colors">
+                          Ler mais <ArrowRight size={10} />
+                        </span>
                       </div>
                     </div>
                   </Link>
                 );
-              }
+              })}
 
-              // Photo Card with Overlay & Text
-              return (
-                <Link
-                  key={`${item.id}-${offset}`}
-                  to={item.link}
-                  onClick={(e) => {
-                    if (item.content) {
-                      e.preventDefault();
-                      setReadingHighlight(item);
-                    }
-                  }}
-                  className="relative rounded-2xl overflow-hidden shadow-2xl h-72 sm:h-64 flex flex-col justify-end p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl group border border-orange-100/40 cursor-pointer"
-                >
-                  <img 
-                    src={item.image} 
-                    alt={item.title} 
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
-                  
-                  <div className="relative z-10 text-white">
-                    {/* YAH Hope Palette Accent Line */}
-                    <div className="w-8 h-1 rounded-full mb-2" style={{ backgroundColor: item.color || '#F49853' }}></div>
-                    <h3 className="font-heading font-bold text-sm sm:text-base leading-snug text-white group-hover:text-orange-200 transition-colors line-clamp-3">
-                      {item.title}
-                    </h3>
-                    <div className="flex items-center justify-between text-[11px] font-gotham-bold mt-2" style={{ color: item.color || '#EBC878' }}>
-                      <div className="flex items-center gap-1.5">
-                        <span>{item.category}</span>
-                        <span className="text-white/40">•</span>
-                        <span>{item.location}</span>
-                      </div>
-                      <span className="text-white/70 group-hover:text-white flex items-center gap-0.5 transition-colors">
-                        Ler mais <ArrowRight size={10} />
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            </div>
+
+            {/* Dots Indicator */}
+            <div className="flex justify-center items-center gap-2 mt-6">
+              {carouselItems.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCarouselIndex(idx)}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    carouselIndex === idx ? 'w-6 bg-[#F49853]' : 'w-2 bg-slate-300 hover:bg-slate-400'
+                  }`}
+                  aria-label={`Slide ${idx + 1}`}
+                />
+              ))}
+            </div>
 
           </div>
-
-          {/* Dots Indicator */}
-          <div className="flex justify-center items-center gap-2 mt-6">
-            {carouselItems.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCarouselIndex(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  carouselIndex === idx ? 'w-6 bg-[#F49853]' : 'w-2 bg-slate-300 hover:bg-slate-400'
-                }`}
-                aria-label={`Slide ${idx + 1}`}
-              />
-            ))}
-          </div>
-
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 6. Impact Stats Block in YAH Hope Identity (`icongrid-block -stat`) */}
       <section className="py-20 bg-white relative overflow-hidden font-gotham-regular">
