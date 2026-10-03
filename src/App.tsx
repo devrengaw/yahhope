@@ -13,6 +13,8 @@ import { Campaign } from './pages/public/Campaign';
 import { CampaignDisplay } from './pages/public/CampaignDisplay';
 import { PrivacyPolicy } from './pages/public/PrivacyPolicy';
 import { TermsOfService } from './pages/public/TermsOfService';
+import { AboutUs } from './pages/public/AboutUs';
+import { MissionVisionValues } from './pages/public/MissionVisionValues';
 
 import { Settings } from './pages/admin/Settings';
 import { Profile } from './pages/admin/Profile';
@@ -221,6 +223,9 @@ export default function App() {
                                           <Route path="/portal/login" element={<PortalLogin />} />
                                           <Route path="/app/login" element={<PortalLogin />} />
                                           <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
+                                          <Route path="/sobre-nos" element={<AboutUs />} />
+                                          <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />
+                                          <Route path="/missao-visao-valores" element={<MissionVisionValues />} />
                                           <Route path="/blog" element={<Blog />} />
                                           <Route path="/blog/:id" element={<Blog />} />
                                           <Route path="/loja" element={<Ecommerce />} />

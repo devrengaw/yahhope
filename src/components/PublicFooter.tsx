@@ -66,6 +66,8 @@ export function PublicFooter() {
               Explorar
             </h3>
             <ul className="space-y-2.5 text-sm font-gotham-light text-slate-400">
+              <li><Link to="/sobre-nos" className="hover:text-[#F49853] transition-colors">Sobre Nós & Manifesto</Link></li>
+              <li><Link to="/missao-visao-valores" className="hover:text-[#F49853] transition-colors">Missão, Visão e Valores</Link></li>
               <li><Link to="/projetos" className="hover:text-[#F49853] transition-colors">Nossos Projetos</Link></li>
               <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Formas de Doar</Link></li>
               <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Campanhas Ativas</Link></li>

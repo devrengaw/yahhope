@@ -136,16 +136,36 @@ export function PublicHeader() {
             <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs xl:text-sm font-gotham-bold text-slate-800">
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
-                  <span>A Crise Humanitária</span>
+                  <span>Sobre Nós</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
-                <div className="absolute top-full left-0 w-72 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider mb-2">Desafios que Enfrentamos</p>
-                  <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Desnutrição Infantil em Nampula</Link></li>
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Evasão e Pobreza Universitária</Link></li>
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Segurança Alimentar e Saúde Materna</Link></li>
-                  </ul>
+                <div className="absolute top-full left-0 w-80 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider mb-3">Conheça a YAH Hope</p>
+                  <div className="space-y-1.5">
+                    <Link 
+                      to="/sobre-nos" 
+                      className="block p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors group/item"
+                    >
+                      <p className="font-gotham-bold text-slate-900 group-hover/item:text-[#F49853] text-xs transition-colors">
+                        Sobre Nós & Manifesto
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5 leading-relaxed">
+                        Nossa história, propósito e a leitura do Manifesto oficial.
+                      </p>
+                    </Link>
+
+                    <Link 
+                      to="/missao-visao-valores" 
+                      className="block p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors group/item"
+                    >
+                      <p className="font-gotham-bold text-slate-900 group-hover/item:text-[#F49853] text-xs transition-colors">
+                        Missão, Visão e Valores
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5 leading-relaxed">
+                        Os princípios fundamentais que regem nossas decisões e ações.
+                      </p>
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -330,17 +350,20 @@ export function PublicHeader() {
             <div className="p-5 flex-1 space-y-5 text-sm font-gotham-bold text-slate-800">
               <div>
                 <button 
-                  onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'crisis' ? null : 'crisis')}
+                  onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'about' ? null : 'about')}
                   className="flex items-center justify-between w-full py-2 hover:text-[#F49853] cursor-pointer"
                 >
-                  <span>A Crise Humanitária</span>
-                  <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'crisis' ? 'rotate-180' : ''}`} />
+                  <span>Sobre Nós</span>
+                  <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'about' ? 'rotate-180' : ''}`} />
                 </button>
-                {activeMobileSubmenu === 'crisis' && (
+                {activeMobileSubmenu === 'about' && (
                   <div className="pl-4 py-2 space-y-2 text-xs font-gotham-regular text-slate-600 border-l-2 border-[#F49853]/30 ml-2">
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Desnutrição Infantil</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Evasão Universitária</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Vulnerabilidade Social</Link>
+                    <Link to="/sobre-nos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">
+                      Sobre Nós & Manifesto
+                    </Link>
+                    <Link to="/missao-visao-valores" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">
+                      Missão, Visão e Valores
+                    </Link>
                   </div>
                 )}
               </div>
