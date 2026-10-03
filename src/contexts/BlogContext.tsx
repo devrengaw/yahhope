@@ -237,6 +237,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [loading, setLoading] = useState(false);
+  const initialSyncDone = React.useRef(false);
 
   // Sync to localStorage as client cache
   useEffect(() => {
@@ -310,26 +311,29 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         });
         setPosts(loadedPosts);
 
-        // Auto-sync featured posts to Home Highlights seamlessly
-        const featuredPosts = loadedPosts.filter(p => p.featured_home && p.status === 'published');
-        for (const fp of featuredPosts) {
-          syncBlogPostHighlight({
-            id: fp.id,
-            title: fp.title,
-            category: fp.category,
-            snippet: fp.excerpt,
-            content: fp.content,
-            image: fp.image,
-            highlight_type: fp.highlight_type || 'split',
-            highlight_color: fp.highlight_color || '#F49853',
-            active: true
-          }).catch(() => {});
-        }
+        // Auto-sync featured posts to Home Highlights seamlessly on initial load
+        if (!initialSyncDone.current) {
+          initialSyncDone.current = true;
+          const featuredPosts = loadedPosts.filter(p => p.featured_home && p.status === 'published');
+          for (const fp of featuredPosts) {
+            syncBlogPostHighlight({
+              id: fp.id,
+              title: fp.title,
+              category: fp.category,
+              snippet: fp.excerpt,
+              content: fp.content,
+              image: fp.image,
+              highlight_type: fp.highlight_type || 'split',
+              highlight_color: fp.highlight_color || '#F49853',
+              active: true
+            }).catch(() => {});
+          }
 
-        // Clean up highlights for any post that is NOT featured
-        const unfeaturedPosts = loadedPosts.filter(p => !p.featured_home || p.status !== 'published');
-        for (const ufp of unfeaturedPosts) {
-          removeBlogPostHighlight(ufp.id).catch(() => {});
+          // Clean up highlights for any post that is NOT featured
+          const unfeaturedPosts = loadedPosts.filter(p => !p.featured_home || p.status !== 'published');
+          for (const ufp of unfeaturedPosts) {
+            removeBlogPostHighlight(ufp.id).catch(() => {});
+          }
         }
       } else if (!error && (!data || data.length === 0)) {
         // Table exists in Supabase but is empty: Seed it automatically with real posts!

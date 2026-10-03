@@ -49,6 +49,8 @@ export const deduplicateHighlights = (items: HomeHighlightItem[]): HomeHighlight
     } else if (item.link && item.link.includes('post=')) {
       const match = item.link.match(/post=([^&#]+)/);
       if (match) key = `blog:${match[1]}`;
+    } else if (String(item.id).startsWith('highlight-post-') || String(item.id).startsWith('blog-post-')) {
+      key = `blog:${String(item.id).replace(/^(highlight|blog)-/, '')}`;
     }
 
     if (!key) {
@@ -190,7 +192,7 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
-            setHighlights(parsed);
+            setHighlights(deduplicateHighlights(parsed));
           }
         } catch {}
       }
@@ -204,19 +206,32 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
   }, []);
 
   const addHighlight = async (item: Omit<HomeHighlightItem, 'id'>) => {
-    const newId = Date.now().toString();
+    const targetId = item.blogPostId ? `highlight-${item.blogPostId}` : Date.now().toString();
     const newItem: HomeHighlightItem = {
       ...item,
-      id: newId,
+      id: targetId,
       active: item.active !== false,
       order: highlights.length + 1
     };
 
-    setHighlights(prev => [...prev, newItem]);
+    setHighlights(prev => {
+      const filtered = prev.filter(h => {
+        if (item.blogPostId && (
+          h.blogPostId === item.blogPostId || 
+          String(h.id) === `highlight-${item.blogPostId}` || 
+          String(h.id) === `blog-${item.blogPostId}` ||
+          (Boolean(h.link) && h.link.includes(`post=${item.blogPostId}`))
+        )) {
+          return false;
+        }
+        return true;
+      });
+      return deduplicateHighlights([...filtered, newItem]);
+    });
 
     try {
       await supabase.from('home_highlights').insert([{
-        id: newId,
+        id: targetId,
         type: newItem.type,
         title: newItem.title,
         category: newItem.category,
@@ -227,7 +242,8 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
         link: newItem.link,
         color: newItem.color,
         active: newItem.active,
-        order: newItem.order
+        order: newItem.order,
+        blog_post_id: newItem.blogPostId
       }]);
     } catch {}
   };
@@ -317,7 +333,7 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
       const existing = existingIndex >= 0 ? prev[existingIndex] : null;
 
       const singleItem: HomeHighlightItem = {
-        id: existing?.id || `highlight-${post.id}`,
+        id: `highlight-${post.id}`,
         title: post.title,
         category: post.category || existing?.category || 'Blog',
         location: post.location || existing?.location || 'Moçambique',

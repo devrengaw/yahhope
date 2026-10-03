@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -52,6 +52,7 @@ const communicationNavItems = [
   { name: 'Blog', path: '/communication/blog', icon: Newspaper },
   { name: 'Disparo de E-mails', path: '/communication/campaigns', icon: Send },
   { name: 'Templates de E-mail', path: '/communication/email-templates', icon: Mail },
+  { name: 'Inscritos na Newsletter', path: '/communication/newsletter', icon: Inbox },
   { name: 'Custos Fixos & Variados', path: '/communication/costs', icon: DollarSign },
   { name: 'Gestão', path: '/communication/management', icon: Settings },
 ];
@@ -113,7 +114,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     Boolean(user?.permissions && user.permissions.some(p => nutritionPermissions.includes(p)));
 
   // Comunicação: Admin ou quem possui permissões de comunicação
-  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication', 'top-banner', 'home-highlights', 'impact-metrics'];
+  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication', 'top-banner', 'home-highlights', 'impact-metrics', 'newsletter'];
   const hasCommunication = 
     isAdmin || 
     Boolean(user?.permissions && user.permissions.some(p => communicationPermissions.includes(p)));

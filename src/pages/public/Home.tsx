@@ -26,7 +26,8 @@ import {
   Lock,
   Loader2
 } from 'lucide-react';
-import { useHomeHighlights, HomeHighlightItem } from '../../contexts/HomeHighlightsContext';
+import { useHomeHighlights, HomeHighlightItem, deduplicateHighlights } from '../../contexts/HomeHighlightsContext';
+import { useNewsletter } from '../../contexts/NewsletterContext';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { useImpactMetrics } from '../../contexts/ImpactMetricsContext';
 import { ImpactIcon } from '../../components/common/ImpactIcon';
@@ -53,13 +54,14 @@ export function Home() {
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   
+  const { addSubscriber } = useNewsletter();
   const [emailInput, setEmailInput] = useState('');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [readingHighlight, setReadingHighlight] = useState<HomeHighlightItem | null>(null);
 
   // Dynamic Carousel Cards managed via Admin Panel (/admin/home-highlights)
   const { highlights } = useHomeHighlights();
-  const activeHighlights = highlights.filter(h => h.active !== false);
+  const activeHighlights = deduplicateHighlights(highlights).filter(h => h.active !== false);
   const carouselItems = activeHighlights;
 
   // Dynamic Impact Metrics managed via Admin Panel (/admin/impact-metrics)
@@ -132,9 +134,14 @@ export function Home() {
   };
 
   // Handle newsletter subscription
-  const handleNewsletter = (e: React.FormEvent) => {
+  const handleNewsletter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailInput) return;
+    try {
+      await addSubscriber(emailInput, 'Landing Page - Rodapé');
+    } catch (err) {
+      console.warn('Newsletter subscription error:', err);
+    }
     setEmailSubmitted(true);
     setTimeout(() => {
       setEmailInput('');

@@ -63,6 +63,7 @@ import { CommBlogAdmin } from './pages/communication/CommBlogAdmin';
 import { CommEmailTemplates } from './pages/communication/CommEmailTemplates';
 import { CommEmailCampaigns } from './pages/communication/CommEmailCampaigns';
 import { CommCosts } from './pages/communication/CommCosts';
+import { CommNewsletter } from './pages/communication/CommNewsletter';
 import { NutritionSupporterUpdates } from './pages/nutrition/SupporterUpdates';
 import { ImpactFeedManager } from './pages/admin/ImpactFeedManager';
 import { SupporterMessages } from './pages/admin/SupporterMessages';
@@ -81,6 +82,7 @@ import { ImpactMetricsProvider } from './contexts/ImpactMetricsContext';
 import { TopBannerProvider } from './contexts/TopBannerContext';
 import { BlogProvider } from './contexts/BlogContext';
 import { WebsiteProjectsProvider } from './contexts/WebsiteProjectsContext';
+import { NewsletterProvider } from './contexts/NewsletterContext';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import { WorkspaceLayout } from './components/workspace/WorkspaceLayout';
 import { WorkspaceViewContainer } from './pages/erp/WorkspaceViewContainer';
@@ -212,6 +214,7 @@ export default function App() {
                                       <TopBannerProvider>
                                         <BlogProvider>
                                           <WebsiteProjectsProvider>
+                                            <NewsletterProvider>
                                         <Router>
                                           <AnalyticsTracker />
                                           <DonationModalProvider>
@@ -300,6 +303,7 @@ export default function App() {
                                               <Route path="/blog" element={<CommBlogAdmin />} />
                                               <Route path="/campaigns" element={<CommEmailCampaigns />} />
                                                <Route path="/email-templates" element={<CommEmailTemplates />} />
+                                               <Route path="/newsletter" element={<CommNewsletter />} />
                                                <Route path="/costs" element={<CommCosts />} />
                                               <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
                                             </Routes>
@@ -358,6 +362,7 @@ export default function App() {
                                     </Routes>
                                           </DonationModalProvider>
                                   </Router>
+                                  </NewsletterProvider>
                                 </WebsiteProjectsProvider>
                                 </BlogProvider>
                                 </TopBannerProvider>
