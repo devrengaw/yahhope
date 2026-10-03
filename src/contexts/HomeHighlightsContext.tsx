@@ -36,6 +36,36 @@ export const isMockupHighlight = (h: { title?: string; snippet?: string }) => {
   );
 };
 
+export const deduplicateHighlights = (items: HomeHighlightItem[]): HomeHighlightItem[] => {
+  const seenKeys = new Set<string>();
+  const result: HomeHighlightItem[] = [];
+
+  for (const item of items) {
+    if (isMockupHighlight(item)) continue;
+
+    let key = '';
+    if (item.blogPostId) {
+      key = `blog:${item.blogPostId}`;
+    } else if (item.link && item.link.includes('post=')) {
+      const match = item.link.match(/post=([^&#]+)/);
+      if (match) key = `blog:${match[1]}`;
+    }
+
+    if (!key) {
+      key = `title:${(item.title || '').trim().toLowerCase()}`;
+    }
+
+    if (seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    result.push(item);
+  }
+
+  return result;
+};
+
+
 export const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
   {
     id: 'highlight-post-1',
@@ -111,7 +141,7 @@ interface HomeHighlightsContextType {
 
 const HomeHighlightsContext = createContext<HomeHighlightsContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'yah_hope_home_highlights_v5';
+const STORAGE_KEY = 'yah_hope_home_highlights_v6';
 
 export function HomeHighlightsProvider({ children }: { children: React.ReactNode }) {
   const [highlights, setHighlights] = useState<HomeHighlightItem[]>(() => {
@@ -120,13 +150,14 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
       localStorage.removeItem('yah_hope_home_highlights_v2');
       localStorage.removeItem('yah_hope_home_highlights_v3');
       localStorage.removeItem('yah_hope_home_highlights_v4');
+      localStorage.removeItem('yah_hope_home_highlights_v5');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.filter(h => !isMockupHighlight(h));
-          if (cleaned.length > 0) {
-            return cleaned;
+          const deduplicated = deduplicateHighlights(parsed);
+          if (deduplicated.length > 0) {
+            return deduplicated;
           }
         }
       }
@@ -141,7 +172,8 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
   // Sync to localStorage whenever highlights change
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(highlights));
+      const deduplicated = deduplicateHighlights(highlights);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(deduplicated));
     } catch (e) {
       console.warn('Failed to save highlights to localStorage', e);
     }
@@ -171,7 +203,7 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
 
           const validItems = data.filter((item: any) => !isMockupHighlight(item));
           if (validItems.length > 0) {
-            setHighlights(validItems.map(item => ({
+            const mapped = validItems.map(item => ({
               id: item.id,
               type: item.type || 'photo',
               title: item.title,
@@ -185,7 +217,8 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
               active: item.active !== false,
               order: item.order || 0,
               blogPostId: item.blog_post_id || item.blogPostId
-            })));
+            }));
+            setHighlights(deduplicateHighlights(mapped));
           } else {
             setHighlights(DEFAULT_HIGHLIGHTS);
           }
@@ -258,10 +291,28 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
   };
 
   const deleteHighlight = async (id: number | string) => {
-    setHighlights(prev => prev.filter(item => String(item.id) !== String(id)));
+    const target = highlights.find(h => String(h.id) === String(id));
+    const blogId = target?.blogPostId || (target?.link?.match(/post=([^&#]+)/)?.[1]);
+
+    const isMatch = (h: HomeHighlightItem) =>
+      String(h.id) === String(id) ||
+      (blogId ? (
+        h.blogPostId === blogId ||
+        String(h.id) === `highlight-${blogId}` ||
+        String(h.id) === `blog-${blogId}` ||
+        (Boolean(h.link) && h.link.includes(`post=${blogId}`))
+      ) : false);
+
+    setHighlights(prev => deduplicateHighlights(prev.filter(item => !isMatch(item))));
 
     try {
       await supabase.from('home_highlights').delete().eq('id', id);
+      if (blogId) {
+        await supabase
+          .from('home_highlights')
+          .delete()
+          .or(`blog_post_id.eq.${blogId},id.eq.highlight-${blogId}`);
+      }
     } catch {}
   };
 
@@ -275,7 +326,7 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
 
   const reorderHighlights = async (items: HomeHighlightItem[]) => {
     const ordered = items.map((item, idx) => ({ ...item, order: idx + 1 }));
-    setHighlights(ordered);
+    setHighlights(deduplicateHighlights(ordered));
 
     try {
       for (const item of ordered) {
@@ -303,57 +354,70 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
     highlight_color?: string;
     active?: boolean;
   }) => {
-    const existingIndex = highlights.findIndex(
-      h => h.blogPostId === post.id || String(h.id) === `blog-${post.id}`
-    );
+    setHighlights(prev => {
+      const isMatch = (h: HomeHighlightItem) =>
+        h.blogPostId === post.id ||
+        String(h.id) === `highlight-${post.id}` ||
+        String(h.id) === `blog-${post.id}` ||
+        (Boolean(h.link) && h.link.includes(`post=${post.id}`));
 
-    if (existingIndex >= 0) {
-      const existing = highlights[existingIndex];
-      const updated: Partial<HomeHighlightItem> = {
+      const existingIndex = prev.findIndex(isMatch);
+      const existing = existingIndex >= 0 ? prev[existingIndex] : null;
+
+      const singleItem: HomeHighlightItem = {
+        id: existing?.id || `highlight-${post.id}`,
         title: post.title,
-        category: post.category || existing.category,
-        location: post.location || existing.location || 'Moçambique',
-        snippet: post.snippet !== undefined ? post.snippet : existing.snippet,
-        content: post.content !== undefined ? post.content : existing.content,
-        image: post.image || existing.image,
+        category: post.category || existing?.category || 'Blog',
+        location: post.location || existing?.location || 'Moçambique',
+        snippet: post.snippet !== undefined ? post.snippet : (existing?.snippet || ''),
+        content: post.content !== undefined ? post.content : (existing?.content || ''),
+        image: post.image || existing?.image || '',
         link: `/blog?post=${post.id}`,
-        type: post.highlight_type || existing.type,
-        color: post.highlight_color || existing.color,
-        active: post.active !== undefined ? post.active : true,
-        blogPostId: post.id
-      };
-      await updateHighlight(existing.id, updated);
-    } else {
-      const newItem: Omit<HomeHighlightItem, 'id'> = {
-        title: post.title,
-        category: post.category || 'Blog',
-        location: post.location || 'Moçambique',
-        snippet: post.snippet || '',
-        content: post.content || '',
-        image: post.image,
-        link: `/blog?post=${post.id}`,
-        type: post.highlight_type || 'split',
-        color: post.highlight_color || '#F49853',
+        type: post.highlight_type || existing?.type || 'split',
+        color: post.highlight_color || existing?.color || '#F49853',
         active: post.active !== undefined ? post.active : true,
         blogPostId: post.id,
-        order: highlights.length + 1
+        order: existing?.order || (prev.length + 1)
       };
-      await addHighlight(newItem);
-    }
+
+      const nonMatching = prev.filter(h => !isMatch(h));
+      let nextList: HomeHighlightItem[];
+      if (existingIndex >= 0) {
+        nextList = [...nonMatching];
+        nextList.splice(Math.min(existingIndex, nextList.length), 0, singleItem);
+      } else {
+        nextList = [...nonMatching, singleItem];
+      }
+
+      return deduplicateHighlights(nextList);
+    });
   };
 
   const removeBlogPostHighlight = async (blogPostId: string) => {
-    const target = highlights.find(
-      h => h.blogPostId === blogPostId || String(h.id) === `blog-${blogPostId}`
-    );
-    if (target) {
-      await deleteHighlight(target.id);
-    }
+    const isMatch = (h: HomeHighlightItem) =>
+      h.blogPostId === blogPostId ||
+      String(h.id) === `highlight-${blogPostId}` ||
+      String(h.id) === `blog-${blogPostId}` ||
+      (Boolean(h.link) && h.link.includes(`post=${blogPostId}`));
+
+    setHighlights(prev => deduplicateHighlights(prev.filter(h => !isMatch(h))));
+
+    try {
+      await supabase
+        .from('home_highlights')
+        .delete()
+        .or(`blog_post_id.eq.${blogPostId},id.eq.highlight-${blogPostId},id.eq.blog-${blogPostId}`);
+    } catch {}
   };
 
   const isBlogPostHighlighted = (blogPostId: string) => {
     return highlights.some(
-      h => (h.blogPostId === blogPostId || String(h.id) === `blog-${blogPostId}`) && h.active !== false
+      h => (
+        h.blogPostId === blogPostId || 
+        String(h.id) === `highlight-${blogPostId}` || 
+        String(h.id) === `blog-${blogPostId}` || 
+        (Boolean(h.link) && h.link.includes(`post=${blogPostId}`))
+      ) && h.active !== false
     );
   };
 

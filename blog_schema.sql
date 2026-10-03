@@ -154,7 +154,7 @@ VALUES
     true,
     'photo',
     '#92BF78',
-    47, 32, 4, 2, 0,
+    0, 0, 0, 0, 0,
     '["pt"]'::jsonb
   ),
   (
@@ -170,7 +170,7 @@ VALUES
     false,
     'split',
     '#88A1F2',
-    23, 18, 7, 3, 0,
+    0, 0, 0, 0, 0,
     '["pt"]'::jsonb
   ),
   (
@@ -186,7 +186,7 @@ VALUES
     false,
     'split',
     '#EBC878',
-    15, 11, 3, 1, 0,
+    0, 0, 0, 0, 0,
     '["pt"]'::jsonb
   ),
   (
@@ -202,7 +202,7 @@ VALUES
     true,
     'photo',
     '#F49853',
-    38, 26, 4, 4, 0,
+    0, 0, 0, 0, 0,
     '["pt"]'::jsonb
   ),
   (
@@ -218,7 +218,7 @@ VALUES
     true,
     'split',
     '#92BF78',
-    23, 16, 5, 2, 0,
+    0, 0, 0, 0, 0,
     '["pt"]'::jsonb
   )
 ON CONFLICT (id) DO UPDATE SET

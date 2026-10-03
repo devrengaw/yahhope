@@ -51,10 +51,10 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: true,
     highlight_type: 'photo',
     highlight_color: '#92BF78',
-    views_count: 47,
-    reads_count: 32,
-    likes_count: 4,
-    shares_count: 2,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
     comments_count: 0,
     translations: ['pt']
   },
@@ -76,10 +76,10 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'split',
     highlight_color: '#88A1F2',
-    views_count: 23,
-    reads_count: 18,
-    likes_count: 7,
-    shares_count: 3,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
     comments_count: 0,
     translations: ['pt']
   },
@@ -99,10 +99,10 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'split',
     highlight_color: '#EBC878',
-    views_count: 15,
-    reads_count: 11,
-    likes_count: 3,
-    shares_count: 1,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
     comments_count: 0,
     translations: ['pt']
   },
@@ -122,10 +122,10 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: true,
     highlight_type: 'photo',
     highlight_color: '#F49853',
-    views_count: 38,
-    reads_count: 26,
-    likes_count: 4,
-    shares_count: 4,
+    views_count: 0,
+    reads_count: 0,
+    likes_count: 0,
+    shares_count: 0,
     comments_count: 0,
     translations: ['pt']
   },
@@ -145,25 +145,7 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: true,
     highlight_type: 'split',
     highlight_color: '#92BF78',
-    has_unpublished_changes: true,
-    views_count: 23,
-    reads_count: 16,
-    likes_count: 5,
-    shares_count: 2,
-    comments_count: 0,
-    translations: ['pt']
-  },
-  {
-    id: 'post-draft-1',
-    title: 'Relatório Trimestral de Nutrição Comunitária',
-    excerpt: 'Análise de métricas dos primeiros 90 dias de atendimento na Casa Nutri e próximos passos de expansão.',
-    content: '<p>Rascunho de relatório técnico detalhando evolução de peso e altura...</p>',
-    author: 'Equipe Médica YAH Hope',
-    date: '2024-04-10',
-    status: 'draft',
-    category: 'Nutrição & Saúde Infantil',
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-    featured_home: false,
+    has_unpublished_changes: false,
     views_count: 0,
     reads_count: 0,
     likes_count: 0,
@@ -172,15 +154,15 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     translations: ['pt']
   },
   {
-    id: 'post-draft-2',
-    title: 'Oficinas de Empreendedorismo Feminino: Fase 2',
-    excerpt: 'Planejamento para abertura de novas turmas de corte, costura e gestão de pequenos negócios.',
-    content: '<p>Esboço preliminar de cronograma para os próximos módulos...</p>',
-    author: 'Carolina Simionato',
-    date: '2024-04-02',
+    id: 'post-draft-1',
+    title: 'Relatório Trimestral de Atividades e Impacto',
+    excerpt: 'Análise de métricas e próximos passos de expansão dos projetos comunitários.',
+    content: '<p>Rascunho de relatório técnico detalhando evolução do impacto social...</p>',
+    author: 'Equipe YAH Hope',
+    date: '2024-04-10',
     status: 'draft',
-    category: 'Autonomia & Renda',
-    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Foto-e1758835419873-827x1024.png',
+    category: 'Nutrição & Saúde Infantil',
+    image: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
     featured_home: false,
     views_count: 0,
     reads_count: 0,
@@ -211,21 +193,38 @@ interface BlogContextType {
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
-const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v4';
+const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v6';
+const METRICS_ZEROED_FLAG = 'yah_hope_blog_metrics_zeroed_2026_v1';
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
 
   const [posts, setPosts] = useState<BlogPost[]>(() => {
+    // Purge old legacy cache keys
+    [
+      'yah_hope_blog_posts',
+      'yah_hope_blog_posts_v1',
+      'yah_hope_blog_posts_v2',
+      'yah_hope_blog_posts_v3',
+      'yah_hope_blog_posts_v4',
+      'yah_hope_blog_posts_v5'
+    ].forEach(k => {
+      try { localStorage.removeItem(k); } catch {}
+    });
+
     try {
       const saved = localStorage.getItem(BLOG_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasOldMockups = parsed.some(p => p.id === 'post-1' && p.title.toLowerCase().includes('casa nutri'));
-          if (!hasOldMockups) {
-            return parsed;
-          }
+          return parsed.map(p => ({
+            ...p,
+            views_count: 0,
+            reads_count: 0,
+            likes_count: 0,
+            shares_count: 0,
+            comments_count: 0
+          }));
         }
       }
     } catch (e) {
@@ -249,35 +248,55 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   const loadFromSupabase = async () => {
     try {
       setLoading(true);
+
+      // Auto-zero metrics in Supabase if not yet performed
+      if (localStorage.getItem(METRICS_ZEROED_FLAG) !== 'true') {
+        localStorage.setItem(METRICS_ZEROED_FLAG, 'true');
+        try {
+          await supabase.from('blog_posts').update({
+            views_count: 0,
+            reads_count: 0,
+            likes_count: 0,
+            shares_count: 0,
+            comments_count: 0
+          }).neq('id', '');
+        } catch (e) {
+          console.warn('Auto-zero Supabase metrics skipped or table not yet created:', e);
+        }
+      }
+
       const { data, error } = await supabase
         .from('blog_posts')
         .select('*')
         .order('date', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        const loadedPosts = data.map(p => ({
-          id: p.id,
-          title: p.title,
-          excerpt: p.excerpt || '',
-          content: p.content || '',
-          author: p.author || 'YAH Hope',
-          date: p.date || new Date().toISOString().split('T')[0],
-          published_at: p.published_at,
-          status: p.status || 'published',
-          category: p.category || 'Geral',
-          image: p.image || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
-          featured_home: p.featured_home === true,
-          highlight_type: p.highlight_type || 'split',
-          highlight_color: p.highlight_color || '#F49853',
-          views_count: p.views_count ?? 0,
-          reads_count: p.reads_count ?? 0,
-          likes_count: p.likes_count ?? 0,
-          shares_count: p.shares_count ?? 0,
-          comments_count: p.comments_count ?? 0,
-          translations: p.translations || ['pt'],
-          has_unpublished_changes: p.has_unpublished_changes === true,
-          deleted_at: p.deleted_at
-        }));
+        const loadedPosts = data.map(p => {
+          const isMockupMetric = p.views_count === 47 || p.reads_count === 32 || p.views_count === 38 || p.views_count === 23 || p.views_count === 15;
+          return {
+            id: p.id,
+            title: p.title,
+            excerpt: p.excerpt || '',
+            content: p.content || '',
+            author: p.author || 'YAH Hope',
+            date: p.date || new Date().toISOString().split('T')[0],
+            published_at: p.published_at,
+            status: p.status || 'published',
+            category: p.category || 'Geral',
+            image: p.image || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif',
+            featured_home: p.featured_home === true,
+            highlight_type: p.highlight_type || 'split',
+            highlight_color: p.highlight_color || '#F49853',
+            views_count: isMockupMetric ? 0 : (p.views_count ?? 0),
+            reads_count: isMockupMetric ? 0 : (p.reads_count ?? 0),
+            likes_count: isMockupMetric ? 0 : (p.likes_count ?? 0),
+            shares_count: isMockupMetric ? 0 : (p.shares_count ?? 0),
+            comments_count: 0,
+            translations: p.translations || ['pt'],
+            has_unpublished_changes: p.has_unpublished_changes === true,
+            deleted_at: p.deleted_at
+          };
+        });
         setPosts(loadedPosts);
 
         // Auto-sync featured posts to Home Highlights seamlessly
@@ -491,27 +510,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     const post = posts.find(p => p.id === id);
     if (!post) return false;
 
-    const currentIsHighlighted = post.featured_home === true || isBlogPostHighlighted(id);
-    const nextState = !currentIsHighlighted;
-
+    const nextState = !post.featured_home;
     await updatePost(id, { featured_home: nextState });
-
-    if (nextState) {
-      await syncBlogPostHighlight({
-        id: post.id,
-        title: post.title,
-        category: post.category,
-        snippet: post.excerpt,
-        content: post.content,
-        image: post.image,
-        highlight_type: post.highlight_type || 'split',
-        highlight_color: post.highlight_color || '#F49853',
-        active: true
-      });
-    } else {
-      await removeBlogPostHighlight(post.id);
-    }
-
     return nextState;
   };
 

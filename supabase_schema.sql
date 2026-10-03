@@ -448,7 +448,7 @@ CREATE TABLE finance_transactions (
   status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed')),
   account TEXT NOT NULL,
   expense_type TEXT CHECK (expense_type IN ('fixed', 'variable')),
-  recurrence TEXT CHECK (recurrence IN ('monthly', 'yearly', 'none')),
+  recurrence TEXT CHECK (recurrence IN ('monthly', 'bimonthly', 'quarterly', 'semiannual', 'yearly', 'none')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
