@@ -51,6 +51,9 @@ export interface InventoryItem {
   patrimony_number?: string;
   location?: string;
   condition?: 'novo' | 'bom' | 'regular' | 'danificado' | 'manutencao';
+  dosage_form?: 'comprimido' | 'liquido' | 'outro';
+  package_units?: number; // Quantidade de comprimidos por caixa
+  liquid_volume_ml?: number; // Volume em ml por frasco
 }
 
 export interface KitItem {

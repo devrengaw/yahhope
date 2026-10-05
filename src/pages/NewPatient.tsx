@@ -306,6 +306,7 @@ export function NewPatient() {
                 
                 if (isMedication) {
                   validPrescriptions.push({
+                    item_id: invItem.id,
                     medication: invItem.name,
                     treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
                     quantity: kitItem.quantity,

@@ -116,6 +116,10 @@ export function Inventory() {
   const [patrimonyNumber, setPatrimonyNumber] = useState('');
   const [location, setLocation] = useState('');
   const [condition, setCondition] = useState<'novo' | 'bom' | 'regular' | 'danificado' | 'manutencao'>('bom');
+  // Medication specific state
+  const [dosageForm, setDosageForm] = useState<'comprimido' | 'liquido' | 'outro'>('outro');
+  const [packageUnits, setPackageUnits] = useState(''); // Comprimidos por caixa
+  const [liquidVolumeMl, setLiquidVolumeMl] = useState(''); // Volume em ml por frasco
 
   // Transaction Modal State & Integrations
   const [transactionModal, setTransactionModal] = useState<{isOpen: boolean, type: 'in'|'out', item: InventoryItem | null}>({isOpen: false, type: 'in', item: null});
@@ -167,7 +171,7 @@ export function Inventory() {
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
   const [kitName, setKitName] = useState('');
   const [kitDesc, setKitDesc] = useState('');
-  const [kitItems, setKitItems] = useState<{item_id: string, quantity: number, dosage?: string}[]>([]);
+  const [kitItems, setKitItems] = useState<{item_id: string, quantity: number}[]>([]);
 
   // Separação dos itens em Consumo vs Patrimônio
   const consumableItems = useMemo(() => items.filter(i => !i.is_patrimonio), [items]);
@@ -383,6 +387,9 @@ export function Inventory() {
       setPatrimonyNumber(item.patrimony_number || '');
       setLocation(item.location || '');
       setCondition(item.condition || 'bom');
+      setDosageForm(item.dosage_form || (item.unit?.toLowerCase().includes('frasco') ? 'liquido' : item.unit?.toLowerCase().includes('caixa') ? 'comprimido' : 'outro'));
+      setPackageUnits(item.package_units !== undefined && item.package_units !== null ? item.package_units.toString() : '');
+      setLiquidVolumeMl(item.liquid_volume_ml !== undefined && item.liquid_volume_ml !== null ? item.liquid_volume_ml.toString() : '');
     } else {
       const willBePatrimonio = forcePatrimonio !== undefined ? forcePatrimonio : (activeTab === 'patrimonio');
       setEditingItem(null);
@@ -399,6 +406,9 @@ export function Inventory() {
       setPatrimonyNumber('');
       setLocation('');
       setCondition('bom');
+      setDosageForm('outro');
+      setPackageUnits('');
+      setLiquidVolumeMl('');
     }
     setIsItemModalOpen(true);
   };
@@ -419,7 +429,10 @@ export function Inventory() {
       is_patrimonio: isPatrimonio,
       patrimony_number: isPatrimonio ? (patrimonyNumber || undefined) : undefined,
       location: isPatrimonio ? (location || undefined) : undefined,
-      condition: isPatrimonio ? condition : undefined
+      condition: isPatrimonio ? condition : undefined,
+      dosage_form: !isPatrimonio ? dosageForm : undefined,
+      package_units: (!isPatrimonio && dosageForm === 'comprimido' && packageUnits) ? parseInt(packageUnits) : undefined,
+      liquid_volume_ml: (!isPatrimonio && dosageForm === 'liquido' && liquidVolumeMl) ? parseFloat(liquidVolumeMl) : undefined,
     };
 
     if (editingItem) {
@@ -642,7 +655,15 @@ export function Inventory() {
   };
 
   const handleDeleteKit = async (id: string) => {
-    if (await confirm('Tem certeza que deseja excluir este kit?')) {
+    const kit = kits.find(k => k.id === id);
+    const confirmed = await confirm({
+      title: 'Excluir Kit',
+      message: `Tem certeza que deseja excluir o kit "${kit?.name || 'selecionado'}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+    if (confirmed) {
       await deleteKit(id);
     }
   };
@@ -651,7 +672,7 @@ export function Inventory() {
     setKitItems([...kitItems, { item_id: '', quantity: 1 }]);
   };
 
-  const updateKitItem = (index: number, field: 'item_id' | 'quantity' | 'dosage', value: string | number) => {
+  const updateKitItem = (index: number, field: 'item_id' | 'quantity', value: string | number) => {
     const newItems = [...kitItems];
     newItems[index] = { ...newItems[index], [field]: value };
     setKitItems(newItems);
@@ -912,6 +933,16 @@ export function Inventory() {
                             <span>{item.name}</span>
                             <History size={14} className="text-slate-400 group-hover/name:text-emerald-600 transition-colors opacity-70" />
                           </button>
+                          {item.dosage_form === 'comprimido' && item.package_units && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md mt-1 w-fit">
+                              💊 {item.package_units} comp/caixa
+                            </span>
+                          )}
+                          {item.dosage_form === 'liquido' && item.liquid_volume_ml && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200/60 px-2 py-0.5 rounded-md mt-1 w-fit">
+                              🧴 {item.liquid_volume_ml} ml/frasco
+                            </span>
+                          )}
                         </td>
                         <td className="p-4 text-slate-600">
                           <div className="flex flex-col gap-1 items-start">
@@ -1211,9 +1242,20 @@ export function Inventory() {
                         <h3 className="font-bold text-slate-800 text-lg">{kit.name}</h3>
                         {kit.description && <p className="text-sm text-slate-500 mt-1">{kit.description}</p>}
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openKitModal(kit)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openKitModal(kit)} 
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          title="Editar Kit"
+                        >
                           <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteKit(kit.id)} 
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir Kit"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -1624,6 +1666,110 @@ export function Inventory() {
                       </div>
                     </div>
 
+                    {/* Forma Farmacêutica / Unidades por Embalagem */}
+                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <BriefcaseMedical size={15} className="text-emerald-600" />
+                          Apresentação do Medicamento
+                        </label>
+                        <span className="text-[10px] font-medium text-slate-400">Previsão de reposição (caixa/frasco)</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDosageForm('outro')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                            dosageForm === 'outro'
+                              ? 'bg-white text-slate-800 border-slate-300 shadow-xs'
+                              : 'bg-slate-100/70 text-slate-500 border-transparent hover:text-slate-800'
+                          }`}
+                        >
+                          Outro / Insumo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDosageForm('comprimido');
+                            if (!unit || unit === 'un') setUnit('caixas');
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            dosageForm === 'comprimido'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-xs'
+                              : 'bg-slate-100/70 text-slate-500 border-transparent hover:text-slate-800'
+                          }`}
+                        >
+                          💊 Comprimido
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDosageForm('liquido');
+                            if (!unit || unit === 'un') setUnit('frascos');
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            dosageForm === 'liquido'
+                              ? 'bg-cyan-50 text-cyan-700 border-cyan-200 shadow-xs'
+                              : 'bg-slate-100/70 text-slate-500 border-transparent hover:text-slate-800'
+                          }`}
+                        >
+                          🧴 Líquido
+                        </button>
+                      </div>
+
+                      {dosageForm === 'comprimido' && (
+                        <div className="pt-1 space-y-1 animate-in fade-in duration-200">
+                          <label className="text-xs font-bold text-indigo-950 block">
+                            Quantidade de Comprimidos por Caixa *
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="1"
+                              required={dosageForm === 'comprimido'}
+                              placeholder="Ex: 30"
+                              value={packageUnits}
+                              onChange={e => setPackageUnits(e.target.value)}
+                              className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-medium"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-indigo-500 font-bold">
+                              comprimidos/caixa
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-tight">
+                            Com base nessa quantidade, o sistema calcula quando a criança vai precisar receber uma nova caixa conforme os comprimidos que toma por dia.
+                          </p>
+                        </div>
+                      )}
+
+                      {dosageForm === 'liquido' && (
+                        <div className="pt-1 space-y-1 animate-in fade-in duration-200">
+                          <label className="text-xs font-bold text-cyan-950 block">
+                            Volume Total do Frasco (ml) *
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="1"
+                              step="0.1"
+                              required={dosageForm === 'liquido'}
+                              placeholder="Ex: 100"
+                              value={liquidVolumeMl}
+                              onChange={e => setLiquidVolumeMl(e.target.value)}
+                              className="w-full bg-white border border-cyan-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none font-medium"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-cyan-600 font-bold">
+                              ml/frasco
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-tight">
+                            Com base nesse volume em ml, o sistema calcula quando a criança deve receber outro frasco dependendo de quantos ml toma ao dia.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-sm font-medium text-slate-700">Estoque Mínimo</label>
@@ -1970,39 +2116,22 @@ export function Inventory() {
                   
                   <div className="space-y-3">
                     {kitItems.map((ki, index) => {
-                      const invItem = items.find(i => i.id === ki.item_id);
-                      const isMedication = invItem?.category?.toLowerCase().includes('medicamento') || invItem?.category?.toLowerCase().includes('remédio');
-                      
                       return (
-                        <div key={index} className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-xl border border-slate-100">
-                          <div className="flex gap-3 items-start">
-                            <div className="flex-1 min-w-[200px]">
-                              <KitItemSelect 
-                                items={items} 
-                                categories={categories}
-                                value={ki.item_id}
-                                onChange={(val) => updateKitItem(index, 'item_id', val)}
-                              />
-                            </div>
-                            <div className="w-24">
-                              <input required type="number" min="1" placeholder="Qtd" value={ki.quantity} onChange={e => updateKitItem(index, 'quantity', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
-                            </div>
-                            <button type="button" onClick={() => removeKitItem(index)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors mt-0.5">
-                              <Trash2 size={20} />
-                            </button>
+                        <div key={index} className="flex gap-3 items-center p-3 bg-slate-50/50 rounded-xl border border-slate-100">
+                          <div className="flex-1 min-w-[200px]">
+                            <KitItemSelect 
+                              items={items} 
+                              categories={categories}
+                              value={ki.item_id}
+                              onChange={(val) => updateKitItem(index, 'item_id', val)}
+                            />
                           </div>
-                          {isMedication && (
-                            <div className="w-full mt-1">
-                              <input 
-                                type="text" 
-                                placeholder="Posologia (ex: 1 comprimido 2x ao dia)" 
-                                value={ki.dosage || ''} 
-                                onChange={e => updateKitItem(index, 'dosage', e.target.value)} 
-                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" 
-                                required 
-                              />
-                            </div>
-                          )}
+                          <div className="w-24">
+                            <input required type="number" min="1" placeholder="Qtd" value={ki.quantity} onChange={e => updateKitItem(index, 'quantity', parseInt(e.target.value) || 0)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none" />
+                          </div>
+                          <button type="button" onClick={() => removeKitItem(index)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+                            <Trash2 size={20} />
+                          </button>
                         </div>
                       );
                     })}
@@ -2016,13 +2145,32 @@ export function Inventory() {
               </form>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setIsKitModalOpen(false)} className="px-6 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" form="kit-form" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium transition-colors shadow-sm">
-                Salvar Kit
-              </button>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-3">
+              {editingKit ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const kitId = editingKit.id;
+                    setIsKitModalOpen(false);
+                    await handleDeleteKit(kitId);
+                  }}
+                  className="px-4 py-2.5 rounded-xl font-medium text-red-600 hover:bg-red-50 hover:border-red-200 border border-transparent transition-colors flex items-center gap-2 text-sm cursor-pointer"
+                  title="Excluir este kit permanentemente"
+                >
+                  <Trash2 size={16} />
+                  Excluir Kit
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-3">
+                <button onClick={() => setIsKitModalOpen(false)} className="px-6 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" form="kit-form" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-medium transition-colors shadow-sm cursor-pointer">
+                  Salvar Kit
+                </button>
+              </div>
             </div>
           </div>
         </div>

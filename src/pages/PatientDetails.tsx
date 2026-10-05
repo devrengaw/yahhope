@@ -3,7 +3,8 @@ import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2 } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
-import { calculateAge, cn, formatLocalDate, parseLocalDate } from '../lib/utils';
+import { calculateAge, cn, formatLocalDate, parseLocalDate, formatDisplayDate } from '../lib/utils';
+import { calculateMedicationDuration } from '../lib/medicationUtils';
 import { StatusBadge } from '../components/StatusBadge';
 import { GrowthCharts } from '../components/GrowthCharts';
 import { PatientProfile } from '../components/PatientProfile';
@@ -91,7 +92,7 @@ export function PatientDetails() {
   const { addEvent, updateEvent, deleteEvent, updatePatient, patients, events } = usePatients();
   const { items, kits, deductKitFromInventory, deductPrescriptionsFromInventory } = useInventory();
   const { agendarVisita, visits } = useVisits();
-  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos, removerAtendimentosPorPaciente } = useAtendimento();
+  const { agendarAtendimento, concluirAtendimento, concluirAtendimentosPorPaciente, iniciarAtendimento, iniciarAtendimentoPorPaciente, adicionarNaFila, atendimentos, removerAtendimentosPorPaciente, cancelarAtendimentoHoje } = useAtendimento();
   const { sendNotification } = useNotification();
   const { confirm } = useConfirm();
   const { user } = useAuth();
@@ -105,6 +106,7 @@ export function PatientDetails() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [activeSessionAptId, setActiveSessionAptId] = useState<string | null>(aptId || null);
 
   // Hospitalization State
   const [isHospitalizationModalOpen, setIsHospitalizationModalOpen] = useState(false);
@@ -202,14 +204,18 @@ export function PatientDetails() {
       defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
       setReturnDate(formatLocalDate(defaultReturnDate));
       setProfessional(user?.name || '');
+      setEditingEventId(null);
       setIsModalOpen(true);
       if (patient) {
-        iniciarAtendimentoPorPaciente(patient.id, patient.name);
+        iniciarAtendimentoPorPaciente(patient.id, patient.name).then(newAptId => {
+          if (newAptId) setActiveSessionAptId(newAptId);
+        });
         sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
       }
     } else if (action === 'edit-last') {
       const lastEvent = patientEvents[0];
       if (lastEvent) {
+        setActiveSessionAptId(null);
         setEditingEventId(lastEvent.id);
         setNewWeight(lastEvent.weight?.toString() || '');
         setNewHeight(lastEvent.height?.toString() || '');
@@ -219,9 +225,16 @@ export function PatientDetails() {
         setReturnDate(lastEvent.return_date || '');
         setSelectedKits(lastEvent.kit_delivered || []);
         if (lastEvent.prescriptions && lastEvent.prescriptions.length > 0) {
-          setPrescriptions(lastEvent.prescriptions);
+          setPrescriptions(lastEvent.prescriptions.map((p: any, idx: number) => ({
+            id: p.id ? p.id.toString() : `p-${idx}-${Date.now()}`,
+            item_id: p.item_id || '',
+            medication: p.medication || '',
+            treatment: p.treatment || '',
+            duration_days: p.duration_days?.toString() || '',
+            quantity: p.quantity?.toString() || '1'
+          })));
         } else {
-          setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+          setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '1' }]);
         }
         setEventDate(lastEvent.date);
         setIsModalOpen(true);
@@ -244,18 +257,51 @@ export function PatientDetails() {
     setNewNotes('');
     setReturnDate(formatLocalDate(defaultReturnDate));
     setSelectedKits([]);
-    setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+    setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '1' }]);
     setProfessional(user?.name || '');
     setEditingEventId(null);
     setIsModalOpen(true);
 
     if (patient) {
-      iniciarAtendimentoPorPaciente(patient.id, patient.name);
+      iniciarAtendimentoPorPaciente(patient.id, patient.name).then(newAptId => {
+        if (newAptId) setActiveSessionAptId(newAptId);
+      });
       sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
     }
   };
 
+  const handleCancelFollowup = async () => {
+    setIsModalOpen(false);
+    navigate(`/nutrition/patients/${patient.id}`, { replace: true });
+
+    // Reset form fields
+    setNewWeight(''); 
+    setNewHeight(''); 
+    setNewMuac(''); 
+    setNewHead(''); 
+    setNewNotes(''); 
+    setSelectedKits([]);
+    setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+
+    if (editingEventId) {
+      setEditingEventId(null);
+      return;
+    }
+
+    // New attendance was cancelled: remove patient from queue
+    if (patient) {
+      await cancelarAtendimentoHoje(patient.id, activeSessionAptId || aptId);
+      setActiveSessionAptId(null);
+      sendNotification(
+        'Atendimento Cancelado',
+        `O atendimento de ${patient.name} foi cancelado e a criança foi retirada da fila.`,
+        'info'
+      );
+    }
+  };
+
   const handleEditPastEvent = (event: any) => {
+    setActiveSessionAptId(null);
     setEditingEventId(event.id);
     setNewWeight(event.weight?.toString() || '');
     setNewHeight(event.height?.toString() || '');
@@ -265,9 +311,16 @@ export function PatientDetails() {
     setReturnDate(event.return_date || '');
     setSelectedKits(event.kit_delivered || []);
     if (event.prescriptions && event.prescriptions.length > 0) {
-      setPrescriptions(event.prescriptions);
+      setPrescriptions(event.prescriptions.map((p: any, idx: number) => ({
+        id: p.id ? p.id.toString() : `p-${idx}-${Date.now()}`,
+        item_id: p.item_id || '',
+        medication: p.medication || '',
+        treatment: p.treatment || '',
+        duration_days: p.duration_days?.toString() || '',
+        quantity: p.quantity?.toString() || '1'
+      })));
     } else {
-      setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+      setPrescriptions([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '1' }]);
     }
     setProfessional(event.professional || user?.name || '');
     setEventDate(event.date);
@@ -309,7 +362,7 @@ export function PatientDetails() {
   const [returnDate, setReturnDate] = useState('');
   const [professional, setProfessional] = useState(user?.name || '');
   const [selectedKits, setSelectedKits] = useState<string[]>([]);
-  const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+  const [prescriptions, setPrescriptions] = useState([{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '1' }]);
 
   // Referral Modal State
   const [refProfessional, setRefProfessional] = useState(user?.name || '');
@@ -385,10 +438,11 @@ export function PatientDetails() {
               const alreadyHas = activeMedications.some(p => p.item_id === invItem.id || p.medication === invItem.name);
               if (!alreadyHas) {
                 activeMedications.push({
+                  item_id: invItem.id,
                   medication: invItem.name,
                   treatment: kitItem.dosage ? `${kitItem.dosage} (Kit: ${kit.name})` : `Via Kit: ${kit.name}`,
                   duration_days: undefined,
-                  quantity: kitItem.quantity?.toString(),
+                  quantity: kitItem.quantity ? (kitItem.quantity as any) : undefined,
                 });
               }
             }
@@ -408,10 +462,27 @@ export function PatientDetails() {
   const handleSaveMedication = (index: number) => {
     if (!latestClinicalEvent) return;
     const newMeds = [...activeMedications];
+    const currentMed = newMeds[index];
+    const invItem = items.find(i => (currentMed.item_id && i.id === currentMed.item_id) || i.name.toLowerCase() === editedMedication.medication.toLowerCase());
+
+    let duration = editedMedication.duration_days ? parseInt(editedMedication.duration_days) : undefined;
+    if (!duration && invItem) {
+      const calc = calculateMedicationDuration(
+        invItem, 
+        editedMedication.treatment, 
+        typeof currentMed.quantity === 'number' ? currentMed.quantity : parseInt(currentMed.quantity || '1') || 1, 
+        latestClinicalEvent.date
+      );
+      if (calc.durationDays) {
+        duration = calc.durationDays;
+      }
+    }
+
     newMeds[index] = { 
-      ...newMeds[index], 
-      ...editedMedication,
-      duration_days: editedMedication.duration_days ? parseInt(editedMedication.duration_days) : undefined
+      ...currentMed, 
+      medication: editedMedication.medication,
+      treatment: editedMedication.treatment,
+      duration_days: duration
     };
     updateEvent(latestClinicalEvent.id, { prescriptions: newMeds });
     setEditingMedicationIndex(null);
@@ -532,6 +603,7 @@ export function PatientDetails() {
     setIsModalOpen(false);
     // Remove query params
     navigate(`/nutrition/patients/${patient.id}`, { replace: true });
+    setActiveSessionAptId(null);
     
     setNewWeight(''); setNewHeight(''); setNewMuac(''); setNewHead(''); setNewNotes(''); setReturnDate(formatLocalDate(addDays(new Date(), 14))); setSelectedKits([]); setEventDate(formatLocalDate(new Date()));
     setPrescriptions([{ id: Date.now().toString(), item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
@@ -611,15 +683,40 @@ export function PatientDetails() {
   };
 
   const addPrescription = () => {
-    setPrescriptions([...prescriptions, { id: Date.now().toString(), item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }]);
+    setPrescriptions(prev => [...prev, { id: Date.now().toString(), item_id: '', medication: '', treatment: '', duration_days: '', quantity: '1' }]);
   };
 
-  const removePrescription = (id: number) => {
-    setPrescriptions(prescriptions.filter(p => p.id !== id));
+  const removePrescription = (id: string | number) => {
+    setPrescriptions(prev => prev.filter(p => p.id !== id.toString()));
   };
 
-  const updatePrescription = (id: number, field: 'medication' | 'treatment' | 'duration_days' | 'quantity', value: string) => {
-    setPrescriptions(prescriptions.map(p => p.id === id ? { ...p, [field]: value } : p));
+  const updatePrescription = (id: string | number, field: 'medication' | 'treatment' | 'duration_days' | 'quantity' | 'item_id', value: string) => {
+    setPrescriptions(prev => prev.map(p => {
+      if (p.id !== id.toString()) return p;
+      const updated = { ...p, [field]: value };
+
+      if (field === 'item_id') {
+        const item = items.find(i => i.id === value);
+        updated.medication = item ? item.name : '';
+        if (!updated.quantity || updated.quantity === '0') {
+          updated.quantity = '1';
+        }
+      }
+
+      // Check if we can calculate duration automatically
+      const currentItemId = field === 'item_id' ? value : updated.item_id;
+      const item = items.find(i => i.id === currentItemId);
+      if (item && (item.package_units || item.liquid_volume_ml)) {
+        const treat = field === 'treatment' ? value : updated.treatment;
+        const qty = parseInt(field === 'quantity' ? value : updated.quantity) || 1;
+        const calc = calculateMedicationDuration(item, treat, qty, eventDate);
+        if (calc.durationDays && (field === 'treatment' || field === 'quantity' || field === 'item_id')) {
+          updated.duration_days = calc.durationDays.toString();
+        }
+      }
+
+      return updated;
+    }));
   };
 
   const openReferralModal = (fromEvent?: { weight?: number, height?: number, zScore?: number, status?: string, professional?: string }) => {
@@ -1087,7 +1184,13 @@ export function PatientDetails() {
                 </h3>
                 {activeMedications.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {activeMedications.map((p, i) => (
+                    {activeMedications.map((p, i) => {
+                      const invItem = items.find(it => (p.item_id && it.id === p.item_id) || it.name.toLowerCase() === p.medication.toLowerCase());
+                      const qty = typeof p.quantity === 'number' ? p.quantity : parseInt(p.quantity || '1') || 1;
+                      const calc = calculateMedicationDuration(invItem, p.treatment, qty, latestClinicalEvent.date);
+                      const durationDays = p.duration_days || calc.durationDays;
+
+                      return (
                       <div key={i} className="bg-white p-5 rounded-2xl border border-emerald-100 flex flex-col group hover:shadow-md transition-all">
                         {editingMedicationIndex === i ? (
                           <div className="flex flex-col h-full">
@@ -1104,8 +1207,8 @@ export function PatientDetails() {
                             <textarea
                               value={editedMedication.treatment}
                               onChange={e => setEditedMedication(prev => ({ ...prev, treatment: e.target.value }))}
-                              className="w-full text-xs font-medium text-slate-600 leading-relaxed mb-4 border-b-2 border-slate-200 focus:border-emerald-500 outline-none pb-1 bg-transparent resize-none"
-                              placeholder="Posologia"
+                              className="w-full text-xs font-medium text-slate-600 leading-relaxed mb-3 border-b-2 border-slate-200 focus:border-emerald-500 outline-none pb-1 bg-transparent resize-none"
+                              placeholder="Posologia (ex: 1 comp 2x ao dia ou 5ml 2x ao dia)"
                               rows={2}
                             />
                             <div className="flex gap-2 items-center mb-4">
@@ -1119,10 +1222,10 @@ export function PatientDetails() {
                               />
                             </div>
                             <div className="mt-auto flex justify-end gap-2 pt-3 border-t border-slate-100">
-                              <button onClick={() => setEditingMedicationIndex(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                              <button onClick={() => setEditingMedicationIndex(null)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
                                 <X size={16} />
                               </button>
-                              <button onClick={() => handleSaveMedication(i)} className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors">
+                              <button onClick={() => handleSaveMedication(i)} className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer">
                                 <Save size={16} />
                               </button>
                             </div>
@@ -1140,45 +1243,84 @@ export function PatientDetails() {
                                     setEditedMedication({ 
                                       medication: p.medication, 
                                       treatment: p.treatment,
-                                      duration_days: p.duration_days?.toString() || ''
+                                      duration_days: (p.duration_days || calc.durationDays)?.toString() || ''
                                     });
-                                  }} className="p-1 text-slate-400 hover:text-emerald-600 transition-colors">
+                                  }} className="p-1 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer" title="Editar medicação">
                                     <Edit2 size={14} />
                                   </button>
-                                  <button onClick={() => handleDeleteMedication(i)} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                  <button onClick={() => handleDeleteMedication(i)} className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer" title="Remover medicação">
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
                               )}
                             </div>
                             
-                            <p className="text-sm font-black text-slate-800 mb-1">{p.medication}</p>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <p className="text-sm font-black text-slate-800">{p.medication}</p>
+                              {invItem?.dosage_form === 'comprimido' && invItem.package_units ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded-md">
+                                  💊 {invItem.package_units} comp/cx
+                                </span>
+                              ) : invItem?.dosage_form === 'liquido' && invItem.liquid_volume_ml ? (
+                                <span className="inline-flex items-center text-[10px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 rounded-md">
+                                  🧴 {invItem.liquid_volume_ml} ml/frasco
+                                </span>
+                              ) : null}
+                            </div>
+
                             <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{p.treatment || 'Posologia não informada'}</p>
                             
-                            {p.duration_days ? (() => {
+                            {durationDays ? (() => {
                               const prescribedDate = parseLocalDate(latestClinicalEvent.date);
                               const today = new Date();
+                              today.setHours(12, 0, 0, 0);
                               const daysTaken = Math.max(0, differenceInDays(today, prescribedDate));
-                              const endDate = addDays(prescribedDate, p.duration_days);
-                              const isFinished = daysTaken >= p.duration_days;
+                              const endDate = calc.renewalDate || addDays(prescribedDate, durationDays);
+                              const daysRemaining = differenceInDays(endDate, today);
+                              const isFinished = daysRemaining <= 0;
+                              const isDueSoon = !isFinished && daysRemaining <= 3;
+                              const packageLabel = calc.packageLabel || 'caixa';
 
                               return (
-                                <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
+                                <div className="mt-auto space-y-2.5 border-t border-slate-100 pt-3">
+                                  {/* Replenishment status / Next Box Badge */}
+                                  <div className={cn(
+                                    "p-2 rounded-xl text-xs font-semibold flex items-center justify-between gap-1.5",
+                                    isFinished
+                                      ? "bg-rose-50 border border-rose-200 text-rose-800"
+                                      : isDueSoon
+                                      ? "bg-amber-50 border border-amber-200 text-amber-800"
+                                      : "bg-emerald-50/80 border border-emerald-200/70 text-emerald-800"
+                                  )}>
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <Clock size={13} className={cn("shrink-0", isFinished ? "text-rose-500" : isDueSoon ? "text-amber-500" : "text-emerald-500")} />
+                                      <span className="truncate">
+                                        {isFinished 
+                                          ? `Reposição Vencida (${endDate.toLocaleDateString('pt-BR')})` 
+                                          : isDueSoon 
+                                          ? `Repor em ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}` 
+                                          : `Próxima ${packageLabel}: ${endDate.toLocaleDateString('pt-BR')}`}
+                                      </span>
+                                    </div>
+                                    <span className={cn(
+                                      "text-[9px] uppercase font-black px-1.5 py-0.5 rounded shrink-0",
+                                      isFinished ? "bg-rose-200 text-rose-900" : isDueSoon ? "bg-amber-200 text-amber-900" : "bg-emerald-200 text-emerald-900"
+                                    )}>
+                                      {isFinished ? 'Entregar Nova' : isDueSoon ? 'Atenção' : 'No Prazo'}
+                                    </span>
+                                  </div>
+
                                   <div className="flex justify-between items-center text-[11px] uppercase tracking-wider">
-                                    <span className="font-bold text-slate-500">Uso (Dias)</span>
-                                    <span className={cn("font-black", isFinished ? "text-slate-400" : "text-emerald-600")}>
-                                      {Math.min(daysTaken, p.duration_days)} / {p.duration_days}
+                                    <span className="font-bold text-slate-500">Progresso</span>
+                                    <span className={cn("font-black", isFinished ? "text-rose-600" : "text-emerald-600")}>
+                                      {Math.min(daysTaken, durationDays)} / {durationDays} dias
                                     </span>
                                   </div>
                                   <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                     <div 
-                                      className={cn("h-full rounded-full transition-all", isFinished ? "bg-slate-300" : "bg-emerald-500")}
-                                      style={{ width: `${Math.min((daysTaken / p.duration_days) * 100, 100)}%` }}
+                                      className={cn("h-full rounded-full transition-all", isFinished ? "bg-rose-500" : isDueSoon ? "bg-amber-500" : "bg-emerald-500")}
+                                      style={{ width: `${Math.min((daysTaken / durationDays) * 100, 100)}%` }}
                                     />
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
-                                    <span>{isFinished ? 'TRATAMENTO CONCLUÍDO' : 'EM ANDAMENTO'}</span>
-                                    <span>FIM: {endDate.toLocaleDateString('pt-BR')}</span>
                                   </div>
                                 </div>
                               );
@@ -1191,7 +1333,8 @@ export function PatientDetails() {
                           </>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="bg-white/60 border border-emerald-100/50 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center">
@@ -1570,22 +1713,40 @@ export function PatientDetails() {
                               <Activity size={12} className="text-white/80" />
                             </div>
                             <div className="divide-y divide-emerald-50">
-                              {event.prescriptions.map((p, i) => (
-                                <div key={i} className="flex flex-col sm:grid sm:grid-cols-2 p-3 bg-emerald-50/30 text-sm group/row hover:bg-emerald-50/60 transition-colors">
-                                  {p.medication && (
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Suplemento/Medicamento</span>
-                                      <span className="text-emerald-900 font-medium">{p.medication}</span>
-                                    </div>
-                                  )}
-                                  {p.treatment && (
-                                    <div className="flex flex-col mt-2 sm:mt-0 sm:pl-4 sm:border-l sm:border-emerald-100/50">
-                                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Posologia / Orientação</span>
-                                      <span className="text-emerald-800">{p.treatment}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
+                              {event.prescriptions.map((p, i) => {
+                                const invItem = items.find(it => (p.item_id && it.id === p.item_id) || it.name.toLowerCase() === p.medication.toLowerCase());
+                                const isPill = invItem?.dosage_form === 'comprimido';
+                                const isLiquid = invItem?.dosage_form === 'liquido';
+                                return (
+                                  <div key={i} className="flex flex-col sm:grid sm:grid-cols-2 p-3 bg-emerald-50/30 text-sm group/row hover:bg-emerald-50/60 transition-colors">
+                                    {p.medication && (
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Suplemento/Medicamento</span>
+                                          {isPill && invItem?.package_units && (
+                                            <span className="text-[9px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-1 rounded">💊 {invItem.package_units} comp/cx</span>
+                                          )}
+                                          {isLiquid && invItem?.liquid_volume_ml && (
+                                            <span className="text-[9px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-1 rounded">🧴 {invItem.liquid_volume_ml} ml/frasco</span>
+                                          )}
+                                        </div>
+                                        <span className="text-emerald-900 font-medium">
+                                          {p.medication} {p.quantity ? `(${p.quantity} ${isPill ? 'cx' : isLiquid ? 'frasco(s)' : 'unid.'})` : ''}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {p.treatment && (
+                                      <div className="flex flex-col mt-2 sm:mt-0 sm:pl-4 sm:border-l sm:border-emerald-100/50">
+                                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">Posologia / Orientação</span>
+                                        <span className="text-emerald-800">{p.treatment}</span>
+                                        {p.duration_days && (
+                                          <span className="text-[10px] text-slate-500 font-semibold mt-0.5">Duração: {p.duration_days} dias</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -1621,7 +1782,7 @@ export function PatientDetails() {
                   <FileText size={14} className="text-amber-600" />
                   Fazer Encaminhamento
                 </button>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer">
+                <button onClick={handleCancelFollowup} className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer" title="Cancelar atendimento">
                   <X size={20} />
                 </button>
               </div>
@@ -1757,78 +1918,203 @@ export function PatientDetails() {
                 </div>
 
                 {/* Medication and Treatment (Dynamic) */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700">Medicamentos e Suplementos</label>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Medicamentos e Suplementos</label>
+                      <p className="text-[11px] text-slate-500">
+                        A data da próxima caixa/frasco é calculada automaticamente conforme a posologia e a apresentação cadastrada no estoque.
+                      </p>
+                    </div>
                     <button 
                       type="button" 
                       onClick={addPrescription}
-                      className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg"
+                      className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 cursor-pointer"
                     >
                       <Plus size={14} /> Adicionar
                     </button>
                   </div>
                   
-                  {prescriptions.map((p, index) => (
-                    <div key={p.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 relative group">
-                      <div className="sm:col-span-4 space-y-1">
-                        <select
-                          value={p.item_id || ''}
-                          onChange={e => {
-                            const itemId = e.target.value;
-                            const item = items.find(i => i.id === itemId);
-                            setPrescriptions(prev => prev.map(pr => pr.id === p.id ? { ...pr, item_id: itemId, medication: item ? item.name : '' } : pr));
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                        >
-                          <option value="">Selecione do estoque...</option>
-                          {items.filter(i => !i.internal_use && !i.is_patrimonio && i.quantity > 0).map(item => (
-                            <option key={item.id} value={item.id}>{item.name} ({item.quantity} dispon.)</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="sm:col-span-3 space-y-1">
-                        <input 
-                          type="text" 
-                          value={p.treatment} 
-                          onChange={e => updatePrescription(p.id, 'treatment', e.target.value)} 
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-                          placeholder="Ex: 1 sachê 2x ao dia" 
-                        />
-                      </div>
-                      <div className="sm:col-span-2 space-y-1">
-                        <input 
-                          type="number" 
-                          value={p.quantity} 
-                          onChange={e => updatePrescription(p.id, 'quantity', e.target.value)} 
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-                          placeholder="Qtd (Retirada)" 
-                          min="1"
-                        />
-                      </div>
-                      <div className="sm:col-span-2 space-y-1">
-                        <input 
-                          type="number" 
-                          value={p.duration_days} 
-                          onChange={e => updatePrescription(p.id, 'duration_days', e.target.value)} 
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
-                          placeholder="Uso (Dias)" 
-                          min="1"
-                        />
-                      </div>
-                      <div className="sm:col-span-1 flex justify-end sm:justify-center pt-1">
-                        {prescriptions.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={() => removePrescription(p.id)}
-                            className="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            <X size={16} />
-                          </button>
+                  {prescriptions.map((p, index) => {
+                    const selectedItem = items.find(i => i.id === p.item_id);
+                    const isPill = selectedItem?.dosage_form === 'comprimido';
+                    const isLiquid = selectedItem?.dosage_form === 'liquido';
+                    const calc = calculateMedicationDuration(
+                      selectedItem, 
+                      p.treatment, 
+                      parseInt(p.quantity) || 1, 
+                      eventDate
+                    );
+
+                    return (
+                      <div key={p.id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                          <div className="sm:col-span-4 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Item do Estoque</label>
+                            <select
+                              value={p.item_id || ''}
+                              onChange={e => updatePrescription(p.id, 'item_id', e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all truncate"
+                            >
+                              <option value="">Selecione do estoque...</option>
+                              {items.filter(i => !i.internal_use && !i.is_patrimonio && i.quantity > 0).map(item => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} ({item.quantity} disp.) {item.dosage_form === 'comprimido' && item.package_units ? `[${item.package_units} comp/cx]` : item.dosage_form === 'liquido' && item.liquid_volume_ml ? `[${item.liquid_volume_ml} ml/frasco]` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="sm:col-span-4 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Posologia / Orientação</label>
+                            <input 
+                              type="text" 
+                              value={p.treatment} 
+                              onChange={e => updatePrescription(p.id, 'treatment', e.target.value)} 
+                              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+                              placeholder={
+                                isPill 
+                                  ? "Ex: 1 comp 2x ao dia" 
+                                  : isLiquid 
+                                  ? "Ex: 5ml 2x ao dia" 
+                                  : "Ex: 1 sachê 2x ao dia"
+                              } 
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              {isPill ? 'Qtd (Caixas)' : isLiquid ? 'Qtd (Frascos)' : 'Qtd (Retirada)'}
+                            </label>
+                            <input 
+                              type="number" 
+                              value={p.quantity} 
+                              onChange={e => updatePrescription(p.id, 'quantity', e.target.value)} 
+                              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold" 
+                              placeholder="Qtd" 
+                              min="1"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Uso (Dias)</label>
+                              {calc.durationDays && (
+                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">Auto</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <input 
+                                type="number" 
+                                value={p.duration_days} 
+                                onChange={e => updatePrescription(p.id, 'duration_days', e.target.value)} 
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all" 
+                                placeholder="Dias" 
+                                min="1"
+                              />
+                              {prescriptions.length > 1 && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => removePrescription(p.id)}
+                                  className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                                  title="Remover medicamento"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quick Posology Chips */}
+                        {selectedItem && (isPill || isLiquid) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mr-1">Sugestões:</span>
+                            {isPill ? (
+                              [
+                                '1 comp 1x ao dia',
+                                '1 comp 2x ao dia',
+                                '1 comp de 8 em 8h',
+                                '1/2 comp ao dia'
+                              ].map(sug => (
+                                <button
+                                  key={sug}
+                                  type="button"
+                                  onClick={() => updatePrescription(p.id, 'treatment', sug)}
+                                  className={cn(
+                                    "text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer",
+                                    p.treatment === sug
+                                      ? "bg-emerald-600 text-white border-emerald-600 font-bold"
+                                      : "bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
+                                  )}
+                                >
+                                  {sug}
+                                </button>
+                              ))
+                            ) : (
+                              [
+                                '2.5ml 2x ao dia',
+                                '5ml 2x ao dia',
+                                '5ml 3x ao dia',
+                                '5ml de 8 em 8h',
+                                '10ml 1x ao dia'
+                              ].map(sug => (
+                                <button
+                                  key={sug}
+                                  type="button"
+                                  onClick={() => updatePrescription(p.id, 'treatment', sug)}
+                                  className={cn(
+                                    "text-[11px] px-2 py-0.5 rounded-full border transition-all cursor-pointer",
+                                    p.treatment === sug
+                                      ? "bg-cyan-600 text-white border-cyan-600 font-bold"
+                                      : "bg-white text-slate-600 border-slate-200 hover:border-cyan-300 hover:text-cyan-700"
+                                  )}
+                                >
+                                  {sug}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {/* Calculation Feedback / Renewal Date */}
+                        {selectedItem && (
+                          <div className="pt-1">
+                            {calc.durationDays && calc.renewalDateStr ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs text-emerald-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span>
+                                    {isPill ? '💊' : isLiquid ? '🧴' : '📦'} {calc.explanation?.split('.')[0]}.
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 font-bold bg-white text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200 shadow-2xs">
+                                  <Calendar size={13} className="text-emerald-600" />
+                                  <span>Próxima {calc.packageLabel}: {formatDisplayDate(calc.renewalDateStr)}</span>
+                                </div>
+                              </div>
+                            ) : isPill && !selectedItem.package_units ? (
+                              <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                                <span>⚠️ Configure a quantidade de comprimidos por caixa no <strong>Estoque</strong> para calcular a data da próxima caixa.</span>
+                              </div>
+                            ) : isLiquid && !selectedItem.liquid_volume_ml ? (
+                              <div className="text-[11px] text-cyan-800 bg-cyan-50 p-2 rounded-lg border border-cyan-200 flex items-center gap-1.5">
+                                <span>⚠️ Configure o volume em ml do frasco no <strong>Estoque</strong> para calcular a data do próximo frasco.</span>
+                              </div>
+                            ) : (isPill || isLiquid) && (!p.treatment || !calc.dailyDose) ? (
+                              <div className="text-[11px] text-slate-500 bg-white p-2 rounded-lg border border-dashed border-slate-200 flex items-center gap-1.5">
+                                <Sparkles size={12} className="text-emerald-500 shrink-0" />
+                                <span>
+                                  {isPill 
+                                    ? `Caixa com ${selectedItem.package_units} comprimidos. Preencha a posologia para calcular a duração e data da próxima caixa.` 
+                                    : `Frasco com ${selectedItem.liquid_volume_ml} ml. Preencha a posologia para calcular a duração e data do próximo frasco.`}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </form>
             </div>
@@ -1847,7 +2133,7 @@ export function PatientDetails() {
               <div className="flex flex-wrap items-center gap-2">
                 <button 
                   type="button"
-                  onClick={() => setIsModalOpen(false)} 
+                  onClick={handleCancelFollowup} 
                   className="px-5 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   Cancelar

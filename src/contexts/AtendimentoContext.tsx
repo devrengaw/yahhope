@@ -25,6 +25,7 @@ interface AtendimentoContextType {
   concluirAtendimentosPorPaciente: (patientId: string) => Promise<boolean>;
   removerDaFila: (id: string) => void;
   removerAtendimentosPorPaciente: (patientId: string) => Promise<void>;
+  cancelarAtendimentoHoje: (patientId: string, appointmentId?: string | null) => Promise<void>;
 }
 
 const AtendimentoContext = createContext<AtendimentoContextType | undefined>(undefined);
@@ -218,6 +219,34 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const cancelarAtendimentoHoje = async (patientId: string, appointmentId?: string | null) => {
+    const today = formatLocalDate(new Date());
+    const matching = atendimentos.filter(
+      a => (appointmentId && a.id === appointmentId) ||
+           (a.patient_id === patientId && a.status !== 'completed' && a.date <= today)
+    );
+
+    const idsToDelete = new Set(matching.map(a => a.id));
+    if (appointmentId) {
+      idsToDelete.add(appointmentId);
+    }
+    const idsArray = Array.from(idsToDelete);
+
+    if (idsArray.length > 0) {
+      setAtendimentos(prev => prev.filter(a => !idsToDelete.has(a.id)));
+      await supabase.from('clinical_appointments').delete().in('id', idsArray);
+    }
+
+    // Direct deletion fallback to ensure removal from supabase in all scenarios (e.g. recent insert)
+    await supabase.from('clinical_appointments')
+      .delete()
+      .eq('patient_id', patientId)
+      .neq('status', 'completed')
+      .lte('date', today);
+
+    await fetchAtendimentos();
+  };
+
   return (
     <AtendimentoContext.Provider value={{ 
       atendimentos, 
@@ -229,7 +258,8 @@ export function AtendimentoProvider({ children }: { children: React.ReactNode })
       concluirAtendimento,
       concluirAtendimentosPorPaciente,
       removerDaFila,
-      removerAtendimentosPorPaciente
+      removerAtendimentosPorPaciente,
+      cancelarAtendimentoHoje
     }}>
       {children}
     </AtendimentoContext.Provider>

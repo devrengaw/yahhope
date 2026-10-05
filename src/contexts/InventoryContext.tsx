@@ -29,6 +29,27 @@ interface InventoryContextType {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
+const MED_META_KEY = 'yah_hope_inventory_med_meta';
+
+function getMedMetadata(): Record<string, { dosage_form?: 'comprimido' | 'liquido' | 'outro'; package_units?: number; liquid_volume_ml?: number }> {
+  try {
+    const raw = localStorage.getItem(MED_META_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveMedMetadata(id: string, meta: { dosage_form?: 'comprimido' | 'liquido' | 'outro'; package_units?: number; liquid_volume_ml?: number }) {
+  try {
+    const existing = getMedMetadata();
+    existing[id] = { ...existing[id], ...meta };
+    localStorage.setItem(MED_META_KEY, JSON.stringify(existing));
+  } catch (e) {
+    console.error('Error saving med metadata', e);
+  }
+}
+
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
@@ -55,6 +76,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }
 
       if (itemsRes.data) {
+        const medMeta = getMedMetadata();
         setItems(itemsRes.data.map(i => ({
           id: i.id,
           name: i.name,
@@ -69,7 +91,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           is_patrimonio: i.is_patrimonio ?? (i.category?.toLowerCase().includes('patrim') || false),
           patrimony_number: i.patrimony_number || '',
           location: i.location || '',
-          condition: i.condition || 'bom'
+          condition: i.condition || 'bom',
+          dosage_form: i.dosage_form || medMeta[i.id]?.dosage_form || (i.unit?.toLowerCase().includes('frasco') ? 'liquido' : i.unit?.toLowerCase().includes('caixa') ? 'comprimido' : undefined),
+          package_units: i.package_units !== undefined && i.package_units !== null ? Number(i.package_units) : medMeta[i.id]?.package_units,
+          liquid_volume_ml: i.liquid_volume_ml !== undefined && i.liquid_volume_ml !== null ? Number(i.liquid_volume_ml) : medMeta[i.id]?.liquid_volume_ml
         })));
       }
 
@@ -125,10 +150,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       condition: item.condition || 'bom'
     };
 
+    if (item.dosage_form !== undefined) fullPayload.dosage_form = item.dosage_form || null;
+    if (item.package_units !== undefined) fullPayload.package_units = item.package_units ? Number(item.package_units) : null;
+    if (item.liquid_volume_ml !== undefined) fullPayload.liquid_volume_ml = item.liquid_volume_ml ? Number(item.liquid_volume_ml) : null;
+
     let { data, error } = await supabase.from('inventory').insert(fullPayload).select().single();
     
     // Resilient fallback if columns are not yet applied in the Supabase schema
-    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use'))) {
+    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use') || error.message.includes('dosage_form') || error.message.includes('package_units') || error.message.includes('liquid_volume'))) {
       const basicPayload = {
         name: item.name,
         category: item.category,
@@ -152,6 +181,11 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
     
     if (data) {
+      saveMedMetadata(data.id, {
+        dosage_form: item.dosage_form,
+        package_units: item.package_units,
+        liquid_volume_ml: item.liquid_volume_ml
+      });
       setItems(prev => [{
         id: data.id,
         name: data.name,
@@ -166,7 +200,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         is_patrimonio: item.is_patrimonio ?? (data.category?.toLowerCase().includes('patrim') || false),
         patrimony_number: item.patrimony_number || '',
         location: item.location || '',
-        condition: item.condition || 'bom'
+        condition: item.condition || 'bom',
+        dosage_form: item.dosage_form,
+        package_units: item.package_units,
+        liquid_volume_ml: item.liquid_volume_ml
       }, ...prev]);
     }
   };
@@ -188,11 +225,20 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     if (updates.patrimony_number !== undefined) fullUpdates.patrimony_number = updates.patrimony_number || null;
     if (updates.location !== undefined) fullUpdates.location = updates.location || null;
     if (updates.condition !== undefined) fullUpdates.condition = updates.condition || 'bom';
+    if (updates.dosage_form !== undefined) fullUpdates.dosage_form = updates.dosage_form || null;
+    if (updates.package_units !== undefined) fullUpdates.package_units = updates.package_units ? Number(updates.package_units) : null;
+    if (updates.liquid_volume_ml !== undefined) fullUpdates.liquid_volume_ml = updates.liquid_volume_ml ? Number(updates.liquid_volume_ml) : null;
+
+    saveMedMetadata(id, {
+      ...(updates.dosage_form !== undefined ? { dosage_form: updates.dosage_form } : {}),
+      ...(updates.package_units !== undefined ? { package_units: updates.package_units } : {}),
+      ...(updates.liquid_volume_ml !== undefined ? { liquid_volume_ml: updates.liquid_volume_ml } : {})
+    });
 
     let { error } = await supabase.from('inventory').update(fullUpdates).eq('id', id);
     
     // Resilient fallback if columns are not yet applied in the Supabase schema
-    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use'))) {
+    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use') || error.message.includes('dosage_form') || error.message.includes('package_units') || error.message.includes('liquid_volume'))) {
       const basicUpdates = {
         name: updates.name,
         category: updates.category,
@@ -266,9 +312,22 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteKit = async (id: string) => {
+    try {
+      // Disassociate from clinical events if referenced
+      await supabase.from('clinical_events').update({ kit_delivered_id: null }).eq('kit_delivered_id', id);
+    } catch (e) {
+      console.warn('Could not nullify kit_delivered_id in clinical_events:', e);
+    }
+
+    // Explicitly delete kit_items to prevent FK constraint issues
+    await supabase.from('kit_items').delete().eq('kit_id', id);
+
     const { error } = await supabase.from('kits').delete().eq('id', id);
     if (!error) {
       setKits(prev => prev.filter(k => k.id !== id));
+    } else {
+      console.error('Error deleting kit:', error);
+      alert('Erro ao excluir kit: ' + error.message);
     }
   };
 
