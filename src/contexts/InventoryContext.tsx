@@ -74,7 +74,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }
 
       if (transRes.data) {
-        setTransactions(transRes.data.map(t => ({
+        setTransactions(transRes.data.filter(t => t.transaction_type === 'in').map(t => ({
           id: t.id,
           item_id: t.item_id,
           type: t.transaction_type as any,
@@ -348,14 +348,6 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       if (item) {
         const newQuantity = Math.max(0, item.quantity - kitItem.quantity);
         updateItem(item.id, { quantity: newQuantity });
-        
-        addTransaction({
-          item_id: kitItem.item_id,
-          type: 'out',
-          quantity: kitItem.quantity,
-          reason: patientId ? 'Saída por conta de Kit e Atendimento' : 'Saída por entrega de Kit',
-          patient_id: patientId
-        });
       }
     }
   };
@@ -370,14 +362,6 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       if (item) {
         const newQuantity = Math.max(0, item.quantity - prescription.quantity);
         updateItem(item.id, { quantity: newQuantity });
-
-        addTransaction({
-          item_id: prescription.item_id,
-          type: 'out',
-          quantity: prescription.quantity,
-          reason: 'Saída por prescrição em consulta médica',
-          patient_id: patientId
-        });
       }
     }
   };

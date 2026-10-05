@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Package, Plus, Search, AlertCircle, Edit2, Trash2, X, ArrowDownToLine, ArrowUpFromLine, 
   BriefcaseMedical, History, Receipt, DollarSign, Check, RefreshCw, Layers, ArrowRight, CheckCircle2,
-  Landmark, ShieldCheck, MapPin, Tag, Wrench, Boxes, SlidersHorizontal, ShoppingCart
+  Landmark, ShieldCheck, MapPin, Tag, Wrench, Boxes, SlidersHorizontal, ShoppingCart, Calculator
 } from 'lucide-react';
 import { InventoryItem, Kit } from '../lib/mockData';
 import { useInventory } from '../contexts/InventoryContext';
@@ -309,6 +309,46 @@ export function Inventory() {
     return { totalMzn, totalBrl };
   }, [kitItems, items, mznRate]);
 
+  // Histórico focado exclusivamente em ENTRADAS para acompanhamento dos valores dos produtos
+  const inflowTransactions = useMemo(() => {
+    return transactions
+      .filter(t => t.type === 'in')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions]);
+
+  const filteredInflowTransactions = useMemo(() => {
+    if (!searchTerm.trim()) return inflowTransactions;
+    const term = searchTerm.toLowerCase();
+    return inflowTransactions.filter(t => {
+      const item = items.find(i => i.id === t.item_id);
+      const itemName = item?.name?.toLowerCase() || '';
+      const itemCategory = item?.category?.toLowerCase() || '';
+      const reason = t.reason?.toLowerCase() || '';
+      return itemName.includes(term) || itemCategory.includes(term) || reason.includes(term);
+    });
+  }, [inflowTransactions, searchTerm, items]);
+
+  const inflowStats = useMemo(() => {
+    let totalSpentMzn = 0;
+    let totalUnits = 0;
+
+    inflowTransactions.forEach(t => {
+      totalUnits += t.quantity || 0;
+      if (t.price) {
+        totalSpentMzn += (t.price || 0) * (t.quantity || 0);
+      }
+    });
+
+    const totalSpentBrl = convertMznToBrl(totalSpentMzn, mznRate);
+
+    return {
+      count: inflowTransactions.length,
+      totalUnits,
+      totalSpentMzn,
+      totalSpentBrl
+    };
+  }, [inflowTransactions, mznRate]);
+
   // Helper para renderizar badge de estado de conservação
   const renderConditionBadge = (cond?: string) => {
     switch (cond) {
@@ -393,6 +433,55 @@ export function Inventory() {
   const handleDeleteItem = async (id: string) => {
     if (await confirm('Tem certeza que deseja excluir este item?')) {
       deleteItem(id);
+    }
+  };
+
+  // --- Quick Price Edit Handlers (permite definir valor unitário mesmo zerado) ---
+  const [quickPriceModalItem, setQuickPriceModalItem] = useState<InventoryItem | null>(null);
+  const [quickPriceVal, setQuickPriceVal] = useState('');
+  const [quickPriceCurr, setQuickPriceCurr] = useState<'MZN' | 'BRL'>('MZN');
+  const [isSavingQuickPrice, setIsSavingQuickPrice] = useState(false);
+  const [calcBatchTotal, setCalcBatchTotal] = useState('');
+  const [calcBatchQty, setCalcBatchQty] = useState('');
+
+  const openQuickPriceModal = (item: InventoryItem) => {
+    setQuickPriceModalItem(item);
+    setQuickPriceVal(item.purchase_price !== undefined && item.purchase_price !== null ? item.purchase_price.toString() : '');
+    setQuickPriceCurr(item.currency || 'MZN');
+    setCalcBatchTotal('');
+    setCalcBatchQty('');
+  };
+
+  const handleSaveQuickPrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickPriceModalItem) return;
+    const price = parseFloat(quickPriceVal);
+    if (isNaN(price) || price < 0) {
+      alert('Informe um valor unitário válido.');
+      return;
+    }
+    setIsSavingQuickPrice(true);
+    try {
+      await updateItem(quickPriceModalItem.id, {
+        purchase_price: price,
+        currency: quickPriceCurr
+      });
+      setToastMessage(`Preço unitário de "${quickPriceModalItem.name}" atualizado para ${quickPriceCurr === 'BRL' ? 'R$' : 'MT'} ${price.toFixed(2)}! Custos do projeto e kits recalculados.`);
+      setQuickPriceModalItem(null);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      console.error('Erro ao atualizar preço unitário:', err);
+      alert('Erro ao atualizar preço.');
+    } finally {
+      setIsSavingQuickPrice(false);
+    }
+  };
+
+  const handleCalcApply = () => {
+    const tot = parseFloat(calcBatchTotal) || 0;
+    const q = parseFloat(calcBatchQty) || 0;
+    if (tot > 0 && q > 0) {
+      setQuickPriceVal((tot / q).toFixed(2));
     }
   };
 
@@ -665,9 +754,9 @@ export function Inventory() {
           className={`pb-3 px-3 font-semibold text-sm transition-colors relative flex items-center gap-2 whitespace-nowrap ${activeTab === 'history' ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
         >
           <History size={17} />
-          <span>Histórico</span>
+          <span>Histórico de Entradas</span>
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === 'history' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-            {transactions.length}
+            {inflowTransactions.length}
           </span>
           {activeTab === 'history' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-600 rounded-t-full"></span>}
         </button>
@@ -682,7 +771,7 @@ export function Inventory() {
             placeholder={
               activeTab === 'consumo' ? "Buscar insumo ou medicamento por nome ou categoria..." :
               activeTab === 'patrimonio' ? "Buscar patrimônio por nome, nº tombamento, setor..." :
-              activeTab === 'kits' ? "Buscar kit de entrega..." : "Buscar movimentação..."
+              activeTab === 'kits' ? "Buscar kit de entrega..." : "Buscar no histórico de entradas por item, fornecedor ou observação..."
             }
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -843,18 +932,41 @@ export function Inventory() {
                           {item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : '--'}
                         </td>
                         <td className="p-4 text-slate-600">
-                          <button
-                            type="button"
-                            onClick={() => setHistoryModalItem(item)}
-                            className="text-left group/price"
-                            title="Ver histórico de valores deste item"
-                          >
-                            <span className="text-sm font-medium text-slate-700 group-hover/price:text-emerald-600 transition-colors underline decoration-dotted underline-offset-4">
-                              {item.purchase_price 
-                                ? `${item.currency === 'BRL' ? 'R$' : 'MT'} ${item.purchase_price.toFixed(2)}` 
-                                : '-'}
-                            </span>
-                          </button>
+                          {item.purchase_price !== undefined && item.purchase_price !== null && item.purchase_price > 0 ? (
+                            <div className="flex items-center gap-1.5 group/price">
+                              <button
+                                type="button"
+                                onClick={() => openQuickPriceModal(item)}
+                                className="text-left font-bold text-slate-800 hover:text-emerald-600 transition-colors text-sm"
+                                title="Clique para editar o preço unitário deste item"
+                              >
+                                <span>
+                                  {item.currency === 'BRL' ? 'R$' : 'MT'} {item.purchase_price.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium block">
+                                  por {item.unit || 'un'}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openQuickPriceModal(item)}
+                                className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors opacity-0 group-hover/price:opacity-100"
+                                title="Editar valor unitário"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openQuickPriceModal(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-all shadow-sm"
+                              title="Produto sem valor cadastrado. Clique para definir o preço unitário e calcular o custo do projeto"
+                            >
+                              <Plus size={12} />
+                              <span>Definir Custo</span>
+                            </button>
+                          )}
                         </td>
                         <td className="p-4">
                           {item.quantity === 0 ? (
@@ -876,11 +988,8 @@ export function Inventory() {
                           )}
                         </td>
                         <td className="p-4 flex justify-end gap-1">
-                          <button onClick={() => openTransactionModal(item, 'in')} title="Registrar Entrada" className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                          <button onClick={() => openTransactionModal(item, 'in')} title="Registrar Entrada / Compra" className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
                             <ArrowDownToLine size={18} />
-                          </button>
-                          <button onClick={() => openTransactionModal(item, 'out')} title="Registrar Retirada" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
-                            <ArrowUpFromLine size={18} />
                           </button>
                           <div className="w-px h-6 bg-slate-200 mx-1 self-center"></div>
                           <button onClick={() => setHistoryModalItem(item)} title="Ver Histórico de Custos e Entradas" className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
@@ -1025,14 +1134,11 @@ export function Inventory() {
                         </button>
                       </td>
                       <td className="p-4 flex justify-end gap-1">
-                        <button onClick={() => openTransactionModal(item, 'in')} title="Adicionar Unidades" className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                        <button onClick={() => openTransactionModal(item, 'in')} title="Registrar Entrada / Aquisição" className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
                           <ArrowDownToLine size={18} />
                         </button>
-                        <button onClick={() => openTransactionModal(item, 'out')} title="Registrar Baixa / Retirada" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
-                          <ArrowUpFromLine size={18} />
-                        </button>
                         <div className="w-px h-6 bg-slate-200 mx-1 self-center"></div>
-                        <button onClick={() => setHistoryModalItem(item)} title="Ver Histórico" className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                        <button onClick={() => setHistoryModalItem(item)} title="Ver Histórico de Valores" className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
                           <History size={18} />
                         </button>
                         <button onClick={() => openItemModal(item, true)} title="Editar Patrimônio" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
@@ -1118,9 +1224,16 @@ export function Inventory() {
                                 {ki.quantity} {item.unit}
                               </span>
                               {subtotalMzn !== null ? (
-                                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80">
-                                  {subtotalMzn.toFixed(2)} MT
-                                </span>
+                                <div className="text-right">
+                                  <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80 inline-block">
+                                    {subtotalMzn.toFixed(2)} MT
+                                  </span>
+                                  {priceMzn !== null && ki.quantity > 1 && (
+                                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                                      ({priceMzn.toFixed(2)} MT/{item.unit})
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-[10px] text-slate-400 italic">sem valor</span>
                               )}
@@ -1157,56 +1270,139 @@ export function Inventory() {
         </div>
       )}
 
-      {/* History List */}
+      {/* History List - Entradas e Valores de Produtos */}
       {activeTab === 'history' && (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-4 animate-in fade-in duration-300">
+          {/* Quick Metrics for Inflow */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ArrowDownToLine size={14} className="text-emerald-600" /> Total de Entradas
+              </span>
+              <span className="text-2xl font-bold text-slate-800 mt-1">{inflowStats.count}</span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Compras e chegadas registradas</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Package size={14} className="text-blue-600" /> Quantidade Adquirida
+              </span>
+              <span className="text-2xl font-bold text-slate-800 mt-1">{inflowStats.totalUnits}</span>
+              <span className="text-[11px] text-slate-500 mt-0.5">Unidades totais registradas</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign size={14} /> Valor Total Investido
+              </span>
+              <span className="text-xl font-bold text-slate-800 mt-1">
+                MT {inflowStats.totalSpentMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">
+                ≈ R$ {inflowStats.totalSpentBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="p-4 font-medium text-slate-500 text-sm">Data</th>
-                    <th className="p-4 font-medium text-slate-500 text-sm">Item</th>
-                    <th className="p-4 font-medium text-slate-500 text-sm">Tipo</th>
-                    <th className="p-4 font-medium text-slate-500 text-sm text-center">Quantidade</th>
-                    <th className="p-4 font-medium text-slate-500 text-sm">Motivo</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Data / Hora</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Item / Produto</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Categoria</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm text-center">Qtd Recebida</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Valor Unitário</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Valor Total</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm">Fornecedor / Observação</th>
+                    <th className="p-4 font-medium text-slate-500 text-sm text-right">Histórico do Item</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {transactions.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => {
+                  {filteredInflowTransactions.map(t => {
                     const item = items.find(i => i.id === t.item_id);
+                    const unitPrice = t.price !== undefined && t.price !== null ? t.price : item?.purchase_price;
+                    const totalPrice = unitPrice ? unitPrice * t.quantity : null;
+                    const totalBrl = totalPrice ? convertMznToBrl(totalPrice, mznRate) : null;
+
                     return (
                       <tr key={t.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="p-4 text-slate-600 font-medium text-sm">
+                        <td className="p-4 text-slate-600 font-medium text-sm whitespace-nowrap">
                           {new Date(t.date).toLocaleDateString('pt-BR')} {new Date(t.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
                         </td>
                         <td className="p-4 text-slate-900 font-bold text-sm">
-                          {item ? item.name : 'Item Removido'}
+                          <button
+                            type="button"
+                            onClick={() => item && setHistoryModalItem(item)}
+                            className="text-left hover:text-emerald-600 transition-colors flex items-center gap-1.5"
+                          >
+                            <span>{item ? item.name : 'Item Removido'}</span>
+                            {item?.is_patrimonio && (
+                              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold">
+                                {item.patrimony_number || 'Patrimônio'}
+                              </span>
+                            )}
+                          </button>
                         </td>
-                        <td className="p-4">
-                          {t.type === 'in' ? (
-                            <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-lg w-max">
-                              <ArrowDownToLine size={12} /> Entrada
+                        <td className="p-4 text-slate-600 text-xs">
+                          {item ? (
+                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-medium">
+                              {item.category}
                             </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-amber-600 text-xs font-bold uppercase tracking-wider bg-amber-50 px-2 py-1 rounded-lg w-max">
-                              <ArrowUpFromLine size={12} /> Saída
-                            </span>
-                          )}
+                          ) : '--'}
                         </td>
                         <td className="p-4 text-center">
-                          <span className="font-bold text-slate-700">{t.quantity} {item?.unit}</span>
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg font-bold text-xs border border-emerald-100">
+                            +{t.quantity} {item?.unit || 'un'}
+                          </span>
                         </td>
-                        <td className="p-4 text-slate-600 text-sm">
+                        <td className="p-4 text-slate-700 font-medium text-sm whitespace-nowrap">
+                          {unitPrice !== undefined && unitPrice !== null ? (
+                            <span>{unitPrice.toFixed(2)} MT</span>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">Sem valor</span>
+                          )}
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          {totalPrice !== null ? (
+                            <div>
+                              <span className="font-bold text-emerald-700 text-sm block">
+                                {totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT
+                              </span>
+                              {totalBrl !== null && (
+                                <span className="text-[11px] text-slate-400 block">
+                                  ≈ R$ {totalBrl.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">--</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-slate-600 text-sm max-w-xs truncate" title={t.reason}>
                           {t.reason || '--'}
+                        </td>
+                        <td className="p-4 text-right">
+                          {item && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryModalItem(item)}
+                              title="Ver histórico de valores deste produto"
+                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-semibold"
+                            >
+                              <History size={16} />
+                              <span className="hidden lg:inline">Valores</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
-                  {transactions.length === 0 && (
+                  {filteredInflowTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-500">
-                        Nenhuma movimentação registrada no histórico.
+                      <td colSpan={8} className="p-8 text-center text-slate-500">
+                        Nenhuma entrada de mercadoria registrada no histórico.
                       </td>
                     </tr>
                   )}
@@ -1432,7 +1628,9 @@ export function Inventory() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Preço de Custo</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Preço Unitário de Custo <span className="text-xs text-slate-400 font-normal">(por {unit || 'unidade'})</span>
+                        </label>
                         <div className="relative">
                           <select
                             value={currency}
