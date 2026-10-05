@@ -1120,18 +1120,37 @@ export function Inventory() {
                         {renderConditionBadge(item.condition)}
                       </td>
                       <td className="p-4 text-slate-600">
-                        <button
-                          type="button"
-                          onClick={() => setHistoryModalItem(item)}
-                          className="text-left group/price"
-                          title="Ver histórico de valores deste item"
-                        >
-                          <span className="text-sm font-medium text-slate-700 group-hover/price:text-emerald-600 transition-colors underline decoration-dotted underline-offset-4">
-                            {item.purchase_price 
-                              ? `${item.currency === 'BRL' ? 'R$' : 'MT'} ${item.purchase_price.toFixed(2)}` 
-                              : '-'}
-                          </span>
-                        </button>
+                        {item.purchase_price !== undefined && item.purchase_price !== null && item.purchase_price > 0 ? (
+                          <div className="flex items-center gap-1.5 group/price">
+                            <button
+                              type="button"
+                              onClick={() => openQuickPriceModal(item)}
+                              className="text-left font-bold text-slate-800 hover:text-emerald-600 transition-colors text-sm"
+                              title="Clique para editar o valor deste patrimônio"
+                            >
+                              <span>
+                                {item.currency === 'BRL' ? 'R$' : 'MT'} {item.purchase_price.toFixed(2)}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openQuickPriceModal(item)}
+                              className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors opacity-0 group-hover/price:opacity-100"
+                              title="Editar valor de aquisição"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openQuickPriceModal(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-all shadow-sm"
+                          >
+                            <Plus size={12} />
+                            <span>Definir Valor</span>
+                          </button>
+                        )}
                       </td>
                       <td className="p-4 flex justify-end gap-1">
                         <button onClick={() => openTransactionModal(item, 'in')} title="Registrar Entrada / Aquisição" className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
