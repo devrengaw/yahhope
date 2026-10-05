@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, RefreshCw } from 'lucide-react';
 import { Transaction, TransactionCategory, TransactionType } from '../../../lib/mockData';
+import { getMznToBrlRate, ExchangeRateResult } from '../../../services/currencyService';
+import { cn } from '../../../lib/utils';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -13,10 +15,38 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
   const [type, setType] = useState<TransactionType>('expense');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<'BRL' | 'MZN'>('BRL');
+  const [exchangeRate, setExchangeRate] = useState<number>(0.08103);
+  const [rateInfo, setRateInfo] = useState<ExchangeRateResult | null>(null);
+  const [isLoadingRate, setIsLoadingRate] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [account, setAccount] = useState('Conta Principal');
   const [status, setStatus] = useState<'pending' | 'completed'>('completed');
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoadingRate(true);
+      getMznToBrlRate()
+        .then(info => {
+          setRateInfo(info);
+          setExchangeRate(info.rate);
+        })
+        .catch(err => console.warn('Erro ao obter cotação:', err))
+        .finally(() => setIsLoadingRate(false));
+    }
+  }, [isOpen]);
+
+  const handleRefreshRate = async () => {
+    setIsLoadingRate(true);
+    try {
+      const info = await getMznToBrlRate(true);
+      setRateInfo(info);
+      setExchangeRate(info.rate);
+    } finally {
+      setIsLoadingRate(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -27,19 +57,30 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
     
     if (!description || !amount || !categoryId || !date || !account) return;
 
+    const rawAmount = parseFloat(amount);
+    const finalAmountInBrl = currency === 'MZN' 
+      ? Number((rawAmount * exchangeRate).toFixed(2)) 
+      : rawAmount;
+    const formattedOriginal = rawAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const currencySuffix = currency === 'MZN' && !description.includes('MT') ? ` (${formattedOriginal} MT)` : '';
+
     onSave({
-      description,
-      amount: parseFloat(amount),
+      description: description + currencySuffix,
+      amount: finalAmountInBrl,
       type,
       category_id: categoryId,
       date,
       status,
-      account
+      account,
+      currency,
+      original_amount: currency === 'MZN' ? rawAmount : undefined,
+      exchange_rate: currency === 'MZN' ? exchangeRate : 1
     });
     
     // Reset form
     setDescription('');
     setAmount('');
+    setCurrency('BRL');
     setCategoryId('');
     setDate(new Date().toISOString().split('T')[0]);
     onClose();
@@ -93,30 +134,92 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                required
-              />
+          {/* Moeda e Valor */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">Moeda</label>
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setCurrency('BRL')}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                    currency === 'BRL' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                  )}
+                >
+                  <span>🇧🇷 BRL (R$)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrency('MZN')}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                    currency === 'MZN' ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                  )}
+                >
+                  <span>🇲🇿 MZN (MT)</span>
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                required
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Valor ({currency === 'MZN' ? 'Meticais - MT' : 'Reais - R$'})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+                    {currency === 'MZN' ? 'MT' : 'R$'}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    placeholder={currency === 'MZN' ? "0,00 MT" : "0.00"}
+                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  required
+                />
+              </div>
             </div>
+
+            {currency === 'MZN' && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 animate-in fade-in duration-200 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-950 flex items-center gap-1">
+                    <span>🇲🇿 Cotação MZN → BRL:</span>
+                    <span className="text-emerald-700">1 MT = R$ {exchangeRate.toFixed(4)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRefreshRate}
+                    disabled={isLoadingRate}
+                    className="text-emerald-800 hover:text-emerald-950 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className={isLoadingRate ? "animate-spin" : ""} />
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+                {parseFloat(amount) > 0 && (
+                  <div className="pt-1 border-t border-emerald-200/60 flex items-center justify-between text-emerald-900 font-bold">
+                    <span>Equivalente em Reais:</span>
+                    <span>R$ {(parseFloat(amount) * exchangeRate).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

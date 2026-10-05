@@ -78,6 +78,7 @@ export function MonthlyExpensesManager({
 
   // Modal de Registro e Ajuste de Pagamento
   const [paymentModalTx, setPaymentModalTx] = useState<Transaction | null>(null);
+  const [paymentCurrency, setPaymentCurrency] = useState<'BRL' | 'MZN'>('BRL');
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentOriginalAmount, setPaymentOriginalAmount] = useState<string>('');
   const [paymentExchangeRate, setPaymentExchangeRate] = useState<string>('');
@@ -87,13 +88,35 @@ export function MonthlyExpensesManager({
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const openPaymentModal = (t: Transaction) => {
+    const curr = t.currency || 'BRL';
+    setPaymentCurrency(curr);
     setPaymentModalTx(t);
     setPaymentAmount(t.amount.toString());
-    setPaymentOriginalAmount(t.original_amount ? t.original_amount.toString() : '');
-    setPaymentExchangeRate(t.exchange_rate ? t.exchange_rate.toString() : '0.08103');
+    const rate = t.exchange_rate ? t.exchange_rate.toString() : '0.08103';
+    setPaymentExchangeRate(rate);
+    const orig = t.original_amount 
+      ? t.original_amount.toString() 
+      : (t.amount > 0 ? (t.amount / (parseFloat(rate) || 0.08103)).toFixed(2) : '');
+    setPaymentOriginalAmount(orig);
     setPaymentDate(t.status === 'completed' && t.date ? t.date : new Date().toISOString().split('T')[0]);
     setPaymentNotes(t.notes || '');
     setPaymentStatus('completed');
+  };
+
+  const handleTogglePaymentCurrency = (newCurr: 'BRL' | 'MZN') => {
+    setPaymentCurrency(newCurr);
+    const rate = parseFloat(paymentExchangeRate) || 0.08103;
+    if (newCurr === 'MZN') {
+      const currBrl = parseFloat(paymentAmount) || paymentModalTx?.amount || 0;
+      if (currBrl > 0 && rate > 0) {
+        setPaymentOriginalAmount((currBrl / rate).toFixed(2));
+      }
+    } else {
+      const orig = parseFloat(paymentOriginalAmount) || 0;
+      if (orig > 0 && rate > 0) {
+        setPaymentAmount((orig * rate).toFixed(2));
+      }
+    }
   };
 
   const handleOriginalAmountChange = (val: string) => {
@@ -121,16 +144,17 @@ export function MonthlyExpensesManager({
     setIsSavingPayment(true);
     try {
       const finalAmount = parseFloat(paymentAmount) || paymentModalTx.amount;
-      const finalOriginalAmount = paymentModalTx.currency === 'MZN'
+      const finalOriginalAmount = paymentCurrency === 'MZN'
         ? (parseFloat(paymentOriginalAmount) || paymentModalTx.original_amount)
         : undefined;
-      const finalRate = paymentModalTx.currency === 'MZN'
-        ? (parseFloat(paymentExchangeRate) || paymentModalTx.exchange_rate)
+      const finalRate = paymentCurrency === 'MZN'
+        ? (parseFloat(paymentExchangeRate) || paymentModalTx.exchange_rate || 0.08103)
         : undefined;
 
       const updates = {
         status: paymentStatus,
         amount: finalAmount,
+        currency: paymentCurrency,
         original_amount: finalOriginalAmount,
         exchange_rate: finalRate,
         date: paymentDate,
@@ -197,6 +221,9 @@ export function MonthlyExpensesManager({
     }, 0);
 
     const totalVariable = variableExpenses.reduce((acc, t) => acc + t.amount, 0);
+    const totalVariableMzn = variableExpenses
+      .filter(t => t.currency === 'MZN' && t.original_amount)
+      .reduce((acc, t) => acc + (t.original_amount || 0), 0);
     const totalExpense = monthlyEquivalentFixed + totalVariable;
 
     // Percentual de cobertura do custo fixo pelas receitas totais
@@ -207,6 +234,7 @@ export function MonthlyExpensesManager({
       totalFixed: monthlyEquivalentFixed,
       totalFixedNominal,
       totalVariable,
+      totalVariableMzn,
       totalExpense,
       fixedCount: fixedExpenses.length,
       variableCount: variableExpenses.length,
@@ -315,6 +343,12 @@ export function MonthlyExpensesManager({
           <p className="text-3xl font-black text-rose-600 mt-1">
             R$ {stats.totalVariable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
+          {stats.totalVariableMzn > 0 && (
+            <p className="text-xs font-black text-emerald-600 mt-1 flex items-center gap-1.5" title="Total em Meticais das despesas variáveis">
+              <span>🇲🇿</span>
+              <span>~ {stats.totalVariableMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais</span>
+            </p>
+          )}
           <p className="text-[11px] text-slate-400 font-bold mt-2">
             Despesas operacionais e emergências
           </p>
@@ -787,7 +821,34 @@ export function MonthlyExpensesManager({
                   </span>
                 </div>
 
-                {paymentModalTx.currency === 'MZN' ? (
+                {/* Seletor de Moeda do Pagamento */}
+                <div className="flex items-center justify-between pb-1">
+                  <span className="text-xs font-semibold text-slate-600">Moeda da Efetivação:</span>
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePaymentCurrency('BRL')}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                        paymentCurrency === 'BRL' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                      )}
+                    >
+                      <span>🇧🇷 BRL (R$)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePaymentCurrency('MZN')}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                        paymentCurrency === 'MZN' ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                      )}
+                    >
+                      <span>🇲🇿 MZN (MT)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {paymentCurrency === 'MZN' ? (
                   <div className="space-y-3 p-4 bg-emerald-50/40 rounded-2xl border border-emerald-100">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">

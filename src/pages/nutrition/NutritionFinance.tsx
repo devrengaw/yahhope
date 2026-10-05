@@ -375,7 +375,17 @@ export function NutritionFinance() {
                             </p>
                           </td>
                           <td className="px-8 py-4">
-                            <p className="font-bold text-slate-900 uppercase text-sm">{t.description}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-slate-900 uppercase text-sm">{t.description}</p>
+                              {t.currency === 'MZN' && (
+                                <span 
+                                  className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
+                                  title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                                >
+                                  🇲🇿 MZN
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 mt-1 text-[10px] font-bold text-slate-400">
                               <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
                               {category?.name || (t.type === 'income' ? 'Repasse Financeiro' : 'Sem categoria')}
@@ -404,6 +414,11 @@ export function NutritionFinance() {
                             <p className={cn("text-lg font-black", t.type === 'income' ? "text-emerald-600" : "text-rose-600")}>
                               {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
+                            {t.currency === 'MZN' && t.original_amount && (
+                              <p className="text-[11px] font-black text-emerald-700 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
+                                {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                              </p>
+                            )}
                           </td>
                         </tr>
                       );

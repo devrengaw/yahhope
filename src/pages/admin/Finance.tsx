@@ -682,8 +682,16 @@ export function Finance() {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-slate-900 leading-tight group-hover/row:text-slate-600 transition-colors uppercase text-sm tracking-tight">{t.description}</p>
+                            {t.currency === 'MZN' && (
+                              <span 
+                                className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
+                                title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                              >
+                                🇲🇿 MZN
+                              </span>
+                            )}
                             {t.module && t.module !== 'global' && (
                               <span className={cn(
                                 "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
@@ -745,6 +753,11 @@ export function Finance() {
                           )}>
                             {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
+                          {t.currency === 'MZN' && t.original_amount && (
+                            <p className="text-[11px] font-black text-emerald-700 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
+                              {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                            </p>
+                          )}
                         </td>
                         <td className="px-8 py-6 text-center">
                           <button className="p-3 text-slate-300 hover:text-slate-900 hover:bg-white rounded-xl transition-all active:scale-95 shadow-none hover:shadow-lg hover:shadow-slate-100">
