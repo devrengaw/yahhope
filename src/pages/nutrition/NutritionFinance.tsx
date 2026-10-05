@@ -319,6 +319,7 @@ export function NutritionFinance() {
               onSaveExpense={handleSaveExpense}
               onDeleteTransaction={handleDeleteTransaction}
               onToggleStatus={handleToggleStatus}
+              onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
             />
           ) : activeTab === 'transactions' ? (
             <div>
@@ -423,6 +424,7 @@ export function NutritionFinance() {
           onSave={handleSaveExpense}
           categories={categories}
           defaultExpenseType={expenseModalType}
+          onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
         />
 
         <ManageCostsAccessModal

@@ -31,6 +31,7 @@ interface MonthlyExpensesManagerProps {
   onSaveExpense: (expense: ExpensePayload) => Promise<void> | void;
   onDeleteTransaction: (id: string) => Promise<void> | void;
   onToggleStatus: (id: string, currentStatus: 'completed' | 'pending') => Promise<void> | void;
+  onAddCategory?: (category: TransactionCategory) => void;
 }
 
 export function MonthlyExpensesManager({
@@ -39,9 +40,24 @@ export function MonthlyExpensesManager({
   totalIncome,
   onSaveExpense,
   onDeleteTransaction,
-  onToggleStatus
+  onToggleStatus,
+  onAddCategory
 }: MonthlyExpensesManagerProps) {
   const { confirm } = useConfirm();
+  const [localCategories, setLocalCategories] = useState<TransactionCategory[]>(categories);
+
+  React.useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  const handleCategoryCreated = (newCat: TransactionCategory) => {
+    setLocalCategories(prev => {
+      if (prev.some(c => c.id === newCat.id)) return prev;
+      return [...prev, newCat];
+    });
+    onAddCategory?.(newCat);
+  };
+
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'fixed' | 'variable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -340,7 +356,7 @@ export function MonthlyExpensesManager({
               className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
             >
               <option value="all">Todas Categorias</option>
-              {categories.filter(c => c.type === 'expense').map(cat => (
+              {localCategories.filter(c => c.type === 'expense').map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
@@ -396,7 +412,7 @@ export function MonthlyExpensesManager({
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {filteredExpenses.map((t) => {
-              const category = categories.find(c => c.id === t.category_id);
+              const category = localCategories.find(c => c.id === t.category_id);
               const isFixed = t.expense_type === 'fixed';
 
               return (
@@ -537,8 +553,9 @@ export function MonthlyExpensesManager({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={onSaveExpense}
-        categories={categories}
+        categories={localCategories}
         defaultExpenseType={modalDefaultType}
+        onAddCategory={handleCategoryCreated}
       />
 
     </div>

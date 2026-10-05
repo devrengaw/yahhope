@@ -1,19 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Transaction, TransactionCategory, TransactionType } from '../../../lib/mockData';
+import { CategorySelectWithCreate } from './CategorySelectWithCreate';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (transaction: Omit<Transaction, 'id'>) => void;
   categories: TransactionCategory[];
+  onAddCategory?: (category: TransactionCategory) => void;
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, categories }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCategory }: TransactionModalProps) {
   const [type, setType] = useState<TransactionType>('expense');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [localCategories, setLocalCategories] = useState<TransactionCategory[]>(categories);
+
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  const handleCategoryCreated = (newCat: TransactionCategory) => {
+    setLocalCategories(prev => {
+      if (prev.some(c => c.id === newCat.id)) return prev;
+      return [...prev, newCat];
+    });
+    setCategoryId(newCat.id);
+    onAddCategory?.(newCat);
+  };
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [account, setAccount] = useState('Conta Principal');
   const [status, setStatus] = useState<'pending' | 'completed'>('completed');
@@ -187,17 +203,14 @@ export function TransactionModal({ isOpen, onClose, onSave, categories }: Transa
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Categoria</label>
-                <select
+                <CategorySelectWithCreate
                   value={categoryId}
-                  onChange={e => setCategoryId(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-4 focus:ring-slate-500/10 focus:border-slate-300 transition-all font-medium appearance-none bg-white"
+                  onChange={setCategoryId}
+                  categories={localCategories}
+                  type={type}
+                  onCategoryCreated={handleCategoryCreated}
                   required
-                >
-                  <option value="" disabled>Selecione...</option>
-                  {filteredCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Conta</label>

@@ -11,6 +11,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { TransactionCategory } from '../../../pages/admin/Finance';
+import { CategorySelectWithCreate } from './CategorySelectWithCreate';
 import { cn } from '../../../lib/utils';
 
 export type RecurrenceType = 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
@@ -37,6 +38,7 @@ interface ExpenseModalProps {
   onSave: (expense: ExpensePayload) => Promise<void> | void;
   categories: TransactionCategory[];
   defaultExpenseType?: 'fixed' | 'variable';
+  onAddCategory?: (category: TransactionCategory) => void;
 }
 
 export function ExpenseModal({
@@ -44,12 +46,27 @@ export function ExpenseModal({
   onClose,
   onSave,
   categories,
-  defaultExpenseType = 'fixed'
+  defaultExpenseType = 'fixed',
+  onAddCategory
 }: ExpenseModalProps) {
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable'>(defaultExpenseType);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [localCategories, setLocalCategories] = useState<TransactionCategory[]>(categories);
+
+  React.useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  const handleCategoryCreated = (newCat: TransactionCategory) => {
+    setLocalCategories(prev => {
+      if (prev.some(c => c.id === newCat.id)) return prev;
+      return [...prev, newCat];
+    });
+    setCategoryId(newCat.id);
+    onAddCategory?.(newCat);
+  };
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDay, setDueDay] = useState(10);
   const [recurrence, setRecurrence] = useState<RecurrenceType>('monthly');
@@ -333,27 +350,22 @@ export function ExpenseModal({
             {/* Categoria e Conta */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                  Categoria
-                </label>
-                <select
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                    Categoria
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    Busque ou crie nova
+                  </span>
+                </div>
+                <CategorySelectWithCreate
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-300 transition-all bg-white"
+                  onChange={setCategoryId}
+                  categories={localCategories}
+                  type="expense"
+                  onCategoryCreated={handleCategoryCreated}
                   required
-                >
-                  <option value="" disabled>Selecione a categoria...</option>
-                  {expenseCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                  {expenseCategories.length === 0 && (
-                    <>
-                      <option value="cat_salary">Folha / Pessoal</option>
-                      <option value="cat_office">Aluguel / Sede</option>
-                      <option value="cat_marketing">Marketing / Eventos</option>
-                    </>
-                  )}
-                </select>
+                />
               </div>
 
               <div>

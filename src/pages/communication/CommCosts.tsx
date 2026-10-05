@@ -269,6 +269,7 @@ export function CommCosts() {
             onSaveExpense={handleSaveExpense}
             onDeleteTransaction={handleDeleteTransaction}
             onToggleStatus={handleToggleStatus}
+            onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
           />
         </div>
 
@@ -279,6 +280,7 @@ export function CommCosts() {
           onSave={handleSaveExpense}
           categories={categories}
           defaultExpenseType={expenseModalType}
+          onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
         />
 
         <ManageCostsAccessModal

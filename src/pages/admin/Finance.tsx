@@ -1015,6 +1015,7 @@ export function Finance() {
             onSaveExpense={handleSaveExpense}
             onDeleteTransaction={handleDeleteTransaction}
             onToggleStatus={handleToggleStatus}
+            onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
           />
         ) : activeTab === 'supporters' ? (
           <SupportersList />
@@ -1060,6 +1061,7 @@ export function Finance() {
         onSave={handleSaveExpense}
         categories={categories}
         defaultExpenseType={expenseModalType}
+        onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
       />
 
       <ProjectRepasseModal
