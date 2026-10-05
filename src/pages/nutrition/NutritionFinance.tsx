@@ -26,6 +26,7 @@ import { TransactionModal } from '../../components/admin/finance/TransactionModa
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCostsAccessModal';
+import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { NutritionPurchasingPlanner } from '../../components/nutrition/NutritionPurchasingPlanner';
 import { 
   fetchModuleTransactions, 
