@@ -47,6 +47,10 @@ export interface InventoryItem {
   purchase_price?: number;
   currency?: 'MZN' | 'BRL';
   internal_use?: boolean;
+  is_patrimonio?: boolean;
+  patrimony_number?: string;
+  location?: string;
+  condition?: 'novo' | 'bom' | 'regular' | 'danificado' | 'manutencao';
 }
 
 export interface KitItem {

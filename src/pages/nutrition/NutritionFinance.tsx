@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   DollarSign, 
   Plus, 
@@ -16,7 +17,8 @@ import {
   Tag, 
   Repeat,
   ShieldCheck,
-  Send
+  Send,
+  ShoppingCart
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -25,6 +27,7 @@ import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyEx
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCostsAccessModal';
 import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
+import { NutritionPurchasingPlanner } from '../../components/nutrition/NutritionPurchasingPlanner';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
@@ -34,7 +37,25 @@ export function NutritionFinance() {
   const { confirm } = useConfirm();
   const isMasterAdmin = user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'contato@yahhope.com';
 
-  const [activeTab, setActiveTab] = useState<'expenses' | 'transactions' | 'planning'>('expenses');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as 'expenses' | 'transactions' | 'planning') || 'expenses';
+  const [activeTab, setActiveTab] = useState<'expenses' | 'transactions' | 'planning'>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && (tabParam === 'expenses' || tabParam === 'transactions' || tabParam === 'planning')) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'expenses' | 'transactions' | 'planning') => {
+    setActiveTab(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tab);
+      return next;
+    }, { replace: true });
+  };
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
@@ -184,6 +205,32 @@ export function NutritionFinance() {
     }
   };
 
+  const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
+    try {
+      const payload: any = {
+        status: updates.status,
+        ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
+        ...(updates.date ? { date: updates.date } : {}),
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+      };
+
+      let { error } = await supabase.from('finance_transactions').update({
+        ...payload,
+        ...(updates.original_amount !== undefined ? { original_amount: updates.original_amount } : {}),
+        ...(updates.exchange_rate !== undefined ? { exchange_rate: updates.exchange_rate } : {})
+      }).eq('id', id);
+
+      if (error && error.message?.includes('column')) {
+        await supabase.from('finance_transactions').update(payload).eq('id', id);
+      }
+
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    } catch (e) {
+      console.error('Error updating payment in NutritionFinance:', e);
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    }
+  };
+
   return (
     <CostsAccessGuard module="nutrition">
       <div className="space-y-8 animate-in fade-in duration-700">
@@ -297,7 +344,7 @@ export function NutritionFinance() {
           {/* Tabs (Sem RH e Voluntários) */}
           <div className="px-8 pt-6 flex flex-wrap border-b border-slate-100 gap-1">
             <button 
-              onClick={() => setActiveTab('expenses')}
+              onClick={() => handleTabChange('expenses')}
               className={cn(
                 "px-5 py-4 font-bold text-sm transition-all relative flex items-center gap-2",
                 activeTab === 'expenses' ? "text-emerald-800" : "text-slate-400 hover:text-slate-600"
@@ -312,7 +359,7 @@ export function NutritionFinance() {
             </button>
 
             <button 
-              onClick={() => setActiveTab('transactions')}
+              onClick={() => handleTabChange('transactions')}
               className={cn(
                 "px-5 py-4 font-bold text-sm transition-all relative",
                 activeTab === 'transactions' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
@@ -323,14 +370,18 @@ export function NutritionFinance() {
             </button>
 
             <button 
-              onClick={() => setActiveTab('planning')}
+              onClick={() => handleTabChange('planning')}
               className={cn(
-                "px-5 py-4 font-bold text-sm transition-all relative",
-                activeTab === 'planning' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+                "px-5 py-4 font-bold text-sm transition-all relative flex items-center gap-2",
+                activeTab === 'planning' ? "text-emerald-800" : "text-slate-400 hover:text-slate-600"
               )}
             >
-              Planejamento
-              {activeTab === 'planning' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-slate-900 rounded-t-full"></div>}
+              <ShoppingCart size={15} className={activeTab === 'planning' ? "text-emerald-600" : "text-slate-400"} />
+              Setor de Compras & Previsão
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Insumos
+              </span>
+              {activeTab === 'planning' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-emerald-600 rounded-t-full"></div>}
             </button>
           </div>
 
@@ -344,6 +395,7 @@ export function NutritionFinance() {
               onDeleteTransaction={handleDeleteTransaction}
               onToggleStatus={handleToggleStatus}
               onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
+              onUpdatePayment={handleUpdatePayment}
             />
           ) : activeTab === 'transactions' ? (
             <div>
@@ -426,10 +478,7 @@ export function NutritionFinance() {
             </div>
           ) : (
             <div className="p-8">
-              <h3 className="text-xl font-bold text-slate-900 mb-6">Orçamento e Planejamento</h3>
-              <div className="bg-slate-50 p-6 rounded-2xl text-center text-slate-500 font-medium">
-                Funcionalidade de planejamento orçamentário detalhado integrado aos custos fixos e variáveis da Casa Nutri.
-              </div>
+              <NutritionPurchasingPlanner onRefreshFinance={fetchData} />
             </div>
           )}
 

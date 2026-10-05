@@ -24,6 +24,7 @@ interface InventoryContextType {
   deductKitFromInventory: (kitId: string, patientId?: string) => void;
   deductPrescriptionsFromInventory: (prescriptions: any[], patientId: string) => void;
   addTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
+  refreshData: () => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -63,7 +64,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           min_quantity: i.min_quantity || 0,
           expiration_date: i.expiration_date,
           purchase_price: i.purchase_price,
-          currency: i.currency
+          currency: i.currency,
+          internal_use: i.internal_use || false,
+          is_patrimonio: i.is_patrimonio ?? (i.category?.toLowerCase().includes('patrim') || false),
+          patrimony_number: i.patrimony_number || '',
+          location: i.location || '',
+          condition: i.condition || 'bom'
         })));
       }
 
@@ -103,7 +109,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // CRUD for items
   const addItem = async (item: InventoryItem) => {
-    const { data, error } = await supabase.from('inventory').insert({
+    const fullPayload: any = {
       name: item.name,
       category: item.category,
       quantity: item.quantity,
@@ -111,8 +117,34 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       min_quantity: item.min_quantity,
       expiration_date: item.expiration_date || null,
       purchase_price: item.purchase_price || null,
-      currency: item.currency || null
-    }).select().single();
+      currency: item.currency || null,
+      internal_use: item.internal_use || false,
+      is_patrimonio: item.is_patrimonio || false,
+      patrimony_number: item.patrimony_number || null,
+      location: item.location || null,
+      condition: item.condition || 'bom'
+    };
+
+    let { data, error } = await supabase.from('inventory').insert(fullPayload).select().single();
+    
+    // Resilient fallback if columns are not yet applied in the Supabase schema
+    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use'))) {
+      const basicPayload = {
+        name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        unit: item.unit,
+        min_quantity: item.min_quantity,
+        expiration_date: item.expiration_date || null,
+        purchase_price: item.purchase_price || null,
+        currency: item.currency || null
+      };
+      const retry = await supabase.from('inventory').insert(basicPayload).select().single();
+      if (!retry.error) {
+        data = retry.data;
+        error = null;
+      }
+    }
     
     if (error) {
       console.error('Supabase Insert Error:', error);
@@ -129,13 +161,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         min_quantity: data.min_quantity || 0,
         expiration_date: data.expiration_date,
         purchase_price: data.purchase_price,
-        currency: data.currency
+        currency: data.currency,
+        internal_use: item.internal_use || false,
+        is_patrimonio: item.is_patrimonio ?? (data.category?.toLowerCase().includes('patrim') || false),
+        patrimony_number: item.patrimony_number || '',
+        location: item.location || '',
+        condition: item.condition || 'bom'
       }, ...prev]);
     }
   };
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
-    const { error } = await supabase.from('inventory').update({
+    const fullUpdates: any = {
       name: updates.name,
       category: updates.category,
       quantity: updates.quantity,
@@ -144,8 +181,34 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       expiration_date: updates.expiration_date || null,
       purchase_price: updates.purchase_price || null,
       currency: updates.currency || null
-    }).eq('id', id);
+    };
+
+    if (updates.internal_use !== undefined) fullUpdates.internal_use = updates.internal_use;
+    if (updates.is_patrimonio !== undefined) fullUpdates.is_patrimonio = updates.is_patrimonio;
+    if (updates.patrimony_number !== undefined) fullUpdates.patrimony_number = updates.patrimony_number || null;
+    if (updates.location !== undefined) fullUpdates.location = updates.location || null;
+    if (updates.condition !== undefined) fullUpdates.condition = updates.condition || 'bom';
+
+    let { error } = await supabase.from('inventory').update(fullUpdates).eq('id', id);
     
+    // Resilient fallback if columns are not yet applied in the Supabase schema
+    if (error && (error.message.includes('column') || error.code === '42703' || error.message.includes('patrimon') || error.message.includes('internal_use'))) {
+      const basicUpdates = {
+        name: updates.name,
+        category: updates.category,
+        quantity: updates.quantity,
+        unit: updates.unit,
+        min_quantity: updates.min_quantity,
+        expiration_date: updates.expiration_date || null,
+        purchase_price: updates.purchase_price || null,
+        currency: updates.currency || null
+      };
+      const retry = await supabase.from('inventory').update(basicUpdates).eq('id', id);
+      if (!retry.error) {
+        error = null;
+      }
+    }
+
     if (error) {
       console.error('Supabase Update Error:', error);
       alert('Erro ao atualizar no banco: ' + error.message);
@@ -325,7 +388,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       addItem, updateItem, deleteItem,
       addKit, updateKit, deleteKit,
       addCategory, updateCategory, deleteCategory,
-      deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction 
+      deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction,
+      refreshData: fetchData
     }}>
       {children}
     </InventoryContext.Provider>

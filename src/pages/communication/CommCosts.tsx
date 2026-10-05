@@ -165,6 +165,32 @@ export function CommCosts() {
     }
   };
 
+  const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
+    try {
+      const payload: any = {
+        status: updates.status,
+        ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
+        ...(updates.date ? { date: updates.date } : {}),
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+      };
+
+      let { error } = await supabase.from('finance_transactions').update({
+        ...payload,
+        ...(updates.original_amount !== undefined ? { original_amount: updates.original_amount } : {}),
+        ...(updates.exchange_rate !== undefined ? { exchange_rate: updates.exchange_rate } : {})
+      }).eq('id', id);
+
+      if (error && error.message?.includes('column')) {
+        await supabase.from('finance_transactions').update(payload).eq('id', id);
+      }
+
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    } catch (e) {
+      console.error('Error updating payment in CommCosts:', e);
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    }
+  };
+
   return (
     <CostsAccessGuard module="communication">
       <div className="space-y-8 animate-in fade-in duration-700">
@@ -294,6 +320,7 @@ export function CommCosts() {
             onDeleteTransaction={handleDeleteTransaction}
             onToggleStatus={handleToggleStatus}
             onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
+            onUpdatePayment={handleUpdatePayment}
           />
         </div>
 

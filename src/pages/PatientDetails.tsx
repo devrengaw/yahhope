@@ -1782,7 +1782,7 @@ export function PatientDetails() {
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
                         >
                           <option value="">Selecione do estoque...</option>
-                          {items.filter(i => !i.internal_use && i.quantity > 0).map(item => (
+                          {items.filter(i => !i.internal_use && !i.is_patrimonio && i.quantity > 0).map(item => (
                             <option key={item.id} value={item.id}>{item.name} ({item.quantity} dispon.)</option>
                           ))}
                         </select>
