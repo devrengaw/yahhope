@@ -184,8 +184,8 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
     setKitTargets(initial);
   };
 
-  // Modo de visualização: Consolidado (todos os kits) ou Kit Específico
-  const [activeKitFilter, setActiveKitFilter] = useState<'all' | string>('all');
+  // Modo de visualização: Consolidado (todos os kits), Kit Específico ou Insumos Zerados / Sem Preço
+  const [activeKitFilter, setActiveKitFilter] = useState<'all' | 'missing_price' | string>('all');
 
   // Custo unitário calculado de cada kit (alimentado diretamente pelos insumos)
   const kitsWithCosts = useMemo(() => {
@@ -314,7 +314,7 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
   // Cálculo da Análise de Compras Consolidada (Multikits ou Filtrada)
   const purchasingAnalysis = useMemo(() => {
     // Determinar quais kits participam do cálculo
-    const targetKits = activeKitFilter === 'all'
+    const targetKits = (activeKitFilter === 'all' || activeKitFilter === 'missing_price')
       ? kitsWithCosts.filter(k => k.targetCount > 0)
       : kitsWithCosts.filter(k => k.kit.id === activeKitFilter);
 
@@ -423,6 +423,19 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [kitsWithCosts, items, activeKitFilter, mznRate]);
+
+  // Quantidade de insumos com preço zerado na análise
+  const missingPriceItemsCount = useMemo(() => {
+    return purchasingAnalysis.filter(r => r.unitPriceMzn <= 0).length;
+  }, [purchasingAnalysis]);
+
+  // Lista exibida na tabela (filtrada por missing_price se ativo)
+  const displayedAnalysis = useMemo(() => {
+    if (activeKitFilter === 'missing_price') {
+      return purchasingAnalysis.filter(r => r.unitPriceMzn <= 0);
+    }
+    return purchasingAnalysis;
+  }, [purchasingAnalysis, activeKitFilter]);
 
   // Totais Executivos do Planejador
   const summary = useMemo(() => {
@@ -795,6 +808,24 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
               >
                 Visão Consolidada ({summary.totalKitsPlanned} kits no mês)
               </button>
+
+              {missingPriceItemsCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveKitFilter(activeKitFilter === 'missing_price' ? 'all' : 'missing_price')}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1",
+                    activeKitFilter === 'missing_price'
+                      ? "bg-amber-500 text-white shadow-sm font-black"
+                      : "bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300"
+                  )}
+                  title="Exibe apenas os insumos que estão sem preço de custo cadastrado"
+                >
+                  <AlertCircle size={12} className={activeKitFilter === 'missing_price' ? 'text-white' : 'text-amber-600'} />
+                  <span>Itens sem Preço ({missingPriceItemsCount})</span>
+                </button>
+              )}
+
               {kits.map(k => (
                 <button
                   key={k.id}
@@ -929,6 +960,30 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
           )}
         </div>
 
+        {/* Banner Informativo quando há insumos sem preço */}
+        {missingPriceItemsCount > 0 && (
+          <div className="p-4 mx-6 mt-6 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle size={18} className="text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold block">
+                  Há {missingPriceItemsCount} insumo(s) sem preço de custo cadastrado.
+                </span>
+                <span className="text-amber-700">
+                  Mesmo com estoque físico zerado, definir o custo unitário permite prever o <strong>custo mensal do projeto</strong> e dos kits com precisão.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveKitFilter(activeKitFilter === 'missing_price' ? 'all' : 'missing_price')}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 font-black text-xs shrink-0 transition-colors"
+            >
+              {activeKitFilter === 'missing_price' ? 'Ver Todos os Insumos' : 'Filtrar Itens sem Preço'}
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -949,7 +1004,7 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-sm">
-              {purchasingAnalysis.map(row => {
+              {displayedAnalysis.map(row => {
                 const isEditing = editingItemId === row.itemId;
 
                 return (
@@ -985,12 +1040,12 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
                       <span className={cn(
                         "font-black px-2.5 py-1 rounded-lg text-xs",
                         row.currentStock >= row.grossDemand 
-                          ? "bg-emerald-50 text-emerald-700" 
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
                           : row.currentStock > 0 
-                          ? "bg-amber-50 text-amber-700" 
-                          : "bg-red-50 text-red-600"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200" 
+                          : "bg-red-50 text-red-600 border border-red-200"
                       )}>
-                        {row.currentStock} {row.unit}
+                        {row.currentStock} {row.unit} {row.currentStock === 0 ? '(Zerado)' : ''}
                       </span>
                     </td>
 
@@ -1044,13 +1099,11 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
                             <X size={14} />
                           </button>
                         </div>
-                      ) : (
+                      ) : row.unitPriceMzn > 0 ? (
                         <div className="flex items-center justify-end gap-2 group/price">
                           <div className="text-right">
                             <span className="font-black text-slate-900 text-sm">
-                              {row.unitPriceMzn > 0 
-                                ? `${row.unitPriceMzn.toFixed(2)} MT` 
-                                : <span className="text-rose-500 font-bold text-xs">Sem valor</span>}
+                              {row.unitPriceMzn.toFixed(2)} MT
                             </span>
                             <span className="text-[10px] text-slate-400 block font-normal">
                               por {row.unit}
@@ -1075,6 +1128,26 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
                               <Calculator size={13} />
                             </button>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => row.item && handleStartEditPrice(row.item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-xs font-black shadow-sm transition-all"
+                            title="Definir preço unitário para calcular o custo mensal do projeto"
+                          >
+                            <Plus size={12} />
+                            <span>Definir Custo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => row.item && openCalculator(row.item)}
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Calculadora por fardo/caixa"
+                          >
+                            <Calculator size={13} />
+                          </button>
                         </div>
                       )}
                     </td>
