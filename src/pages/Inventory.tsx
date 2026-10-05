@@ -10,6 +10,7 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { supabase } from '../lib/supabase';
 import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../services/currencyService';
+import { saveExpenseTransaction } from '../services/financeTransactionService';
 
 const KitItemSelect = ({ items, categories, value, onChange }: { items: InventoryItem[], categories: any[], value: string, onChange: (id: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -484,29 +485,22 @@ export function Inventory() {
           const rate = transCurrency === 'MZN' ? mznRate : 1;
           const amountBrl = transCurrency === 'MZN' ? convertMznToBrl(totalP, rate) : totalP;
 
-          const payload: any = {
+          await saveExpenseTransaction({
             description: `Entrada Estoque: ${q} ${item.unit} de ${item.name}`,
             amount: amountBrl,
             type: 'expense',
-            category_id: transFinanceCat || null,
+            category_id: transFinanceCat || '',
             date: new Date().toISOString().split('T')[0],
-            status: 'paid',
+            status: 'completed',
             account: 'Caixa Moçambique',
             expense_type: 'variable',
+            recurrence: 'none',
             module: 'nutrition',
-            notes: `Insumos Casa Nutri: ${q} ${item.unit} x ${unitP.toFixed(2)} ${transCurrency} = ${totalP.toFixed(2)} ${transCurrency}. ${transNotes || ''}`.trim()
-          };
-
-          let { error } = await supabase.from('finance_transactions').insert([{
-            ...payload,
+            notes: `Insumos Casa Nutri: ${q} ${item.unit} x ${unitP.toFixed(2)} ${transCurrency} = ${totalP.toFixed(2)} ${transCurrency}. ${transNotes || ''}`.trim(),
             currency: transCurrency,
             original_amount: totalP,
             exchange_rate: rate
-          }]);
-
-          if (error && error.message?.includes('column')) {
-            await supabase.from('finance_transactions').insert([payload]);
-          }
+          }, 'nutrition');
 
           setToastMessage(`Entrada de ${q} ${item.unit} registrada e despesa lançada no Financeiro da Nutrição!`);
         } catch (finErr) {

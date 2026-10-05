@@ -123,7 +123,7 @@ export function ExpenseModal({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sincroniza tipo inicial quando modal abre
+  // Sincroniza tipo inicial e categoria quando modal abre
   React.useEffect(() => {
     if (isOpen) {
       setExpenseType(defaultExpenseType);
@@ -132,12 +132,16 @@ export function ExpenseModal({
       } else {
         setRecurrence('none');
       }
+      const expCats = (localCategories.length > 0 ? localCategories : categories).filter(c => c.type === 'expense');
+      if (!categoryId && expCats.length > 0) {
+        setCategoryId(expCats[0].id);
+      }
     }
-  }, [isOpen, defaultExpenseType]);
+  }, [isOpen, defaultExpenseType, categories, localCategories]);
 
   if (!isOpen) return null;
 
-  const expenseCategories = categories.filter(c => c.type === 'expense');
+  const expenseCategories = (localCategories.length > 0 ? localCategories : categories).filter(c => c.type === 'expense');
 
   // Amortização mensal estimada quando semestral/anual/etc.
   const getMonthlyAmortization = () => {
@@ -154,7 +158,15 @@ export function ExpenseModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description || !amount || !categoryId || !account) return;
+    if (!description.trim()) {
+      alert('Por favor, informe a descrição do gasto.');
+      return;
+    }
+    if (!amount || parseFloat(amount) <= 0) {
+      alert('Por favor, informe um valor válido para o gasto.');
+      return;
+    }
+    const effectiveCatId = categoryId || expenseCategories[0]?.id || '';
 
     setIsSubmitting(true);
     try {
@@ -168,19 +180,25 @@ export function ExpenseModal({
         ? `[Moçambique] Lançado em Meticais: ${formattedOriginal} MT (Cotação aplicada: 1 MZN = R$ ${exchangeRate.toFixed(4)}).`
         : '';
 
+      const safeDueDay = Math.min(Math.max(1, dueDay || 10), 31);
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const safeDateStr = `${year}-${month}-${String(safeDueDay).padStart(2, '0')}`;
+
       await onSave({
         description: description + (currency === 'MZN' ? ` (${formattedOriginal} MT)` : ''),
         amount: finalAmountInBrl,
         type: 'expense',
-        category_id: categoryId,
+        category_id: effectiveCatId,
         date: expenseType === 'fixed' && recurrence === 'monthly'
-          ? `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
-          : date,
+          ? safeDateStr
+          : (date || new Date().toISOString().split('T')[0]),
         status,
-        account,
+        account: account || 'Conta Principal',
         expense_type: expenseType,
         recurrence: expenseType === 'fixed' ? recurrence : 'none',
-        due_day: expenseType === 'fixed' && recurrence === 'monthly' ? dueDay : undefined,
+        due_day: expenseType === 'fixed' && recurrence === 'monthly' ? safeDueDay : undefined,
         department,
         notes: notes ? `${notes}\n${currencyNote}`.trim() : currencyNote || undefined,
         currency,

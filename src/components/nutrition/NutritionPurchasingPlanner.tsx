@@ -26,6 +26,7 @@ import { useInventory } from '../../contexts/InventoryContext';
 import { usePatients } from '../../contexts/PatientContext';
 import { supabase } from '../../lib/supabase';
 import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../../services/currencyService';
+import { saveExpenseTransaction } from '../../services/financeTransactionService';
 import { cn } from '../../lib/utils';
 import { Kit } from '../../lib/mockData';
 
@@ -256,28 +257,22 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       // 2. Registrar despesa no Financeiro da Nutrição
       if (totalMznSpent > 0) {
         const totalBrlSpent = convertMznToBrl(totalMznSpent, mznRate);
-        const payload: any = {
+        await saveExpenseTransaction({
           description: `Compra de Insumos Casa Nutri (${targetKitsCount} kits)`,
           amount: totalBrlSpent,
           type: 'expense',
+          category_id: '',
           date: new Date().toISOString().split('T')[0],
           status: 'completed',
           account: 'Caixa Moçambique',
           expense_type: 'variable',
+          recurrence: 'none',
           module: 'nutrition',
-          notes: `${purchaseNotes}. Total: ${totalMznSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT (Câmbio: R$ ${mznRate})`.trim()
-        };
-
-        let { error } = await supabase.from('finance_transactions').insert([{
-          ...payload,
+          notes: `${purchaseNotes}. Total: ${totalMznSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT (Câmbio: R$ ${mznRate})`.trim(),
           currency: 'MZN',
           original_amount: totalMznSpent,
           exchange_rate: mznRate
-        }]);
-
-        if (error && error.message?.includes('column')) {
-          await supabase.from('finance_transactions').insert([payload]);
-        }
+        }, 'nutrition');
       }
 
       setIsPurchaseModalOpen(false);
@@ -300,54 +295,24 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       const budgetBrl = summary.theoreticalBudgetBrl;
       const budgetMzn = summary.theoreticalBudgetMzn;
 
-      // Verifica se já existe um compromisso fixo mensal cadastrado para Insumos
-      const { data: existing } = await supabase
-        .from('finance_transactions')
-        .select('id')
-        .eq('module', 'nutrition')
-        .eq('expense_type', 'fixed')
-        .ilike('description', '%Insumos Nutricionais%')
-        .limit(1);
-
-      const payload: any = {
+      await saveExpenseTransaction({
         description: `Insumos Nutricionais (Previsão Mensal - ${targetKitsCount} kits)`,
         amount: budgetBrl,
         type: 'expense',
+        category_id: '',
         date: new Date().toISOString().split('T')[0],
         status: 'pending',
         account: 'Caixa Moçambique',
         expense_type: 'fixed',
         recurrence: 'monthly',
         module: 'nutrition',
-        notes: `Previsão estrutural calculada pelo Planejador de Compras: ${targetKitsCount} kits x ${currentKit?.name || 'Kit Padrão'} = ${budgetMzn.toFixed(2)} MT`.trim()
-      };
+        notes: `Previsão estrutural calculada pelo Planejador de Compras: ${targetKitsCount} kits x ${currentKit?.name || 'Kit Padrão'} = ${budgetMzn.toFixed(2)} MT`.trim(),
+        currency: 'MZN',
+        original_amount: budgetMzn,
+        exchange_rate: mznRate
+      }, 'nutrition');
 
-      if (existing && existing.length > 0) {
-        let { error } = await supabase.from('finance_transactions').update({
-          ...payload,
-          currency: 'MZN',
-          original_amount: budgetMzn,
-          exchange_rate: mznRate
-        }).eq('id', existing[0].id);
-
-        if (error && error.message?.includes('column')) {
-          await supabase.from('finance_transactions').update(payload).eq('id', existing[0].id);
-        }
-        setToastMessage(`Previsão orçamentária atualizada para R$ ${budgetBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês!`);
-      } else {
-        let { error } = await supabase.from('finance_transactions').insert([{
-          ...payload,
-          currency: 'MZN',
-          original_amount: budgetMzn,
-          exchange_rate: mznRate
-        }]);
-
-        if (error && error.message?.includes('column')) {
-          await supabase.from('finance_transactions').insert([payload]);
-        }
-        setToastMessage(`Compromisso fixo de insumos de R$ ${budgetBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} registrado nas despesas fixas!`);
-      }
-
+      setToastMessage(`Compromisso fixo de insumos de R$ ${budgetBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} registrado nas despesas fixas com sucesso!`);
       onRefreshFinance?.();
       setTimeout(() => setToastMessage(null), 5000);
     } catch (e) {

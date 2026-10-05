@@ -26,8 +26,14 @@ import { TransactionModal } from '../../components/admin/finance/TransactionModa
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCostsAccessModal';
-import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { NutritionPurchasingPlanner } from '../../components/nutrition/NutritionPurchasingPlanner';
+import { 
+  fetchModuleTransactions, 
+  saveExpenseTransaction, 
+  deleteModuleTransaction, 
+  toggleModuleTransactionStatus, 
+  updateModuleTransactionPayment 
+} from '../../services/financeTransactionService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
@@ -70,11 +76,11 @@ export function NutritionFinance() {
 
   const fetchData = async () => {
     try {
-      const [txRes, catRes] = await Promise.all([
-        supabase.from('finance_transactions').select('*').eq('module', 'nutrition').order('date', { ascending: false }),
+      const [txs, catRes] = await Promise.all([
+        fetchModuleTransactions('nutrition'),
         supabase.from('finance_categories').select('*').order('name', { ascending: true })
       ]);
-      if (txRes.data) setTransactions(txRes.data);
+      setTransactions(txs);
       if (catRes.data) setCategories(catRes.data);
     } catch (e) {
       console.error('Error fetching nutrition finance data:', e);
@@ -126,69 +132,18 @@ export function NutritionFinance() {
 
   const handleSaveExpense = async (newExpense: ExpensePayload) => {
     try {
-      const payload: any = {
-        description: newExpense.description,
-        amount: newExpense.amount,
-        type: newExpense.type,
-        category_id: newExpense.category_id,
-        date: newExpense.date,
-        status: newExpense.status,
-        account: newExpense.account,
-        expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence,
-        module: 'nutrition',
-        notes: newExpense.notes
-      };
-
-      let { data, error } = await supabase.from('finance_transactions').insert([{
-        ...payload,
-        currency: newExpense.currency || 'BRL',
-        original_amount: newExpense.original_amount,
-        exchange_rate: newExpense.exchange_rate
-      }]).select();
-
-      if (error && error.message?.includes('column')) {
-        const retry = await supabase.from('finance_transactions').insert([payload]).select();
-        data = retry.data;
-        error = retry.error;
-      }
-
-      if (error) throw error;
-      if (data && data[0]) {
-        const savedTx: Transaction = {
-          ...(data[0] as Transaction),
-          currency: newExpense.currency || 'BRL',
-          original_amount: newExpense.original_amount,
-          exchange_rate: newExpense.exchange_rate
-        };
-        setTransactions(prev => [savedTx, ...prev]);
-      }
+      const savedTx = await saveExpenseTransaction(newExpense, 'nutrition');
+      setTransactions(prev => [savedTx, ...prev.filter(t => t.id !== savedTx.id)]);
+      setIsExpenseModalOpen(false);
     } catch (e) {
-      console.warn('Erro ao salvar no Supabase, adicionando localmente:', e);
-      const localTx: Transaction = {
-        id: 'tx_nutri_' + Math.random().toString(36).substring(2, 9),
-        description: newExpense.description,
-        amount: newExpense.amount,
-        type: newExpense.type,
-        category_id: newExpense.category_id,
-        date: newExpense.date,
-        status: newExpense.status,
-        account: newExpense.account,
-        expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence,
-        module: 'nutrition',
-        notes: newExpense.notes,
-        currency: newExpense.currency || 'BRL',
-        original_amount: newExpense.original_amount,
-        exchange_rate: newExpense.exchange_rate
-      };
-      setTransactions(prev => [localTx, ...prev]);
+      console.error('Erro ao salvar despesa na Nutrição:', e);
+      alert('Erro inesperado ao salvar despesa.');
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
     try {
-      await supabase.from('finance_transactions').delete().eq('id', id);
+      await deleteModuleTransaction(id, 'nutrition');
       setTransactions(prev => prev.filter(t => t.id !== id));
     } catch (e) {
       setTransactions(prev => prev.filter(t => t.id !== id));
@@ -198,7 +153,7 @@ export function NutritionFinance() {
   const handleToggleStatus = async (id: string, currentStatus: 'completed' | 'pending') => {
     const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     try {
-      await supabase.from('finance_transactions').update({ status: nextStatus }).eq('id', id);
+      await toggleModuleTransactionStatus(id, nextStatus, 'nutrition');
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
     } catch (e) {
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
@@ -207,23 +162,7 @@ export function NutritionFinance() {
 
   const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
     try {
-      const payload: any = {
-        status: updates.status,
-        ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
-        ...(updates.date ? { date: updates.date } : {}),
-        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
-      };
-
-      let { error } = await supabase.from('finance_transactions').update({
-        ...payload,
-        ...(updates.original_amount !== undefined ? { original_amount: updates.original_amount } : {}),
-        ...(updates.exchange_rate !== undefined ? { exchange_rate: updates.exchange_rate } : {})
-      }).eq('id', id);
-
-      if (error && error.message?.includes('column')) {
-        await supabase.from('finance_transactions').update(payload).eq('id', id);
-      }
-
+      await updateModuleTransactionPayment(id, updates, 'nutrition');
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     } catch (e) {
       console.error('Error updating payment in NutritionFinance:', e);
