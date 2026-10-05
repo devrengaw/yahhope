@@ -61,12 +61,18 @@ export interface TransactionCategory {
 }
 
 import { Project } from '../../lib/mockData';
+import { 
+  getLocalCategories, 
+  fetchAndSyncCategories, 
+  saveCategory as persistCategory, 
+  deleteCategory as removePersistedCategory 
+} from '../../services/financeCategoryService';
 
 export function Finance() {
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>(getLocalCategories());
   const [projects, setProjects] = useState<Project[]>([]);
   
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -82,13 +88,13 @@ export function Finance() {
 
   const fetchData = async () => {
     try {
-      const [txRes, catRes, projRes] = await Promise.all([
+      const [txRes, syncedCategories, projRes] = await Promise.all([
         supabase.from('finance_transactions').select('*').order('date', { ascending: false }),
-        supabase.from('finance_categories').select('*').order('name', { ascending: true }),
+        fetchAndSyncCategories(),
         supabase.from('projects').select('*').order('created_at', { ascending: false })
       ]);
       if (txRes.data) setTransactions(txRes.data);
-      if (catRes.data) setCategories(catRes.data);
+      if (syncedCategories) setCategories(syncedCategories);
       if (projRes.data) setProjects(projRes.data);
     } catch (e) {
       console.error('Error fetching finance data:', e);
@@ -201,21 +207,25 @@ export function Finance() {
   };
 
   const handleSaveCategory = async (cat: Omit<TransactionCategory, 'id'> & { id?: string }) => {
-    if (cat.id) {
-      const { error } = await supabase.from('finance_categories').update(cat).eq('id', cat.id);
-      if (error) alert('Erro ao atualizar categoria');
-    } else {
-      const id = 'cat_' + Math.random().toString(36).substring(2, 9);
-      const { error } = await supabase.from('finance_categories').insert([{ ...cat, id }]);
-      if (error) alert('Erro ao criar categoria');
-    }
+    const id = cat.id || ('cat_' + Math.random().toString(36).substring(2, 9));
+    const fullCat: TransactionCategory = {
+      id,
+      name: cat.name,
+      type: cat.type,
+      color: cat.color,
+      icon: cat.icon || 'Tag'
+    };
+    await persistCategory(fullCat);
+    const updated = await fetchAndSyncCategories();
+    setCategories(updated);
     setEditingCategory(null);
   };
 
   const handleDeleteCategory = async (id: string) => {
     if (await confirm('Tem certeza que deseja excluir esta categoria? Transações vinculadas a ela não serão excluídas, mas perderão a referência.')) {
-      const { error } = await supabase.from('finance_categories').delete().eq('id', id);
-      if (error) alert('Erro ao excluir categoria');
+      await removePersistedCategory(id);
+      const updated = await fetchAndSyncCategories();
+      setCategories(updated);
     }
   };
 

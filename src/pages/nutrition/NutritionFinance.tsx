@@ -38,6 +38,7 @@ import {
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
+import { getLocalCategories, fetchAndSyncCategories } from '../../services/financeCategoryService';
 
 export function NutritionFinance() {
   const { user } = useAuth();
@@ -65,7 +66,7 @@ export function NutritionFinance() {
   };
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>(getLocalCategories());
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -77,12 +78,12 @@ export function NutritionFinance() {
 
   const fetchData = async () => {
     try {
-      const [txs, catRes] = await Promise.all([
+      const [txs, syncedCats] = await Promise.all([
         fetchModuleTransactions('nutrition'),
-        supabase.from('finance_categories').select('*').order('name', { ascending: true })
+        fetchAndSyncCategories()
       ]);
       setTransactions(txs);
-      if (catRes.data) setCategories(catRes.data);
+      if (syncedCats) setCategories(syncedCats);
     } catch (e) {
       console.error('Error fetching nutrition finance data:', e);
     }

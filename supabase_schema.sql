@@ -428,7 +428,7 @@ CREATE TABLE store_order_items (
 );
 
 -- 34. finance_categories (Categorias Financeiras)
-CREATE TABLE finance_categories (
+CREATE TABLE IF NOT EXISTS finance_categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
@@ -438,7 +438,7 @@ CREATE TABLE finance_categories (
 );
 
 -- 35. finance_transactions (Extrato Financeiro)
-CREATE TABLE finance_transactions (
+CREATE TABLE IF NOT EXISTS finance_transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   description TEXT NOT NULL,
   amount NUMERIC(10, 2) NOT NULL,
@@ -452,14 +452,33 @@ CREATE TABLE finance_transactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default categories
+-- 36. organization_settings (Configurações Globais da Organização)
+CREATE TABLE IF NOT EXISTS organization_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  name TEXT DEFAULT 'YAH Hope International',
+  website TEXT DEFAULT 'https://yahhope.org',
+  email TEXT DEFAULT 'contato@yahhope.org',
+  phone TEXT DEFAULT '+55 11 99999-9999',
+  address TEXT DEFAULT 'Rua da Esperança, 123 - São Paulo, SP',
+  timezone TEXT DEFAULT 'America/Sao_Paulo',
+  locale TEXT DEFAULT 'pt-BR',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Inserção segura de categorias padrão (sem apagar ou conflitar com existentes)
 INSERT INTO finance_categories (id, name, type, color, icon) VALUES
 ('cat_donation', 'Doações da Campanha', 'income', 'bg-emerald-100 text-emerald-600', 'Heart'),
 ('cat_sponsorship', 'Apadrinhamento', 'income', 'bg-teal-100 text-teal-600', 'Users'),
 ('cat_store', 'Vendas da Loja', 'income', 'bg-indigo-100 text-indigo-600', 'ShoppingBag'),
 ('cat_salary', 'Pagamento de Pessoal', 'expense', 'bg-rose-100 text-rose-600', 'Briefcase'),
 ('cat_office', 'Material de Escritório', 'expense', 'bg-orange-100 text-orange-600', 'Paperclip'),
-('cat_marketing', 'Marketing e Eventos', 'expense', 'bg-blue-100 text-blue-600', 'Megaphone');
+('cat_marketing', 'Marketing e Eventos', 'expense', 'bg-blue-100 text-blue-600', 'Megaphone')
+ON CONFLICT (id) DO NOTHING;
+
+-- Inserção segura de configurações padrão
+INSERT INTO organization_settings (id, name, website, email, phone, address, timezone, locale)
+VALUES ('default', 'YAH Hope International', 'https://yahhope.org', 'contato@yahhope.org', '+55 11 99999-9999', 'Rua da Esperança, 123 - São Paulo, SP', 'America/Sao_Paulo', 'pt-BR')
+ON CONFLICT (id) DO NOTHING;
 
 -- Habilitar Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE finance_transactions;

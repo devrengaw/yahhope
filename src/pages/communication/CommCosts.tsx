@@ -22,25 +22,26 @@ import { ManageCostsAccessModal } from '../../components/admin/finance/ManageCos
 import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
+import { getLocalCategories, fetchAndSyncCategories } from '../../services/financeCategoryService';
 
 export function CommCosts() {
   const { user } = useAuth();
   const isMasterAdmin = user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'contato@yahhope.com';
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>(getLocalCategories());
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseModalType, setExpenseModalType] = useState<'fixed' | 'variable'>('fixed');
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [txRes, catRes] = await Promise.all([
+      const [txRes, syncedCats] = await Promise.all([
         supabase.from('finance_transactions').select('*').eq('module', 'communication').order('date', { ascending: false }),
-        supabase.from('finance_categories').select('*').order('name', { ascending: true })
+        fetchAndSyncCategories()
       ]);
       if (txRes.data) setTransactions(txRes.data);
-      if (catRes.data) setCategories(catRes.data);
+      if (syncedCats) setCategories(syncedCats);
     } catch (e) {
       console.error('Erro ao carregar finanças de comunicação:', e);
     }

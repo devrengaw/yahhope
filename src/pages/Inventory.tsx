@@ -11,6 +11,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { supabase } from '../lib/supabase';
 import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../services/currencyService';
 import { saveExpenseTransaction } from '../services/financeTransactionService';
+import { getLocalCategories, fetchAndSyncCategories } from '../services/financeCategoryService';
 
 const KitItemSelect = ({ items, categories, value, onChange }: { items: InventoryItem[], categories: any[], value: string, onChange: (id: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -136,7 +137,9 @@ export function Inventory() {
   const [historyModalItem, setHistoryModalItem] = useState<InventoryItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [mznRate, setMznRate] = useState<number>(0.08103);
-  const [financeCategories, setFinanceCategories] = useState<{ id: string; name: string }[]>([]);
+  const [financeCategories, setFinanceCategories] = useState<{ id: string; name: string }[]>(() => 
+    getLocalCategories().filter(c => c.type === 'expense').map(c => ({ id: c.id, name: c.name }))
+  );
 
   // Fetch exchange rate and finance categories
   useEffect(() => {
@@ -144,20 +147,17 @@ export function Inventory() {
 
     async function loadFinanceCategories() {
       try {
-        const { data } = await supabase
-          .from('finance_categories')
-          .select('id, name')
-          .eq('type', 'expense')
-          .order('name');
-        if (data && data.length > 0) {
-          setFinanceCategories(data);
-          const foodCat = data.find(c => 
+        const synced = await fetchAndSyncCategories();
+        const expenses = synced.filter(c => c.type === 'expense').map(c => ({ id: c.id, name: c.name }));
+        if (expenses.length > 0) {
+          setFinanceCategories(expenses);
+          const foodCat = expenses.find(c => 
             c.name.toLowerCase().includes('aliment') || 
             c.name.toLowerCase().includes('insumo') ||
             c.name.toLowerCase().includes('nutri')
           );
           if (foodCat) setTransFinanceCat(foodCat.id);
-          else setTransFinanceCat(data[0].id);
+          else setTransFinanceCat(expenses[0].id);
         }
       } catch (e) {
         console.warn('Erro ao carregar categorias financeiras:', e);
@@ -640,9 +640,9 @@ export function Inventory() {
   const handleSaveKit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newKit: Kit = {
-      id: editingKit ? editingKit.id : Date.now().toString(),
-      name: kitName,
-      description: kitDesc,
+      id: editingKit ? editingKit.id : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString()),
+      name: kitName.trim(),
+      description: kitDesc.trim(),
       items: kitItems.filter(ki => ki.item_id && ki.quantity > 0)
     };
 

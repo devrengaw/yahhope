@@ -33,6 +33,14 @@ import { useLocation } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
+import { 
+  getLocalOrgSettings, 
+  fetchAndSyncOrgSettings, 
+  saveOrgSettings, 
+  OrganizationSettings 
+} from '../../services/organizationSettingsService';
+import { Loader2, Check } from 'lucide-react';
+
 type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
 
 const CURRENT_USER_ID = '1';
@@ -55,16 +63,10 @@ export function Settings() {
 
   const activeTab = getActiveTab();
   
-  // Organization State
-  const [orgInfo, setOrgInfo] = useState({
-    name: 'YAH Hope International',
-    website: 'https://yahhope.org',
-    email: 'contato@yahhope.org',
-    phone: '+55 11 99999-9999',
-    address: 'Rua da Esperança, 123 - São Paulo, SP',
-    timezone: 'America/Sao_Paulo',
-    locale: 'pt-BR'
-  });
+  // Organization State (Persistência Local + Supabase)
+  const [orgInfo, setOrgInfo] = useState<OrganizationSettings>(getLocalOrgSettings());
+  const [isSavingOrg, setIsSavingOrg] = useState(false);
+  const [orgSaveSuccess, setOrgSaveSuccess] = useState(false);
 
   // Project State - Carregado diretamente do Supabase via ProjectContext
   const { projects, addProject, updateProject } = useProject();
@@ -79,6 +81,9 @@ export function Settings() {
 
   useEffect(() => {
     fetchUsers();
+    fetchAndSyncOrgSettings().then(settings => {
+      setOrgInfo(settings);
+    });
   }, []);
 
   const fetchUsers = async () => {
@@ -107,8 +112,29 @@ export function Settings() {
   };
 
   // Handlers
-  const handleOrgChange = (field: string, value: string) => {
+  const handleOrgChange = (field: keyof OrganizationSettings, value: string) => {
     setOrgInfo(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveOrganization = async () => {
+    setIsSavingOrg(true);
+    setOrgSaveSuccess(false);
+    try {
+      const res = await saveOrgSettings(orgInfo);
+      setIsSavingOrg(false);
+      if (res.success) {
+        setOrgSaveSuccess(true);
+        addNotification({
+          title: 'Configurações Salvas',
+          message: 'As configurações da organização foram salvas e sincronizadas com sucesso!',
+          type: 'success'
+        });
+        setTimeout(() => setOrgSaveSuccess(false), 3000);
+      }
+    } catch (err: any) {
+      setIsSavingOrg(false);
+      showAlert('Erro', 'Ocorreu um erro ao salvar as configurações: ' + (err?.message || 'Erro desconhecido'));
+    }
   };
   
   // Project Handlers
@@ -343,16 +369,97 @@ export function Settings() {
               </div>
               <div className="lg:col-span-2 space-y-8">
                 <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">
-                  <div className="flex items-center gap-3 mb-8 px-2">
-                    <Globe className="text-slate-900" size={24} />
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Perfil da Organização</h3>
+                  <div className="flex items-center justify-between mb-8 px-2 flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <Globe className="text-slate-900" size={24} />
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Perfil da Organização</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveOrganization}
+                      disabled={isSavingOrg}
+                      className="flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-2xl transition-all shadow-lg shadow-slate-900/20 text-xs uppercase tracking-wider disabled:opacity-50"
+                    >
+                      {isSavingOrg ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Salvando...</span>
+                        </>
+                      ) : orgSaveSuccess ? (
+                        <>
+                          <Check className="text-emerald-400" size={16} />
+                          <span>Salvo com Sucesso!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          <span>Salvar Configurações</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Nome da Organização</label><input type="text" value={orgInfo.name} onChange={(e) => handleOrgChange('name', e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-100 transition-all text-sm outline-none" /></div>
-                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Website</label><div className="relative group"><LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} /><input type="text" value={orgInfo.website} onChange={(e) => handleOrgChange('website', e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-4 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-100 transition-all text-sm outline-none" /></div></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Nome da Organização</label>
+                      <input 
+                        type="text" 
+                        value={orgInfo.name} 
+                        onChange={(e) => handleOrgChange('name', e.target.value)} 
+                        className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Website</label>
+                      <div className="relative group">
+                        <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input 
+                          type="text" 
+                          value={orgInfo.website} 
+                          onChange={(e) => handleOrgChange('website', e.target.value)} 
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">E-mail Principal</label>
+                      <div className="relative group">
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input 
+                          type="email" 
+                          value={orgInfo.email} 
+                          onChange={(e) => handleOrgChange('email', e.target.value)} 
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Telefone Principal</label>
+                      <input 
+                        type="text" 
+                        value={orgInfo.phone} 
+                        onChange={(e) => handleOrgChange('phone', e.target.value)} 
+                        className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none" 
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Endereço da Sede</label>
+                      <div className="relative group">
+                        <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input 
+                          type="text" 
+                          value={orgInfo.address} 
+                          onChange={(e) => handleOrgChange('address', e.target.value)} 
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none" 
+                        />
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Idioma Padrão</label>
-                      <select className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-100 transition-all text-sm outline-none appearance-none cursor-pointer">
+                      <select 
+                        value={orgInfo.locale}
+                        onChange={(e) => handleOrgChange('locale', e.target.value)}
+                        className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none appearance-none cursor-pointer"
+                      >
                         <option value="pt-BR">Português (Brasil)</option>
                         <option value="en-US">English (US)</option>
                         <option value="es">Español</option>
@@ -360,8 +467,13 @@ export function Settings() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Fuso Horário</label>
-                      <select className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-100 transition-all text-sm outline-none appearance-none cursor-pointer">
+                      <select 
+                        value={orgInfo.timezone}
+                        onChange={(e) => handleOrgChange('timezone', e.target.value)}
+                        className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none appearance-none cursor-pointer"
+                      >
                         <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
+                        <option value="Africa/Maputo">Moçambique (GMT+2)</option>
                         <option value="UTC">UTC (Universal)</option>
                       </select>
                     </div>

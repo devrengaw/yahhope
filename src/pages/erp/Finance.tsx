@@ -6,19 +6,22 @@ import { TransactionList } from '../../components/erp/finance/TransactionList';
 import { TransactionModal } from '../../components/erp/finance/TransactionModal';
 import { Transaction } from '../../lib/mockData'; // keeping type
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { getLocalCategories, fetchAndSyncCategories } from '../../services/financeCategoryService';
 
 export function Finance() {
   const { confirm, alert: showAlert } = useConfirm();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>(getLocalCategories());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: txs } = await supabase.from('finance_transactions').select('*').order('date', { ascending: false });
-      const { data: cats } = await supabase.from('finance_categories').select('*');
-      if (txs) setTransactions(txs as Transaction[]);
+      const [txRes, cats] = await Promise.all([
+        supabase.from('finance_transactions').select('*').order('date', { ascending: false }),
+        fetchAndSyncCategories()
+      ]);
+      if (txRes.data) setTransactions(txRes.data as Transaction[]);
       if (cats) setCategories(cats);
     };
     fetchData();

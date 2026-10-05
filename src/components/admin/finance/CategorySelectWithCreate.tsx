@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { TransactionCategory } from '../../../pages/admin/Finance';
 import { supabase } from '../../../lib/supabase';
+import { saveCategory } from '../../../services/financeCategoryService';
 import { cn } from '../../../lib/utils';
 
 export interface CategorySelectWithCreateProps {
@@ -123,18 +124,9 @@ export function CategorySelectWithCreate({
     };
 
     try {
-      const { error } = await supabase.from('finance_categories').insert([{
-        id: newCat.id,
-        name: newCat.name,
-        type: newCat.type,
-        color: newCat.color,
-        icon: newCat.icon
-      }]);
-      if (error) {
-        console.warn('Aviso ao gravar no Supabase, adicionando localmente:', error);
-      }
+      await saveCategory(newCat);
     } catch (err) {
-      console.warn('Erro ao conectar ao Supabase, adicionando localmente:', err);
+      console.warn('Erro ao salvar categoria:', err);
     }
 
     // Notifica pai para atualizar listas e filtros

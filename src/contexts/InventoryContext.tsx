@@ -30,6 +30,26 @@ interface InventoryContextType {
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 const MED_META_KEY = 'yah_hope_inventory_med_meta';
+const KITS_STORAGE_KEY = 'yah_hope_inventory_kits_v2';
+
+function getLocalKits(): Kit[] {
+  try {
+    const raw = localStorage.getItem(KITS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveKitsToStorage(kits: Kit[]) {
+  try {
+    localStorage.setItem(KITS_STORAGE_KEY, JSON.stringify(kits));
+  } catch (e) {
+    console.error('Error saving kits to localStorage', e);
+  }
+}
 
 function getMedMetadata(): Record<string, { dosage_form?: 'comprimido' | 'liquido' | 'outro'; package_units?: number; liquid_volume_ml?: number }> {
   try {
@@ -52,7 +72,7 @@ function saveMedMetadata(id: string, meta: { dosage_form?: 'comprimido' | 'liqui
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [kits, setKits] = useState<Kit[]>([]);
+  const [kits, setKits] = useState<Kit[]>(() => getLocalKits());
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -110,18 +130,41 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      if (kitsRes.data) {
-        const kData = kitsRes.data.map(k => ({
-          id: k.id,
-          name: k.name,
-          description: k.description || '',
-          items: kitItemsRes.data ? kitItemsRes.data.filter(ki => ki.kit_id === k.id).map(ki => ({
+      // Reconcile and protect kits from disappearing on refresh
+      const localCachedKits = getLocalKits();
+      if (kitsRes.data && kitsRes.data.length > 0) {
+        const kData = kitsRes.data.map(k => {
+          const dbItems = kitItemsRes.data ? kitItemsRes.data.filter(ki => ki.kit_id === k.id).map(ki => ({
             item_id: ki.item_id,
             quantity: ki.quantity,
             dosage: ki.dosage || undefined
-          })) : []
-        }));
-        setKits(kData);
+          })) : [];
+
+          // If DB has items, use them; if DB items is empty (or kit_items table failed), retain local items
+          const matchingLocal = localCachedKits.find(lk => lk.id === k.id || lk.name.trim().toLowerCase() === k.name.trim().toLowerCase());
+          const finalItems = dbItems.length > 0 ? dbItems : (matchingLocal?.items || []);
+
+          return {
+            id: k.id,
+            name: k.name,
+            description: k.description || '',
+            items: finalItems
+          };
+        });
+
+        // Retain any local kits that haven't synced to DB yet
+        const mergedKits = [...kData];
+        localCachedKits.forEach(lk => {
+          if (!mergedKits.some(mk => mk.id === lk.id || mk.name.trim().toLowerCase() === lk.name.trim().toLowerCase())) {
+            mergedKits.push(lk);
+          }
+        });
+
+        setKits(mergedKits);
+        saveKitsToStorage(mergedKits);
+      } else if (localCachedKits.length > 0) {
+        // DB returned 0 kits or error: preserve our local kits so they never zero out
+        setKits(localCachedKits);
       }
       
       setIsLoaded(true);
@@ -272,62 +315,123 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // CRUD for kits
   const addKit = async (kit: Kit) => {
-    const { data } = await supabase.from('kits').insert({
-      name: kit.name,
-      description: kit.description
-    }).select().single();
-    if (data) {
-      if (kit.items.length > 0) {
-        await supabase.from('kit_items').insert(kit.items.map(ki => ({
-          kit_id: data.id,
-          item_id: ki.item_id,
-          quantity: ki.quantity,
-          dosage: ki.dosage || null
-        })));
+    const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (kit.id && kit.id.length > 20 ? kit.id : `kit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
+    const kitWithId: Kit = { ...kit, id: newId };
+
+    // 1. Optimistic update and instant local persistence
+    setKits(prev => {
+      const updated = [kitWithId, ...prev.filter(k => k.id !== newId)];
+      saveKitsToStorage(updated);
+      return updated;
+    });
+
+    // 2. Persist to Supabase
+    try {
+      let insertedId = newId;
+      const { data, error } = await supabase.from('kits').insert({
+        name: kit.name,
+        description: kit.description || null
+      }).select().single();
+
+      if (error) {
+        console.warn('Supabase kit insert warning, saved locally in localStorage:', error);
+      } else if (data) {
+        insertedId = data.id;
+        if (insertedId !== newId) {
+          setKits(prev => {
+            const updated = prev.map(k => k.id === newId ? { ...k, id: insertedId } : k);
+            saveKitsToStorage(updated);
+            return updated;
+          });
+        }
       }
-      setKits(prev => [{ ...kit, id: data.id }, ...prev]);
+
+      if (kit.items && kit.items.length > 0) {
+        const validItems = kit.items.filter(ki => ki.item_id && ki.quantity > 0);
+        if (validItems.length > 0) {
+          try {
+            await supabase.from('kit_items').insert(validItems.map(ki => ({
+              kit_id: insertedId,
+              item_id: ki.item_id,
+              quantity: ki.quantity,
+              dosage: ki.dosage || null
+            })));
+          } catch (itemErr) {
+            console.warn('Supabase kit_items insert warning, preserved locally:', itemErr);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error saving kit to Supabase, kit safely stored locally:', e);
     }
   };
 
   const updateKit = async (id: string, updates: Partial<Kit>) => {
-    const { error } = await supabase.from('kits').update({
-      name: updates.name,
-      description: updates.description
-    }).eq('id', id);
-    
-    if (!error) {
+    // 1. Optimistic update and instant local persistence
+    setKits(prev => {
+      const updated = prev.map(k => k.id === id ? { ...k, ...updates } : k);
+      saveKitsToStorage(updated);
+      return updated;
+    });
+
+    // 2. Persist to Supabase
+    try {
+      const { error } = await supabase.from('kits').update({
+        name: updates.name,
+        description: updates.description || null
+      }).eq('id', id);
+
+      if (error) {
+        console.warn('Supabase kit update warning, preserved locally:', error);
+      }
+
       if (updates.items) {
-        await supabase.from('kit_items').delete().eq('kit_id', id);
-        if (updates.items.length > 0) {
-          await supabase.from('kit_items').insert(updates.items.map(ki => ({
-            kit_id: id,
-            item_id: ki.item_id,
-            quantity: ki.quantity,
-            dosage: ki.dosage || null
-          })));
+        const validItems = updates.items.filter(ki => ki.item_id && ki.quantity > 0);
+        try {
+          await supabase.from('kit_items').delete().eq('kit_id', id);
+          if (validItems.length > 0) {
+            const { error: itemsErr } = await supabase.from('kit_items').insert(validItems.map(ki => ({
+              kit_id: id,
+              item_id: ki.item_id,
+              quantity: ki.quantity,
+              dosage: ki.dosage || null
+            })));
+            if (itemsErr) {
+              console.warn('Supabase kit_items update warning, preserved locally:', itemsErr);
+            }
+          }
+        } catch (itemErr) {
+          console.warn('Error updating kit_items in Supabase:', itemErr);
         }
       }
-      setKits(prev => prev.map(k => k.id === id ? { ...k, ...updates } : k));
+    } catch (e) {
+      console.warn('Error updating kit in Supabase, preserved locally:', e);
     }
   };
 
   const deleteKit = async (id: string) => {
+    // 1. Remove from state and localStorage immediately
+    setKits(prev => {
+      const updated = prev.filter(k => k.id !== id);
+      saveKitsToStorage(updated);
+      return updated;
+    });
+
+    // 2. Remove from Supabase
     try {
-      // Disassociate from clinical events if referenced
-      await supabase.from('clinical_events').update({ kit_delivered_id: null }).eq('kit_delivered_id', id);
+      try {
+        await supabase.from('clinical_events').update({ kit_delivered_id: null }).eq('kit_delivered_id', id);
+      } catch (e) {
+        console.warn('Could not nullify kit_delivered_id in clinical_events:', e);
+      }
+
+      await supabase.from('kit_items').delete().eq('kit_id', id);
+      const { error } = await supabase.from('kits').delete().eq('id', id);
+      if (error) {
+        console.warn('Supabase delete kit warning, kit removed locally:', error);
+      }
     } catch (e) {
-      console.warn('Could not nullify kit_delivered_id in clinical_events:', e);
-    }
-
-    // Explicitly delete kit_items to prevent FK constraint issues
-    await supabase.from('kit_items').delete().eq('kit_id', id);
-
-    const { error } = await supabase.from('kits').delete().eq('id', id);
-    if (!error) {
-      setKits(prev => prev.filter(k => k.id !== id));
-    } else {
-      console.error('Error deleting kit:', error);
-      alert('Erro ao excluir kit: ' + error.message);
+      console.warn('Error deleting kit in Supabase:', e);
     }
   };
 
