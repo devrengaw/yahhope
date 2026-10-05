@@ -447,8 +447,16 @@ export function MonthlyExpensesManager({
 
                   {/* Descrição e Categoria */}
                   <td className="px-6 py-5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-slate-900 text-sm">{t.description}</p>
+                      {t.currency === 'MZN' && (
+                        <span 
+                          className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
+                          title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                        >
+                          🇲🇿 MZN
+                        </span>
+                      )}
                       {hasMultipleModules && t.module && t.module !== 'global' && (
                         <span className={cn(
                           "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
@@ -509,6 +517,14 @@ export function MonthlyExpensesManager({
                     <p className="text-base font-black text-rose-600 tracking-tight">
                       - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
+                    {t.currency === 'MZN' && t.original_amount && (
+                      <p 
+                        className="text-[11px] font-black text-emerald-700 mt-0.5" 
+                        title={t.exchange_rate ? `Taxa aplicada: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}
+                      >
+                        {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                      </p>
+                    )}
                     {isFixed && t.recurrence && t.recurrence !== 'monthly' && t.recurrence !== 'none' && (
                       <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
                         ~ R$ {(t.amount / (t.recurrence === 'bimonthly' ? 2 : t.recurrence === 'quarterly' ? 3 : t.recurrence === 'semiannual' ? 6 : 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês

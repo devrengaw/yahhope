@@ -46,6 +46,10 @@ export interface Transaction {
   expense_type?: 'fixed' | 'variable';
   recurrence?: 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
   module?: string;
+  currency?: 'BRL' | 'MZN';
+  original_amount?: number;
+  exchange_rate?: number;
+  notes?: string;
 }
 
 export interface TransactionCategory {
@@ -217,7 +221,7 @@ export function Finance() {
 
   const handleSaveExpense = async (newExpense: ExpensePayload) => {
     try {
-      const payload = {
+      const payload: any = {
         description: newExpense.description,
         amount: newExpense.amount,
         type: newExpense.type,
@@ -226,12 +230,32 @@ export function Finance() {
         status: newExpense.status,
         account: newExpense.account,
         expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence
+        recurrence: newExpense.recurrence,
+        notes: newExpense.notes
       };
-      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
+
+      let { data, error } = await supabase.from('finance_transactions').insert([{
+        ...payload,
+        currency: newExpense.currency || 'BRL',
+        original_amount: newExpense.original_amount,
+        exchange_rate: newExpense.exchange_rate
+      }]).select();
+
+      if (error && error.message?.includes('column')) {
+        const retry = await supabase.from('finance_transactions').insert([payload]).select();
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) throw error;
       if (data && data[0]) {
-        setTransactions(prev => [data[0] as Transaction, ...prev]);
+        const savedTx: Transaction = {
+          ...(data[0] as Transaction),
+          currency: newExpense.currency || 'BRL',
+          original_amount: newExpense.original_amount,
+          exchange_rate: newExpense.exchange_rate
+        };
+        setTransactions(prev => [savedTx, ...prev]);
       }
     } catch (e) {
       console.warn('Erro ao salvar despesa no Supabase, adicionando localmente:', e);
@@ -245,7 +269,11 @@ export function Finance() {
         status: newExpense.status,
         account: newExpense.account,
         expense_type: newExpense.expense_type,
-        recurrence: newExpense.recurrence
+        recurrence: newExpense.recurrence,
+        notes: newExpense.notes,
+        currency: newExpense.currency || 'BRL',
+        original_amount: newExpense.original_amount,
+        exchange_rate: newExpense.exchange_rate
       };
       setTransactions(prev => [localTx, ...prev]);
     }

@@ -86,7 +86,7 @@ export function CommCosts() {
 
   const handleSaveExpense = async (newExpense: ExpensePayload) => {
     try {
-      const payload = {
+      const payload: any = {
         description: newExpense.description,
         amount: newExpense.amount,
         type: newExpense.type,
@@ -96,12 +96,32 @@ export function CommCosts() {
         account: newExpense.account,
         expense_type: newExpense.expense_type,
         recurrence: newExpense.recurrence,
-        module: 'communication'
+        module: 'communication',
+        notes: newExpense.notes
       };
-      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
+
+      let { data, error } = await supabase.from('finance_transactions').insert([{
+        ...payload,
+        currency: newExpense.currency || 'BRL',
+        original_amount: newExpense.original_amount,
+        exchange_rate: newExpense.exchange_rate
+      }]).select();
+
+      if (error && error.message?.includes('column')) {
+        const retry = await supabase.from('finance_transactions').insert([payload]).select();
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) throw error;
       if (data && data[0]) {
-        setTransactions(prev => [data[0] as Transaction, ...prev]);
+        const savedTx: Transaction = {
+          ...(data[0] as Transaction),
+          currency: newExpense.currency || 'BRL',
+          original_amount: newExpense.original_amount,
+          exchange_rate: newExpense.exchange_rate
+        };
+        setTransactions(prev => [savedTx, ...prev]);
       }
     } catch (e) {
       console.warn('Erro ao salvar no Supabase, adicionando localmente:', e);
@@ -116,7 +136,11 @@ export function CommCosts() {
         account: newExpense.account,
         expense_type: newExpense.expense_type,
         recurrence: newExpense.recurrence,
-        module: 'communication'
+        module: 'communication',
+        notes: newExpense.notes,
+        currency: newExpense.currency || 'BRL',
+        original_amount: newExpense.original_amount,
+        exchange_rate: newExpense.exchange_rate
       };
       setTransactions(prev => [localTx, ...prev]);
     }

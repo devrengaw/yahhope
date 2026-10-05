@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { TransactionCategory } from '../../../pages/admin/Finance';
 import { CategorySelectWithCreate } from './CategorySelectWithCreate';
+import { getMznToBrlRate, ExchangeRateResult } from '../../../services/currencyService';
+import { RefreshCw, Globe, ArrowRightLeft } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 export type RecurrenceType = 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
@@ -30,6 +32,9 @@ export interface ExpensePayload {
   department?: string;
   notes?: string;
   module?: string;
+  currency?: 'BRL' | 'MZN';
+  original_amount?: number;
+  exchange_rate?: number;
 }
 
 interface ExpenseModalProps {
@@ -52,12 +57,54 @@ export function ExpenseModal({
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable'>(defaultExpenseType);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<'BRL' | 'MZN'>('BRL');
+  const [exchangeRate, setExchangeRate] = useState<number>(0.08103);
+  const [rateInfo, setRateInfo] = useState<ExchangeRateResult | null>(null);
+  const [isLoadingRate, setIsLoadingRate] = useState(false);
+  const [isEditingRate, setIsEditingRate] = useState(false);
+  const [customRateInput, setCustomRateInput] = useState('0.0810');
   const [categoryId, setCategoryId] = useState('');
   const [localCategories, setLocalCategories] = useState<TransactionCategory[]>(categories);
 
   React.useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
+
+  // Consulta a cotação oficial em tempo real de MZN para BRL ao abrir o modal
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsLoadingRate(true);
+      getMznToBrlRate()
+        .then(info => {
+          setRateInfo(info);
+          setExchangeRate(info.rate);
+          setCustomRateInput(info.rate.toFixed(4));
+        })
+        .catch(err => console.warn('Erro ao obter cotação:', err))
+        .finally(() => setIsLoadingRate(false));
+    }
+  }, [isOpen]);
+
+  const handleRefreshRate = async () => {
+    setIsLoadingRate(true);
+    try {
+      const info = await getMznToBrlRate(true);
+      setRateInfo(info);
+      setExchangeRate(info.rate);
+      setCustomRateInput(info.rate.toFixed(4));
+      setIsEditingRate(false);
+    } finally {
+      setIsLoadingRate(false);
+    }
+  };
+
+  const handleApplyCustomRate = () => {
+    const val = parseFloat(customRateInput.replace(',', '.'));
+    if (!isNaN(val) && val > 0) {
+      setExchangeRate(val);
+      setIsEditingRate(false);
+    }
+  };
 
   const handleCategoryCreated = (newCat: TransactionCategory) => {
     setLocalCategories(prev => {
@@ -94,8 +141,9 @@ export function ExpenseModal({
 
   // Amortização mensal estimada quando semestral/anual/etc.
   const getMonthlyAmortization = () => {
-    const val = parseFloat(amount);
-    if (isNaN(val) || val <= 0) return null;
+    const rawVal = parseFloat(amount);
+    if (isNaN(rawVal) || rawVal <= 0) return null;
+    const val = currency === 'MZN' ? rawVal * exchangeRate : rawVal;
     if (recurrence === 'bimonthly') return val / 2;
     if (recurrence === 'quarterly') return val / 3;
     if (recurrence === 'semiannual') return val / 6;
@@ -110,9 +158,19 @@ export function ExpenseModal({
 
     setIsSubmitting(true);
     try {
+      const rawAmount = parseFloat(amount);
+      const finalAmountInBrl = currency === 'MZN' 
+        ? Number((rawAmount * exchangeRate).toFixed(2)) 
+        : rawAmount;
+
+      const formattedOriginal = rawAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      const currencyNote = currency === 'MZN'
+        ? `[Moçambique] Lançado em Meticais: ${formattedOriginal} MT (Cotação aplicada: 1 MZN = R$ ${exchangeRate.toFixed(4)}).`
+        : '';
+
       await onSave({
-        description,
-        amount: parseFloat(amount),
+        description: description + (currency === 'MZN' ? ` (${formattedOriginal} MT)` : ''),
+        amount: finalAmountInBrl,
         type: 'expense',
         category_id: categoryId,
         date: expenseType === 'fixed' && recurrence === 'monthly'
@@ -124,7 +182,10 @@ export function ExpenseModal({
         recurrence: expenseType === 'fixed' ? recurrence : 'none',
         due_day: expenseType === 'fixed' && recurrence === 'monthly' ? dueDay : undefined,
         department,
-        notes
+        notes: notes ? `${notes}\n${currencyNote}`.trim() : currencyNote || undefined,
+        currency,
+        original_amount: rawAmount,
+        exchange_rate: currency === 'MZN' ? exchangeRate : 1
       });
 
       // Reset
@@ -291,58 +352,179 @@ export function ExpenseModal({
               />
             </div>
 
-            {/* Valor e Vencimento / Data */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                  Valor {expenseType === 'fixed' && recurrence !== 'monthly' ? `do Pagamento (${recurrence === 'semiannual' ? 'Semestral' : recurrence === 'yearly' ? 'Anual' : recurrence === 'quarterly' ? 'Trimestral' : 'Bimestral'})` : 'Estimado'} (R$)
+            {/* Moeda e Valor */}
+            <div className="space-y-3">
+              {/* Seletor de Moeda */}
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                  Moeda do Pagamento
                 </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0,00"
-                    className="w-full border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3 text-sm font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-500/5 focus:border-slate-300 transition-all"
-                    required
-                  />
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setCurrency('BRL')}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      currency === 'BRL' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                    )}
+                  >
+                    <span>🇧🇷 BRL (R$)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrency('MZN')}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      currency === 'MZN' ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                    )}
+                  >
+                    <span>🇲🇿 MZN (MT)</span>
+                    <span className="text-[9px] bg-emerald-700/60 text-white px-1.5 py-0.2 rounded font-black">Moçambique</span>
+                  </button>
                 </div>
               </div>
 
-              {expenseType === 'fixed' && recurrence === 'monthly' ? (
+              {/* Valor e Vencimento / Data */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                    Dia do Vencimento Mensal
+                    Valor {expenseType === 'fixed' && recurrence !== 'monthly' ? `do Pagamento (${recurrence === 'semiannual' ? 'Semestral' : recurrence === 'yearly' ? 'Anual' : recurrence === 'quarterly' ? 'Trimestral' : 'Bimestral'})` : 'Estimado'} ({currency === 'MZN' ? 'Meticais' : 'Reais'})
                   </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400">Todo dia</span>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                      {currency === 'MZN' ? 'MT' : 'R$'}
+                    </span>
                     <input
                       type="number"
-                      min="1"
-                      max="31"
-                      value={dueDay}
-                      onChange={(e) => setDueDay(Number(e.target.value))}
-                      className="w-20 border-2 border-slate-100 rounded-2xl px-3 py-3 text-sm font-black text-center text-slate-900 focus:outline-none focus:border-slate-300 transition-all"
+                      step="0.01"
+                      min="0"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder={currency === 'MZN' ? "0,00 MT" : "0,00"}
+                      className="w-full border-2 border-slate-100 rounded-2xl pl-14 pr-4 py-3 text-sm font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-500/5 focus:border-slate-300 transition-all"
                       required
                     />
-                    <span className="text-xs font-bold text-slate-400">de cada mês</span>
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                    {expenseType === 'fixed' ? 'Data do Próximo Pagamento' : 'Data da Despesa'}
-                  </label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-slate-300 transition-all"
-                    required
-                  />
+
+                {expenseType === 'fixed' && recurrence === 'monthly' ? (
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
+                      Dia do Vencimento Mensal
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-400">Todo dia</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={dueDay}
+                        onChange={(e) => setDueDay(Number(e.target.value))}
+                        className="w-20 border-2 border-slate-100 rounded-2xl px-3 py-3 text-sm font-black text-center text-slate-900 focus:outline-none focus:border-slate-300 transition-all"
+                        required
+                      />
+                      <span className="text-xs font-bold text-slate-400">de cada mês</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
+                      {expenseType === 'fixed' ? 'Data do Próximo Pagamento' : 'Data da Despesa'}
+                    </label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-slate-300 transition-all"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Card de Cotação e Conversão em Tempo Real (MZN -> BRL) */}
+              {currency === 'MZN' && (
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl space-y-3 animate-in fade-in duration-200">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <div>
+                        <p className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
+                          <span>Cotação Oficial Metical (MZN) → Real (BRL)</span>
+                          <span className="text-[10px] bg-emerald-200/80 text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                            {rateInfo?.source === 'api' ? 'Tempo Real' : rateInfo?.source === 'cache' ? 'Em Cache' : 'Estimada'}
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-emerald-700 font-bold">
+                          1 MZN = R$ {exchangeRate.toFixed(4)} &bull; 1 BRL = {(1 / (exchangeRate || 1)).toFixed(2)} MT
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRefreshRate}
+                        disabled={isLoadingRate}
+                        className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold hover:bg-emerald-100/50 shadow-xs flex items-center gap-1 transition-all cursor-pointer"
+                        title="Buscar cotação mais recente na internet"
+                      >
+                        <RefreshCw size={12} className={isLoadingRate ? "animate-spin" : ""} />
+                        <span>{isLoadingRate ? 'Consultando...' : 'Atualizar Cotação'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingRate(!isEditingRate)}
+                        className="px-2.5 py-1.5 rounded-xl bg-white border border-emerald-200 text-slate-600 text-[11px] font-bold hover:bg-slate-50 shadow-xs transition-all cursor-pointer"
+                      >
+                        {isEditingRate ? 'Fechar' : 'Editar Taxa'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Edição Manual da Taxa se necessário */}
+                  {isEditingRate && (
+                    <div className="pt-2 border-t border-emerald-200/60 flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] font-black uppercase text-emerald-900">
+                          1 MZN = R$
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          min="0.0001"
+                          value={customRateInput}
+                          onChange={(e) => setCustomRateInput(e.target.value)}
+                          className="w-24 px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-black text-emerald-950 focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomRate}
+                        className="px-3 py-1 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-800 cursor-pointer"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Conversão em Destaque */}
+                  {parseFloat(amount) > 0 && (
+                    <div className="pt-3 border-t border-emerald-200/80 flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900">
+                        Total convertido para o caixa consolidado (BRL):
+                      </span>
+                      <div className="text-right">
+                        <span className="text-base font-black text-emerald-950 bg-white px-3 py-1 rounded-xl border border-emerald-300 shadow-sm inline-block">
+                          R$ {(parseFloat(amount) * exchangeRate).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">
+                          Calculado de {parseFloat(amount).toLocaleString('pt-BR')} MT
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
