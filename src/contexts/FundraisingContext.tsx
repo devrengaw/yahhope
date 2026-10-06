@@ -24,6 +24,7 @@ export interface Campaign {
   milestones: CampaignMilestone[];
   accept_pix?: boolean;
   accept_card?: boolean;
+  priority?: number;
   created_at?: string;
 }
 
@@ -71,6 +72,9 @@ interface FundraisingContextType {
   updateCampaign: (updates: Partial<Campaign>, campaignId?: string) => Promise<{ success: boolean; error?: any }>;
   deleteCampaign: (id: string) => Promise<{ success: boolean; error?: any }>;
   setActiveCampaign: (id: string) => Promise<{ success: boolean; error?: any }>;
+  toggleCampaignActive: (id: string, active?: boolean) => Promise<{ success: boolean; error?: any }>;
+  reorderCampaigns: (orderedIds: string[]) => Promise<{ success: boolean; error?: any }>;
+  updateCampaignPriority: (id: string, newPriority: number) => Promise<{ success: boolean; error?: any }>;
   resetCampaignMonth: (id: string) => Promise<{ success: boolean; error?: any }>;
   addMilestone: (milestone: Omit<CampaignMilestone, 'id'>, targetCampaignId?: string) => Promise<void>;
   updateMilestone: (id: string, updates: Partial<CampaignMilestone>) => Promise<void>;
@@ -192,7 +196,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       setDonations(formattedDonations);
 
       if (campaignsData && campaignsData.length > 0) {
-        const mappedCampaigns: Campaign[] = campaignsData.map(c => {
+        const mappedCampaigns: Campaign[] = campaignsData.map((c, index) => {
           const campMilestones = (milestonesData || []).filter(m => m.campaign_id === c.id);
           
           return {
@@ -202,7 +206,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             target_amount: Number(c.target_amount || 0),
             current_amount: Number(c.current_amount || 0),
             type: c.type || 'monthly',
-            is_active: c.is_active ?? false,
+            is_active: c.is_active !== false,
+            priority: typeof c.priority === 'number' ? c.priority : (index + 1),
             start_date: c.start_date,
             end_date: c.end_date,
             reset_day: c.reset_day || 1,
@@ -213,6 +218,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             created_at: c.created_at
           };
         });
+
+        // Ordena campanhas pela ordem de prioridade crescente
+        mappedCampaigns.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
 
         setCampaigns(mappedCampaigns);
 
@@ -293,7 +301,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         description: data.description,
         target_amount: data.target_amount,
         current_amount: 0,
-        is_active: campaigns.length === 0, // se for a primeira, fica ativa
+        is_active: true, // Por padrão, novas campanhas já nascem ativas
+        priority: campaigns.length + 1,
         accept_pix: data.accept_pix ?? true,
         accept_card: data.accept_card ?? true
       };
@@ -398,19 +407,66 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
 
   const setActiveCampaign = async (id: string) => {
     try {
-      // 1. Desativa todas
-      await supabase.from('campaigns').update({ is_active: false }).neq('id', id);
-      // 2. Ativa a escolhida
+      // Ativa a escolhida sem desativar as outras
       await supabase.from('campaigns').update({ is_active: true }).eq('id', id);
 
-      setCampaigns(prev => prev.map(c => ({
-        ...c,
-        is_active: c.id === id
-      })));
+      setCampaigns(prev => prev.map(c => c.id === id ? { ...c, is_active: true } : c));
       setSelectedCampaignId(id);
       return { success: true };
     } catch (err) {
       console.error('Error setting active campaign:', err);
+      return { success: false, error: err };
+    }
+  };
+
+  const toggleCampaignActive = async (id: string, active?: boolean) => {
+    try {
+      const camp = campaigns.find(c => c.id === id);
+      const newActive = active !== undefined ? active : !(camp?.is_active ?? true);
+      
+      const { error } = await supabase.from('campaigns').update({ is_active: newActive }).eq('id', id);
+      if (error && error.message && error.message.includes('column')) {
+        // Ignora se coluna não existir no banco
+      }
+      setCampaigns(prev => prev.map(c => c.id === id ? { ...c, is_active: newActive } : c));
+      return { success: true };
+    } catch (err) {
+      console.error('Error toggling campaign active:', err);
+      return { success: false, error: err };
+    }
+  };
+
+  const updateCampaignPriority = async (id: string, newPriority: number) => {
+    try {
+      await supabase.from('campaigns').update({ priority: newPriority }).eq('id', id);
+      setCampaigns(prev => {
+        const next = prev.map(c => c.id === id ? { ...c, priority: newPriority } : c);
+        return next.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+      });
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating campaign priority:', err);
+      return { success: false, error: err };
+    }
+  };
+
+  const reorderCampaigns = async (orderedIds: string[]) => {
+    try {
+      setCampaigns(prev => {
+        const updated = [...prev];
+        orderedIds.forEach((id, index) => {
+          const camp = updated.find(c => c.id === id);
+          if (camp) camp.priority = index + 1;
+        });
+        return updated.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+      });
+
+      for (let i = 0; i < orderedIds.length; i++) {
+        supabase.from('campaigns').update({ priority: i + 1 }).eq('id', orderedIds[i]).then(() => {}).catch(() => {});
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Error reordering campaigns:', err);
       return { success: false, error: err };
     }
   };
@@ -555,6 +611,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       updateCampaign,
       deleteCampaign,
       setActiveCampaign,
+      toggleCampaignActive,
+      updateCampaignPriority,
+      reorderCampaigns,
       resetCampaignMonth,
       addMilestone,
       updateMilestone,

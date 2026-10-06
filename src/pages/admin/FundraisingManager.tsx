@@ -17,7 +17,9 @@ import {
   Copy, 
   AlertCircle,
   Flag,
-  Sparkles
+  Sparkles,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useFundraising, CampaignMilestone, Campaign } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
@@ -35,6 +37,9 @@ export function FundraisingManager() {
     updateCampaign, 
     deleteCampaign, 
     setActiveCampaign, 
+    toggleCampaignActive,
+    updateCampaignPriority,
+    reorderCampaigns,
     resetCampaignMonth, 
     addMilestone, 
     updateMilestone, 
@@ -62,6 +67,8 @@ export function FundraisingManager() {
   const [campaignType, setCampaignType] = useState<'monthly' | 'specific'>(selectedCampaign.type || 'monthly');
   const [acceptPix, setAcceptPix] = useState(selectedCampaign.accept_pix ?? true);
   const [acceptCard, setAcceptCard] = useState(selectedCampaign.accept_card ?? true);
+  const [campaignPriority, setCampaignPriority] = useState<number>(selectedCampaign.priority ?? 1);
+  const [campaignIsActive, setCampaignIsActive] = useState<boolean>(selectedCampaign.is_active !== false);
 
   // Sincroniza formulário de edição quando seleciona outra campanha
   React.useEffect(() => {
@@ -71,7 +78,9 @@ export function FundraisingManager() {
     setCampaignType(selectedCampaign.type || 'monthly');
     setAcceptPix(selectedCampaign.accept_pix ?? true);
     setAcceptCard(selectedCampaign.accept_card ?? true);
-  }, [selectedCampaign.id, selectedCampaign.title, selectedCampaign.description, selectedCampaign.target_amount, selectedCampaign.type, selectedCampaign.accept_pix, selectedCampaign.accept_card]);
+    setCampaignPriority(selectedCampaign.priority ?? 1);
+    setCampaignIsActive(selectedCampaign.is_active !== false);
+  }, [selectedCampaign.id, selectedCampaign.title, selectedCampaign.description, selectedCampaign.target_amount, selectedCampaign.type, selectedCampaign.accept_pix, selectedCampaign.accept_card, selectedCampaign.priority, selectedCampaign.is_active]);
 
   // Formulário de Milestones
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
@@ -117,6 +126,17 @@ export function FundraisingManager() {
     }
   };
 
+  const handleMoveCampaign = async (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= campaigns.length) return;
+    const newOrder = [...campaigns];
+    const temp = newOrder[index];
+    newOrder[index] = newOrder[targetIndex];
+    newOrder[targetIndex] = temp;
+    await reorderCampaigns(newOrder.map(c => c.id));
+  };
+
   const handleSaveCampaign = async () => {
     const result = await updateCampaign({
       title: campaignTitle,
@@ -124,7 +144,9 @@ export function FundraisingManager() {
       target_amount: parseFloat(campaignGoal),
       type: campaignType,
       accept_pix: acceptPix,
-      accept_card: acceptCard
+      accept_card: acceptCard,
+      priority: campaignPriority,
+      is_active: campaignIsActive
     }, selectedCampaign.id);
     
     if (result && result.error) {
@@ -331,7 +353,7 @@ export function FundraisingManager() {
 
         {/* Campaign Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {campaigns.map(camp => {
+          {campaigns.map((camp, idx) => {
             const isSelected = camp.id === selectedCampaign.id;
             const stats = calculateCampaignProgress(camp);
             const isMonthly = camp.type !== 'specific';
@@ -349,19 +371,58 @@ export function FundraisingManager() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className={cn(
-                      "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1",
-                      isMonthly ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
-                    )}>
-                      {isMonthly ? <Calendar size={10} /> : <Target size={10} />}
-                      {isMonthly ? 'Meta Mensal' : 'Específica'}
-                    </span>
-
-                    {camp.is_active && (
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
-                        ★ Ativa no Site
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1",
+                        isMonthly ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
+                      )}>
+                        {isMonthly ? <Calendar size={10} /> : <Target size={10} />}
+                        {isMonthly ? 'Meta Mensal' : 'Específica'}
                       </span>
-                    )}
+                      <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                        #{camp.priority ?? (idx + 1)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {/* Botões de Mover Prioridade */}
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={(e) => handleMoveCampaign(idx, 'up', e)}
+                        className="p-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none text-slate-600 transition-colors"
+                        title="Aumentar prioridade"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === campaigns.length - 1}
+                        onClick={(e) => handleMoveCampaign(idx, 'down', e)}
+                        className="p-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none text-slate-600 transition-colors"
+                        title="Diminuir prioridade"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
+
+                      {/* Botão de Toggle Ativa / Inativa */}
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await toggleCampaignActive(camp.id);
+                        }}
+                        className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors",
+                          camp.is_active !== false 
+                            ? "bg-emerald-500 text-white" 
+                            : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                        )}
+                        title={camp.is_active !== false ? "Clique para desativar esta campanha" : "Clique para ativar esta campanha"}
+                      >
+                        {camp.is_active !== false ? "✓ Ativa" : "Inativa"}
+                      </button>
+                    </div>
                   </div>
 
                   <h3 className="font-bold text-slate-900 text-sm line-clamp-1">{camp.title}</h3>
@@ -579,6 +640,42 @@ export function FundraisingManager() {
                     onChange={e => setCampaignGoal(e.target.value)}
                     className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 font-black text-xl text-slate-900"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    Ordem de Prioridade (Telão / Régua)
+                  </label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={campaignPriority}
+                    onChange={e => setCampaignPriority(parseInt(e.target.value, 10) || 1)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 font-black text-slate-900"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Define a posição na régua geral de arrecadação do telão.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    Visibilidade Pública
+                  </label>
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={campaignIsActive}
+                      onChange={(e) => setCampaignIsActive(e.target.checked)}
+                      className="w-5 h-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-slate-800 block">Campanha Ativa</span>
+                      <span className="text-[11px] text-slate-500">Exibida na página pública e no telão</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 

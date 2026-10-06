@@ -216,13 +216,9 @@ export function Campaign() {
   const renderDonationForm = (camp: Campaign) => (
     <div className="flex flex-col h-full justify-between">
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black text-slate-900">Faça sua contribuição</h2>
-          {availableCampaigns.length > 1 && (
-            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-full truncate max-w-[180px]">
-              {camp.title}
-            </span>
-          )}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-black text-slate-900">Escolha o valor</h3>
+          <span className="text-xs font-bold text-slate-400">Doação segura</span>
         </div>
         
         <div className="space-y-3 mb-6">
@@ -447,75 +443,91 @@ export function Campaign() {
         </h1>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 -mt-20 relative z-20 space-y-6">
-        {availableCampaigns.map((camp) => {
-          const isSelected = camp.id === currentCampaign.id;
-          const campStats = calculateCampaignProgress(camp);
+      {/* Main Content: 2 Colunas */}
+      <div className="max-w-7xl mx-auto px-4 -mt-24 relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Coluna Esquerda (lg:col-span-7): Campanhas uma embaixo da outra */}
+          <div className="lg:col-span-7 space-y-6">
+            {availableCampaigns.map((camp, index) => {
+              const isSelected = camp.id === currentCampaign.id;
+              const campStats = calculateCampaignProgress(camp);
 
-          if (isSelected) {
-            return (
-              <div 
-                key={camp.id}
-                id={`campaign-card-${camp.id}`}
-                className="bg-white rounded-3xl shadow-2xl border-2 border-emerald-500 overflow-hidden flex flex-col md:flex-row transition-all duration-300 animate-in fade-in"
-              >
-                {/* Lado Esquerdo: Informações e Régua Crescida */}
-                <div className="p-8 md:p-12 md:w-1/2 border-b md:border-b-0 md:border-r border-slate-100 flex flex-col justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                      {campStats.isMonthly ? (
-                        <span className="bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                          <Calendar size={12} /> Meta do Mês • {currentMonthName}
+              if (isSelected) {
+                return (
+                  <div 
+                    key={camp.id}
+                    id={`campaign-card-${camp.id}`}
+                    onClick={() => handleSelectCampaign(camp.id)}
+                    className="bg-white rounded-3xl shadow-xl border-2 border-emerald-500 ring-4 ring-emerald-500/10 p-6 md:p-8 transition-all duration-300 relative overflow-hidden"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        {campStats.isMonthly ? (
+                          <span className="bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                            <Calendar size={12} /> Meta do Mês • {currentMonthName}
+                          </span>
+                        ) : (
+                          <span className="bg-purple-100 text-purple-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                            <Target size={12} /> Campanha Especial
+                          </span>
+                        )}
+                        <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                          <Sparkles size={12} /> Selecionada
                         </span>
-                      ) : (
-                        <span className="bg-purple-100 text-purple-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                          <Target size={12} /> Campanha Especial
-                        </span>
-                      )}
-                      {availableCampaigns.length > 1 && (
-                        <span className="bg-emerald-100 text-emerald-800 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                          <Sparkles size={11} /> Selecionada
-                        </span>
-                      )}
+                      </div>
+
+                      <span className="text-xs font-bold text-slate-400">
+                        #{index + 1}
+                      </span>
                     </div>
 
-                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">{camp.title}</h2>
+                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">
+                      {camp.title}
+                    </h2>
+
                     {camp.description && (
-                      <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                      <p className="text-sm text-slate-600 mb-6 leading-relaxed">
                         {camp.description}
                       </p>
                     )}
-                    
-                    {/* Régua de Arrecadação Expandida (Crescida) */}
-                    <div className="mb-10">
+
+                    {/* Régua de Arrecadação Crescida / Expandida */}
+                    <div className="bg-emerald-50/40 rounded-2xl p-5 border border-emerald-100">
                       <div className="flex justify-between items-end mb-4">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                             {campStats.isMonthly ? 'Arrecadado no Mês' : 'Total Arrecadado'}
                           </p>
-                          <p className="text-3xl md:text-4xl font-black text-emerald-600">{campStats.percentage}%</p>
-                          <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          <p className="text-3xl md:text-4xl font-black text-emerald-600">
+                            {campStats.percentage}%
+                          </p>
+                          <p className="text-xs text-slate-500 font-bold mt-0.5">
                             R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Objetivo</p>
-                          <p className="text-xl md:text-2xl font-black text-slate-900">R$ {campStats.targetAmount.toLocaleString('pt-BR')}</p>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+                            Objetivo
+                          </p>
+                          <p className="text-xl md:text-2xl font-black text-slate-900">
+                            R$ {campStats.targetAmount.toLocaleString('pt-BR')}
+                          </p>
                         </div>
                       </div>
 
                       {/* Barra de Progresso Crescida com Milestones */}
-                      <div className="relative pt-6">
-                        <div className="h-5 md:h-6 bg-slate-100 rounded-full overflow-hidden relative z-10 shadow-inner ring-1 ring-slate-200">
+                      <div className="relative pt-6 pb-2">
+                        <div className="h-6 bg-slate-200/80 rounded-full overflow-hidden relative z-10 shadow-inner ring-1 ring-slate-300/60">
                           <div 
                             className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000 ease-out relative"
                             style={{ width: `${campStats.percentage}%` }}
                           >
-                            <div className="absolute inset-0 bg-white/25 w-full animate-[shimmer_2s_infinite]" />
+                            <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
                           </div>
                         </div>
 
-                        {/* Marcadores de Milestones na Régua */}
+                        {/* Marcadores de Milestones */}
                         {camp.milestones?.map((m) => {
                           const percent = Math.min((m.target_amount / campStats.targetAmount) * 100, 100);
                           const isReached = campStats.currentAmount >= m.target_amount;
@@ -527,12 +539,12 @@ export function Campaign() {
                             >
                               <div className={cn(
                                 "w-7 h-7 rounded-full border-4 border-white shadow-md flex items-center justify-center z-20 relative transition-transform hover:scale-125",
-                                isReached ? "bg-emerald-500" : "bg-slate-300"
+                                isReached ? "bg-emerald-500 text-white" : "bg-slate-300 text-transparent"
                               )}>
-                                {isReached && <CheckCircle2 size={13} className="text-white" />}
+                                {isReached && <CheckCircle2 size={13} />}
                               </div>
-                              <div className="absolute top-11 w-24 text-center">
-                                <p className={cn("text-[10px] font-black uppercase tracking-tight", isReached ? "text-emerald-600" : "text-slate-400")}>
+                              <div className="absolute top-12 w-24 text-center">
+                                <p className={cn("text-[10px] font-black uppercase tracking-tight", isReached ? "text-emerald-700" : "text-slate-400")}>
                                   R$ {m.target_amount >= 1000 ? `${m.target_amount / 1000}k` : m.target_amount}
                                 </p>
                               </div>
@@ -540,120 +552,142 @@ export function Campaign() {
                           );
                         })}
                       </div>
+
+                      {/* Lista de Marcos da Régua se existirem */}
+                      {camp.milestones && camp.milestones.length > 0 && (
+                        <div className="mt-8 pt-4 border-t border-emerald-100/80 space-y-3">
+                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            Estágios da meta:
+                          </h4>
+                          <div className="space-y-2">
+                            {camp.milestones.map((m, idx) => {
+                              const isReached = campStats.currentAmount >= m.target_amount;
+                              return (
+                                <div key={m.id} className="flex items-start gap-2.5 text-xs">
+                                  <div className={cn(
+                                    "w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-black text-[10px] mt-0.5",
+                                    isReached ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                                  )}>
+                                    {isReached ? <CheckCircle2 size={12} /> : idx + 1}
+                                  </div>
+                                  <div>
+                                    <span className={cn("font-bold", isReached ? "text-emerald-950 font-black" : "text-slate-700")}>
+                                      {m.title}
+                                    </span>
+                                    <span className="text-slate-400 font-semibold ml-1.5">
+                                      (R$ {m.target_amount.toLocaleString('pt-BR')})
+                                    </span>
+                                    {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Card Não Selecionado (embaixo da selecionada)
+              return (
+                <div 
+                  key={camp.id}
+                  id={`campaign-card-${camp.id}`}
+                  onClick={() => handleSelectCampaign(camp.id)}
+                  className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-200/80 hover:border-emerald-300 transition-all duration-300 p-6 md:p-7 cursor-pointer group"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      {campStats.isMonthly ? (
+                        <span className="bg-blue-50 text-blue-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-blue-100">
+                          <Calendar size={12} /> Meta do Mês • {currentMonthName}
+                        </span>
+                      ) : (
+                        <span className="bg-purple-50 text-purple-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-purple-100">
+                          <Target size={12} /> Campanha Especial
+                        </span>
+                      )}
                     </div>
 
-                    {/* Explicação dos estágios / marcos se houver */}
-                    {camp.milestones && camp.milestones.length > 0 && (
-                      <div className="mt-14 space-y-4">
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
-                          O que cada estágio garante?
-                        </h3>
-                        {camp.milestones.map((m, idx) => {
-                          const isReached = campStats.currentAmount >= m.target_amount;
-                          return (
-                            <div key={m.id} className="flex gap-3">
-                              <div className={cn(
-                                "w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-black text-xs",
-                                isReached ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"
-                              )}>
-                                {isReached ? <CheckCircle2 size={14} /> : idx + 1}
-                              </div>
-                              <div>
-                                <h4 className={cn("text-sm font-bold", isReached ? "text-emerald-950 font-black" : "text-slate-700")}>
-                                  {m.title}
-                                  <span className="text-xs ml-2 text-slate-400 font-semibold">(R$ {m.target_amount.toLocaleString('pt-BR')})</span>
-                                </h4>
-                                {m.description && <p className="text-xs text-slate-500 mt-0.5">{m.description}</p>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectCampaign(camp.id);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 group-hover:bg-emerald-600 text-slate-700 group-hover:text-white font-bold text-xs uppercase tracking-wider transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+                    >
+                      <span>Apoiar esta</span>
+                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                    </button>
                   </div>
-                </div>
 
-                {/* Lado Direito: Formulário de Pagamento Aberto */}
-                <div className="p-8 md:p-12 md:w-1/2 bg-slate-50/50">
-                  {renderDonationForm(camp)}
-                </div>
-              </div>
-            );
-          }
+                  <h3 className="text-xl md:text-2xl font-black text-slate-900 group-hover:text-emerald-700 transition-colors mb-2">
+                    {camp.title}
+                  </h3>
 
-          // Card Não Selecionado (Embaixo, com sua própria régua e clique para abrir o pagamento)
-          return (
-            <div 
-              key={camp.id}
-              id={`campaign-card-${camp.id}`}
-              onClick={() => handleSelectCampaign(camp.id)}
-              className="bg-white rounded-3xl shadow-md hover:shadow-xl border-2 border-slate-100 hover:border-emerald-300 transition-all duration-300 p-6 md:p-8 cursor-pointer group"
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2.5">
-                  {campStats.isMonthly ? (
-                    <span className="bg-blue-50 text-blue-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-blue-100">
-                      <Calendar size={12} /> Meta do Mês • {currentMonthName}
-                    </span>
-                  ) : (
-                    <span className="bg-purple-50 text-purple-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-purple-100">
-                      <Target size={12} /> Campanha Especial
-                    </span>
+                  {camp.description && (
+                    <p className="text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                      {camp.description}
+                    </p>
                   )}
-                  <span className="text-xs font-bold text-slate-400 hidden sm:inline">
-                    Clique para abrir o pagamento
-                  </span>
+
+                  {/* Régua de Arrecadação Compacta da Campanha */}
+                  <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 group-hover:border-emerald-100 transition-colors">
+                    <div className="flex justify-between items-center mb-2.5 text-xs">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-black text-lg text-emerald-600">{campStats.percentage}%</span>
+                        <span className="text-slate-500 font-bold">
+                          R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} arrecadados
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-400 font-medium">Meta: </span>
+                        <span className="font-black text-slate-800">R$ {campStats.targetAmount.toLocaleString('pt-BR')}</span>
+                      </div>
+                    </div>
+
+                    {/* Barra de Progresso Compacta */}
+                    <div className="h-3.5 bg-slate-200/80 rounded-full overflow-hidden relative">
+                      <div 
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${campStats.percentage}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectCampaign(camp.id);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 group-hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-xs shrink-0 self-start md:self-auto cursor-pointer"
-                >
-                  <span>Apoiar esta Campanha</span>
-                  <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </div>
-
-              <h3 className="text-xl md:text-2xl font-black text-slate-900 group-hover:text-emerald-700 transition-colors mb-2">
-                {camp.title}
-              </h3>
-
-              {camp.description && (
-                <p className="text-sm text-slate-500 line-clamp-2 mb-6 leading-relaxed">
-                  {camp.description}
+          {/* Coluna Direita (lg:col-span-5): Caixa Fixa "Faça sua contribuição" */}
+          <div className="lg:col-span-5 lg:sticky lg:top-24">
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-4">Faça sua contribuição</h2>
+              
+              {/* Identificação Clara da Campanha Clicada */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 mb-6">
+                <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-black uppercase tracking-wider mb-1">
+                  <Sparkles size={14} className="text-emerald-600" />
+                  Você está apoiando:
+                </div>
+                <h3 className="font-black text-slate-900 text-lg leading-snug">
+                  {currentCampaign.title}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  {currentCampaign.description 
+                    ? (currentCampaign.description.length > 90 ? `${currentCampaign.description.substring(0, 90)}...` : currentCampaign.description)
+                    : 'Sua doação será destinada diretamente a este projeto.'}
                 </p>
-              )}
-
-              {/* Régua de Arrecadação Compacta da Campanha */}
-              <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 group-hover:border-emerald-100 transition-colors">
-                <div className="flex justify-between items-center mb-2.5 text-xs">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-black text-lg text-emerald-600">{campStats.percentage}%</span>
-                    <span className="text-slate-500 font-bold">
-                      R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} arrecadados
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-slate-400 font-medium">Meta: </span>
-                    <span className="font-black text-slate-800">R$ {campStats.targetAmount.toLocaleString('pt-BR')}</span>
-                  </div>
-                </div>
-
-                {/* Barra de Progresso Compacta */}
-                <div className="h-3.5 bg-slate-200/80 rounded-full overflow-hidden relative">
-                  <div 
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
-                    style={{ width: `${campStats.percentage}%` }}
-                  />
-                </div>
               </div>
+
+              {renderDonationForm(currentCampaign)}
             </div>
-          );
-        })}
+          </div>
+
+        </div>
       </div>
     </div>
   );
