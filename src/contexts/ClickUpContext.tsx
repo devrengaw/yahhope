@@ -408,6 +408,20 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
 
         // Process Tasks
         if (resTasks.status === 'fulfilled' && resTasks.value.data && resTasks.value.data.length > 0) {
+          // Build map of locally cached tasks to preserve any local metadata (like created_by)
+          const savedBeforeMerge = localStorage.getItem(STORAGE_KEY_TASKS);
+          const localCacheMap = new Map<string, CU_Task>();
+          if (savedBeforeMerge) {
+            try {
+              const parsedCache = JSON.parse(savedBeforeMerge);
+              if (Array.isArray(parsedCache)) {
+                parsedCache.forEach((item: CU_Task) => {
+                  if (item?.id) localCacheMap.set(item.id, item);
+                });
+              }
+            } catch {}
+          }
+
           const parsedTasks: CU_Task[] = resTasks.value.data.map(t => {
             const assigneeUser = loadedUsers.find(u => 
               u.id === (t.assignee_id || t.assignee) ||
@@ -415,6 +429,9 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
               (t.assignee && u.email && u.email.toLowerCase() === t.assignee.toLowerCase())
             );
             const team = t.team_id ? teamsMap[t.team_id] : undefined;
+            const cached = localCacheMap.get(t.id);
+            const effectiveCreatedBy = t.created_by || cached?.created_by;
+
             return {
               id: t.id,
               list_id: t.list_id,
@@ -433,7 +450,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
               comments: Array.isArray(t.comments) ? t.comments : [],
               custom_values: t.custom_values || {},
               order_index: t.order_index ?? 0,
-              created_by: t.created_by,
+              created_by: effectiveCreatedBy,
               created_at: t.created_at
             };
           });
@@ -723,6 +740,11 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         ? systemUsers.find(u => u.id === options.assignee || u.name === options.assignee || u.email === options.assignee)
         : undefined;
 
+    const currentUserId = user?.id;
+    const currentUserEmail = user?.email;
+    const currentUserName = user?.name;
+    const taskCreator = options.created_by || currentUserId || currentUserEmail || currentUserName || 'admin';
+
     const newTask: CU_Task = {
       id: tempId,
       list_id,
@@ -741,7 +763,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       comments: options.comments || [],
       custom_values: options.custom_values || {},
       order_index: options.order_index ?? 0,
-      created_by: options.created_by || user?.id || user?.email,
+      created_by: taskCreator,
       created_at: new Date().toISOString()
     };
 
@@ -768,11 +790,14 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         if (isUuid(newTask.assignee_id)) payload.assignee_id = newTask.assignee_id;
         if (isUuid(newTask.team_id)) payload.team_id = newTask.team_id;
         if (newTask.due_date) payload.due_date = newTask.due_date;
+        if (isUuid(taskCreator)) {
+          payload.created_by = taskCreator;
+        }
 
         const { data, error } = await supabase.from('clickup_tasks').insert([payload]).select().single();
 
         if (!error && data) {
-          const finalTask = { ...newTask, id: data.id };
+          const finalTask = { ...newTask, id: data.id, created_by: newTask.created_by || data.created_by };
           setTasks(prev => {
             const updated = prev.map(t => t.id === tempId ? finalTask : t);
             persistLocally(STORAGE_KEY_TASKS, updated);

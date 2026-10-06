@@ -28,22 +28,37 @@ export function MyTasksView() {
   // Helper to determine if a task is assigned to the current user
   const isAssignedToCurrentUser = (t: CU_Task) => {
     if (!user) return false;
+    const uId = String(user.id || '').toLowerCase().trim();
+    const uEmail = String(user.email || '').toLowerCase().trim();
+    const uName = String(user.name || '').toLowerCase().trim();
+
+    const tAssigneeId = String(t.assignee_id || '').toLowerCase().trim();
+    const tAssignee = String(t.assignee || '').toLowerCase().trim();
+    const tUserEmail = String(t.assignee_user?.email || '').toLowerCase().trim();
+    const tUserId = String(t.assignee_user?.id || '').toLowerCase().trim();
+    const tUserName = String(t.assignee_user?.name || '').toLowerCase().trim();
+
     return (
-      t.assignee_id === user.id ||
-      t.assignee === user.id ||
-      t.assignee === user.name ||
-      (user.email && t.assignee_user?.email === user.email) ||
-      (user.id && t.assignee_user?.id === user.id)
+      (uId && (tAssigneeId === uId || tAssignee === uId || tUserId === uId)) ||
+      (uEmail && (tAssignee === uEmail || tUserEmail === uEmail)) ||
+      (uName && (tAssignee === uName || tUserName === uName))
     );
   };
 
   // Helper to determine if a task was created by the current user
   const isCreatedByCurrentUser = (t: CU_Task) => {
     if (!user) return false;
+    const uId = String(user.id || '').toLowerCase().trim();
+    const uEmail = String(user.email || '').toLowerCase().trim();
+    const uName = String(user.name || '').toLowerCase().trim();
+
+    const tCreator = String(t.created_by || '').toLowerCase().trim();
+    if (!tCreator) return false;
+
     return (
-      t.created_by === user.id ||
-      t.created_by === user.email ||
-      t.created_by === user.name
+      (uId && tCreator === uId) ||
+      (uEmail && tCreator === uEmail) ||
+      (uName && tCreator === uName)
     );
   };
 
