@@ -223,7 +223,7 @@ export default function App() {
                                         {/* Dedicated full-screen Display Route */}
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
 
-                                        <Route element={<PublicLayout />}>
+                                        <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
                                           <Route path="/portal/login" element={<PortalLogin />} />
                                           <Route path="/app/login" element={<PortalLogin />} />
                                           <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />

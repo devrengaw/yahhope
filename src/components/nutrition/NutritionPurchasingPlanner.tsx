@@ -664,8 +664,7 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
               Previsão & Gestão de Custos por Insumo
             </h2>
             <p className="text-emerald-100/90 text-sm mt-2 leading-relaxed">
-              O sistema consolida a demanda de todos os kits das <strong>{activeChildrenCount > 0 ? `${activeChildrenCount} crianças` : 'crianças'}</strong> atendidas 
-              (Cesta Básica para 100% das famílias atendidas + kits segmentados por faixa etária e condição clínica/HIV). 
+              O sistema consolida a demanda de todos os kits das <strong>crianças atendidas</strong> (Cesta Básica para 100% das famílias atendidas + kits segmentados por faixa etária e condição clínica/HIV). 
               Defina o <strong>preço unitário</strong> de cada alimento diretamente aqui para alimentar automaticamente 
               o custo de todos os kits e cruzar com o saldo disponível na despensa.
             </p>

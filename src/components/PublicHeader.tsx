@@ -51,26 +51,26 @@ export function PublicHeader() {
 
 
   // Banner fallback resolution
-  const bannerBg = (topBanner.bgColor && (topBanner.bgColor.startsWith('#') || topBanner.bgColor.startsWith('rgb') || topBanner.bgColor.startsWith('hsl')))
+  const bannerBg = (typeof topBanner?.bgColor === 'string' && (topBanner.bgColor.startsWith('#') || topBanner.bgColor.startsWith('rgb') || topBanner.bgColor.startsWith('hsl')))
     ? topBanner.bgColor
-    : (topBanner.bgColor?.includes('emerald') ? '#059669' : '#0F172A');
+    : (typeof topBanner?.bgColor === 'string' && topBanner.bgColor.includes('emerald') ? '#059669' : '#0F172A');
 
-  const bannerTextColor = (topBanner.textColor && (topBanner.textColor.startsWith('#') || topBanner.textColor.startsWith('rgb') || topBanner.textColor.startsWith('hsl')))
+  const bannerTextColor = (typeof topBanner?.textColor === 'string' && (topBanner.textColor.startsWith('#') || topBanner.textColor.startsWith('rgb') || topBanner.textColor.startsWith('hsl')))
     ? topBanner.textColor
     : '#FFFFFF';
 
-  const bannerTagColor = (topBanner.tagColor && (topBanner.tagColor.startsWith('#') || topBanner.tagColor.startsWith('rgb') || topBanner.tagColor.startsWith('hsl')))
+  const bannerTagColor = (typeof topBanner?.tagColor === 'string' && (topBanner.tagColor.startsWith('#') || topBanner.tagColor.startsWith('rgb') || topBanner.tagColor.startsWith('hsl')))
     ? topBanner.tagColor
     : '#F49853';
 
-  const bannerMessage = topBanner.message || (topBanner as any).text || 'Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional';
-  const bannerButtonText = topBanner.buttonText || (topBanner as any).linkText || 'Apoiar Agora';
-  const bannerButtonLink = topBanner.buttonLink || (topBanner as any).link || '/campanha';
+  const bannerMessage = topBanner?.message || (topBanner as any)?.text || 'Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional';
+  const bannerButtonText = topBanner?.buttonText || (topBanner as any)?.linkText || 'Apoiar Agora';
+  const bannerButtonLink = topBanner?.buttonLink || (topBanner as any)?.link || '/campanha';
 
   return (
     <>
       {/* 1. Global Alert Banner */}
-      {topBanner.enabled && alertVisible && (
+      {topBanner?.enabled && alertVisible && (
         <aside 
           aria-label="Alerta Humanitário Urgente"
           style={{ backgroundColor: bannerBg }}
