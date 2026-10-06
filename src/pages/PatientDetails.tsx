@@ -192,6 +192,8 @@ export function PatientDetails() {
     return prof;
   };
 
+  const retroDateParam = searchParams.get('date');
+
   useEffect(() => {
     if (isObserver) {
       if (action || aptId) {
@@ -200,17 +202,28 @@ export function PatientDetails() {
       return;
     }
     if (action === 'new-followup') {
-      const defaultReturnDate = new Date();
-      defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
-      setReturnDate(formatLocalDate(defaultReturnDate));
+      const targetDate = retroDateParam || formatLocalDate(new Date());
+      setEventDate(targetDate);
+      const defaultReturnDate = parseLocalDate(targetDate);
+      if (!isNaN(defaultReturnDate.getTime())) {
+        defaultReturnDate.setDate(defaultReturnDate.getDate() + 14);
+        setReturnDate(formatLocalDate(defaultReturnDate));
+      } else {
+        const fallbackReturn = new Date();
+        fallbackReturn.setDate(fallbackReturn.getDate() + 14);
+        setReturnDate(formatLocalDate(fallbackReturn));
+      }
       setProfessional(user?.name || '');
       setEditingEventId(null);
       setIsModalOpen(true);
       if (patient) {
-        iniciarAtendimentoPorPaciente(patient.id, patient.name).then(newAptId => {
-          if (newAptId) setActiveSessionAptId(newAptId);
-        });
-        sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
+        const isRetro = targetDate < formatLocalDate(new Date());
+        if (!isRetro) {
+          iniciarAtendimentoPorPaciente(patient.id, patient.name).then(newAptId => {
+            if (newAptId) setActiveSessionAptId(newAptId);
+          });
+          sendNotification('Atendimento Iniciado', `${patient.name} começou a ser atendido(a) na clínica agora.`, 'info');
+        }
       }
     } else if (action === 'edit-last') {
       const lastEvent = patientEvents[0];
@@ -243,7 +256,7 @@ export function PatientDetails() {
       setRefProfessional(user?.name || '');
       setIsReferralModalOpen(true);
     }
-  }, [action, aptId, patient?.id]);
+  }, [action, aptId, patient?.id, retroDateParam]);
 
   const handleOpenNewFollowup = () => {
     const defaultReturnDate = new Date();
@@ -491,6 +504,7 @@ export function PatientDetails() {
   if (!patient) return <div className="p-8 text-center">Paciente não encontrado</div>;
 
   // Auto-calculated fields for modal
+  const isCurrentEventRetroactive = Boolean(eventDate && eventDate < formatLocalDate(new Date()));
   const ageInMonths = differenceInMonths(new Date(), new Date(patient.dob));
   const bmi = (newWeight && newHeight) ? (parseFloat(newWeight) / Math.pow(parseFloat(newHeight) / 100, 2)).toFixed(2) : '--';
   const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender, ageInMonths);
@@ -532,26 +546,33 @@ export function PatientDetails() {
       is_discharge: isDischarge,
     };
     
-    const originalEvent = editingEventId ? patientEvents.find(e => e.id === editingEventId) : null;
-    
-    // Only deduct newly added kits during an edit
-    const originalKits = originalEvent?.kit_delivered || [];
-    const kitsToDeduct = editingEventId 
-      ? selectedKits.filter(kitId => !originalKits.includes(kitId))
-      : selectedKits;
+    const todayDate = formatLocalDate(new Date());
+    const isRetroactive = Boolean(eventDate && eventDate < todayDate);
 
-    if (kitsToDeduct.length > 0) {
-      kitsToDeduct.forEach(kitId => deductKitFromInventory(kitId, patient.id));
-    }
-    
-    // Only deduct newly added prescriptions during an edit
-    const originalPrescriptions = originalEvent?.prescriptions || [];
-    const prescriptionsToDeduct = editingEventId
-      ? validPrescriptions.filter(p => !originalPrescriptions.some(op => op.item_id === p.item_id))
-      : validPrescriptions;
+    // Only deduct stock from current inventory if attendance is NOT retroactive
+    // Retroactive records represent historical distributions and shouldn't distort today's inventory count
+    if (!isRetroactive) {
+      const originalEvent = editingEventId ? patientEvents.find(e => e.id === editingEventId) : null;
+      
+      // Only deduct newly added kits during an edit
+      const originalKits = originalEvent?.kit_delivered || [];
+      const kitsToDeduct = editingEventId 
+        ? selectedKits.filter(kitId => !originalKits.includes(kitId))
+        : selectedKits;
 
-    if (prescriptionsToDeduct.length > 0) {
-      deductPrescriptionsFromInventory(prescriptionsToDeduct, patient.id);
+      if (kitsToDeduct.length > 0) {
+        kitsToDeduct.forEach(kitId => deductKitFromInventory(kitId, patient.id));
+      }
+      
+      // Only deduct newly added prescriptions during an edit
+      const originalPrescriptions = originalEvent?.prescriptions || [];
+      const prescriptionsToDeduct = editingEventId
+        ? validPrescriptions.filter(p => !originalPrescriptions.some(op => op.item_id === p.item_id))
+        : validPrescriptions;
+
+      if (prescriptionsToDeduct.length > 0) {
+        deductPrescriptionsFromInventory(prescriptionsToDeduct, patient.id);
+      }
     }
 
     if (editingEventId) {
@@ -563,8 +584,8 @@ export function PatientDetails() {
     // Update patient status if it's a discharge
     if (isDischarge) {
       updatePatient(patient.id, { status: 'Alta' });
-    } else if (calcStatus !== 'N/A') {
-      // Also update status based on latest measurement if not discharge
+    } else if (calcStatus !== 'N/A' && !isRetroactive) {
+      // Also update status based on latest measurement if not discharge and not a historical record
       updatePatient(patient.id, { status: calcStatus as any });
     }
     
@@ -576,19 +597,21 @@ export function PatientDetails() {
 
     // Match and conclude appointment from queue if present (either via aptId or direct patient match)
     let concludedFromQueue = false;
-    if (aptId) {
-      await concluirAtendimento(aptId);
-      concludedFromQueue = true;
-    }
-    
-    // Also match any active appointment in the queue for this patient (e.g. attendant accessed via Crianças > Novo Acompanhamento)
-    const matched = await concluirAtendimentosPorPaciente(patient.id);
-    if (matched) {
-      concludedFromQueue = true;
+    if (!isRetroactive) {
+      if (aptId) {
+        await concluirAtendimento(aptId);
+        concludedFromQueue = true;
+      }
+      
+      // Also match any active appointment in the queue for this patient (e.g. attendant accessed via Crianças > Novo Acompanhamento)
+      const matched = await concluirAtendimentosPorPaciente(patient.id);
+      if (matched) {
+        concludedFromQueue = true;
+      }
     }
 
-    // Always ensure the ACS visit for next week is scheduled for new clinical events
-    if (!editingEventId) {
+    // Always ensure the ACS visit for next week is scheduled for new clinical events (if not retroactive or if appropriate)
+    if (!editingEventId && !isRetroactive) {
       agendarVisita(patient.id, eventDate);
     }
 
@@ -696,8 +719,12 @@ export function PatientDetails() {
       const updated = { ...p, [field]: value };
 
       if (field === 'item_id') {
-        const item = items.find(i => i.id === value);
-        updated.medication = item ? item.name : '';
+        if (value === 'custom') {
+          // Keep whatever custom medication name the user might have entered
+        } else {
+          const item = items.find(i => i.id === value);
+          updated.medication = item ? item.name : '';
+        }
         if (!updated.quantity || updated.quantity === '0') {
           updated.quantity = '1';
         }
@@ -1792,7 +1819,7 @@ export function PatientDetails() {
               <form id="followup-form" onSubmit={handleSaveEvent} className="space-y-6">
                 
                 {/* Queue Match Alert Banner */}
-                {queueAppointment && !editingEventId && (
+                {queueAppointment && !editingEventId && !isCurrentEventRetroactive && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-emerald-800 animate-in fade-in duration-300">
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                     <div>
@@ -1801,6 +1828,21 @@ export function PatientDetails() {
                       </p>
                       <p className="text-[11px] text-emerald-700 mt-0.5">
                         Ao salvar este acompanhamento, o status passará direto para <strong>Atendidos Hoje</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Retroactive Date Alert Banner */}
+                {isCurrentEventRetroactive && (
+                  <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-900 animate-in fade-in duration-300">
+                    <Clock size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                        <span>Registro em Data Retroativa ({eventDate ? parseLocalDate(eventDate).toLocaleDateString('pt-BR') : ''})</span>
+                      </p>
+                      <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                        Modo histórico ativo: Você pode selecionar <strong>medicamentos e kits mesmo que estejam sem estoque atual</strong>. O registro não deduzirá do estoque físico de hoje.
                       </p>
                     </div>
                   </div>
@@ -1950,19 +1992,64 @@ export function PatientDetails() {
                       <div key={p.id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
                           <div className="sm:col-span-4 space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Item do Estoque</label>
-                            <select
-                              value={p.item_id || ''}
-                              onChange={e => updatePrescription(p.id, 'item_id', e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all truncate"
-                            >
-                              <option value="">Selecione do estoque...</option>
-                              {items.filter(i => !i.internal_use && !i.is_patrimonio && i.quantity > 0).map(item => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name} ({item.quantity} disp.) {item.dosage_form === 'comprimido' && item.package_units ? `[${item.package_units} comp/cx]` : item.dosage_form === 'liquido' && item.liquid_volume_ml ? `[${item.liquid_volume_ml} ml/frasco]` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Item do Estoque</label>
+                              {isCurrentEventRetroactive && p.item_id === 'custom' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => updatePrescription(p.id, 'item_id', '')}
+                                  className="text-[9px] text-emerald-600 hover:underline font-bold"
+                                >
+                                  Escolher da lista
+                                </button>
+                              ) : isCurrentEventRetroactive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updatePrescription(p.id, 'item_id', 'custom');
+                                    updatePrescription(p.id, 'medication', '');
+                                  }}
+                                  className="text-[9px] text-amber-600 hover:underline font-bold"
+                                >
+                                  Digitar outro
+                                </button>
+                              ) : null}
+                            </div>
+
+                            {p.item_id === 'custom' ? (
+                              <input
+                                type="text"
+                                value={p.medication}
+                                onChange={e => updatePrescription(p.id, 'medication', e.target.value)}
+                                placeholder="Nome do medicamento/suplemento..."
+                                className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all"
+                              />
+                            ) : (
+                              <select
+                                value={p.item_id || ''}
+                                onChange={e => {
+                                  if (e.target.value === '__custom__') {
+                                    updatePrescription(p.id, 'item_id', 'custom');
+                                    updatePrescription(p.id, 'medication', '');
+                                  } else {
+                                    updatePrescription(p.id, 'item_id', e.target.value);
+                                  }
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all truncate"
+                              >
+                                <option value="">Selecione do estoque...</option>
+                                {items
+                                  .filter(i => !i.internal_use && !i.is_patrimonio && (isCurrentEventRetroactive || i.quantity > 0 || i.id === p.item_id))
+                                  .map(item => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.name} {item.quantity <= 0 ? '(Sem estoque - Histórico)' : `(${item.quantity} disp.)`} {item.dosage_form === 'comprimido' && item.package_units ? `[${item.package_units} comp/cx]` : item.dosage_form === 'liquido' && item.liquid_volume_ml ? `[${item.liquid_volume_ml} ml/frasco]` : ''}
+                                    </option>
+                                  ))}
+                                {isCurrentEventRetroactive && (
+                                  <option value="__custom__">➕ Outro medicamento (não cadastrado)</option>
+                                )}
+                              </select>
+                            )}
                           </div>
 
                           <div className="sm:col-span-4 space-y-1">
