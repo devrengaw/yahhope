@@ -343,6 +343,7 @@ export function NutritionFinance() {
               onToggleStatus={handleToggleStatus}
               onAddCategory={(newCat) => setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat])}
               onUpdatePayment={handleUpdatePayment}
+              hideProjectBreakdown={true}
             />
           ) : activeTab === 'transactions' ? (
             <div>

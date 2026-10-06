@@ -247,7 +247,8 @@ export function Finance() {
         account: newExpense.account,
         expense_type: newExpense.expense_type,
         recurrence: newExpense.recurrence,
-        notes: newExpense.notes
+        notes: newExpense.notes,
+        module: newExpense.module || 'global'
       };
 
       let { data, error } = await supabase.from('finance_transactions').insert([{
@@ -267,6 +268,7 @@ export function Finance() {
       if (data && data[0]) {
         const savedTx: Transaction = {
           ...(data[0] as Transaction),
+          module: newExpense.module || (data[0] as any).module || 'global',
           currency: newExpense.currency || 'BRL',
           original_amount: newExpense.original_amount,
           exchange_rate: newExpense.exchange_rate
@@ -287,6 +289,7 @@ export function Finance() {
         expense_type: newExpense.expense_type,
         recurrence: newExpense.recurrence,
         notes: newExpense.notes,
+        module: newExpense.module || 'global',
         currency: newExpense.currency || 'BRL',
         original_amount: newExpense.original_amount,
         exchange_rate: newExpense.exchange_rate

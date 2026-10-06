@@ -33,12 +33,18 @@ import { supabase } from '../../../lib/supabase';
 import { convertMznToBrl } from '../../../services/currencyService';
 
 import { Project } from '../../../lib/mockData';
+import { 
+  PaymentAccount, 
+  getLocalPaymentAccounts, 
+  savePaymentAccount 
+} from '../../../services/paymentAccountService';
 
 interface MonthlyExpensesManagerProps {
   transactions: Transaction[];
   categories: TransactionCategory[];
   totalIncome: number;
   projects?: Project[];
+  hideProjectBreakdown?: boolean;
   onSaveExpense: (expense: ExpensePayload) => Promise<void> | void;
   onDeleteTransaction: (id: string) => Promise<void> | void;
   onToggleStatus: (id: string, currentStatus: 'completed' | 'pending') => Promise<void> | void;
@@ -51,6 +57,7 @@ export function MonthlyExpensesManager({
   categories,
   totalIncome,
   projects = [],
+  hideProjectBreakdown = false,
   onSaveExpense,
   onDeleteTransaction,
   onToggleStatus,
@@ -70,6 +77,47 @@ export function MonthlyExpensesManager({
       return [...prev, newCat];
     });
     onAddCategory?.(newCat);
+  };
+
+  // Contas de pagamento cadastradas
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>(() => getLocalPaymentAccounts());
+  const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('all');
+
+  // Modal para criação de nova conta de pagamento
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountProjectId, setNewAccountProjectId] = useState('global');
+  const [newAccountCustomProject, setNewAccountCustomProject] = useState('');
+  const [newAccountDescription, setNewAccountDescription] = useState('');
+
+  const handleAddPaymentAccount = (acc: PaymentAccount) => {
+    const updated = savePaymentAccount(acc);
+    setPaymentAccounts(updated);
+  };
+
+  const handleSaveNewPaymentAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAccountName.trim()) return;
+
+    const finalProjectId = newAccountProjectId === 'custom'
+      ? (newAccountCustomProject.trim().toLowerCase().replace(/\s+/g, '_') || 'global')
+      : newAccountProjectId;
+
+    const newAcc: PaymentAccount = {
+      id: `acc_${Date.now()}`,
+      name: newAccountName.trim(),
+      description: newAccountDescription.trim() || undefined,
+      project_id: finalProjectId,
+      color: 'indigo'
+    };
+
+    const updated = savePaymentAccount(newAcc);
+    setPaymentAccounts(updated);
+    setNewAccountName('');
+    setNewAccountDescription('');
+    setNewAccountProjectId('global');
+    setNewAccountCustomProject('');
+    setIsCreateAccountModalOpen(false);
   };
 
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'fixed' | 'variable'>('all');
@@ -245,11 +293,17 @@ export function MonthlyExpensesManager({
     return activeMonthKey;
   }, [activeMonthKey]);
 
-  // Cálculos de Indicadores de Custos Mensais
+  // Cálculos de Indicadores de Custos Mensais (com escopo dinâmico por Conta/Projeto)
   const stats = useMemo(() => {
-    const fixedExpenses = allExpenses.filter(t => t.expense_type === 'fixed');
+    const targetExpenses = allExpenses.filter(t => {
+      const matchAcc = selectedAccountFilter === 'all' || t.account.toLowerCase() === selectedAccountFilter.toLowerCase();
+      const matchMod = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
+      return matchAcc && matchMod;
+    });
+
+    const fixedExpenses = targetExpenses.filter(t => t.expense_type === 'fixed');
     // Gastos variáveis pertencentes ao mês ativo (ou ao mês selecionado)
-    const variableExpensesInMonth = allExpenses.filter(t => 
+    const variableExpensesInMonth = targetExpenses.filter(t => 
       t.expense_type === 'variable' && 
       t.date && t.date.startsWith(activeMonthKey)
     );
@@ -285,11 +339,12 @@ export function MonthlyExpensesManager({
       totalExpense,
       fixedCount: fixedExpenses.length,
       variableCount: variableExpensesInMonth.length,
-      allVariableCount: allExpenses.filter(t => t.expense_type === 'variable').length,
+      allVariableCount: targetExpenses.filter(t => t.expense_type === 'variable').length,
       fixedCoverage,
-      balance
+      balance,
+      isFiltered: selectedAccountFilter !== 'all' || moduleFilter !== 'all'
     };
-  }, [allExpenses, totalIncome, activeMonthKey]);
+  }, [allExpenses, totalIncome, activeMonthKey, selectedAccountFilter, moduleFilter]);
 
   // Opções de Projetos disponíveis para filtro e agrupamento
   const availableProjectOptions = useMemo(() => {
@@ -392,16 +447,17 @@ export function MonthlyExpensesManager({
         const matchCat = categoryFilter === 'all' || t.category_id === categoryFilter;
         const matchStatus = statusFilter === 'all' || t.status === statusFilter;
         const matchModule = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
+        const matchAccount = selectedAccountFilter === 'all' || t.account.toLowerCase() === selectedAccountFilter.toLowerCase();
         const matchMonth = selectedMonth === 'all' || (t.date && t.date.startsWith(selectedMonth));
 
-        return matchType && matchSearch && matchCat && matchStatus && matchModule && matchMonth;
+        return matchType && matchSearch && matchCat && matchStatus && matchModule && matchAccount && matchMonth;
       })
       .sort((a, b) => {
         const timeA = new Date(a.date).getTime() || 0;
         const timeB = new Date(b.date).getTime() || 0;
         return timeB - timeA;
       });
-  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter, selectedMonth]);
+  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter, selectedAccountFilter, selectedMonth]);
 
   // Agrupamento por Mês (os mais recentes primeiro)
   const expensesByMonth = useMemo(() => {
@@ -492,6 +548,161 @@ export function MonthlyExpensesManager({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      
+      {/* Barra de Seleção: Contas de Pagamento & Visão por Projeto */}
+      <div className="px-8 pt-4">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Contas & Projetos
+                </span>
+                <span className="text-xs text-slate-400 font-bold">• Seletor Central Financeiro</span>
+                {stats.isFiltered && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                    Filtro Ativo: {selectedAccountFilter !== 'all' ? selectedAccountFilter : moduleFilter === 'nutrition' ? 'Casa Nutri' : moduleFilter === 'communication' ? 'Comunicação' : moduleFilter}
+                  </span>
+                )}
+              </div>
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Wallet size={18} className="text-indigo-600" />
+                Visão Financeira por Conta e Centro de Custo
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Clique nas contas de pagamento para isolar os gastos do respectivo projeto vinculado, ou veja tudo na Visão Global.
+              </p>
+            </div>
+            
+            {/* Botão de Criar Nova Conta de Pagamento (No Módulo Global) */}
+            {!hideProjectBreakdown && (
+              <button
+                type="button"
+                onClick={() => setIsCreateAccountModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-xs shadow-md transition-all active:scale-95 shrink-0"
+              >
+                <Plus size={15} className="text-amber-400" />
+                + Nova Conta de Pagamento
+              </button>
+            )}
+          </div>
+
+          {/* Botões Seletores: Visão Global + Contas Vinculadas + Projetos */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {/* Botão Visão Global */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAccountFilter('all');
+                setModuleFilter('all');
+              }}
+              className={cn(
+                "px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 border shadow-sm",
+                selectedAccountFilter === 'all' && moduleFilter === 'all'
+                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20 ring-2 ring-slate-900/10"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+              )}
+            >
+              <span>🌐</span>
+              <span>Visão Global (Tudo)</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px]",
+                selectedAccountFilter === 'all' && moduleFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-700"
+              )}>
+                {allExpenses.length}
+              </span>
+            </button>
+
+            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+            {/* Contas de Pagamento cadastradas */}
+            {paymentAccounts.map((acc) => {
+              const isSelected = selectedAccountFilter.toLowerCase() === acc.name.toLowerCase();
+              const count = allExpenses.filter(e => e.account?.toLowerCase() === acc.name.toLowerCase()).length;
+              const projName = acc.project_id === 'nutrition' 
+                ? 'Casa Nutri' 
+                : acc.project_id === 'communication' 
+                ? 'Comunicação' 
+                : acc.project_id === 'global' 
+                ? 'Geral' 
+                : projects.find(p => p.id === acc.project_id)?.name || acc.project_id || 'Geral';
+
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setSelectedAccountFilter('all');
+                      setModuleFilter('all');
+                    } else {
+                      setSelectedAccountFilter(acc.name);
+                      if (acc.project_id) {
+                        setModuleFilter(acc.project_id as any);
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "px-3.5 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 border shadow-sm",
+                    isSelected
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20 ring-2 ring-indigo-200"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  )}
+                  title={`Filtrar financeiro da conta "${acc.name}" vinculada ao projeto ${projName}`}
+                >
+                  <Wallet size={13} className={isSelected ? "text-indigo-200" : "text-slate-400"} />
+                  <div className="flex flex-col items-start text-left">
+                    <span className="leading-tight">{acc.name}</span>
+                    <span className={cn(
+                      "text-[9px] font-semibold uppercase tracking-wider",
+                      isSelected ? "text-indigo-200" : "text-slate-400"
+                    )}>
+                      {projName}
+                    </span>
+                  </div>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-lg text-[10px] font-black ml-1",
+                    isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Botões individuais de Projetos para acesso direto */}
+            {availableProjectOptions.filter(p => !paymentAccounts.some(a => a.name.toLowerCase() === p.name.toLowerCase())).map(proj => {
+              const isSelected = moduleFilter === proj.id && selectedAccountFilter === 'all';
+              const count = allExpenses.filter(e => (e.module || 'global') === proj.id).length;
+              return (
+                <button
+                  key={proj.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setModuleFilter('all');
+                    } else {
+                      setModuleFilter(proj.id as any);
+                      setSelectedAccountFilter('all');
+                    }
+                  }}
+                  className={cn(
+                    "px-3 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-1.5 border shadow-sm",
+                    isSelected
+                      ? "bg-slate-800 text-white border-slate-800 ring-2 ring-slate-800/10"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  )}
+                  title={`Filtrar todos os gastos do projeto ${proj.name}`}
+                >
+                  <Building2 size={13} />
+                  <span>{proj.name}</span>
+                  <span className="text-[10px] opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
       
       {/* Cards de Métricas de Gastos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-8 pb-0">
@@ -593,102 +804,104 @@ export function MonthlyExpensesManager({
 
       </div>
 
-      {/* Seção: Custos Mensais por Projeto / Setor */}
-      <div className="px-8">
-        <div className="bg-slate-50/70 border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
-                  Rateio por Centro de Custo
-                </span>
-                <span className="text-xs text-slate-400 font-bold">• {activeMonthLabel || 'Mês Atual'}</span>
-              </div>
-              <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <Building2 size={18} className="text-indigo-600" />
-                Custos Mensais por Projeto e Frente Setorial
-              </h4>
-            </div>
-            <div className="text-left sm:text-right">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Alocado no Período</span>
-              <p className="text-lg font-black text-slate-900">
-                R$ {projectCostBreakdown.reduce((acc, p) => acc + p.total, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-
-          {/* Cards dos Projetos */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            {projectCostBreakdown.map((proj) => {
-              const isSelected = moduleFilter === proj.projectId;
-              const totalCost = stats.totalExpense || 1;
-              const percentOfTotal = Math.min(100, (proj.total / totalCost) * 100);
-
-              return (
-                <div 
-                  key={proj.projectId}
-                  onClick={() => setModuleFilter(prev => prev === proj.projectId ? 'all' : (proj.projectId as any))}
-                  className={cn(
-                    "p-5 rounded-2xl border transition-all cursor-pointer relative group",
-                    isSelected 
-                      ? "bg-white border-indigo-500 ring-2 ring-indigo-500/20 shadow-md" 
-                      : "bg-white border-slate-200/70 hover:border-slate-300 hover:shadow-sm"
-                  )}
-                  title="Clique para filtrar apenas os gastos deste projeto"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={cn(
-                        "w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs",
-                        proj.projectId === 'nutrition' ? "bg-amber-100 text-amber-800" :
-                        proj.projectId === 'communication' ? "bg-purple-100 text-purple-800" :
-                        "bg-slate-100 text-slate-800"
-                      )}>
-                        {proj.projectId === 'nutrition' ? 'CN' : proj.projectId === 'communication' ? 'COM' : 'GER'}
-                      </div>
-                      <div>
-                        <h5 className="font-black text-sm text-slate-900">{proj.name}</h5>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          {proj.count} {proj.count === 1 ? 'gasto registrado' : 'gastos registrados'}
-                        </p>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        Ativo
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Valor Total do Projeto */}
-                  <p className="text-xl font-black text-slate-900 mt-3">
-                    R$ {proj.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-
-                  {/* Barra de Distribuição */}
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-3">
-                    <div 
-                      className={cn(
-                        "h-full rounded-full transition-all duration-700",
-                        proj.projectId === 'nutrition' ? "bg-amber-500" :
-                        proj.projectId === 'communication' ? "bg-purple-500" :
-                        "bg-indigo-600"
-                      )}
-                      style={{ width: `${percentOfTotal}%` }}
-                    />
-                  </div>
-
-                  {/* Detalhamento Fixo vs Variável */}
-                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mt-2.5 pt-2 border-t border-slate-100">
-                    <span>Fixo: R$ {proj.fixedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    <span>Var: R$ {proj.variableTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
+      {/* Seção: Custos Mensais por Projeto / Setor (Oculto no Módulo Nutrição) */}
+      {!hideProjectBreakdown && (
+        <div className="px-8">
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Rateio por Centro de Custo
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold">• {activeMonthLabel || 'Mês Atual'}</span>
                 </div>
-              );
-            })}
+                <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Building2 size={18} className="text-indigo-600" />
+                  Custos Mensais por Projeto e Frente Setorial
+                </h4>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Alocado no Período</span>
+                <p className="text-lg font-black text-slate-900">
+                  R$ {projectCostBreakdown.reduce((acc, p) => acc + p.total, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Cards dos Projetos */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {projectCostBreakdown.map((proj) => {
+                const isSelected = moduleFilter === proj.projectId;
+                const totalCost = stats.totalExpense || 1;
+                const percentOfTotal = Math.min(100, (proj.total / totalCost) * 100);
+
+                return (
+                  <div 
+                    key={proj.projectId}
+                    onClick={() => setModuleFilter(prev => prev === proj.projectId ? 'all' : (proj.projectId as any))}
+                    className={cn(
+                      "p-5 rounded-2xl border transition-all cursor-pointer relative group",
+                      isSelected 
+                        ? "bg-white border-indigo-500 ring-2 ring-indigo-500/20 shadow-md" 
+                        : "bg-white border-slate-200/70 hover:border-slate-300 hover:shadow-sm"
+                    )}
+                    title="Clique para filtrar apenas os gastos deste projeto"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs",
+                          proj.projectId === 'nutrition' ? "bg-amber-100 text-amber-800" :
+                          proj.projectId === 'communication' ? "bg-purple-100 text-purple-800" :
+                          "bg-slate-100 text-slate-800"
+                        )}>
+                          {proj.projectId === 'nutrition' ? 'CN' : proj.projectId === 'communication' ? 'COM' : 'GER'}
+                        </div>
+                        <div>
+                          <h5 className="font-black text-sm text-slate-900">{proj.name}</h5>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            {proj.count} {proj.count === 1 ? 'gasto registrado' : 'gastos registrados'}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          Ativo
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Valor Total do Projeto */}
+                    <p className="text-xl font-black text-slate-900 mt-3">
+                      R$ {proj.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+
+                    {/* Barra de Distribuição */}
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-3">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all duration-700",
+                          proj.projectId === 'nutrition' ? "bg-amber-500" :
+                          proj.projectId === 'communication' ? "bg-purple-500" :
+                          "bg-indigo-600"
+                        )}
+                        style={{ width: `${percentOfTotal}%` }}
+                      />
+                    </div>
+
+                    {/* Detalhamento Fixo vs Variável */}
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mt-2.5 pt-2 border-t border-slate-100">
+                      <span>Fixo: R$ {proj.fixedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>Var: R$ {proj.variableTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Ações Rápidas: Botões de Adicionar Gasto Fixo e Variável */}
       <div className="px-8">
@@ -1047,9 +1260,36 @@ export function MonthlyExpensesManager({
                         </div>
                       </td>
 
-                      {/* Conta de Débito */}
-                      <td className="px-6 py-5 text-xs font-bold text-slate-600 uppercase">
-                        {t.account}
+                      {/* Conta de Débito (Clicável para filtrar financeiro do projeto/conta) */}
+                      <td className="px-6 py-5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isCurrentlySelected = selectedAccountFilter.toLowerCase() === t.account.toLowerCase();
+                            if (isCurrentlySelected) {
+                              setSelectedAccountFilter('all');
+                              setModuleFilter('all');
+                            } else {
+                              setSelectedAccountFilter(t.account);
+                              const matchedAcc = paymentAccounts.find(a => a.name.toLowerCase() === t.account.toLowerCase());
+                              if (matchedAcc?.project_id) {
+                                setModuleFilter(matchedAcc.project_id as any);
+                              } else if (t.module) {
+                                setModuleFilter(t.module as any);
+                              }
+                            }
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 border group",
+                            selectedAccountFilter.toLowerCase() === t.account.toLowerCase()
+                              ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200 shadow-sm"
+                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200"
+                          )}
+                          title={`Clique para filtrar as informações financeiras da conta "${t.account}"`}
+                        >
+                          <Wallet size={12} className={selectedAccountFilter.toLowerCase() === t.account.toLowerCase() ? "text-indigo-200" : "text-slate-400 group-hover:text-indigo-600"} />
+                          <span>{t.account}</span>
+                        </button>
                       </td>
 
                       {/* Valor */}
@@ -1131,7 +1371,117 @@ export function MonthlyExpensesManager({
         categories={localCategories}
         defaultExpenseType={modalDefaultType}
         onAddCategory={handleCategoryCreated}
+        paymentAccounts={paymentAccounts}
+        onAddPaymentAccount={handleAddPaymentAccount}
       />
+
+      {/* Modal de Criação de Conta de Pagamento */}
+      {isCreateAccountModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-50/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                  <Wallet size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Nova Conta de Pagamento</h3>
+                  <p className="text-xs text-slate-500 font-medium">Vincule a conta a um projeto ou frente financeira</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateAccountModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center shadow-sm transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveNewPaymentAccount} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Nome da Conta *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Conta Projetos, Conta Obra, Fundo Reserva..."
+                  value={newAccountName}
+                  onChange={(e) => setNewAccountName(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Projeto / Setor Vinculado *
+                </label>
+                <select
+                  value={newAccountProjectId}
+                  onChange={(e) => setNewAccountProjectId(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                >
+                  <option value="global">Geral / Global (Institucional)</option>
+                  <option value="nutrition">Casa Nutri (Nutrição Infantil)</option>
+                  <option value="communication">Comunicação & Mídia</option>
+                  {projects.filter(p => p.id !== 'nutrition' && p.id !== 'communication').map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  <option value="custom">+ Outro Projeto / Digitar Novo...</option>
+                </select>
+              </div>
+
+              {newAccountProjectId === 'custom' && (
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                    Nome do Projeto *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Projeto Alfabetização, Construção..."
+                    value={newAccountCustomProject}
+                    onChange={(e) => setNewAccountCustomProject(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Descrição ou Finalidade (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Utilizada para compras de insumos e custeio deste projeto."
+                  value={newAccountDescription}
+                  onChange={(e) => setNewAccountDescription(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateAccountModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95"
+                >
+                  Salvar Conta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Registro e Ajuste de Pagamento */}
       {paymentModalTx && (

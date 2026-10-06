@@ -15,6 +15,7 @@ import { CategorySelectWithCreate } from './CategorySelectWithCreate';
 import { getMznToBrlRate, ExchangeRateResult } from '../../../services/currencyService';
 import { RefreshCw, Globe, ArrowRightLeft } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { PaymentAccount, getLocalPaymentAccounts, savePaymentAccount } from '../../../services/paymentAccountService';
 
 export type RecurrenceType = 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
 
@@ -44,6 +45,8 @@ interface ExpenseModalProps {
   categories: TransactionCategory[];
   defaultExpenseType?: 'fixed' | 'variable';
   onAddCategory?: (category: TransactionCategory) => void;
+  paymentAccounts?: PaymentAccount[];
+  onAddPaymentAccount?: (account: PaymentAccount) => void;
 }
 
 export function ExpenseModal({
@@ -52,7 +55,9 @@ export function ExpenseModal({
   onSave,
   categories,
   defaultExpenseType = 'fixed',
-  onAddCategory
+  onAddCategory,
+  paymentAccounts,
+  onAddPaymentAccount
 }: ExpenseModalProps) {
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable'>(defaultExpenseType);
   const [description, setDescription] = useState('');
@@ -117,7 +122,33 @@ export function ExpenseModal({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDay, setDueDay] = useState(10);
   const [recurrence, setRecurrence] = useState<RecurrenceType>('monthly');
-  const [account, setAccount] = useState('Conta Principal');
+  const [localAccounts, setLocalAccounts] = useState<PaymentAccount[]>(paymentAccounts || getLocalPaymentAccounts());
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+
+  React.useEffect(() => {
+    if (paymentAccounts && paymentAccounts.length > 0) {
+      setLocalAccounts(paymentAccounts);
+    } else {
+      setLocalAccounts(getLocalPaymentAccounts());
+    }
+  }, [paymentAccounts, isOpen]);
+
+  const handleCreateAccount = () => {
+    if (!newAccountName.trim()) return;
+    const newAcc: PaymentAccount = {
+      id: `acc_${Date.now()}`,
+      name: newAccountName.trim(),
+      description: 'Conta criada manualmente',
+      project_id: 'global'
+    };
+    const updated = savePaymentAccount(newAcc);
+    setLocalAccounts(updated);
+    setAccount(newAcc.name);
+    onAddPaymentAccount?.(newAcc);
+    setNewAccountName('');
+    setIsCreatingAccount(false);
+  };
   const [status, setStatus] = useState<'pending' | 'completed'>('completed');
   const [department, setDepartment] = useState('Operações & Nutrição');
   const [notes, setNotes] = useState('');
@@ -186,6 +217,16 @@ export function ExpenseModal({
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const safeDateStr = `${year}-${month}-${String(safeDueDay).padStart(2, '0')}`;
 
+      const effectiveAccount = account || 'Conta Principal';
+      const matchedAcc = localAccounts.find(a => a.name.toLowerCase() === effectiveAccount.toLowerCase());
+      const detectedModule = matchedAcc?.project_id || (
+        effectiveAccount.toLowerCase().includes('projetos') || effectiveAccount.toLowerCase().includes('nutri')
+          ? 'nutrition'
+          : effectiveAccount.toLowerCase().includes('comun')
+          ? 'communication'
+          : 'global'
+      );
+
       await onSave({
         description: description + (currency === 'MZN' ? ` (${formattedOriginal} MT)` : ''),
         amount: finalAmountInBrl,
@@ -195,7 +236,7 @@ export function ExpenseModal({
           ? safeDateStr
           : (date || new Date().toISOString().split('T')[0]),
         status,
-        account: account || 'Conta Principal',
+        account: effectiveAccount,
         expense_type: expenseType,
         recurrence: expenseType === 'fixed' ? recurrence : 'none',
         due_day: expenseType === 'fixed' && recurrence === 'monthly' ? safeDueDay : undefined,
@@ -203,7 +244,8 @@ export function ExpenseModal({
         notes: notes ? `${notes}\n${currencyNote}`.trim() : currencyNote || undefined,
         currency,
         original_amount: rawAmount,
-        exchange_rate: currency === 'MZN' ? exchangeRate : 1
+        exchange_rate: currency === 'MZN' ? exchangeRate : 1,
+        module: detectedModule
       });
 
       // Reset
@@ -569,18 +611,60 @@ export function ExpenseModal({
               </div>
 
               <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                  Conta de Pagamento
-                </label>
-                <select
-                  value={account}
-                  onChange={(e) => setAccount(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-300 transition-all bg-white"
-                >
-                  <option value="Conta Principal">Conta Principal (Operações)</option>
-                  <option value="Conta Projetos">Conta Projetos / Nutrição</option>
-                  <option value="Fundo de Reserva">Fundo de Reserva Emergencial</option>
-                </select>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                    Conta de Pagamento
+                  </label>
+                  {!isCreatingAccount ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingAccount(true)}
+                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={12} />
+                      + Nova Conta
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setIsCreatingAccount(false); setNewAccountName(''); }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+
+                {isCreatingAccount ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nome da nova conta..."
+                      value={newAccountName}
+                      onChange={(e) => setNewAccountName(e.target.value)}
+                      className="flex-1 border-2 border-indigo-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateAccount}
+                      className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
+                    >
+                      Criar
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    className="w-full border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-300 transition-all bg-white"
+                  >
+                    {localAccounts.map(acc => (
+                      <option key={acc.id} value={acc.name}>
+                        {acc.name} {acc.description ? `(${acc.description})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
