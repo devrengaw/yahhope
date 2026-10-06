@@ -3,19 +3,23 @@
 
 @font-face {
   font-family: 'gotham-black';
-  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/Gotham-Black.otf') format('opentype');
+  src: url('/fonts/Gotham-Black.otf') format('opentype');
+  font-display: swap;
 }
 @font-face {
   font-family: 'gotham-bold';
-  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/Gotham-Bold.otf') format('opentype');
+  src: url('/fonts/Gotham-Bold.otf') format('opentype');
+  font-display: swap;
 }
 @font-face {
   font-family: 'gotham-light';
-  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/GothamLight.ttf') format('truetype');
+  src: url('/fonts/GothamLight.ttf') format('truetype');
+  font-display: swap;
 }
 @font-face {
   font-family: 'gotham-regular';
-  src: url('https://hope.yahchurch.com/wp-content/uploads/2025/09/GothamMedium.ttf') format('truetype');
+  src: url('/fonts/GothamMedium.ttf') format('truetype');
+  font-display: swap;
 }
 
 @font-face {

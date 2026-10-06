@@ -63,11 +63,11 @@ export function WebsiteProjectsProvider({ children }: { children: React.ReactNod
         setLoading(true);
         const { data, error } = await supabase
           .from('website_projects')
-          .select('*')
-          .order('order', { ascending: true, nullsFirst: false });
+          .select('*');
 
         if (!error && data && data.length > 0 && isMounted) {
-          setProjects(data.map(p => ({
+          const sorted = [...data].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+          setProjects(sorted.map(p => ({
             id: p.id,
             title: p.title,
             description: p.description || '',

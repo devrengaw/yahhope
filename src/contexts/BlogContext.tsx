@@ -329,8 +329,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
             }).catch(() => {});
           }
 
-          // Clean up highlights for any post that is NOT featured
-          const unfeaturedPosts = loadedPosts.filter(p => !p.featured_home || p.status !== 'published');
+          // Clean up highlights only for posts that were previously highlighted but are no longer featured
+          const unfeaturedPosts = loadedPosts.filter(p => (!p.featured_home || p.status !== 'published') && isBlogPostHighlighted(p.id));
           for (const ufp of unfeaturedPosts) {
             removeBlogPostHighlight(ufp.id).catch(() => {});
           }

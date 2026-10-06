@@ -133,6 +133,8 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
     }
   }, [highlights]);
 
+let homeHighlightsTableAvailable = true;
+
   // Try to load from Supabase if table exists
   useEffect(() => {
     let isMounted = true;
@@ -142,10 +144,18 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
         setLoading(true);
         const { data, error } = await supabase
           .from('home_highlights')
-          .select('*')
-          .order('order', { ascending: true });
+          .select('*');
 
-        if (!error && data && data.length > 0 && isMounted) {
+        if (error) {
+          if (error.code === '42P01' || error.message?.includes('does not exist') || (error as any).status === 404 || error.code === 'PGRST116') {
+            homeHighlightsTableAvailable = false;
+          }
+          return;
+        }
+
+        homeHighlightsTableAvailable = true;
+
+        if (data && data.length > 0 && isMounted) {
           // Detect and purge mockup rows from Supabase
           const mockupItems = data.filter((item: any) => isMockupHighlight(item));
           if (mockupItems.length > 0) {
@@ -157,7 +167,8 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
 
           const validItems = data.filter((item: any) => !isMockupHighlight(item));
           if (validItems.length > 0) {
-            const mapped = validItems.map(item => ({
+            const sortedItems = [...validItems].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+            const mapped = sortedItems.map(item => ({
               id: item.id,
               type: item.type || 'photo',
               title: item.title,
@@ -368,14 +379,24 @@ export function HomeHighlightsProvider({ children }: { children: React.ReactNode
       String(h.id) === `blog-${blogPostId}` ||
       (Boolean(h.link) && h.link.includes(`post=${blogPostId}`));
 
+    const hasMatch = highlights.some(isMatch);
+    if (!hasMatch) return;
+
     setHighlights(prev => deduplicateHighlights(prev.filter(h => !isMatch(h))));
 
+    if (!homeHighlightsTableAvailable) return;
+
     try {
-      await supabase
+      const { error } = await supabase
         .from('home_highlights')
         .delete()
         .or(`blog_post_id.eq.${blogPostId},id.eq.highlight-${blogPostId},id.eq.blog-${blogPostId}`);
-    } catch {}
+      if (error && (error.code === '42P01' || (error as any).status === 404)) {
+        homeHighlightsTableAvailable = false;
+      }
+    } catch {
+      homeHighlightsTableAvailable = false;
+    }
   };
 
   const isBlogPostHighlighted = (blogPostId: string) => {

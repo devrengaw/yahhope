@@ -96,11 +96,11 @@ export function ImpactMetricsProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         const { data, error } = await supabase
           .from('impact_metrics')
-          .select('*')
-          .order('order', { ascending: true });
+          .select('*');
 
         if (!error && data && data.length > 0 && isMounted) {
-          setMetrics(data.map(item => ({
+          const sorted = [...data].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+          setMetrics(sorted.map(item => ({
             id: item.id,
             metric: item.metric,
             subtitle: item.subtitle,
