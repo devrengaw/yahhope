@@ -549,33 +549,33 @@ export function MonthlyExpensesManager({
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Barra de Seleção: Contas de Pagamento & Visão por Projeto */}
-      <div className="px-8 pt-4">
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  Contas & Projetos
-                </span>
-                <span className="text-xs text-slate-400 font-bold">• Seletor Central Financeiro</span>
-                {stats.isFiltered && (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
-                    Filtro Ativo: {selectedAccountFilter !== 'all' ? selectedAccountFilter : moduleFilter === 'nutrition' ? 'Casa Nutri' : moduleFilter === 'communication' ? 'Comunicação' : moduleFilter}
+      {/* Barra de Seleção: Contas de Pagamento & Visão por Projeto (Apenas no Módulo Admin / Global) */}
+      {!hideProjectBreakdown && (
+        <div className="px-8 pt-4">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Contas & Projetos
                   </span>
-                )}
+                  <span className="text-xs text-slate-400 font-bold">• Seletor Central Financeiro</span>
+                  {stats.isFiltered && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                      Filtro Ativo: {selectedAccountFilter !== 'all' ? selectedAccountFilter : moduleFilter === 'nutrition' ? 'Casa Nutri' : moduleFilter === 'communication' ? 'Comunicação' : moduleFilter}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Wallet size={18} className="text-indigo-600" />
+                  Visão Financeira por Conta e Centro de Custo
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Clique nas contas de pagamento para isolar os gastos do respectivo projeto vinculado, ou veja tudo na Visão Global.
+                </p>
               </div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <Wallet size={18} className="text-indigo-600" />
-                Visão Financeira por Conta e Centro de Custo
-              </h3>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Clique nas contas de pagamento para isolar os gastos do respectivo projeto vinculado, ou veja tudo na Visão Global.
-              </p>
-            </div>
-            
-            {/* Botão de Criar Nova Conta de Pagamento (No Módulo Global) */}
-            {!hideProjectBreakdown && (
+              
+              {/* Botão de Criar Nova Conta de Pagamento (No Módulo Global) */}
               <button
                 type="button"
                 onClick={() => setIsCreateAccountModalOpen(true)}
@@ -584,125 +584,125 @@ export function MonthlyExpensesManager({
                 <Plus size={15} className="text-amber-400" />
                 + Nova Conta de Pagamento
               </button>
-            )}
-          </div>
+            </div>
 
-          {/* Botões Seletores: Visão Global + Contas Vinculadas + Projetos */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {/* Botão Visão Global */}
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAccountFilter('all');
-                setModuleFilter('all');
-              }}
-              className={cn(
-                "px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 border shadow-sm",
-                selectedAccountFilter === 'all' && moduleFilter === 'all'
-                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20 ring-2 ring-slate-900/10"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
-              )}
-            >
-              <span>🌐</span>
-              <span>Visão Global (Tudo)</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[10px]",
-                selectedAccountFilter === 'all' && moduleFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-700"
-              )}>
-                {allExpenses.length}
-              </span>
-            </button>
+            {/* Botões Seletores: Visão Global + Contas Vinculadas + Projetos */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {/* Botão Visão Global */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAccountFilter('all');
+                  setModuleFilter('all');
+                }}
+                className={cn(
+                  "px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 border shadow-sm",
+                  selectedAccountFilter === 'all' && moduleFilter === 'all'
+                    ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20 ring-2 ring-slate-900/10"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                <span>🌐</span>
+                <span>Visão Global (Tudo)</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px]",
+                  selectedAccountFilter === 'all' && moduleFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-700"
+                )}>
+                  {allExpenses.length}
+                </span>
+              </button>
 
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+              <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
 
-            {/* Contas de Pagamento cadastradas */}
-            {paymentAccounts.map((acc) => {
-              const isSelected = selectedAccountFilter.toLowerCase() === acc.name.toLowerCase();
-              const count = allExpenses.filter(e => e.account?.toLowerCase() === acc.name.toLowerCase()).length;
-              const projName = acc.project_id === 'nutrition' 
-                ? 'Casa Nutri' 
-                : acc.project_id === 'communication' 
-                ? 'Comunicação' 
-                : acc.project_id === 'global' 
-                ? 'Geral' 
-                : projects.find(p => p.id === acc.project_id)?.name || acc.project_id || 'Geral';
+              {/* Contas de Pagamento cadastradas */}
+              {paymentAccounts.map((acc) => {
+                const isSelected = selectedAccountFilter.toLowerCase() === acc.name.toLowerCase();
+                const count = allExpenses.filter(e => e.account?.toLowerCase() === acc.name.toLowerCase()).length;
+                const projName = acc.project_id === 'nutrition' 
+                  ? 'Casa Nutri' 
+                  : acc.project_id === 'communication' 
+                  ? 'Comunicação' 
+                  : acc.project_id === 'global' 
+                  ? 'Geral' 
+                  : projects.find(p => p.id === acc.project_id)?.name || acc.project_id || 'Geral';
 
-              return (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => {
-                    if (isSelected) {
-                      setSelectedAccountFilter('all');
-                      setModuleFilter('all');
-                    } else {
-                      setSelectedAccountFilter(acc.name);
-                      if (acc.project_id) {
-                        setModuleFilter(acc.project_id as any);
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedAccountFilter('all');
+                        setModuleFilter('all');
+                      } else {
+                        setSelectedAccountFilter(acc.name);
+                        if (acc.project_id) {
+                          setModuleFilter(acc.project_id as any);
+                        }
                       }
-                    }
-                  }}
-                  className={cn(
-                    "px-3.5 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 border shadow-sm",
-                    isSelected
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20 ring-2 ring-indigo-200"
-                      : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                  )}
-                  title={`Filtrar financeiro da conta "${acc.name}" vinculada ao projeto ${projName}`}
-                >
-                  <Wallet size={13} className={isSelected ? "text-indigo-200" : "text-slate-400"} />
-                  <div className="flex flex-col items-start text-left">
-                    <span className="leading-tight">{acc.name}</span>
+                    }}
+                    className={cn(
+                      "px-3.5 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 border shadow-sm",
+                      isSelected
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20 ring-2 ring-indigo-200"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    )}
+                    title={`Filtrar financeiro da conta "${acc.name}" vinculada ao projeto ${projName}`}
+                  >
+                    <Wallet size={13} className={isSelected ? "text-indigo-200" : "text-slate-400"} />
+                    <div className="flex flex-col items-start text-left">
+                      <span className="leading-tight">{acc.name}</span>
+                      <span className={cn(
+                        "text-[9px] font-semibold uppercase tracking-wider",
+                        isSelected ? "text-indigo-200" : "text-slate-400"
+                      )}>
+                        {projName}
+                      </span>
+                    </div>
                     <span className={cn(
-                      "text-[9px] font-semibold uppercase tracking-wider",
-                      isSelected ? "text-indigo-200" : "text-slate-400"
+                      "px-1.5 py-0.5 rounded-lg text-[10px] font-black ml-1",
+                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
                     )}>
-                      {projName}
+                      {count}
                     </span>
-                  </div>
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded-lg text-[10px] font-black ml-1",
-                    isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                  )}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
 
-            {/* Botões individuais de Projetos para acesso direto */}
-            {availableProjectOptions.filter(p => !paymentAccounts.some(a => a.name.toLowerCase() === p.name.toLowerCase())).map(proj => {
-              const isSelected = moduleFilter === proj.id && selectedAccountFilter === 'all';
-              const count = allExpenses.filter(e => (e.module || 'global') === proj.id).length;
-              return (
-                <button
-                  key={proj.id}
-                  type="button"
-                  onClick={() => {
-                    if (isSelected) {
-                      setModuleFilter('all');
-                    } else {
-                      setModuleFilter(proj.id as any);
-                      setSelectedAccountFilter('all');
-                    }
-                  }}
-                  className={cn(
-                    "px-3 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-1.5 border shadow-sm",
-                    isSelected
-                      ? "bg-slate-800 text-white border-slate-800 ring-2 ring-slate-800/10"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                  )}
-                  title={`Filtrar todos os gastos do projeto ${proj.name}`}
-                >
-                  <Building2 size={13} />
-                  <span>{proj.name}</span>
-                  <span className="text-[10px] opacity-70">({count})</span>
-                </button>
-              );
-            })}
+              {/* Botões individuais de Projetos para acesso direto */}
+              {availableProjectOptions.filter(p => !paymentAccounts.some(a => a.name.toLowerCase() === p.name.toLowerCase())).map(proj => {
+                const isSelected = moduleFilter === proj.id && selectedAccountFilter === 'all';
+                const count = allExpenses.filter(e => (e.module || 'global') === proj.id).length;
+                return (
+                  <button
+                    key={proj.id}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setModuleFilter('all');
+                      } else {
+                        setModuleFilter(proj.id as any);
+                        setSelectedAccountFilter('all');
+                      }
+                    }}
+                    className={cn(
+                      "px-3 py-2 rounded-2xl font-bold text-xs transition-all flex items-center gap-1.5 border shadow-sm",
+                      isSelected
+                        ? "bg-slate-800 text-white border-slate-800 ring-2 ring-slate-800/10"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    )}
+                    title={`Filtrar todos os gastos do projeto ${proj.name}`}
+                  >
+                    <Building2 size={13} />
+                    <span>{proj.name}</span>
+                    <span className="text-[10px] opacity-70">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
       {/* Cards de Métricas de Gastos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-8 pb-0">
