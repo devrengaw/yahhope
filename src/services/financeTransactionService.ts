@@ -357,22 +357,24 @@ export async function toggleModuleTransactionStatus(
 export async function updateModuleTransactionPayment(
   id: string,
   updates: {
-    status: 'completed' | 'pending';
+    status?: 'completed' | 'pending';
     amount?: number;
     original_amount?: number;
     exchange_rate?: number;
     date?: string;
     notes?: string;
+    category_id?: string;
   },
   moduleName: string = 'nutrition'
 ) {
   try {
     if (!id.startsWith('local_tx_')) {
       const payload: any = {
-        status: updates.status,
+        ...(updates.status ? { status: updates.status } : {}),
         ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
         ...(updates.date ? { date: updates.date } : {}),
-        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {})
       };
 
       let { error } = await supabase.from('finance_transactions').update({

@@ -189,13 +189,19 @@ export function Finance() {
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      const matchesType = filterType === 'all' || t.type === filterType;
-      const matchesExpenseType = filterExpenseType === 'all' || t.expense_type === filterExpenseType;
-      const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           t.account.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesType && matchesExpenseType && matchesSearch;
-    });
+    return transactions
+      .filter(t => {
+        const matchesType = filterType === 'all' || t.type === filterType;
+        const matchesExpenseType = filterExpenseType === 'all' || t.expense_type === filterExpenseType;
+        const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             t.account.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesType && matchesExpenseType && matchesSearch;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return timeB - timeA;
+      });
   }, [transactions, filterType, filterExpenseType, searchTerm]);
 
   const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
@@ -345,13 +351,14 @@ export function Finance() {
     }
   };
 
-  const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
+  const handleUpdatePayment = async (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => {
     try {
       const payload: any = {
-        status: updates.status,
+        ...(updates.status ? { status: updates.status } : {}),
         ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
         ...(updates.date ? { date: updates.date } : {}),
-        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {})
       };
 
       let { error } = await supabase.from('finance_transactions').update({

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Transaction, TransactionCategory } from '../../../pages/admin/Finance';
 import { ExpenseModal, ExpensePayload } from './ExpenseModal';
+import { CategorySelectWithCreate } from './CategorySelectWithCreate';
 import { cn } from '../../../lib/utils';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { supabase } from '../../../lib/supabase';
@@ -39,7 +40,7 @@ interface MonthlyExpensesManagerProps {
   onDeleteTransaction: (id: string) => Promise<void> | void;
   onToggleStatus: (id: string, currentStatus: 'completed' | 'pending') => Promise<void> | void;
   onAddCategory?: (category: TransactionCategory) => void;
-  onUpdatePayment?: (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => Promise<void> | void;
+  onUpdatePayment?: (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => Promise<void> | void;
 }
 
 export function MonthlyExpensesManager({
@@ -72,6 +73,7 @@ export function MonthlyExpensesManager({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
   const [moduleFilter, setModuleFilter] = useState<'all' | 'nutrition' | 'communication' | 'global'>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<'fixed' | 'variable'>('fixed');
@@ -85,6 +87,7 @@ export function MonthlyExpensesManager({
   const [paymentDate, setPaymentDate] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
   const [paymentStatus, setPaymentStatus] = useState<'completed' | 'pending'>('completed');
+  const [paymentCategoryId, setPaymentCategoryId] = useState<string>('');
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const openPaymentModal = (t: Transaction) => {
@@ -100,7 +103,8 @@ export function MonthlyExpensesManager({
     setPaymentOriginalAmount(orig);
     setPaymentDate(t.status === 'completed' && t.date ? t.date : new Date().toISOString().split('T')[0]);
     setPaymentNotes(t.notes || '');
-    setPaymentStatus('completed');
+    setPaymentStatus(t.status || 'completed');
+    setPaymentCategoryId(t.category_id || '');
   };
 
   const handleTogglePaymentCurrency = (newCurr: 'BRL' | 'MZN') => {
@@ -158,7 +162,8 @@ export function MonthlyExpensesManager({
         original_amount: finalOriginalAmount,
         exchange_rate: finalRate,
         date: paymentDate,
-        notes: paymentNotes
+        notes: paymentNotes,
+        category_id: paymentCategoryId || undefined
       };
 
       if (onUpdatePayment) {
@@ -168,7 +173,8 @@ export function MonthlyExpensesManager({
           status: updates.status,
           amount: updates.amount,
           date: updates.date,
-          notes: updates.notes
+          notes: updates.notes,
+          category_id: updates.category_id || null
         };
         let { error } = await supabase.from('finance_transactions').update({
           ...payload,
@@ -185,7 +191,7 @@ export function MonthlyExpensesManager({
       setPaymentModalTx(null);
     } catch (err) {
       console.error('Erro ao salvar pagamento:', err);
-      alert('Erro ao registrar pagamento.');
+      alert('Erro ao registrar alterações.');
     } finally {
       setIsSavingPayment(false);
     }
@@ -243,25 +249,89 @@ export function MonthlyExpensesManager({
     };
   }, [allExpenses, totalIncome]);
 
-  // Lista Filtrada
-  const filteredExpenses = useMemo(() => {
-    return allExpenses.filter(t => {
-      const matchType = 
-        activeSubTab === 'all' || 
-        (activeSubTab === 'fixed' && t.expense_type === 'fixed') ||
-        (activeSubTab === 'variable' && t.expense_type === 'variable');
-
-      const matchSearch = 
-        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.account.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchCat = categoryFilter === 'all' || t.category_id === categoryFilter;
-      const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-      const matchModule = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
-
-      return matchType && matchSearch && matchCat && matchStatus && matchModule;
+  // Meses disponíveis com gastos para o filtro
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    allExpenses.forEach(t => {
+      if (t.date) {
+        monthSet.add(t.date.substring(0, 7)); // YYYY-MM
+      }
     });
-  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter]);
+    return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+  }, [allExpenses]);
+
+  // Lista Filtrada (Ordenada pelos mais recentes no topo)
+  const filteredExpenses = useMemo(() => {
+    return allExpenses
+      .filter(t => {
+        const matchType = 
+          activeSubTab === 'all' || 
+          (activeSubTab === 'fixed' && t.expense_type === 'fixed') ||
+          (activeSubTab === 'variable' && t.expense_type === 'variable');
+
+        const matchSearch = 
+          t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          t.account.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchCat = categoryFilter === 'all' || t.category_id === categoryFilter;
+        const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+        const matchModule = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
+        const matchMonth = selectedMonth === 'all' || (t.date && t.date.startsWith(selectedMonth));
+
+        return matchType && matchSearch && matchCat && matchStatus && matchModule && matchMonth;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return timeB - timeA;
+      });
+  }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter, selectedMonth]);
+
+  // Agrupamento por Mês (os mais recentes primeiro)
+  const expensesByMonth = useMemo(() => {
+    const groups: {
+      [key: string]: {
+        monthKey: string;
+        monthLabel: string;
+        items: Transaction[];
+        totalBrl: number;
+        totalMzn: number;
+      };
+    } = {};
+
+    filteredExpenses.forEach(t => {
+      const monthKey = t.date ? t.date.substring(0, 7) : 'sem-data';
+      if (!groups[monthKey]) {
+        let label = 'Sem Data Definida';
+        if (monthKey !== 'sem-data') {
+          const parts = monthKey.split('-');
+          if (parts.length === 2) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const dateObj = new Date(year, month, 1);
+            const rawLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+          }
+        }
+
+        groups[monthKey] = {
+          monthKey,
+          monthLabel: label,
+          items: [],
+          totalBrl: 0,
+          totalMzn: 0
+        };
+      }
+
+      groups[monthKey].items.push(t);
+      groups[monthKey].totalBrl += t.amount;
+      if (t.currency === 'MZN' && t.original_amount) {
+        groups[monthKey].totalMzn += t.original_amount;
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [filteredExpenses]);
 
   const handleOpenModal = (type: 'fixed' | 'variable') => {
     setModalDefaultType(type);
@@ -505,6 +575,28 @@ export function MonthlyExpensesManager({
               <option value="pending">Pendentes</option>
             </select>
 
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
+            >
+              <option value="all">Todos os Meses</option>
+              {availableMonths.map(mKey => {
+                const parts = mKey.split('-');
+                let label = mKey;
+                if (parts.length === 2) {
+                  const year = parseInt(parts[0], 10);
+                  const month = parseInt(parts[1], 10) - 1;
+                  const dateObj = new Date(year, month, 1);
+                  const rawLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                  label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+                }
+                return (
+                  <option key={mKey} value={mKey}>{label}</option>
+                );
+              })}
+            </select>
+
             {hasMultipleModules && (
               <select
                 value={moduleFilter}
@@ -545,189 +637,232 @@ export function MonthlyExpensesManager({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
-            {filteredExpenses.map((t) => {
-              const category = localCategories.find(c => c.id === t.category_id);
-              const isFixed = t.expense_type === 'fixed';
+            {expensesByMonth.map((group) => (
+              <React.Fragment key={group.monthKey}>
+                {/* Cabeçalho do Mês */}
+                <tr className="bg-slate-100/80 border-y border-slate-200/80">
+                  <td colSpan={6} className="px-6 py-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-slate-600" />
+                        <span className="text-xs font-black text-slate-800 tracking-wide uppercase">
+                          {group.monthLabel}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                          {group.items.length} {group.items.length === 1 ? 'gasto' : 'gastos'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          Subtotal do mês:
+                        </span>
+                        <span className="text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200/60">
+                          R$ {group.totalBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {group.totalMzn > 0 && (
+                          <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200/60">
+                            {group.totalMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
 
-              return (
-                <tr key={t.id} className="hover:bg-slate-50/80 transition-all group/row">
-                  
-                  {/* Status e Data */}
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      {isFixed ? (
-                        <div className="flex flex-col gap-1.5 items-start">
-                          {t.status === 'pending' ? (
-                            <button
-                              type="button"
-                              onClick={() => openPaymentModal(t)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm active:scale-95 group/btn"
-                              title="Clique para registrar o pagamento e alterar o valor pago se necessário"
-                            >
-                              <CheckCircle2 size={14} className="group-hover/btn:scale-110 transition-transform" />
-                              <span>Registrar Pagamento</span>
-                            </button>
+                {/* Linhas de Gastos do Mês */}
+                {group.items.map((t) => {
+                  const category = localCategories.find(c => c.id === t.category_id);
+                  const isFixed = t.expense_type === 'fixed';
+
+                  return (
+                    <tr key={t.id} className="hover:bg-slate-50/80 transition-all group/row">
+                      
+                      {/* Status e Data */}
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          {isFixed ? (
+                            <div className="flex flex-col gap-1.5 items-start">
+                              {t.status === 'pending' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openPaymentModal(t)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm active:scale-95 group/btn"
+                                  title="Clique para registrar o pagamento e alterar o valor pago se necessário"
+                                >
+                                  <CheckCircle2 size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                  <span>Registrar Pagamento</span>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                                    <CheckCircle2 size={13} className="text-emerald-600" />
+                                    <span>Efetivado</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openPaymentModal(t)}
+                                    className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    title="Editar pagamento ou alterar valor pago"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                </div>
+                              )}
+                              <p className="text-[11px] font-bold text-slate-500">
+                                Vencimento: Dia {t.date.split('-')[2] || '10'} todo mês
+                              </p>
+                            </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
-                                <CheckCircle2 size={13} className="text-emerald-600" />
-                                <span>Efetivado</span>
-                              </span>
+                            <>
                               <button
                                 type="button"
                                 onClick={() => openPaymentModal(t)}
-                                className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="Editar pagamento ou alterar valor pago"
+                                title={t.status === 'completed' ? 'Editar pagamento / Marcar como pendente' : 'Registrar pagamento'}
+                                className={cn(
+                                  "w-9 h-9 rounded-xl flex items-center justify-center transition-all group-hover/row:scale-105 active:scale-90",
+                                  t.status === 'completed' ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                )}
                               >
-                                <Edit2 size={12} />
+                                {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
                               </button>
-                            </div>
+                              <div>
+                                <p className="text-xs font-black text-slate-900 tracking-wider">
+                                  {t.date}
+                                </p>
+                                <p className={cn(
+                                  "text-[10px] font-bold uppercase",
+                                  t.status === 'completed' ? "text-emerald-600" : "text-amber-600"
+                                )}>
+                                  {t.status === 'completed' ? 'Efetivado' : 'A Vencer / Pendente'}
+                                </p>
+                              </div>
+                            </>
                           )}
-                          <p className="text-[11px] font-bold text-slate-500">
-                            Vencimento: Dia {t.date.split('-')[2] || '10'} todo mês
-                          </p>
                         </div>
-                      ) : (
-                        <>
+                      </td>
+
+                      {/* Descrição e Categoria */}
+                      <td className="px-6 py-5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-bold text-slate-900 text-sm">{t.description}</p>
+                          {t.currency === 'MZN' && (
+                            <span 
+                              className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
+                              title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                            >
+                              🇲🇿 MZN
+                            </span>
+                          )}
+                          {hasMultipleModules && t.module && t.module !== 'global' && (
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
+                              t.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                              t.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                              "bg-slate-100 text-slate-700 border border-slate-200"
+                            )}>
+                              {t.module === 'nutrition' ? 'Casa Nutri' : t.module === 'communication' ? 'Comunicação' : t.module}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
+                          {category?.name || 'Geral / Operações'}
+                        </div>
+                      </td>
+
+                      {/* Tipo de Gasto */}
+                      <td className="px-6 py-5">
+                        <div className="flex flex-col gap-1">
+                          <span className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider w-fit border shadow-sm",
+                            isFixed 
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-100" 
+                              : "bg-rose-50 text-rose-700 border-rose-100"
+                          )}>
+                            {isFixed ? (
+                              <>
+                                <Repeat size={11} />
+                                Fixo Recorrente
+                              </>
+                            ) : (
+                              <>
+                                <Clock size={11} />
+                                Variável
+                              </>
+                            )}
+                          </span>
+                          {t.recurrence && t.recurrence !== 'none' && (
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md uppercase tracking-wider w-fit">
+                              {t.recurrence === 'monthly' ? 'Mensal' : 
+                               t.recurrence === 'bimonthly' ? 'Bimestral' :
+                               t.recurrence === 'quarterly' ? 'Trimestral' :
+                               t.recurrence === 'semiannual' ? 'Semestral' :
+                               t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Conta de Débito */}
+                      <td className="px-6 py-5 text-xs font-bold text-slate-600 uppercase">
+                        {t.account}
+                      </td>
+
+                      {/* Valor */}
+                      <td className="px-6 py-5 text-right">
+                        <p className="text-base font-black text-rose-600 tracking-tight">
+                          - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        {t.currency === 'MZN' && t.original_amount && (
+                          <p 
+                            className="text-[11px] font-black text-emerald-700 mt-0.5" 
+                            title={t.exchange_rate ? `Taxa aplicada: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}
+                          >
+                            {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                          </p>
+                        )}
+                        {isFixed && t.recurrence && t.recurrence !== 'monthly' && t.recurrence !== 'none' && (
+                          <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
+                            ~ R$ {(t.amount / (t.recurrence === 'bimonthly' ? 2 : t.recurrence === 'quarterly' ? 3 : t.recurrence === 'semiannual' ? 6 : 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Ações */}
+                      <td className="px-6 py-5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => openPaymentModal(t)}
-                            title={t.status === 'completed' ? 'Editar pagamento / Marcar como pendente' : 'Registrar pagamento'}
-                            className={cn(
-                              "w-9 h-9 rounded-xl flex items-center justify-center transition-all group-hover/row:scale-105 active:scale-90",
-                              t.status === 'completed' ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                            )}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                            title="Editar categoria, valor e dados do gasto"
                           >
-                            {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                            <Edit2 size={16} />
                           </button>
-                          <div>
-                            <p className="text-xs font-black text-slate-900 tracking-wider">
-                              {t.date}
-                            </p>
-                            <p className={cn(
-                              "text-[10px] font-bold uppercase",
-                              t.status === 'completed' ? "text-emerald-600" : "text-amber-600"
-                            )}>
-                              {t.status === 'completed' ? 'Efetivado' : 'A Vencer / Pendente'}
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </td>
+                          <button
+                            type="button"
+                            onClick={() => openPaymentModal(t)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                            title={t.status === 'completed' ? 'Ver / Ajustar valor pago e categoria' : 'Registrar pagamento'}
+                          >
+                            <Receipt size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(t.id, t.description)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            title="Remover despesa"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
 
-                  {/* Descrição e Categoria */}
-                  <td className="px-6 py-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-bold text-slate-900 text-sm">{t.description}</p>
-                      {t.currency === 'MZN' && (
-                        <span 
-                          className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
-                          title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
-                        >
-                          🇲🇿 MZN
-                        </span>
-                      )}
-                      {hasMultipleModules && t.module && t.module !== 'global' && (
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
-                          t.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                          t.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
-                          "bg-slate-100 text-slate-700 border border-slate-200"
-                        )}>
-                          {t.module === 'nutrition' ? 'Casa Nutri' : t.module === 'communication' ? 'Comunicação' : t.module}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
-                      {category?.name || 'Geral / Operações'}
-                    </div>
-                  </td>
-
-                  {/* Tipo de Gasto */}
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col gap-1">
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider w-fit border shadow-sm",
-                        isFixed 
-                          ? "bg-indigo-50 text-indigo-700 border-indigo-100" 
-                          : "bg-rose-50 text-rose-700 border-rose-100"
-                      )}>
-                        {isFixed ? (
-                          <>
-                            <Repeat size={11} />
-                            Fixo Recorrente
-                          </>
-                        ) : (
-                          <>
-                            <Clock size={11} />
-                            Variável
-                          </>
-                        )}
-                      </span>
-                      {t.recurrence && t.recurrence !== 'none' && (
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md uppercase tracking-wider w-fit">
-                          {t.recurrence === 'monthly' ? 'Mensal' : 
-                           t.recurrence === 'bimonthly' ? 'Bimestral' :
-                           t.recurrence === 'quarterly' ? 'Trimestral' :
-                           t.recurrence === 'semiannual' ? 'Semestral' :
-                           t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Conta de Débito */}
-                  <td className="px-6 py-5 text-xs font-bold text-slate-600 uppercase">
-                    {t.account}
-                  </td>
-
-                  {/* Valor */}
-                  <td className="px-6 py-5 text-right">
-                    <p className="text-base font-black text-rose-600 tracking-tight">
-                      - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    {t.currency === 'MZN' && t.original_amount && (
-                      <p 
-                        className="text-[11px] font-black text-emerald-700 mt-0.5" 
-                        title={t.exchange_rate ? `Taxa aplicada: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}
-                      >
-                        {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
-                      </p>
-                    )}
-                    {isFixed && t.recurrence && t.recurrence !== 'monthly' && t.recurrence !== 'none' && (
-                      <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                        ~ R$ {(t.amount / (t.recurrence === 'bimonthly' ? 2 : t.recurrence === 'quarterly' ? 3 : t.recurrence === 'semiannual' ? 6 : 12)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Ações */}
-                  <td className="px-6 py-5 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openPaymentModal(t)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                        title={t.status === 'completed' ? 'Ver / Ajustar valor pago' : 'Registrar pagamento'}
-                      >
-                        <Receipt size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(t.id, t.description)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                        title="Remover despesa"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-
-                </tr>
-              );
-            })}
+                    </tr>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </tbody>
         </table>
 
@@ -766,10 +901,10 @@ export function MonthlyExpensesManager({
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
-                    Registrar Pagamento
+                    {paymentModalTx.status === 'completed' ? 'Editar Dados / Pagamento' : 'Registrar Pagamento'}
                   </h2>
                   <p className="text-xs text-slate-500 font-medium">
-                    {paymentModalTx.expense_type === 'fixed' ? 'Gasto Fixo Recorrente' : 'Despesa Variável'}
+                    Ajuste categoria, data, notas ou valor pago deste lançamento
                   </p>
                 </div>
               </div>
@@ -938,10 +1073,28 @@ export function MonthlyExpensesManager({
                 })()}
               </div>
 
+              {/* Categoria do Gasto */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Categoria da Despesa *
+                </label>
+                <CategorySelectWithCreate
+                  value={paymentCategoryId}
+                  onChange={setPaymentCategoryId}
+                  categories={localCategories}
+                  type="expense"
+                  onCategoryCreated={(newCat) => {
+                    setLocalCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat]);
+                    onAddCategory?.(newCat);
+                  }}
+                  placeholder="Selecione ou altere a categoria..."
+                />
+              </div>
+
               {/* Data do Pagamento */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Data em que foi Pago *
+                  Data em que foi Pago / Vencimento *
                 </label>
                 <div className="relative">
                   <Calendar size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />

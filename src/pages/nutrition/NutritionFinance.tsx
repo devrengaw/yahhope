@@ -117,11 +117,17 @@ export function NutritionFinance() {
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      const matchesType = filterType === 'all' || t.type === filterType;
-      const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesType && matchesSearch;
-    });
+    return transactions
+      .filter(t => {
+        const matchesType = filterType === 'all' || t.type === filterType;
+        const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesType && matchesSearch;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return timeB - timeA;
+      });
   }, [transactions, filterType, searchTerm]);
 
   const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
@@ -162,7 +168,7 @@ export function NutritionFinance() {
     }
   };
 
-  const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
+  const handleUpdatePayment = async (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => {
     try {
       await updateModuleTransactionPayment(id, updates, 'nutrition');
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
