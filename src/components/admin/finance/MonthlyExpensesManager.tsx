@@ -296,7 +296,8 @@ export function MonthlyExpensesManager({
   // Cálculos de Indicadores de Custos Mensais (com escopo dinâmico por Conta/Projeto)
   const stats = useMemo(() => {
     const targetExpenses = allExpenses.filter(t => {
-      const matchAcc = selectedAccountFilter === 'all' || t.account.toLowerCase() === selectedAccountFilter.toLowerCase();
+      const accName = t.account || '';
+      const matchAcc = selectedAccountFilter === 'all' || accName.toLowerCase() === selectedAccountFilter.toLowerCase();
       const matchMod = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
       return matchAcc && matchMod;
     });
@@ -440,21 +441,24 @@ export function MonthlyExpensesManager({
           (activeSubTab === 'fixed' && t.expense_type === 'fixed') ||
           (activeSubTab === 'variable' && t.expense_type === 'variable');
 
+        const desc = t.description || '';
+        const acc = t.account || '';
+
         const matchSearch = 
-          t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.account.toLowerCase().includes(searchTerm.toLowerCase());
+          desc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          acc.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchCat = categoryFilter === 'all' || t.category_id === categoryFilter;
         const matchStatus = statusFilter === 'all' || t.status === statusFilter;
         const matchModule = moduleFilter === 'all' || (t.module || 'global') === moduleFilter;
-        const matchAccount = selectedAccountFilter === 'all' || t.account.toLowerCase() === selectedAccountFilter.toLowerCase();
+        const matchAccount = selectedAccountFilter === 'all' || acc.toLowerCase() === selectedAccountFilter.toLowerCase();
         const matchMonth = selectedMonth === 'all' || (t.date && t.date.startsWith(selectedMonth));
 
         return matchType && matchSearch && matchCat && matchStatus && matchModule && matchAccount && matchMonth;
       })
       .sort((a, b) => {
-        const timeA = new Date(a.date).getTime() || 0;
-        const timeB = new Date(b.date).getTime() || 0;
+        const timeA = new Date(a.date || '').getTime() || 0;
+        const timeB = new Date(b.date || '').getTime() || 0;
         return timeB - timeA;
       });
   }, [allExpenses, activeSubTab, searchTerm, categoryFilter, statusFilter, moduleFilter, selectedAccountFilter, selectedMonth]);
@@ -526,12 +530,12 @@ export function MonthlyExpensesManager({
       const cat = categories.find(c => c.id === t.category_id);
       return [
         t.expense_type === 'fixed' ? 'Fixo Recorrente' : 'Variável',
-        `"${t.description}"`,
+        `"${(t.description || '').replace(/"/g, '""')}"`,
         ...(hasMultipleModules ? [t.module === 'nutrition' ? '"Casa Nutri"' : t.module === 'communication' ? '"Comunicação"' : '"Geral"'] : []),
         `"${cat?.name || 'Sem Categoria'}"`,
-        t.date,
-        `"${t.account}"`,
-        t.amount.toFixed(2),
+        t.date || '',
+        `"${(t.account || '').replace(/"/g, '""')}"`,
+        (Number(t.amount) || 0).toFixed(2),
         t.status === 'completed' ? 'Efetivado' : 'Pendente'
       ];
     });
@@ -1166,7 +1170,7 @@ export function MonthlyExpensesManager({
                                 </div>
                               )}
                               <p className="text-[11px] font-bold text-slate-500">
-                                Vencimento: Dia {t.date.split('-')[2] || '10'} todo mês
+                                Vencimento: Dia {t.date ? (t.date.split('-')[2] || '10') : '10'} todo mês
                               </p>
                             </div>
                           ) : (
@@ -1265,13 +1269,14 @@ export function MonthlyExpensesManager({
                         <button
                           type="button"
                           onClick={() => {
-                            const isCurrentlySelected = selectedAccountFilter.toLowerCase() === t.account.toLowerCase();
+                            const currentAcc = t.account || '';
+                            const isCurrentlySelected = selectedAccountFilter !== 'all' && selectedAccountFilter.toLowerCase() === currentAcc.toLowerCase();
                             if (isCurrentlySelected) {
                               setSelectedAccountFilter('all');
                               setModuleFilter('all');
                             } else {
-                              setSelectedAccountFilter(t.account);
-                              const matchedAcc = paymentAccounts.find(a => a.name.toLowerCase() === t.account.toLowerCase());
+                              setSelectedAccountFilter(currentAcc || 'all');
+                              const matchedAcc = paymentAccounts.find(a => a.name.toLowerCase() === currentAcc.toLowerCase());
                               if (matchedAcc?.project_id) {
                                 setModuleFilter(matchedAcc.project_id as any);
                               } else if (t.module) {
@@ -1281,14 +1286,14 @@ export function MonthlyExpensesManager({
                           }}
                           className={cn(
                             "px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 border group",
-                            selectedAccountFilter.toLowerCase() === t.account.toLowerCase()
+                            (t.account && selectedAccountFilter.toLowerCase() === t.account.toLowerCase())
                               ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-200 shadow-sm"
                               : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200"
                           )}
-                          title={`Clique para filtrar as informações financeiras da conta "${t.account}"`}
+                          title={`Clique para filtrar as informações financeiras da conta "${t.account || 'Sem conta'}"`}
                         >
-                          <Wallet size={12} className={selectedAccountFilter.toLowerCase() === t.account.toLowerCase() ? "text-indigo-200" : "text-slate-400 group-hover:text-indigo-600"} />
-                          <span>{t.account}</span>
+                          <Wallet size={12} className={(t.account && selectedAccountFilter.toLowerCase() === t.account.toLowerCase()) ? "text-indigo-200" : "text-slate-400 group-hover:text-indigo-600"} />
+                          <span>{t.account || 'Sem conta'}</span>
                         </button>
                       </td>
 
@@ -1527,9 +1532,11 @@ export function MonthlyExpensesManager({
                   )}
                 </div>
                 <div className="flex flex-wrap gap-4 pt-1 text-xs text-slate-600">
-                  <span>Conta: <strong className="text-slate-800">{paymentModalTx.account}</strong></span>
+                  <span>Conta: <strong className="text-slate-800">{paymentModalTx.account || 'Não especificada'}</strong></span>
                   <span>Vencimento: <strong className="text-slate-800">
-                    {paymentModalTx.expense_type === 'fixed' ? `Dia ${paymentModalTx.date.split('-')[2] || '10'} todo mês` : paymentModalTx.date}
+                    {paymentModalTx.expense_type === 'fixed' 
+                      ? `Dia ${paymentModalTx.date ? (paymentModalTx.date.split('-')[2] || '10') : '10'} todo mês` 
+                      : (paymentModalTx.date || 'Não informada')}
                   </strong></span>
                 </div>
               </div>

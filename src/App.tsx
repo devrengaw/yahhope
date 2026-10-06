@@ -58,6 +58,7 @@ import { CommProjects } from './pages/communication/CommProjects';
 
 import { SetPassword } from './pages/public/SetPassword';
 import { SponsorSetup } from './pages/public/SponsorSetup';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { CommChat } from './pages/communication/CommChat';
 import { CommBlogAdmin } from './pages/communication/CommBlogAdmin';
 import { CommEmailTemplates } from './pages/communication/CommEmailTemplates';
@@ -324,7 +325,7 @@ export default function App() {
                                               <Route path="/updates" element={<ObserverRestricted><NutritionSupporterUpdates /></ObserverRestricted>} />
                                               <Route path="/inventory" element={<ObserverRestricted><Inventory /></ObserverRestricted>} />
                                               <Route path="/management" element={<ObserverRestricted><Management /></ObserverRestricted>} />
-                                              <Route path="/finance" element={<ObserverRestricted><NutritionFinance /></ObserverRestricted>} />
+                                              <Route path="/finance" element={<ObserverRestricted><ErrorBoundary fallbackTitle="Falha ao carregar Finanças da Nutrição"><NutritionFinance /></ErrorBoundary></ObserverRestricted>} />
                                               <Route path="/atendimento" element={<ObserverRestricted><Atendimentos /></ObserverRestricted>} />
                                               <Route path="/visits" element={<ObserverRestricted><HomeVisits /></ObserverRestricted>} />
                                               <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
