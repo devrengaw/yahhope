@@ -195,7 +195,34 @@ const MOCK_STATUSES: CU_Status[] = [
   { id: 'st-d-4', list_id: 'l-desenvolvimento', name: 'CONCLUÍDO', color: '#10b981', order_index: 3 }
 ];
 
-const STORAGE_KEY_TASKS = 'yah_hope_clickup_tasks_v3';
+const STORAGE_KEY_TASKS = 'yah_hope_clickup_tasks_v5';
+const STORAGE_KEY_SPACES = 'yah_hope_clickup_spaces_v5';
+const STORAGE_KEY_LISTS = 'yah_hope_clickup_lists_v5';
+const STORAGE_KEY_STATUSES = 'yah_hope_clickup_statuses_v5';
+
+const isUuid = (val?: string | null): boolean => 
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+const persistLocally = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Failed to persist ${key}:`, e);
+  }
+};
+
+const getLocally = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+    }
+  } catch (e) {
+    console.error(`Failed to load ${key}:`, e);
+  }
+  return fallback;
+};
 
 // Mock tasks eliminated: tasks must be real and created by the user or fetched from DB
 const MOCK_TASKS: CU_Task[] = [];
@@ -210,10 +237,10 @@ const MOCK_CHANNELS: CU_Channel[] = [
 export function ClickUpProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
-  const [spaces, setSpaces] = useState<CU_Space[]>([]);
+  const [spaces, setSpaces] = useState<CU_Space[]>(() => getLocally(STORAGE_KEY_SPACES, MOCK_SPACES));
   const [folders, setFolders] = useState<CU_Folder[]>([]);
-  const [lists, setLists] = useState<CU_List[]>([]);
-  const [statuses, setStatuses] = useState<CU_Status[]>([]);
+  const [lists, setLists] = useState<CU_List[]>(() => getLocally(STORAGE_KEY_LISTS, MOCK_LISTS));
+  const [statuses, setStatuses] = useState<CU_Status[]>(() => getLocally(STORAGE_KEY_STATUSES, MOCK_STATUSES));
   const [fields, setFields] = useState<CU_CustomField[]>([]);
   const [tasks, setTasks] = useState<CU_Task[]>(() => {
     try {
@@ -221,7 +248,6 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Filter out any legacy mock tasks that might be cached
           return parsed.filter(t => !['t-1', 't-2', 't-3', 't-4', 't-5'].includes(t.id));
         }
       }
@@ -236,12 +262,21 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
 
   // Sync tasks state to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-    } catch (e) {
-      console.error('Failed to sync tasks to localStorage:', e);
-    }
+    persistLocally(STORAGE_KEY_TASKS, tasks);
   }, [tasks]);
+
+  // Sync spaces, lists, statuses to localStorage
+  useEffect(() => {
+    if (spaces.length > 0) persistLocally(STORAGE_KEY_SPACES, spaces);
+  }, [spaces]);
+
+  useEffect(() => {
+    if (lists.length > 0) persistLocally(STORAGE_KEY_LISTS, lists);
+  }, [lists]);
+
+  useEffect(() => {
+    if (statuses.length > 0) persistLocally(STORAGE_KEY_STATUSES, statuses);
+  }, [statuses]);
 
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
   const [activeList, setActiveList] = useState<string | null>(null);
@@ -411,7 +446,6 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
               const localParsed: CU_Task[] = JSON.parse(saved);
               if (Array.isArray(localParsed)) {
                 localUnsynced = localParsed.filter(lt => 
-                  lt.id.startsWith('t-') && 
                   !['t-1','t-2','t-3','t-4','t-5'].includes(lt.id) &&
                   !parsedTasks.some(pt => pt.id === lt.id)
                 );
@@ -420,6 +454,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
           }
           const merged = [...localUnsynced, ...parsedTasks];
           setTasks(merged);
+          persistLocally(STORAGE_KEY_TASKS, merged);
         } else {
           // No tasks in DB. Keep local offline tasks or empty, NEVER mock tasks!
           const saved = localStorage.getItem(STORAGE_KEY_TASKS);
@@ -427,7 +462,9 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
             try {
               const localParsed: CU_Task[] = JSON.parse(saved);
               if (Array.isArray(localParsed)) {
-                setTasks(localParsed.filter(t => !['t-1','t-2','t-3','t-4','t-5'].includes(t.id)));
+                const cleaned = localParsed.filter(t => !['t-1','t-2','t-3','t-4','t-5'].includes(t.id));
+                setTasks(cleaned);
+                persistLocally(STORAGE_KEY_TASKS, cleaned);
               } else {
                 setTasks([]);
               }
@@ -525,12 +562,20 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   const addSpace = async (name: string, color: string, icon: string, module: string = 'geral') => {
     const tempId = 's-' + Math.random().toString(36).substring(2, 9);
     const newSpace: CU_Space = { id: tempId, name, color, icon, module };
-    setSpaces(prev => [...prev, newSpace]);
+    setSpaces(prev => {
+      const updated = [...prev, newSpace];
+      persistLocally(STORAGE_KEY_SPACES, updated);
+      return updated;
+    });
 
     try {
       const { data, error } = await supabase.from('clickup_spaces').insert([{ name, color, icon, module }]).select().single();
       if (!error && data) {
-        setSpaces(prev => prev.map(s => s.id === tempId ? data : s));
+        setSpaces(prev => {
+          const updated = prev.map(s => s.id === tempId ? data : s);
+          persistLocally(STORAGE_KEY_SPACES, updated);
+          return updated;
+        });
         if (!activeSpace) setActiveSpace(data.id);
       }
     } catch (err) {
@@ -539,23 +584,39 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   };
 
   const updateSpace = async (id: string, updates: Partial<CU_Space>) => {
-    setSpaces(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    setSpaces(prev => {
+      const updated = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+      persistLocally(STORAGE_KEY_SPACES, updated);
+      return updated;
+    });
     try {
-      await supabase.from('clickup_spaces').update(updates).eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_spaces').update(updates).eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for updateSpace');
     }
   };
 
   const deleteSpace = async (id: string) => {
-    setSpaces(prev => prev.filter(s => s.id !== id));
-    setLists(prev => prev.filter(l => l.space_id !== id));
+    setSpaces(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      persistLocally(STORAGE_KEY_SPACES, updated);
+      return updated;
+    });
+    setLists(prev => {
+      const updated = prev.filter(l => l.space_id !== id);
+      persistLocally(STORAGE_KEY_LISTS, updated);
+      return updated;
+    });
     if (activeSpace === id) {
       setActiveSpace(null);
       setActiveList(null);
     }
     try {
-      await supabase.from('clickup_spaces').delete().eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_spaces').delete().eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for deleteSpace');
     }
@@ -564,7 +625,11 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   const addList = async (space_id: string, name: string, color: string = '#3b82f6') => {
     const tempId = 'l-' + Math.random().toString(36).substring(2, 9);
     const newList: CU_List = { id: tempId, space_id, name, color };
-    setLists(prev => [...prev, newList]);
+    setLists(prev => {
+      const updated = [...prev, newList];
+      persistLocally(STORAGE_KEY_LISTS, updated);
+      return updated;
+    });
 
     // Add default statuses for this new list
     const defaultStatuses: CU_Status[] = [
@@ -572,48 +637,86 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       { id: 'st-' + Math.random().toString(36).substring(2, 7), list_id: tempId, name: 'EM ANDAMENTO', color: '#3b82f6', order_index: 1 },
       { id: 'st-' + Math.random().toString(36).substring(2, 7), list_id: tempId, name: 'CONCLUÍDO', color: '#10b981', order_index: 2 }
     ];
-    setStatuses(prev => [...prev, ...defaultStatuses]);
+    setStatuses(prev => {
+      const updated = [...prev, ...defaultStatuses];
+      persistLocally(STORAGE_KEY_STATUSES, updated);
+      return updated;
+    });
 
     try {
-      const { data, error } = await supabase.from('clickup_lists').insert([{ space_id, name, color }]).select().single();
-      if (!error && data) {
-        setLists(prev => prev.map(l => l.id === tempId ? data : l));
-        // Insert statuses into db
-        await supabase.from('clickup_statuses').insert(defaultStatuses.map((st, i) => ({
-          list_id: data.id,
-          name: st.name,
-          color: st.color,
-          order_index: i
-        })));
-        setActiveList(data.id);
+      if (isUuid(space_id)) {
+        const { data, error } = await supabase.from('clickup_lists').insert([{ space_id, name, color }]).select().single();
+        if (!error && data) {
+          setLists(prev => {
+            const updated = prev.map(l => l.id === tempId ? data : l);
+            persistLocally(STORAGE_KEY_LISTS, updated);
+            return updated;
+          });
+          // Insert statuses into db
+          const { data: dbStatuses } = await supabase.from('clickup_statuses').insert(defaultStatuses.map((st, i) => ({
+            list_id: data.id,
+            name: st.name,
+            color: st.color,
+            order_index: i
+          }))).select();
+
+          if (dbStatuses && dbStatuses.length > 0) {
+            setStatuses(prev => {
+              const withoutTemp = prev.filter(s => s.list_id !== tempId);
+              const updated = [...withoutTemp, ...dbStatuses];
+              persistLocally(STORAGE_KEY_STATUSES, updated);
+              return updated;
+            });
+          }
+
+          setActiveList(data.id);
+          return;
+        }
       }
+      setActiveList(tempId);
     } catch (err) {
       setActiveList(tempId);
     }
   };
 
   const updateList = async (id: string, updates: Partial<CU_List>) => {
-    setLists(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+    setLists(prev => {
+      const updated = prev.map(l => l.id === id ? { ...l, ...updates } : l);
+      persistLocally(STORAGE_KEY_LISTS, updated);
+      return updated;
+    });
     try {
-      await supabase.from('clickup_lists').update(updates).eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_lists').update(updates).eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for updateList');
     }
   };
 
   const deleteList = async (id: string) => {
-    setLists(prev => prev.filter(l => l.id !== id));
-    setTasks(prev => prev.filter(t => t.list_id !== id));
+    setLists(prev => {
+      const updated = prev.filter(l => l.id !== id);
+      persistLocally(STORAGE_KEY_LISTS, updated);
+      return updated;
+    });
+    setTasks(prev => {
+      const updated = prev.filter(t => t.list_id !== id);
+      persistLocally(STORAGE_KEY_TASKS, updated);
+      return updated;
+    });
     if (activeList === id) setActiveList(null);
     try {
-      await supabase.from('clickup_lists').delete().eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_lists').delete().eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for deleteList');
     }
   };
 
   const addTask = async (list_id: string, name: string, status_id: string, options: Partial<CU_Task> = {}): Promise<CU_Task | null> => {
-    const tempId = 't-' + Math.random().toString(36).substring(2, 9);
+    const tempId = 't-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
     const assigneeUser = options.assignee_id 
       ? systemUsers.find(u => u.id === options.assignee_id) 
       : options.assignee 
@@ -642,11 +745,13 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       created_at: new Date().toISOString()
     };
 
-    setTasks(prev => [newTask, ...prev]);
+    setTasks(prev => {
+      const updated = [newTask, ...prev];
+      persistLocally(STORAGE_KEY_TASKS, updated);
+      return updated;
+    });
 
     try {
-      const isUuid = (val?: string | null) => !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
-
       if (isUuid(list_id)) {
         const payload: Record<string, any> = {
           list_id,
@@ -667,8 +772,13 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase.from('clickup_tasks').insert([payload]).select().single();
 
         if (!error && data) {
-          setTasks(prev => prev.map(t => t.id === tempId ? { ...newTask, id: data.id } : t));
-          return { ...newTask, id: data.id };
+          const finalTask = { ...newTask, id: data.id };
+          setTasks(prev => {
+            const updated = prev.map(t => t.id === tempId ? finalTask : t);
+            persistLocally(STORAGE_KEY_TASKS, updated);
+            return updated;
+          });
+          return finalTask;
         } else if (error) {
           console.warn('Supabase task insert fallback to local state:', error);
         }
@@ -681,39 +791,52 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   };
 
   const updateTask = async (task_id: string, updates: Partial<CU_Task>) => {
-    // If assignee_id is updated, also update assignee_user
     let assigneeUser = updates.assignee_user;
     if (updates.assignee_id && !assigneeUser) {
       assigneeUser = systemUsers.find(u => u.id === updates.assignee_id);
     }
 
-    setTasks(prev => prev.map(t => {
-      if (t.id === task_id) {
-        return {
-          ...t,
-          ...updates,
-          assignee_user: assigneeUser || t.assignee_user
-        };
-      }
-      return t;
-    }));
+    setTasks(prev => {
+      const updated = prev.map(t => {
+        if (t.id === task_id) {
+          return {
+            ...t,
+            ...updates,
+            assignee_user: assigneeUser || t.assignee_user
+          };
+        }
+        return t;
+      });
+      persistLocally(STORAGE_KEY_TASKS, updated);
+      return updated;
+    });
+
+    if (selectedTask?.id === task_id) {
+      setSelectedTask(prev => prev ? {
+        ...prev,
+        ...updates,
+        assignee_user: assigneeUser || prev.assignee_user
+      } : null);
+    }
 
     try {
-      const payload: Record<string, any> = {};
-      if (updates.name !== undefined) payload.name = updates.name;
-      if (updates.description !== undefined) payload.description = updates.description;
-      if (updates.status_id !== undefined) payload.status_id = updates.status_id;
-      if (updates.priority !== undefined) payload.priority = updates.priority;
-      if (updates.assignee_id !== undefined) payload.assignee_id = updates.assignee_id;
-      if (updates.team_id !== undefined) payload.team_id = updates.team_id;
-      if (updates.due_date !== undefined) payload.due_date = updates.due_date;
-      if (updates.tags !== undefined) payload.tags = updates.tags;
-      if (updates.checklists !== undefined) payload.checklists = updates.checklists;
-      if (updates.comments !== undefined) payload.comments = updates.comments;
-      if (updates.order_index !== undefined) payload.order_index = updates.order_index;
+      if (isUuid(task_id)) {
+        const payload: Record<string, any> = {};
+        if (updates.name !== undefined) payload.name = updates.name;
+        if (updates.description !== undefined) payload.description = updates.description;
+        if (updates.status_id !== undefined && isUuid(updates.status_id)) payload.status_id = updates.status_id;
+        if (updates.priority !== undefined) payload.priority = updates.priority;
+        if (updates.assignee_id !== undefined) payload.assignee_id = isUuid(updates.assignee_id) ? updates.assignee_id : null;
+        if (updates.team_id !== undefined) payload.team_id = isUuid(updates.team_id) ? updates.team_id : null;
+        if (updates.due_date !== undefined) payload.due_date = updates.due_date;
+        if (updates.tags !== undefined) payload.tags = updates.tags;
+        if (updates.checklists !== undefined) payload.checklists = updates.checklists;
+        if (updates.comments !== undefined) payload.comments = updates.comments;
+        if (updates.order_index !== undefined) payload.order_index = updates.order_index;
 
-      if (Object.keys(payload).length > 0) {
-        await supabase.from('clickup_tasks').update(payload).eq('id', task_id);
+        if (Object.keys(payload).length > 0) {
+          await supabase.from('clickup_tasks').update(payload).eq('id', task_id);
+        }
       }
     } catch (err) {
       console.log('Using local state for updateTask');
@@ -721,32 +844,55 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteTask = async (task_id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== task_id));
+    setTasks(prev => {
+      const updated = prev.filter(t => t.id !== task_id);
+      persistLocally(STORAGE_KEY_TASKS, updated);
+      return updated;
+    });
     if (selectedTask?.id === task_id) setSelectedTask(null);
     try {
-      await supabase.from('clickup_tasks').delete().eq('id', task_id);
+      if (isUuid(task_id)) {
+        await supabase.from('clickup_tasks').delete().eq('id', task_id);
+      }
     } catch (err) {
       console.log('Using local state for deleteTask');
     }
   };
 
   const moveTaskStatus = async (task_id: string, newStatusId: string, newOrderIndex?: number) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === task_id) {
-        return {
-          ...t,
-          status_id: newStatusId,
-          order_index: newOrderIndex !== undefined ? newOrderIndex : t.order_index
-        };
-      }
-      return t;
-    }));
+    setTasks(prev => {
+      const updated = prev.map(t => {
+        if (t.id === task_id) {
+          return {
+            ...t,
+            status_id: newStatusId,
+            order_index: newOrderIndex !== undefined ? newOrderIndex : t.order_index
+          };
+        }
+        return t;
+      });
+      persistLocally(STORAGE_KEY_TASKS, updated);
+      return updated;
+    });
+
+    if (selectedTask?.id === task_id) {
+      setSelectedTask(prev => prev ? {
+        ...prev,
+        status_id: newStatusId,
+        order_index: newOrderIndex !== undefined ? newOrderIndex : prev.order_index
+      } : null);
+    }
 
     try {
-      await supabase.from('clickup_tasks').update({
-        status_id: newStatusId,
-        order_index: newOrderIndex ?? 0
-      }).eq('id', task_id);
+      if (isUuid(task_id)) {
+        const payload: Record<string, any> = {
+          order_index: newOrderIndex ?? 0
+        };
+        if (isUuid(newStatusId)) {
+          payload.status_id = newStatusId;
+        }
+        await supabase.from('clickup_tasks').update(payload).eq('id', task_id);
+      }
     } catch (err) {
       console.log('Using local state for moveTaskStatus');
     }
@@ -835,12 +981,22 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
     const tempId = 'st-' + Math.random().toString(36).substring(2, 7);
 
     const newStatus: CU_Status = { id: tempId, list_id, name, color, order_index };
-    setStatuses(prev => [...prev, newStatus]);
+    setStatuses(prev => {
+      const updated = [...prev, newStatus];
+      persistLocally(STORAGE_KEY_STATUSES, updated);
+      return updated;
+    });
 
     try {
-      const { data, error } = await supabase.from('clickup_statuses').insert([{ list_id, name, color, order_index }]).select().single();
-      if (!error && data) {
-        setStatuses(prev => prev.map(s => s.id === tempId ? data : s));
+      if (isUuid(list_id)) {
+        const { data, error } = await supabase.from('clickup_statuses').insert([{ list_id, name, color, order_index }]).select().single();
+        if (!error && data) {
+          setStatuses(prev => {
+            const updated = prev.map(s => s.id === tempId ? data : s);
+            persistLocally(STORAGE_KEY_STATUSES, updated);
+            return updated;
+          });
+        }
       }
     } catch (err) {
       console.log('Using local state for addStatus');
@@ -848,18 +1004,30 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
   };
 
   const updateStatus = async (id: string, updates: Partial<CU_Status>) => {
-    setStatuses(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    setStatuses(prev => {
+      const updated = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+      persistLocally(STORAGE_KEY_STATUSES, updated);
+      return updated;
+    });
     try {
-      await supabase.from('clickup_statuses').update(updates).eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_statuses').update(updates).eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for updateStatus');
     }
   };
 
   const deleteStatus = async (id: string) => {
-    setStatuses(prev => prev.filter(s => s.id !== id));
+    setStatuses(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      persistLocally(STORAGE_KEY_STATUSES, updated);
+      return updated;
+    });
     try {
-      await supabase.from('clickup_statuses').delete().eq('id', id);
+      if (isUuid(id)) {
+        await supabase.from('clickup_statuses').delete().eq('id', id);
+      }
     } catch (err) {
       console.log('Using local state for deleteStatus');
     }

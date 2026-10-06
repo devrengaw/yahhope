@@ -349,6 +349,28 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               </Link>
             )}
           </div>
+
+          {/* Bottom Logout & Profile in Primary Sidebar */}
+          <div className="mt-auto flex flex-col items-center gap-3 pt-4 border-t border-white/20 w-full px-2 shrink-0">
+            <Link 
+              to="/profile" 
+              title={user?.name || 'Meu Perfil'} 
+              className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-bold text-xs transition-all shadow-xs"
+            >
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover rounded-xl" />
+              ) : (
+                user?.name?.charAt(0) || 'U'
+              )}
+            </Link>
+            <button
+              onClick={handleLogout}
+              title="Sair do Sistema (Logoff)"
+              className="w-10 h-10 rounded-xl bg-black/20 hover:bg-rose-600 text-white flex items-center justify-center transition-all cursor-pointer group shadow-xs"
+            >
+              <LogOut size={18} className="group-hover:scale-110 transition-transform" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -381,7 +403,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {/* Secondary Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col border-r pt-safe pb-safe md:h-full md:max-h-full",
+            "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col border-r pt-safe pb-safe md:h-full md:max-h-full min-h-0 overflow-y-auto md:overflow-hidden",
             theme.sidebarBg,
             module === 'workspace' 
               ? "md:hidden" 
@@ -514,7 +536,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           )}
           
           <nav 
-            className="mt-3 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 md:pb-4" 
+            className="mt-3 flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-6 md:pb-4" 
             style={{ WebkitOverflowScrolling: 'touch' }}
             aria-label="Navegação Lateral"
           >
@@ -649,7 +671,12 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         </aside>
 
       {/* Main Content */}
-      <main className={cn("flex-1 w-full pb-20 md:pb-0 relative", module === 'workspace' ? "flex flex-col min-w-0 h-screen overflow-hidden" : "overflow-auto")}>
+      <main className={cn(
+        "flex-1 w-full pb-20 md:pb-0 relative min-h-0",
+        module === 'workspace' 
+          ? "flex flex-col min-w-0 h-full overflow-y-auto md:overflow-hidden" 
+          : "overflow-y-auto h-full"
+      )}>
         {/* Botão flutuante para reabrir menu no Desktop se estiver oculto */}
         {isDesktopSidebarHidden && module !== 'workspace' && (
           <button

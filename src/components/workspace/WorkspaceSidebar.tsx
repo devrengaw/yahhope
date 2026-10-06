@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
-  Hash, Link2, Star, Briefcase, Calendar, Users, X
+  Hash, Link2, Star, Briefcase, Calendar, Users, X, LogOut
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -16,7 +16,7 @@ interface WorkspaceSidebarProps {
 }
 
 export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSidebarProps = {}) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { 
     spaces, lists, channels, addChannel, 
@@ -73,12 +73,12 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
 
   return (
     <div className={cn(
-      "w-[260px] max-w-[85vw] bg-[#EBBF6E] flex flex-col h-full border-r border-[#EBBF6E] shrink-0 text-white transition-transform duration-300",
+      "w-[260px] max-w-[85vw] bg-[#EBBF6E] flex flex-col h-full border-r border-[#EBBF6E] shrink-0 text-white transition-transform duration-300 min-h-0",
       "fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0",
       isMobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
     )}>
       {/* Top Header */}
-      <div className="p-4 flex items-center justify-between border-b border-white/20 hover:bg-white/10 transition-colors">
+      <div className="p-4 flex items-center justify-between border-b border-white/20 hover:bg-white/10 transition-colors shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-lg text-white flex items-center justify-center font-black">
             YH
@@ -102,7 +102,7 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         {/* Meu Workspace */}
         <div className="p-3 border-b border-white/20">
           <h3 className="text-[10px] font-black text-white/60 uppercase tracking-widest px-2 mb-2">
@@ -473,6 +473,40 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
             className="w-full mt-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-medium cursor-pointer"
           >
             <Plus size={14} /> Novo Espaço
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Footer: Usuário & Logoff no Workspace */}
+      <div className="p-3 border-t border-white/20 shrink-0 bg-black/15">
+        <div className="flex items-center justify-between gap-2">
+          <NavLink 
+            to="/profile" 
+            onClick={onClose}
+            className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-90 transition-opacity"
+            title="Ir para o meu perfil"
+          >
+            <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                user?.name?.charAt(0) || 'U'
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate leading-tight">{user?.name || 'Meu Perfil'}</p>
+              <p className="text-[10px] text-white/70 truncate">{user?.role === 'ADMIN' ? 'Administrador' : 'Membro'}</p>
+            </div>
+          </NavLink>
+          <button
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            title="Sair do Sistema (Logoff)"
+            className="p-2 rounded-xl bg-white/10 hover:bg-rose-600 text-white transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+          >
+            <LogOut size={16} />
           </button>
         </div>
       </div>
