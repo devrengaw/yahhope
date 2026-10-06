@@ -25,6 +25,78 @@ export const DEFAULT_TOP_BANNER: TopBannerConfig = {
   textColor: '#FFFFFF',
 };
 
+export function isValidCssColor(val: unknown): boolean {
+  if (typeof val !== 'string') return false;
+  const s = val.trim();
+  return s.startsWith('#') || s.startsWith('rgb(') || s.startsWith('rgba(') || s.startsWith('hsl(') || s.startsWith('hsla(');
+}
+
+export function sanitizeTopBannerConfig(raw: any, fallback: TopBannerConfig = DEFAULT_TOP_BANNER): TopBannerConfig {
+  if (!raw || typeof raw !== 'object') return fallback;
+
+  // Resolve message (support legacy `text` and `message`)
+  const message = (typeof raw.message === 'string' && raw.message.trim())
+    ? raw.message.trim()
+    : (typeof raw.text === 'string' && raw.text.trim())
+      ? raw.text.trim()
+      : fallback.message;
+
+  // Resolve buttonText (support legacy `linkText` and `buttonText`)
+  const buttonText = (typeof raw.buttonText === 'string' && raw.buttonText.trim())
+    ? raw.buttonText.trim()
+    : (typeof raw.linkText === 'string' && raw.linkText.trim())
+      ? raw.linkText.trim()
+      : fallback.buttonText;
+
+  // Resolve buttonLink (support legacy `link` and `buttonLink`)
+  const buttonLink = (typeof raw.buttonLink === 'string' && raw.buttonLink.trim())
+    ? raw.buttonLink.trim()
+    : (typeof raw.link === 'string' && raw.link.trim())
+      ? raw.link.trim()
+      : fallback.buttonLink;
+
+  // Resolve tag
+  const tag = (typeof raw.tag === 'string' && raw.tag.trim())
+    ? raw.tag.trim()
+    : fallback.tag;
+
+  // Resolve tagColor
+  let tagColor = fallback.tagColor;
+  if (isValidCssColor(raw.tagColor)) {
+    tagColor = raw.tagColor.trim();
+  }
+
+  // Resolve bgColor (convert Tailwind classes like 'bg-emerald-600' to hex, or fallback to solid dark '#0F172A')
+  let bgColor = fallback.bgColor;
+  if (isValidCssColor(raw.bgColor)) {
+    bgColor = raw.bgColor.trim();
+  } else if (typeof raw.bgColor === 'string' && raw.bgColor.includes('emerald')) {
+    bgColor = '#059669';
+  } else if (typeof raw.bgColor === 'string' && raw.bgColor.includes('slate')) {
+    bgColor = '#0F172A';
+  }
+
+  // Resolve textColor (convert 'text-white' to hex '#FFFFFF')
+  let textColor = fallback.textColor;
+  if (isValidCssColor(raw.textColor)) {
+    textColor = raw.textColor.trim();
+  } else if (typeof raw.textColor === 'string' && (raw.textColor.includes('white') || raw.textColor === 'text-white')) {
+    textColor = '#FFFFFF';
+  }
+
+  return {
+    enabled: raw.enabled !== false,
+    tag,
+    tagColor,
+    message,
+    buttonText,
+    buttonActionType: raw.buttonActionType === 'custom_link' ? 'custom_link' : (fallback.buttonActionType || 'donation_modal'),
+    buttonLink,
+    bgColor,
+    textColor,
+  };
+}
+
 interface TopBannerContextType {
   banner: TopBannerConfig;
   loading: boolean;
@@ -43,7 +115,7 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          return { ...DEFAULT_TOP_BANNER, ...parsed };
+          return sanitizeTopBannerConfig(parsed, DEFAULT_TOP_BANNER);
         }
       }
     } catch (e) {
@@ -76,7 +148,22 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         if (!error && data && data.value && isMounted) {
-          setBanner(prev => ({ ...prev, ...data.value }));
+          const sanitized = sanitizeTopBannerConfig(data.value, DEFAULT_TOP_BANNER);
+          setBanner(sanitized);
+
+          // If the stored value in Supabase was legacy, sanitize it in Supabase as well
+          if ((data.value.text && !data.value.message) || !isValidCssColor(data.value.bgColor)) {
+            supabase.from('site_settings').upsert({
+              key: 'top_banner',
+              value: {
+                ...sanitized,
+                text: sanitized.message,
+                linkText: sanitized.buttonText,
+                link: sanitized.buttonLink,
+              },
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'key' }).then(() => {}).catch(() => {});
+          }
         }
       } catch {
         // Fallback to local storage state
@@ -92,7 +179,7 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (parsed && typeof parsed === 'object') {
-            setBanner(prev => ({ ...prev, ...parsed }));
+            setBanner(prev => sanitizeTopBannerConfig(parsed, prev));
           }
         } catch {}
       }
@@ -106,13 +193,18 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateBanner = async (updates: Partial<TopBannerConfig>) => {
-    const updated = { ...banner, ...updates };
+    const updated = sanitizeTopBannerConfig({ ...banner, ...updates }, banner);
     setBanner(updated);
 
     try {
       await supabase.from('site_settings').upsert({
         key: 'top_banner',
-        value: updated,
+        value: {
+          ...updated,
+          text: updated.message,
+          linkText: updated.buttonText,
+          link: updated.buttonLink,
+        },
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
     } catch {}
@@ -124,7 +216,12 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TOP_BANNER));
       await supabase.from('site_settings').upsert({
         key: 'top_banner',
-        value: DEFAULT_TOP_BANNER,
+        value: {
+          ...DEFAULT_TOP_BANNER,
+          text: DEFAULT_TOP_BANNER.message,
+          linkText: DEFAULT_TOP_BANNER.buttonText,
+          link: DEFAULT_TOP_BANNER.buttonLink,
+        },
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
     } catch {}

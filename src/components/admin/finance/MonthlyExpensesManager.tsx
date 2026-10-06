@@ -22,7 +22,8 @@ import {
   X,
   Receipt,
   Wallet,
-  RefreshCw
+  RefreshCw,
+  Tag
 } from 'lucide-react';
 import { Transaction, TransactionCategory } from '../../../pages/admin/Finance';
 import { ExpenseModal, ExpensePayload } from './ExpenseModal';
@@ -141,6 +142,10 @@ export function MonthlyExpensesManager({
   const [moduleFilter, setModuleFilter] = useState<'all' | 'nutrition' | 'communication' | 'global'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   
+  // Modal de Criação / Edição de Despesas
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalDefaultType, setModalDefaultType] = useState<'fixed' | 'variable'>('fixed');
+
   // Modal de Gerenciamento de Categorias de Despesas
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);

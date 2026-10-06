@@ -13,16 +13,18 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
 
 -- Habilitar RLS e permitir leitura pública e gravação autenticada/anon
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública site_settings" ON public.site_settings;
 CREATE POLICY "Leitura pública site_settings" ON public.site_settings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Inserção/Atualização site_settings" ON public.site_settings;
 CREATE POLICY "Inserção/Atualização site_settings" ON public.site_settings FOR ALL USING (true);
 
--- Inserir configuração padrão do Top Banner caso não exista
+-- Inserir configuração padrão do Top Banner caso não exista ou atualizar se estiver desatualizado
 INSERT INTO public.site_settings (key, value)
 VALUES (
   'top_banner', 
-  '{"enabled": true, "text": "Ajude as crianças de Moçambique: Faça uma doação hoje", "link": "/doar", "linkText": "Doar Agora", "bgColor": "bg-emerald-600", "textColor": "text-white"}'::jsonb
+  '{"enabled": true, "tag": "URGENTE", "tagColor": "#F49853", "message": "Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional", "text": "Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional", "buttonText": "Apoiar Agora", "linkText": "Apoiar Agora", "buttonActionType": "donation_modal", "buttonLink": "/campanha", "link": "/campanha", "bgColor": "#0F172A", "textColor": "#FFFFFF"}'::jsonb
 )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 
 -- 2. Tabela para Destaques da Página Inicial (Home Highlights)
@@ -44,7 +46,9 @@ CREATE TABLE IF NOT EXISTS public.home_highlights (
 );
 
 ALTER TABLE public.home_highlights ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública home_highlights" ON public.home_highlights;
 CREATE POLICY "Leitura pública home_highlights" ON public.home_highlights FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Operações home_highlights" ON public.home_highlights;
 CREATE POLICY "Operações home_highlights" ON public.home_highlights FOR ALL USING (true);
 
 
@@ -62,7 +66,9 @@ CREATE TABLE IF NOT EXISTS public.impact_metrics (
 );
 
 ALTER TABLE public.impact_metrics ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública impact_metrics" ON public.impact_metrics;
 CREATE POLICY "Leitura pública impact_metrics" ON public.impact_metrics FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Operações impact_metrics" ON public.impact_metrics;
 CREATE POLICY "Operações impact_metrics" ON public.impact_metrics FOR ALL USING (true);
 
 
@@ -93,5 +99,7 @@ BEGIN
 END $$;
 
 ALTER TABLE public.website_projects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública website_projects" ON public.website_projects;
 CREATE POLICY "Leitura pública website_projects" ON public.website_projects FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Operações website_projects" ON public.website_projects;
 CREATE POLICY "Operações website_projects" ON public.website_projects FOR ALL USING (true);

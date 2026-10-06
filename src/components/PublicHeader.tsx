@@ -50,60 +50,77 @@ export function PublicHeader() {
   };
 
 
+  // Banner fallback resolution
+  const bannerBg = (topBanner.bgColor && (topBanner.bgColor.startsWith('#') || topBanner.bgColor.startsWith('rgb') || topBanner.bgColor.startsWith('hsl')))
+    ? topBanner.bgColor
+    : (topBanner.bgColor?.includes('emerald') ? '#059669' : '#0F172A');
+
+  const bannerTextColor = (topBanner.textColor && (topBanner.textColor.startsWith('#') || topBanner.textColor.startsWith('rgb') || topBanner.textColor.startsWith('hsl')))
+    ? topBanner.textColor
+    : '#FFFFFF';
+
+  const bannerTagColor = (topBanner.tagColor && (topBanner.tagColor.startsWith('#') || topBanner.tagColor.startsWith('rgb') || topBanner.tagColor.startsWith('hsl')))
+    ? topBanner.tagColor
+    : '#F49853';
+
+  const bannerMessage = topBanner.message || (topBanner as any).text || 'Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional';
+  const bannerButtonText = topBanner.buttonText || (topBanner as any).linkText || 'Apoiar Agora';
+  const bannerButtonLink = topBanner.buttonLink || (topBanner as any).link || '/campanha';
+
   return (
     <>
       {/* 1. Global Alert Banner */}
       {topBanner.enabled && alertVisible && (
         <aside 
           aria-label="Alerta Humanitário Urgente"
-          style={{ backgroundColor: topBanner.bgColor || '#0F172A' }}
+          style={{ backgroundColor: bannerBg }}
           className="text-white text-xs md:text-sm py-2.5 px-4 sticky top-0 z-50 border-b border-white/10 shadow-md transition-all duration-300 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]"
         >
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
               {topBanner.tag && (
                 <span 
-                  style={{ backgroundColor: topBanner.tagColor || '#F49853' }}
+                  style={{ backgroundColor: bannerTagColor }}
                   className="text-white font-gotham-bold uppercase text-[10px] tracking-wider px-2.5 py-0.5 rounded-full shadow-xs shrink-0"
                 >
                   {topBanner.tag}
                 </span>
               )}
               <p 
-                style={{ color: topBanner.textColor || '#FFFFFF' }}
+                style={{ color: bannerTextColor }}
                 className="font-gotham-regular truncate text-xs md:text-sm"
               >
-                {topBanner.message}
+                {bannerMessage}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {topBanner.buttonActionType === 'donation_modal' ? (
                 <button
                   onClick={() => openDonationModal()}
-                  style={{ backgroundColor: topBanner.tagColor || '#F49853' }}
+                  style={{ backgroundColor: bannerTagColor }}
                   className="inline-flex items-center gap-1.5 hover:opacity-90 text-white font-gotham-bold text-xs uppercase tracking-wider px-4 py-1.5 rounded-full transition-transform active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span>{topBanner.buttonText || 'Apoiar Agora'}</span>
+                  <span>{bannerButtonText}</span>
                   <ArrowRight size={13} />
                 </button>
-              ) : topBanner.buttonLink && topBanner.buttonLink.startsWith('http') ? (
+              ) : bannerButtonLink && bannerButtonLink.startsWith('http') ? (
                 <a
-                  href={topBanner.buttonLink}
+                  href={bannerButtonLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ backgroundColor: topBanner.tagColor || '#F49853' }}
+                  style={{ backgroundColor: bannerTagColor }}
                   className="inline-flex items-center gap-1.5 hover:opacity-90 text-white font-gotham-bold text-xs uppercase tracking-wider px-4 py-1.5 rounded-full transition-transform active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span>{topBanner.buttonText || 'Saiba Mais'}</span>
+                  <span>{bannerButtonText}</span>
                   <ArrowRight size={13} />
                 </a>
               ) : (
                 <Link
-                  to={topBanner.buttonLink || '/projetos'}
-                  style={{ backgroundColor: topBanner.tagColor || '#F49853' }}
+                  to={bannerButtonLink}
+                  style={{ backgroundColor: bannerTagColor }}
                   className="inline-flex items-center gap-1.5 hover:opacity-90 text-white font-gotham-bold text-xs uppercase tracking-wider px-4 py-1.5 rounded-full transition-transform active:scale-95 shadow-sm cursor-pointer"
                 >
-                  <span>{topBanner.buttonText || 'Saiba Mais'}</span>
+                  <span>{bannerButtonText}</span>
                   <ArrowRight size={13} />
                 </Link>
               )}
