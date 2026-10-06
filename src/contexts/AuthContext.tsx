@@ -10,6 +10,9 @@ export interface User {
   role: Role;
   permissions: string[];
   avatar?: string;
+  avatar_url?: string;
+  phone?: string;
+  about?: string;
 }
 
 interface AuthContextType {
@@ -20,6 +23,7 @@ interface AuthContextType {
   registerWithEmail: (name: string, email: string, password?: string) => Promise<boolean>;
   sendPasswordResetEmail: (email: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  updateProfile: (updates: { name?: string; phone?: string; avatar_url?: string; about?: string }) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -123,15 +127,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 3. Build the User object for context
+      // 3. Build the User object for context (with fallback to auth metadata if table columns aren't populated yet)
       const roleStr = (finalUser.role || 'SPONSOR').toUpperCase() as Role;
+      const avatarImg = finalUser.avatar_url || finalUser.avatar || authUser.user_metadata?.avatar_url;
+      const phoneVal = finalUser.phone || authUser.user_metadata?.phone;
+      const aboutVal = finalUser.about || authUser.user_metadata?.about;
+
       const contextUser: User = {
         id: finalUser.id,
         name: finalUser.name,
         email: finalUser.email,
         role: roleStr,
         permissions: roleStr === 'OBSERVER' ? ['patients'] : ((finalUser.permissions && Array.isArray(finalUser.permissions)) ? finalUser.permissions : getPermissionsForRole(roleStr)),
-        avatar: finalUser.name ? finalUser.name[0].toUpperCase() : 'U'
+        avatar: avatarImg || (finalUser.name ? finalUser.name[0].toUpperCase() : 'U'),
+        avatar_url: avatarImg || undefined,
+        phone: phoneVal || undefined,
+        about: aboutVal || undefined
       };
 
       setUser(contextUser);
@@ -214,8 +225,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const updateProfile = async (updates: { name?: string; phone?: string; avatar_url?: string; about?: string }): Promise<boolean> => {
+    if (!user) return false;
+
+    // Immediately update local state for responsive UI
+    setUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        name: updates.name !== undefined ? updates.name : prev.name,
+        phone: updates.phone !== undefined ? updates.phone : prev.phone,
+        avatar_url: updates.avatar_url !== undefined ? updates.avatar_url : prev.avatar_url,
+        avatar: updates.avatar_url !== undefined ? updates.avatar_url : prev.avatar,
+        about: updates.about !== undefined ? updates.about : prev.about
+      };
+    });
+
+    try {
+      const dbPayload: Record<string, any> = {};
+      if (updates.name !== undefined) dbPayload.name = updates.name;
+      if (updates.phone !== undefined) dbPayload.phone = updates.phone;
+      if (updates.avatar_url !== undefined) {
+        dbPayload.avatar_url = updates.avatar_url;
+        dbPayload.avatar = updates.avatar_url;
+      }
+      if (updates.about !== undefined) dbPayload.about = updates.about;
+
+      // Update public.users table
+      const { error } = await supabase
+        .from('users')
+        .update(dbPayload)
+        .eq('id', user.id);
+
+      if (error) {
+        console.warn('Could not update users table directly, attempting email match:', error);
+        await supabase
+          .from('users')
+          .update(dbPayload)
+          .eq('email', user.email);
+      }
+
+      // Also update auth user metadata (always works even if SQL columns don't exist yet)
+      try {
+        const metaUpdates: Record<string, any> = {};
+        if (updates.name !== undefined) metaUpdates.full_name = updates.name;
+        if (updates.avatar_url !== undefined) metaUpdates.avatar_url = updates.avatar_url;
+        if (updates.phone !== undefined) metaUpdates.phone = updates.phone;
+        if (updates.about !== undefined) metaUpdates.about = updates.about;
+
+        await supabase.auth.updateUser({
+          data: metaUpdates
+        });
+      } catch (metaErr) {
+        console.warn('Could not update user metadata:', metaErr);
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Error updating user profile:', err);
+      return false;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithEmail, loginWithGoogle, registerWithEmail, sendPasswordResetEmail, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginWithEmail, loginWithGoogle, registerWithEmail, sendPasswordResetEmail, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

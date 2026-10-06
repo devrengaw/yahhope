@@ -111,3 +111,52 @@ export async function uploadBlogImage(
 
   return optimizedDataUrl;
 }
+
+/**
+ * Compresses and crops an avatar profile picture to a square image (max 500x500, quality 0.82)
+ * for fast loading and low storage footprint, uploading to avatars bucket if possible.
+ */
+export async function uploadProfileAvatar(
+  file: File,
+  userId: string
+): Promise<string> {
+  // Heavy optimization for user profile avatar: max 500x500, quality 0.82
+  const optimizedDataUrl = await optimizeImageFile(file, {
+    maxWidth: 500,
+    maxHeight: 500,
+    quality: 0.82
+  });
+
+  // Attempt Supabase storage upload if bucket exists
+  try {
+    const fileExt = 'webp';
+    const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
+    const filePath = `user-avatars/${fileName}`;
+
+    const response = await fetch(optimizedDataUrl);
+    const blob = await response.blob();
+
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: blob.type || 'image/webp'
+      });
+
+    if (!error) {
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+  } catch {
+    // Fallback to optimized data URL if bucket is not configured
+  }
+
+  return optimizedDataUrl;
+}
+
