@@ -1096,6 +1096,7 @@ export function Finance() {
             transactions={transactions}
             categories={categories}
             totalIncome={stats.totalIncome}
+            projects={projects}
             onSaveExpense={handleSaveExpense}
             onDeleteTransaction={handleDeleteTransaction}
             onToggleStatus={handleToggleStatus}

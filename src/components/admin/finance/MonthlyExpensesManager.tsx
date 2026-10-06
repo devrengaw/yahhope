@@ -32,10 +32,13 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { supabase } from '../../../lib/supabase';
 import { convertMznToBrl } from '../../../services/currencyService';
 
+import { Project } from '../../../lib/mockData';
+
 interface MonthlyExpensesManagerProps {
   transactions: Transaction[];
   categories: TransactionCategory[];
   totalIncome: number;
+  projects?: Project[];
   onSaveExpense: (expense: ExpensePayload) => Promise<void> | void;
   onDeleteTransaction: (id: string) => Promise<void> | void;
   onToggleStatus: (id: string, currentStatus: 'completed' | 'pending') => Promise<void> | void;
@@ -47,6 +50,7 @@ export function MonthlyExpensesManager({
   transactions,
   categories,
   totalIncome,
+  projects = [],
   onSaveExpense,
   onDeleteTransaction,
   onToggleStatus,
@@ -208,10 +212,47 @@ export function MonthlyExpensesManager({
     return transactions.filter(t => t.type === 'expense');
   }, [transactions]);
 
+  // Meses disponíveis com gastos para o filtro
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    allExpenses.forEach(t => {
+      if (t.date) {
+        monthSet.add(t.date.substring(0, 7)); // YYYY-MM
+      }
+    });
+    return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+  }, [allExpenses]);
+
+  // Mês de referência ativo para métricas mensais
+  const activeMonthKey = useMemo(() => {
+    if (selectedMonth !== 'all') return selectedMonth;
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    if (availableMonths.includes(currentMonthKey)) return currentMonthKey;
+    return availableMonths[0] || currentMonthKey;
+  }, [selectedMonth, availableMonths]);
+
+  // Nome formatado do mês de referência
+  const activeMonthLabel = useMemo(() => {
+    if (!activeMonthKey) return '';
+    const parts = activeMonthKey.split('-');
+    if (parts.length === 2) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const dateObj = new Date(year, month, 1);
+      const raw = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+    return activeMonthKey;
+  }, [activeMonthKey]);
+
   // Cálculos de Indicadores de Custos Mensais
   const stats = useMemo(() => {
     const fixedExpenses = allExpenses.filter(t => t.expense_type === 'fixed');
-    const variableExpenses = allExpenses.filter(t => t.expense_type === 'variable');
+    // Gastos variáveis pertencentes ao mês ativo (ou ao mês selecionado)
+    const variableExpensesInMonth = allExpenses.filter(t => 
+      t.expense_type === 'variable' && 
+      t.date && t.date.startsWith(activeMonthKey)
+    );
 
     // Total nominal dos contratos fixos cadastrados
     const totalFixedNominal = fixedExpenses.reduce((acc, t) => acc + t.amount, 0);
@@ -226,8 +267,8 @@ export function MonthlyExpensesManager({
       return acc + t.amount;
     }, 0);
 
-    const totalVariable = variableExpenses.reduce((acc, t) => acc + t.amount, 0);
-    const totalVariableMzn = variableExpenses
+    const totalVariable = variableExpensesInMonth.reduce((acc, t) => acc + t.amount, 0);
+    const totalVariableMzn = variableExpensesInMonth
       .filter(t => t.currency === 'MZN' && t.original_amount)
       .reduce((acc, t) => acc + (t.original_amount || 0), 0);
     const totalExpense = monthlyEquivalentFixed + totalVariable;
@@ -243,22 +284,97 @@ export function MonthlyExpensesManager({
       totalVariableMzn,
       totalExpense,
       fixedCount: fixedExpenses.length,
-      variableCount: variableExpenses.length,
+      variableCount: variableExpensesInMonth.length,
+      allVariableCount: allExpenses.filter(t => t.expense_type === 'variable').length,
       fixedCoverage,
       balance
     };
-  }, [allExpenses, totalIncome]);
+  }, [allExpenses, totalIncome, activeMonthKey]);
 
-  // Meses disponíveis com gastos para o filtro
-  const availableMonths = useMemo(() => {
-    const monthSet = new Set<string>();
-    allExpenses.forEach(t => {
-      if (t.date) {
-        monthSet.add(t.date.substring(0, 7)); // YYYY-MM
+  // Opções de Projetos disponíveis para filtro e agrupamento
+  const availableProjectOptions = useMemo(() => {
+    const list: { id: string; name: string }[] = [];
+    const seen = new Set<string>();
+
+    // Adiciona módulos estruturais conhecidos
+    list.push({ id: 'nutrition', name: 'Casa Nutri' });
+    list.push({ id: 'communication', name: 'Comunicação' });
+    list.push({ id: 'global', name: 'Geral / Institucional' });
+    seen.add('nutrition');
+    seen.add('communication');
+    seen.add('global');
+
+    // Adiciona projetos vindos do banco de projetos
+    projects.forEach(p => {
+      if (p.id && !seen.has(p.id)) {
+        seen.add(p.id);
+        list.push({ id: p.id, name: p.name });
       }
     });
-    return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
-  }, [allExpenses]);
+
+    // Adiciona outros módulos existentes em transações
+    transactions.forEach(t => {
+      if (t.module && !seen.has(t.module)) {
+        seen.add(t.module);
+        list.push({ id: t.module, name: t.module });
+      }
+    });
+
+    return list;
+  }, [projects, transactions]);
+
+  // Custos mensais calculados por projeto/módulo
+  const projectCostBreakdown = useMemo(() => {
+    // Gastos que pertencem ao período do mês ativo
+    const monthlyExpenses = allExpenses.filter(t => {
+      if (selectedMonth !== 'all') {
+        return t.date && t.date.startsWith(selectedMonth);
+      }
+      return t.date && t.date.startsWith(activeMonthKey);
+    });
+
+    const map = new Map<string, {
+      projectId: string;
+      name: string;
+      fixedTotal: number;
+      variableTotal: number;
+      total: number;
+      count: number;
+    }>();
+
+    // Inicializa os principais setores
+    map.set('nutrition', { projectId: 'nutrition', name: 'Casa Nutri', fixedTotal: 0, variableTotal: 0, total: 0, count: 0 });
+    map.set('communication', { projectId: 'communication', name: 'Comunicação', fixedTotal: 0, variableTotal: 0, total: 0, count: 0 });
+    map.set('global', { projectId: 'global', name: 'Geral / Institucional', fixedTotal: 0, variableTotal: 0, total: 0, count: 0 });
+
+    monthlyExpenses.forEach(t => {
+      const modKey = t.module || 'global';
+      if (!map.has(modKey)) {
+        const foundProj = projects.find(p => p.id === modKey);
+        map.set(modKey, {
+          projectId: modKey,
+          name: foundProj ? foundProj.name : (modKey === 'nutrition' ? 'Casa Nutri' : modKey === 'communication' ? 'Comunicação' : modKey),
+          fixedTotal: 0,
+          variableTotal: 0,
+          total: 0,
+          count: 0
+        });
+      }
+
+      const item = map.get(modKey)!;
+      item.count += 1;
+      item.total += t.amount;
+      if (t.expense_type === 'fixed') {
+        item.fixedTotal += t.amount;
+      } else {
+        item.variableTotal += t.amount;
+      }
+    });
+
+    return Array.from(map.values())
+      .filter(item => item.count > 0 || item.projectId === 'nutrition')
+      .sort((a, b) => b.total - a.total);
+  }, [allExpenses, activeMonthKey, selectedMonth, projects]);
 
   // Lista Filtrada (Ordenada pelos mais recentes no topo)
   const filteredExpenses = useMemo(() => {
@@ -406,10 +522,12 @@ export function MonthlyExpensesManager({
               <Clock size={22} />
             </div>
             <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-              {stats.variableCount} itens variáveis
+              {stats.variableCount} no período
             </span>
           </div>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Gastos Variáveis do Mês</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+            Gastos Variáveis {activeMonthLabel ? `(${activeMonthLabel})` : 'do Mês'}
+          </p>
           <p className="text-3xl font-black text-rose-600 mt-1">
             R$ {stats.totalVariable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
@@ -420,7 +538,9 @@ export function MonthlyExpensesManager({
             </p>
           )}
           <p className="text-[11px] text-slate-400 font-bold mt-2">
-            Despesas operacionais e emergências
+            {selectedMonth === 'all' 
+              ? `Base: ${activeMonthLabel || 'mês mais recente'} (${stats.allVariableCount} variáveis no total)` 
+              : `Filtrado por: ${activeMonthLabel}`}
           </p>
         </div>
 
@@ -473,12 +593,115 @@ export function MonthlyExpensesManager({
 
       </div>
 
+      {/* Seção: Custos Mensais por Projeto / Setor */}
+      <div className="px-8">
+        <div className="bg-slate-50/70 border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  Rateio por Centro de Custo
+                </span>
+                <span className="text-xs text-slate-400 font-bold">• {activeMonthLabel || 'Mês Atual'}</span>
+              </div>
+              <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Building2 size={18} className="text-indigo-600" />
+                Custos Mensais por Projeto e Frente Setorial
+              </h4>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Alocado no Período</span>
+              <p className="text-lg font-black text-slate-900">
+                R$ {projectCostBreakdown.reduce((acc, p) => acc + p.total, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+
+          {/* Cards dos Projetos */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {projectCostBreakdown.map((proj) => {
+              const isSelected = moduleFilter === proj.projectId;
+              const totalCost = stats.totalExpense || 1;
+              const percentOfTotal = Math.min(100, (proj.total / totalCost) * 100);
+
+              return (
+                <div 
+                  key={proj.projectId}
+                  onClick={() => setModuleFilter(prev => prev === proj.projectId ? 'all' : (proj.projectId as any))}
+                  className={cn(
+                    "p-5 rounded-2xl border transition-all cursor-pointer relative group",
+                    isSelected 
+                      ? "bg-white border-indigo-500 ring-2 ring-indigo-500/20 shadow-md" 
+                      : "bg-white border-slate-200/70 hover:border-slate-300 hover:shadow-sm"
+                  )}
+                  title="Clique para filtrar apenas os gastos deste projeto"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs",
+                        proj.projectId === 'nutrition' ? "bg-amber-100 text-amber-800" :
+                        proj.projectId === 'communication' ? "bg-purple-100 text-purple-800" :
+                        "bg-slate-100 text-slate-800"
+                      )}>
+                        {proj.projectId === 'nutrition' ? 'CN' : proj.projectId === 'communication' ? 'COM' : 'GER'}
+                      </div>
+                      <div>
+                        <h5 className="font-black text-sm text-slate-900">{proj.name}</h5>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          {proj.count} {proj.count === 1 ? 'gasto registrado' : 'gastos registrados'}
+                        </p>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Valor Total do Projeto */}
+                  <p className="text-xl font-black text-slate-900 mt-3">
+                    R$ {proj.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+
+                  {/* Barra de Distribuição */}
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-3">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-700",
+                        proj.projectId === 'nutrition' ? "bg-amber-500" :
+                        proj.projectId === 'communication' ? "bg-purple-500" :
+                        "bg-indigo-600"
+                      )}
+                      style={{ width: `${percentOfTotal}%` }}
+                    />
+                  </div>
+
+                  {/* Detalhamento Fixo vs Variável */}
+                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mt-2.5 pt-2 border-t border-slate-100">
+                    <span>Fixo: R$ {proj.fixedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Var: R$ {proj.variableTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Ações Rápidas: Botões de Adicionar Gasto Fixo e Variável */}
       <div className="px-8">
-        <div className="p-6 bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="p-6 bg-slate-900 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6 border border-slate-800">
           <div>
-            <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
-              <Plus className="text-amber-400" size={24} />
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                Lançamentos
+              </span>
+              <span className="text-xs text-slate-400 font-medium">• Custos Mensais</span>
+            </div>
+            <h3 className="text-xl font-black tracking-tight flex items-center gap-2 text-white">
+              <Plus className="text-amber-400" size={22} />
               Área de Lançamento de Custos Mensais
             </h3>
             <p className="text-slate-300 text-xs font-medium mt-1">
@@ -504,46 +727,61 @@ export function MonthlyExpensesManager({
         </div>
       </div>
 
-      {/* Toolbar: Filtros e Abas Segregadas */}
+      {/* Toolbar: Filtros e Abas Segregadas (Design Responsivo Sem Cortes) */}
       <div className="px-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-slate-50/60 p-4 rounded-2xl border border-slate-100">
+        <div className="flex flex-col gap-3.5 bg-slate-50/70 p-4.5 rounded-2xl border border-slate-200/80 shadow-sm">
           
-          {/* Seletor de Sub-aba */}
-          <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-bold w-full sm:w-auto">
+          {/* Linha Superior: Abas e Botão Exportar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Seletor de Sub-aba */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm text-xs font-bold overflow-x-auto max-w-full">
+              <button
+                onClick={() => setActiveSubTab('all')}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0",
+                  activeSubTab === 'all' ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
+                )}
+              >
+                Todos ({allExpenses.length})
+              </button>
+              <button
+                onClick={() => setActiveSubTab('fixed')}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0",
+                  activeSubTab === 'fixed' ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:text-indigo-700 hover:bg-slate-100/60"
+                )}
+              >
+                <Repeat size={12} className="shrink-0" />
+                Fixos ({stats.fixedCount})
+              </button>
+              <button
+                onClick={() => setActiveSubTab('variable')}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0",
+                  activeSubTab === 'variable' ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-rose-700 hover:bg-slate-100/60"
+                )}
+              >
+                <Clock size={12} className="shrink-0" />
+                Variáveis ({stats.allVariableCount})
+              </button>
+            </div>
+
+            {/* Exportar CSV */}
             <button
-              onClick={() => setActiveSubTab('all')}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all",
-                activeSubTab === 'all' ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:text-slate-900"
-              )}
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all active:scale-95 shrink-0 ml-auto"
+              title="Baixar planilha de despesas filtradas"
             >
-              Todos ({allExpenses.length})
-            </button>
-            <button
-              onClick={() => setActiveSubTab('fixed')}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5",
-                activeSubTab === 'fixed' ? "bg-indigo-600 text-white shadow" : "text-slate-500 hover:text-indigo-700"
-              )}
-            >
-              <Repeat size={12} />
-              Fixos ({stats.fixedCount})
-            </button>
-            <button
-              onClick={() => setActiveSubTab('variable')}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5",
-                activeSubTab === 'variable' ? "bg-rose-600 text-white shadow" : "text-slate-500 hover:text-rose-700"
-              )}
-            >
-              <Clock size={12} />
-              Variáveis ({stats.variableCount})
+              <Download size={14} className="text-slate-500 shrink-0" />
+              <span>Exportar CSV</span>
             </button>
           </div>
 
-          {/* Busca e Filtros Complementares */}
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <div className="relative flex-1 sm:w-64">
+          {/* Linha Inferior: Campo de Busca e Dropdowns de Filtro */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-2.5 items-center">
+            
+            {/* Campo de Busca */}
+            <div className="relative col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 min-w-[200px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
@@ -554,72 +792,78 @@ export function MonthlyExpensesManager({
               />
             </div>
 
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
-            >
-              <option value="all">Todas Categorias</option>
-              {localCategories.filter(c => c.type === 'expense').map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
-            >
-              <option value="all">Todos os Status</option>
-              <option value="completed">Efetivados / Pagos</option>
-              <option value="pending">Pendentes</option>
-            </select>
-
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
-            >
-              <option value="all">Todos os Meses</option>
-              {availableMonths.map(mKey => {
-                const parts = mKey.split('-');
-                let label = mKey;
-                if (parts.length === 2) {
-                  const year = parseInt(parts[0], 10);
-                  const month = parseInt(parts[1], 10) - 1;
-                  const dateObj = new Date(year, month, 1);
-                  const rawLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                  label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
-                }
-                return (
-                  <option key={mKey} value={mKey}>{label}</option>
-                );
-              })}
-            </select>
-
-            {hasMultipleModules && (
+            {/* Filtro de Categoria */}
+            <div className="col-span-1 sm:col-span-1 md:col-span-1 lg:col-span-3">
               <select
-                value={moduleFilter}
-                onChange={(e) => setModuleFilter(e.target.value as any)}
-                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none truncate"
               >
-                <option value="all">Todos os Setores</option>
-                <option value="nutrition">Casa Nutri</option>
-                <option value="communication">Comunicação</option>
-                <option value="global">Geral / Global</option>
+                <option value="all">Todas Categorias</option>
+                {localCategories.filter(c => c.type === 'expense').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
               </select>
+            </div>
+
+            {/* Filtro de Status */}
+            <div className="col-span-1 sm:col-span-1 md:col-span-1 lg:col-span-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none truncate"
+              >
+                <option value="all">Todos os Status</option>
+                <option value="completed">Efetivados / Pagos</option>
+                <option value="pending">Pendentes</option>
+              </select>
+            </div>
+
+            {/* Filtro de Mês */}
+            <div className={cn(
+              "col-span-1 sm:col-span-1 md:col-span-1",
+              hasMultipleModules ? "lg:col-span-2" : "lg:col-span-3"
+            )}>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none truncate"
+              >
+                <option value="all">Todos os Meses</option>
+                {availableMonths.map(mKey => {
+                  const parts = mKey.split('-');
+                  let label = mKey;
+                  if (parts.length === 2) {
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10) - 1;
+                    const dateObj = new Date(year, month, 1);
+                    const rawLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                    label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+                  }
+                  return (
+                    <option key={mKey} value={mKey}>{label}</option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Filtro de Setor / Projeto (se houver múltiplos) */}
+            {hasMultipleModules && (
+              <div className="col-span-1 sm:col-span-1 md:col-span-1 lg:col-span-1">
+                <select
+                  value={moduleFilter}
+                  onChange={(e) => setModuleFilter(e.target.value as any)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none truncate"
+                >
+                  <option value="all">Todos Projetos</option>
+                  {availableProjectOptions.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
             )}
 
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all active:scale-95 ml-auto lg:ml-0"
-              title="Baixar planilha de despesas"
-            >
-              <Download size={14} className="text-slate-500" />
-              Exportar CSV
-            </button>
           </div>
-
         </div>
       </div>
 

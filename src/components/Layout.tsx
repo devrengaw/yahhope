@@ -301,11 +301,11 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden">
       
       {/* Primary Sidebar - Workspaces & Módulos no PC */}
       {module !== 'supporter' && user?.role !== 'OBSERVER' && (
-        <div className="w-16 sm:w-[72px] bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex">
+        <div className="w-16 sm:w-[72px] h-full bg-[#878787] flex-col items-center py-4 shrink-0 shadow-2xl z-30 hidden md:flex overflow-y-auto">
           {hasWorkspace && (
             <Link 
               to="/workspace" 
@@ -353,7 +353,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       )}
 
       {/* Main Content Area containing Secondary Sidebar and Page */}
-      <div className="flex-1 flex flex-col md:flex-row relative">
+      <div className="flex-1 flex flex-col md:flex-row relative h-full min-h-0 overflow-hidden">
         {/* Mobile Header with Safe Area for Notch and Status Bar */}
         <div className={cn(
           "md:hidden px-4 pt-[calc(0.85rem+env(safe-area-inset-top,0px))] pb-3.5 flex justify-between items-center shadow-md z-30 transition-colors shrink-0",
@@ -381,11 +381,11 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         {/* Secondary Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col border-r pt-safe pb-safe",
+            "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col border-r pt-safe pb-safe md:h-full md:max-h-full",
             theme.sidebarBg,
             module === 'workspace' 
               ? "md:hidden" 
-              : (isDesktopSidebarHidden ? "md:hidden" : "md:relative md:translate-x-0 md:shadow-none"),
+              : (isDesktopSidebarHidden ? "md:hidden" : "md:relative md:translate-x-0 md:shadow-none md:shrink-0"),
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -514,7 +514,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           )}
           
           <nav 
-            className="mt-3 flex-1 overflow-y-auto overscroll-contain px-3 pb-32" 
+            className="mt-3 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 md:pb-4" 
             style={{ WebkitOverflowScrolling: 'touch' }}
             aria-label="Navegação Lateral"
           >
