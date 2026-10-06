@@ -8,7 +8,8 @@ import {
   CheckCircle2, 
   Building2, 
   AlertCircle,
-  Repeat
+  Repeat,
+  Plus
 } from 'lucide-react';
 import { TransactionCategory } from '../../../pages/admin/Finance';
 import { CategorySelectWithCreate } from './CategorySelectWithCreate';
@@ -122,6 +123,7 @@ export function ExpenseModal({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDay, setDueDay] = useState(10);
   const [recurrence, setRecurrence] = useState<RecurrenceType>('monthly');
+  const [account, setAccount] = useState('Conta Principal');
   const [localAccounts, setLocalAccounts] = useState<PaymentAccount[]>(paymentAccounts || getLocalPaymentAccounts());
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
