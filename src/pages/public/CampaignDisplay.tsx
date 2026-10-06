@@ -122,8 +122,8 @@ export function CampaignDisplay() {
 
       {/* Header Topo */}
       <div className="w-full max-w-7xl mx-auto z-10 flex flex-col items-center justify-center flex-shrink-0 mt-2 mb-4 md:mb-6">
-        <h1 className="font-heading text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-105">
-          Campanhas Solidárias
+        <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-105">
+          Participe
         </h1>
       </div>
 
@@ -229,10 +229,6 @@ export function CampaignDisplay() {
           <div className="pt-4 border-t border-white/10">
             <div className="flex justify-between items-end mb-3 text-white">
               <div>
-                <p className="text-emerald-300 uppercase tracking-widest font-black text-xs md:text-sm flex items-center gap-1.5 mb-1">
-                  <Sparkles size={15} className="text-amber-400" />
-                  Régua Cumulativa Geral (Total de Campanhas Ativas)
-                </p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl md:text-5xl font-black text-amber-400 drop-shadow-lg">
                     {overallPercentage}%
@@ -257,7 +253,7 @@ export function CampaignDisplay() {
             </div>
 
             {/* Barra Cumulativa Gigante com Marcadores das Campanhas */}
-            <div className="relative pt-6 pb-14">
+            <div className="relative pt-6 pb-20">
               <div className="h-9 bg-black/40 rounded-full overflow-hidden relative z-10 backdrop-blur-md border border-white/15 shadow-inner">
                 <div 
                   className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 rounded-full transition-all duration-1000 ease-out relative"
@@ -270,6 +266,8 @@ export function CampaignDisplay() {
               {/* Marcadores de Cada Campanha ao longo da barra em ordem de prioridade */}
               {cumulativeMilestones.map((m) => {
                 const isCurrentSlide = m.campaign.id === currentSlide.id;
+                const isAlternate = m.index % 2 === 1;
+
                 return (
                   <div 
                     key={m.campaign.id} 
@@ -293,7 +291,10 @@ export function CampaignDisplay() {
                       )}
                     </div>
 
-                    <div className="absolute top-12 w-28 text-center drop-shadow-md pointer-events-none">
+                    <div className={cn(
+                      "absolute w-28 text-center drop-shadow-md pointer-events-none transition-all",
+                      isAlternate ? "top-14" : "top-11"
+                    )}>
                       <p className={cn(
                         "text-xs font-black uppercase tracking-tight truncate", 
                         m.isReached 
@@ -305,7 +306,7 @@ export function CampaignDisplay() {
                         {m.campaign.title}
                       </p>
                       <p className={cn("text-[10px] font-bold mt-0.5", m.isReached ? "text-white" : "text-slate-400")}>
-                        R$ {m.threshold >= 1000 ? `${m.threshold / 1000}k` : m.threshold}
+                        R$ {m.threshold >= 1000 ? `${(m.threshold / 1000).toFixed(m.threshold % 1000 !== 0 ? 1 : 0)}k` : m.threshold}
                       </p>
                     </div>
                   </div>

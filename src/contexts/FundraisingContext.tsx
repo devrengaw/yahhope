@@ -117,7 +117,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   const calculateCampaignProgress = useCallback((camp: Campaign): CampaignProgressStats => {
     const isMonthly = camp.type !== 'specific'; // Padrão é mensal
     const campDonations = donations.filter(d => 
-      (d.campaign_id === camp.id || (!d.campaign_id && camp.is_active)) && d.status === 'paid'
+      (d.campaign_id === camp.id || (!d.campaign_id && camp.is_active && (camp.priority === 1 || camp.id === '1'))) && d.status === 'paid'
     );
 
     const totalHistorical = campDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
@@ -141,8 +141,13 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
 
     const currentMonthTotal = monthDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
 
-    // Se for mensal, o valor corrente é o total do mês atual. Se for específica, é o histórico total.
-    const currentAmount = isMonthly ? currentMonthTotal : totalHistorical;
+    // Se for mensal, calcula apenas o total do mês atual. 
+    // Se for específica, é o histórico total permanente (NUNCA zera ao virar o mês).
+    const baseManualAmount = Number(camp.current_amount || 0);
+    const currentAmount = isMonthly 
+      ? Math.max(currentMonthTotal, (camp.last_reset_at && new Date(camp.last_reset_at) < startOfMonth ? 0 : baseManualAmount))
+      : Math.max(totalHistorical, baseManualAmount);
+
     const targetAmount = Math.max(camp.target_amount || 1, 1);
     const percentage = Math.min(Math.round((currentAmount / targetAmount) * 100), 100);
 
@@ -152,7 +157,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       percentage,
       isMonthly,
       currentMonthTotal,
-      totalHistorical
+      totalHistorical: Math.max(totalHistorical, baseManualAmount)
     };
   }, [donations]);
 
@@ -474,6 +479,14 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   // Zerar régua manualmente para a campanha no mês atual
   const resetCampaignMonth = async (id: string) => {
     try {
+      const camp = campaigns.find(c => c.id === id);
+      if (camp && camp.type === 'specific') {
+        return { 
+          success: false, 
+          error: { message: 'Campanhas específicas são acumulativas e não podem ser zeradas mensalmente.' } 
+        };
+      }
+
       const nowIso = new Date().toISOString();
       const payload: any = {
         last_reset_at: nowIso,

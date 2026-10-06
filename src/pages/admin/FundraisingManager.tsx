@@ -88,6 +88,11 @@ export function FundraisingManager() {
   const [newMilestoneDesc, setNewMilestoneDesc] = useState('');
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
 
+  // Lista de campanhas ativas
+  const activeCampaigns = useMemo(() => {
+    return campaigns.filter(c => c && c.is_active !== false);
+  }, [campaigns]);
+
   // Estatísticas calculadas
   const selectedStats = useMemo(() => {
     return calculateCampaignProgress(selectedCampaign);
@@ -96,6 +101,41 @@ export function FundraisingManager() {
   const activeStats = useMemo(() => {
     return activeCampaign ? calculateCampaignProgress(activeCampaign) : selectedStats;
   }, [calculateCampaignProgress, activeCampaign, selectedStats]);
+
+  // Totais combinados de todas as campanhas ativas
+  const combinedStats = useMemo(() => {
+    const list = activeCampaigns.length > 0 ? activeCampaigns : campaigns;
+    
+    // Meta global somando todas as campanhas ativas
+    const totalGoal = list.reduce((sum, c) => sum + (c.target_amount || 0), 0);
+    
+    // Total arrecadado no momento (mensais pegam mês atual, específicas pegam total acumulado que não zera)
+    const totalRaised = list.reduce((sum, c) => {
+      const p = calculateCampaignProgress(c);
+      return sum + p.currentAmount;
+    }, 0);
+
+    // Total arrecadado no mês atual apenas para campanhas mensais
+    const totalMonthRaised = list
+      .filter(c => c.type !== 'specific')
+      .reduce((sum, c) => {
+        const p = calculateCampaignProgress(c);
+        return sum + p.currentMonthTotal;
+      }, 0);
+
+    const percentage = totalGoal > 0 ? Math.min(Math.round((totalRaised / totalGoal) * 100), 100) : 0;
+
+    return {
+      totalGoal,
+      totalRaised,
+      totalMonthRaised,
+      percentage,
+      activeCount: activeCampaigns.length,
+      totalCount: campaigns.length,
+      specificCount: campaigns.filter(c => c.type === 'specific').length,
+      monthlyCount: campaigns.filter(c => c.type !== 'specific').length
+    };
+  }, [activeCampaigns, campaigns, calculateCampaignProgress]);
 
   const pendingDonations = useMemo(() => {
     return allDonations.filter(d => d.status === 'pending');
@@ -277,40 +317,57 @@ export function FundraisingManager() {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Arrecadado */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Arrecadado no Mês</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {combinedStats.activeCount > 1 ? 'Total Arrecadado' : 'Arrecadado no Mês'}
+            </span>
             <Calendar size={18} className="text-emerald-500" />
           </div>
           <div>
             <p className="text-2xl font-black text-slate-900">
-              R$ {activeStats.currentMonthTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {combinedStats.totalRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              Campanha Ativa: <span className="font-bold text-slate-700">{activeCampaign?.title || 'Principal'}</span>
+              {combinedStats.activeCount > 1 
+                ? `${combinedStats.activeCount} campanhas ativas (R$ ${combinedStats.totalMonthRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} neste mês)`
+                : `Campanha Ativa: ${activeCampaign?.title || selectedCampaign.title}`
+              }
             </p>
           </div>
         </div>
 
+        {/* Card 2: Metas & Evolução Total */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Meta & Evolução</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {combinedStats.activeCount > 1 ? 'Metas & Evolução Total' : 'Meta & Evolução'}
+            </span>
             <Target size={18} className="text-blue-500" />
           </div>
           <div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900">{activeStats.percentage}%</span>
-              <span className="text-xs text-slate-400">de R$ {activeStats.targetAmount.toLocaleString('pt-BR')}</span>
+              <span className="text-2xl font-black text-slate-900">{combinedStats.percentage}%</span>
+              <span className="text-xs text-slate-400">
+                de R$ {combinedStats.totalGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden">
               <div 
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${activeStats.percentage}%` }}
+                style={{ width: `${combinedStats.percentage}%` }}
               />
             </div>
+            {combinedStats.activeCount > 1 && (
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Total conjunto de {combinedStats.activeCount} campanhas ativas
+              </p>
+            )}
           </div>
         </div>
 
+        {/* Card 3: Campanhas Criadas / Ativas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">Campanhas Criadas</span>
@@ -319,11 +376,12 @@ export function FundraisingManager() {
           <div>
             <p className="text-2xl font-black text-slate-900">{campaigns.length}</p>
             <p className="text-xs text-slate-500 mt-1">
-              {campaigns.filter(c => c.type === 'specific').length} específicas, {campaigns.filter(c => c.type !== 'specific').length} mensais
+              <span className="font-bold text-emerald-700">{combinedStats.activeCount} ativas</span> • {combinedStats.specificCount} específicas, {combinedStats.monthlyCount} mensais
             </p>
           </div>
         </div>
 
+        {/* Card 4: Doações Pendentes */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">Doações Pendentes</span>
@@ -489,8 +547,8 @@ export function FundraisingManager() {
               </div>
               <p className="text-xs text-slate-600 mt-0.5">
                 {selectedCampaign.type === 'specific'
-                  ? 'Esta campanha acumula todo o valor arrecadado especificamente para esta meta com barra de evolução permanente.'
-                  : 'Esta régua zera automaticamente todo dia 1º de mês, mostrando a barra de arrecadação do mês corrente.'}
+                  ? 'Esta campanha acumula todo o valor arrecadado permanentemente para esta meta e NÃO zera ao virar o mês.'
+                  : 'Esta régua zera automaticamente todo dia 1º de mês, mostrando a arrecadação do mês corrente.'}
               </p>
             </div>
           </div>
