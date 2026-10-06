@@ -27,6 +27,8 @@ import {
 import { Transaction, TransactionCategory } from '../../../pages/admin/Finance';
 import { ExpenseModal, ExpensePayload } from './ExpenseModal';
 import { CategorySelectWithCreate } from './CategorySelectWithCreate';
+import { CategoryModal } from './CategoryModal';
+import { saveCategory as persistCategory, deleteCategory as removePersistedCategory, fetchAndSyncCategories } from '../../../services/financeCategoryService';
 import { cn } from '../../../lib/utils';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { supabase } from '../../../lib/supabase';
@@ -39,6 +41,18 @@ import {
   savePaymentAccount 
 } from '../../../services/paymentAccountService';
 
+export interface PaymentUpdateData {
+  status?: 'completed' | 'pending';
+  amount?: number;
+  original_amount?: number;
+  exchange_rate?: number;
+  currency?: 'BRL' | 'MZN';
+  date?: string;
+  notes?: string;
+  category_id?: string;
+  description?: string;
+}
+
 interface MonthlyExpensesManagerProps {
   transactions: Transaction[];
   categories: TransactionCategory[];
@@ -49,7 +63,7 @@ interface MonthlyExpensesManagerProps {
   onDeleteTransaction: (id: string) => Promise<void> | void;
   onToggleStatus: (id: string, currentStatus: 'completed' | 'pending') => Promise<void> | void;
   onAddCategory?: (category: TransactionCategory) => void;
-  onUpdatePayment?: (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => Promise<void> | void;
+  onUpdatePayment?: (id: string, updates: PaymentUpdateData) => Promise<void> | void;
 }
 
 export function MonthlyExpensesManager({
@@ -127,11 +141,50 @@ export function MonthlyExpensesManager({
   const [moduleFilter, setModuleFilter] = useState<'all' | 'nutrition' | 'communication' | 'global'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalDefaultType, setModalDefaultType] = useState<'fixed' | 'variable'>('fixed');
+  // Modal de Gerenciamento de Categorias de Despesas
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<TransactionCategory | null>(null);
+
+  const handleSaveCategory = async (cat: Omit<TransactionCategory, 'id'> & { id?: string }) => {
+    const id = cat.id || ('cat_' + Math.random().toString(36).substring(2, 9));
+    const fullCat: TransactionCategory = {
+      id,
+      name: cat.name,
+      type: cat.type,
+      color: cat.color,
+      icon: cat.icon || 'Tag'
+    };
+    await persistCategory(fullCat);
+    const updated = await fetchAndSyncCategories();
+    setLocalCategories(updated);
+    onAddCategory?.(fullCat);
+    setEditingCategory(null);
+    setIsCatModalOpen(false);
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    const isConfirmed = await confirm({
+      title: 'Excluir Categoria',
+      message: `Tem certeza que deseja excluir a categoria "${name}"? Os lançamentos vinculados a ela não serão excluídos, mas perderão a referência.`,
+      confirmText: 'Excluir Categoria',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (isConfirmed) {
+      await removePersistedCategory(id);
+      const updated = await fetchAndSyncCategories();
+      setLocalCategories(updated);
+      if (categoryFilter === id) {
+        setCategoryFilter('all');
+      }
+    }
+  };
 
   // Modal de Registro e Ajuste de Pagamento
   const [paymentModalTx, setPaymentModalTx] = useState<Transaction | null>(null);
+  const [paymentDescription, setPaymentDescription] = useState<string>('');
   const [paymentCurrency, setPaymentCurrency] = useState<'BRL' | 'MZN'>('BRL');
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentOriginalAmount, setPaymentOriginalAmount] = useState<string>('');
@@ -143,13 +196,14 @@ export function MonthlyExpensesManager({
   const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const openPaymentModal = (t: Transaction) => {
-    const curr = t.currency || 'BRL';
+    const curr = (t.currency === 'MZN' || t.currency === 'BRL') ? t.currency : 'BRL';
     setPaymentCurrency(curr);
     setPaymentModalTx(t);
+    setPaymentDescription(t.description || '');
     setPaymentAmount(t.amount.toString());
     const rate = t.exchange_rate ? t.exchange_rate.toString() : '0.08103';
     setPaymentExchangeRate(rate);
-    const orig = t.original_amount 
+    const orig = t.original_amount != null
       ? t.original_amount.toString() 
       : (t.amount > 0 ? (t.amount / (parseFloat(rate) || 0.08103)).toFixed(2) : '');
     setPaymentOriginalAmount(orig);
@@ -163,13 +217,19 @@ export function MonthlyExpensesManager({
     setPaymentCurrency(newCurr);
     const rate = parseFloat(paymentExchangeRate) || 0.08103;
     if (newCurr === 'MZN') {
-      const currBrl = parseFloat(paymentAmount) || paymentModalTx?.amount || 0;
-      if (currBrl > 0 && rate > 0) {
-        setPaymentOriginalAmount((currBrl / rate).toFixed(2));
+      const orig = parseFloat(paymentOriginalAmount);
+      if (!isNaN(orig) && orig > 0) {
+        setPaymentAmount((orig * rate).toFixed(2));
+      } else {
+        const currBrl = parseFloat(paymentAmount) || paymentModalTx?.amount || 0;
+        if (currBrl > 0 && rate > 0) {
+          setPaymentOriginalAmount((currBrl / rate).toFixed(2));
+        }
       }
     } else {
+      const currentBrl = parseFloat(paymentAmount) || 0;
       const orig = parseFloat(paymentOriginalAmount) || 0;
-      if (orig > 0 && rate > 0) {
+      if (currentBrl <= 0 && orig > 0 && rate > 0) {
         setPaymentAmount((orig * rate).toFixed(2));
       }
     }
@@ -199,15 +259,31 @@ export function MonthlyExpensesManager({
 
     setIsSavingPayment(true);
     try {
-      const finalAmount = parseFloat(paymentAmount) || paymentModalTx.amount;
-      const finalOriginalAmount = paymentCurrency === 'MZN'
-        ? (parseFloat(paymentOriginalAmount) || paymentModalTx.original_amount)
-        : undefined;
-      const finalRate = paymentCurrency === 'MZN'
-        ? (parseFloat(paymentExchangeRate) || paymentModalTx.exchange_rate || 0.08103)
-        : undefined;
+      const parsedOrig = parseFloat(paymentOriginalAmount);
+      const parsedAmt = parseFloat(paymentAmount);
+      const parsedRate = parseFloat(paymentExchangeRate) || 0.08103;
 
-      const updates = {
+      let finalAmount: number;
+      let finalOriginalAmount: number | undefined = undefined;
+      let finalRate: number | undefined = undefined;
+
+      if (paymentCurrency === 'MZN') {
+        finalOriginalAmount = !isNaN(parsedOrig) && parsedOrig >= 0 
+          ? parsedOrig 
+          : (paymentModalTx.original_amount ?? (paymentModalTx.amount > 0 ? Number((paymentModalTx.amount / parsedRate).toFixed(2)) : 0));
+        finalRate = parsedRate > 0 ? parsedRate : 0.08103;
+        finalAmount = !isNaN(parsedAmt) && parsedAmt > 0 
+          ? parsedAmt 
+          : Number((finalOriginalAmount * finalRate).toFixed(2));
+      } else {
+        finalAmount = !isNaN(parsedAmt) && parsedAmt >= 0 
+          ? parsedAmt 
+          : paymentModalTx.amount;
+        finalOriginalAmount = undefined;
+        finalRate = 1;
+      }
+
+      const updates: PaymentUpdateData = {
         status: paymentStatus,
         amount: finalAmount,
         currency: paymentCurrency,
@@ -215,7 +291,8 @@ export function MonthlyExpensesManager({
         exchange_rate: finalRate,
         date: paymentDate,
         notes: paymentNotes,
-        category_id: paymentCategoryId || undefined
+        category_id: paymentCategoryId || undefined,
+        description: paymentDescription?.trim() || paymentModalTx.description
       };
 
       if (onUpdatePayment) {
@@ -224,14 +301,16 @@ export function MonthlyExpensesManager({
         const payload: any = {
           status: updates.status,
           amount: updates.amount,
+          currency: updates.currency,
           date: updates.date,
           notes: updates.notes,
-          category_id: updates.category_id || null
+          category_id: updates.category_id || null,
+          ...(updates.description ? { description: updates.description } : {})
         };
         let { error } = await supabase.from('finance_transactions').update({
           ...payload,
-          original_amount: updates.original_amount,
-          exchange_rate: updates.exchange_rate
+          original_amount: updates.original_amount !== undefined ? updates.original_amount : null,
+          exchange_rate: updates.exchange_rate !== undefined ? updates.exchange_rate : null
         }).eq('id', paymentModalTx.id);
 
         if (error && error.message?.includes('column')) {
@@ -322,11 +401,26 @@ export function MonthlyExpensesManager({
       return acc + t.amount;
     }, 0);
 
+    // Custos fixos em Meticais (amortizados conforme recorrência)
+    const totalFixedMzn = fixedExpenses
+      .filter(t => t.currency === 'MZN')
+      .reduce((acc, t) => {
+        const val = t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount);
+        const rec = t.recurrence || 'monthly';
+        if (rec === 'bimonthly') return acc + (val / 2);
+        if (rec === 'quarterly') return acc + (val / 3);
+        if (rec === 'semiannual') return acc + (val / 6);
+        if (rec === 'yearly') return acc + (val / 12);
+        return acc + val;
+      }, 0);
+
     const totalVariable = variableExpensesInMonth.reduce((acc, t) => acc + t.amount, 0);
     const totalVariableMzn = variableExpensesInMonth
-      .filter(t => t.currency === 'MZN' && t.original_amount)
-      .reduce((acc, t) => acc + (t.original_amount || 0), 0);
+      .filter(t => t.currency === 'MZN')
+      .reduce((acc, t) => acc + (t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)), 0);
+
     const totalExpense = monthlyEquivalentFixed + totalVariable;
+    const totalExpenseMzn = totalFixedMzn + totalVariableMzn;
 
     // Percentual de cobertura do custo fixo pelas receitas totais
     const fixedCoverage = monthlyEquivalentFixed > 0 ? (totalIncome / monthlyEquivalentFixed) * 100 : 100;
@@ -335,9 +429,11 @@ export function MonthlyExpensesManager({
     return {
       totalFixed: monthlyEquivalentFixed,
       totalFixedNominal,
+      totalFixedMzn,
       totalVariable,
       totalVariableMzn,
       totalExpense,
+      totalExpenseMzn,
       fixedCount: fixedExpenses.length,
       variableCount: variableExpensesInMonth.length,
       allVariableCount: targetExpenses.filter(t => t.expense_type === 'variable').length,
@@ -501,8 +597,9 @@ export function MonthlyExpensesManager({
 
       groups[monthKey].items.push(t);
       groups[monthKey].totalBrl += t.amount;
-      if (t.currency === 'MZN' && t.original_amount) {
-        groups[monthKey].totalMzn += t.original_amount;
+      if (t.currency === 'MZN') {
+        const mznVal = t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount);
+        groups[monthKey].totalMzn += mznVal;
       }
     });
 
@@ -725,6 +822,12 @@ export function MonthlyExpensesManager({
           <p className="text-3xl font-black text-slate-900 mt-1">
             R$ {stats.totalFixed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
+          {stats.totalFixedMzn > 0 && (
+            <p className="text-xs font-black text-emerald-600 mt-1 flex items-center gap-1.5" title="Total em Meticais das despesas fixas recorrentes">
+              <span>🇲🇿</span>
+              <span>~ {stats.totalFixedMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais</span>
+            </p>
+          )}
           <p className="text-[11px] text-slate-400 font-bold mt-2">
             Compromisso estrutural mensal
           </p>
@@ -773,6 +876,12 @@ export function MonthlyExpensesManager({
           <p className="text-3xl font-black text-slate-900 mt-1">
             R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
+          {stats.totalExpenseMzn > 0 && (
+            <p className="text-xs font-black text-emerald-600 mt-1 flex items-center gap-1.5" title="Total geral em Meticais">
+              <span>🇲🇿</span>
+              <span>~ {stats.totalExpenseMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais</span>
+            </p>
+          )}
           <p className="text-[11px] text-slate-400 font-bold mt-2">
             Fixo ({((stats.totalFixed / (stats.totalExpense || 1)) * 100).toFixed(0)}%) + Variável ({((stats.totalVariable / (stats.totalExpense || 1)) * 100).toFixed(0)}%)
           </p>
@@ -983,15 +1092,28 @@ export function MonthlyExpensesManager({
               </button>
             </div>
 
-            {/* Exportar CSV */}
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all active:scale-95 shrink-0 ml-auto"
-              title="Baixar planilha de despesas filtradas"
-            >
-              <Download size={14} className="text-slate-500 shrink-0" />
-              <span>Exportar CSV</span>
-            </button>
+            {/* Ações da Toolbar: Gerenciar Categorias e Exportar CSV */}
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl text-xs font-bold text-indigo-700 shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
+                title="Editar ou excluir categorias de despesas"
+              >
+                <Tag size={14} className="text-indigo-600 shrink-0" />
+                <span>Gerenciar Categorias</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
+                title="Baixar planilha de despesas filtradas"
+              >
+                <Download size={14} className="text-slate-500 shrink-0" />
+                <span>Exportar CSV</span>
+              </button>
+            </div>
           </div>
 
           {/* Linha Inferior: Campo de Busca e Dropdowns de Filtro */}
@@ -1299,16 +1421,31 @@ export function MonthlyExpensesManager({
 
                       {/* Valor */}
                       <td className="px-6 py-5 text-right">
-                        <p className="text-base font-black text-rose-600 tracking-tight">
-                          - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        {t.currency === 'MZN' && t.original_amount && (
-                          <p 
-                            className="text-[11px] font-black text-emerald-700 mt-0.5" 
-                            title={t.exchange_rate ? `Taxa aplicada: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}
-                          >
-                            {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
-                          </p>
+                        {t.currency === 'MZN' ? (
+                          <>
+                            <p className="text-base font-black text-emerald-700 tracking-tight flex items-center justify-end gap-1">
+                              <span>-</span>
+                              <span>{(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">MT</span>
+                            </p>
+                            <p 
+                              className="text-[11px] font-bold text-slate-500 mt-0.5" 
+                              title={t.exchange_rate ? `Taxa aplicada: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}
+                            >
+                              ~ R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-base font-black text-rose-600 tracking-tight">
+                              - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            {t.original_amount && (
+                              <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                                Original: R$ {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            )}
+                          </>
                         )}
                         {isFixed && t.recurrence && t.recurrence !== 'monthly' && t.recurrence !== 'none' && (
                           <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
@@ -1500,15 +1637,17 @@ export function MonthlyExpensesManager({
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
-                    {paymentModalTx.status === 'completed' ? 'Editar Dados / Pagamento' : 'Registrar Pagamento'}
+                    {paymentModalTx.expense_type === 'fixed' ? 'Editar Custo Fixo' : (paymentModalTx.status === 'completed' ? 'Editar Dados / Pagamento' : 'Registrar Pagamento')}
                   </h2>
                   <p className="text-xs text-slate-500 font-medium">
-                    Ajuste categoria, data, notas ou valor pago deste lançamento
+                    {paymentModalTx.expense_type === 'fixed'
+                      ? 'Ajuste categoria, descrição, valor (em Meticais ou Reais) e vencimento deste custo fixo'
+                      : 'Ajuste categoria, data, notas ou valor pago deste lançamento'}
                   </p>
                 </div>
               </div>
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setPaymentModalTx(null)} 
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white/60 rounded-xl transition-colors"
               >
@@ -1518,18 +1657,27 @@ export function MonthlyExpensesManager({
 
             {/* Form */}
             <form id="payment-form" onSubmit={handleSavePayment} className="p-6 overflow-y-auto flex-1 space-y-5">
-              {/* Card de Identificação da Conta */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Conta / Descrição</span>
-                    <p className="font-bold text-slate-900 text-base mt-0.5">{paymentModalTx.description}</p>
+              {/* Card de Identificação da Conta e Descrição */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
+                      Descrição do Gasto *
+                    </label>
+                    {paymentCurrency === 'MZN' && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        🇲🇿 MZN
+                      </span>
+                    )}
                   </div>
-                  {paymentModalTx.currency === 'MZN' && (
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      🇲🇿 MZN
-                    </span>
-                  )}
+                  <input
+                    type="text"
+                    required
+                    value={paymentDescription}
+                    onChange={e => setPaymentDescription(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-bold text-slate-900"
+                    placeholder="Descrição da despesa"
+                  />
                 </div>
                 <div className="flex flex-wrap gap-4 pt-1 text-xs text-slate-600">
                   <span>Conta: <strong className="text-slate-800">{paymentModalTx.account || 'Não especificada'}</strong></span>
@@ -1545,7 +1693,7 @@ export function MonthlyExpensesManager({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Valor Efetivamente Pago
+                    {paymentModalTx.expense_type === 'fixed' ? 'Valor do Custo Fixo' : 'Valor Efetivamente Pago'}
                   </label>
                   <span className="text-xs text-slate-400">
                     Valor Previsto: <strong className="text-slate-600">
@@ -1559,7 +1707,7 @@ export function MonthlyExpensesManager({
 
                 {/* Seletor de Moeda do Pagamento */}
                 <div className="flex items-center justify-between pb-1">
-                  <span className="text-xs font-semibold text-slate-600">Moeda da Efetivação:</span>
+                  <span className="text-xs font-semibold text-slate-600">Moeda do Lançamento:</span>
                   <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                     <button
                       type="button"
@@ -1588,7 +1736,9 @@ export function MonthlyExpensesManager({
                   <div className="space-y-3 p-4 bg-emerald-50/40 rounded-2xl border border-emerald-100">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-700">Valor Pago em MT (MZN) *</label>
+                        <label className="text-xs font-semibold text-slate-700">
+                          {paymentModalTx.expense_type === 'fixed' ? 'Valor em MT (MZN) *' : 'Valor Pago em MT (MZN) *'}
+                        </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">MT</span>
                           <input 
@@ -1663,8 +1813,8 @@ export function MonthlyExpensesManager({
                         <AlertCircle size={14} className="shrink-0" />
                         <span>
                           {diff > 0 
-                            ? `Valor pago é R$ ${diff.toFixed(2)} maior que o valor cadastrado originalmente.`
-                            : `Valor pago é R$ ${Math.abs(diff).toFixed(2)} menor que o valor cadastrado originalmente.`
+                            ? `Valor ajustado é R$ ${diff.toFixed(2)} maior que o valor cadastrado anteriormente.`
+                            : `Valor ajustado é R$ ${Math.abs(diff).toFixed(2)} menor que o valor cadastrado anteriormente.`
                           }
                         </span>
                       </div>
@@ -1792,6 +1942,128 @@ export function MonthlyExpensesManager({
           </div>
         </div>
       )}
+
+      {/* Modal de Gerenciamento das Categorias de Despesas */}
+      {isManageCategoriesOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                  <Tag size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Categorias de Despesas</h3>
+                  <p className="text-xs text-slate-500 font-medium">Edite, exclua ou adicione categorias para organizar seus gastos</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setIsCatModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>Nova Categoria</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsManageCategoriesOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Categorias */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {localCategories.filter(c => c.type === 'expense').map(cat => {
+                  const linkedCount = transactions.filter(t => t.category_id === cat.id).length;
+                  const linkedTotal = transactions
+                    .filter(t => t.category_id === cat.id)
+                    .reduce((acc, t) => acc + t.amount, 0);
+
+                  return (
+                    <div 
+                      key={cat.id}
+                      className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-3 hover:border-indigo-200 transition-all"
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <span className={cn(
+                          "w-3.5 h-3.5 rounded-full shrink-0 shadow-xs",
+                          cat.color || 'bg-slate-400'
+                        )} />
+                        <div className="truncate">
+                          <p className="text-xs font-bold text-slate-900 truncate">{cat.name}</p>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            {linkedCount} lançamentos • R$ {linkedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            setIsCatModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                          title="Editar categoria"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir categoria"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {localCategories.filter(c => c.type === 'expense').length === 0 && (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Nenhuma categoria de despesa cadastrada.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-black transition-colors cursor-pointer"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Criação / Edição de Categoria */}
+      <CategoryModal
+        isOpen={isCatModalOpen}
+        onClose={() => {
+          setIsCatModalOpen(false);
+          setEditingCategory(null);
+        }}
+        onSave={handleSaveCategory}
+        category={editingCategory}
+      />
 
     </div>
   );

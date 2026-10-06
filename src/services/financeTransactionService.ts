@@ -299,9 +299,9 @@ export async function fetchModuleTransactions(moduleName: string = 'nutrition'):
         const localMatch = localList.find(l => l.id === t.id);
         return {
           ...t,
-          currency: t.currency || localMatch?.currency || 'BRL',
-          original_amount: t.original_amount !== undefined ? t.original_amount : localMatch?.original_amount,
-          exchange_rate: t.exchange_rate !== undefined ? t.exchange_rate : localMatch?.exchange_rate,
+          currency: (t.currency && String(t.currency).trim()) ? t.currency : (localMatch?.currency || 'BRL'),
+          original_amount: (t.original_amount != null) ? t.original_amount : localMatch?.original_amount,
+          exchange_rate: (t.exchange_rate != null) ? t.exchange_rate : localMatch?.exchange_rate,
           notes: t.notes || localMatch?.notes
         };
       })
@@ -361,9 +361,11 @@ export async function updateModuleTransactionPayment(
     amount?: number;
     original_amount?: number;
     exchange_rate?: number;
+    currency?: 'BRL' | 'MZN';
     date?: string;
     notes?: string;
     category_id?: string;
+    description?: string;
   },
   moduleName: string = 'nutrition'
 ) {
@@ -372,9 +374,11 @@ export async function updateModuleTransactionPayment(
       const payload: any = {
         ...(updates.status ? { status: updates.status } : {}),
         ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
+        ...(updates.currency ? { currency: updates.currency } : {}),
         ...(updates.date ? { date: updates.date } : {}),
         ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
-        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {})
+        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {}),
+        ...(updates.description ? { description: updates.description } : {})
       };
 
       let { error } = await supabase.from('finance_transactions').update({

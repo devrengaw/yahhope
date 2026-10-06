@@ -106,12 +106,16 @@ export function NutritionFinance() {
     const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
     const fixedExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'fixed').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
     const variableExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'variable').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const expenseMzn = transactions
+      .filter(t => t.type === 'expense' && t.currency === 'MZN')
+      .reduce((acc, t) => acc + (t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)), 0);
     
     return {
       totalIncome: income, // Valor total repassado ao projeto
       totalExpense: expense,
       fixedExpense,
       variableExpense,
+      expenseMzn,
       balance: income - expense
     };
   }, [transactions]);
@@ -169,7 +173,20 @@ export function NutritionFinance() {
     }
   };
 
-  const handleUpdatePayment = async (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => {
+  const handleUpdatePayment = async (
+    id: string, 
+    updates: { 
+      status?: 'completed' | 'pending'; 
+      amount?: number; 
+      original_amount?: number; 
+      exchange_rate?: number; 
+      currency?: 'BRL' | 'MZN';
+      date?: string; 
+      notes?: string; 
+      category_id?: string;
+      description?: string;
+    }
+  ) => {
     try {
       await updateModuleTransactionPayment(id, updates, 'nutrition');
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
@@ -259,6 +276,11 @@ export function NutritionFinance() {
             <p className="text-3xl font-black text-slate-900 mt-1">
               R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
+            {stats.expenseMzn > 0 && (
+              <p className="text-xs font-bold text-emerald-600 mt-1">
+                ~ {stats.expenseMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais
+              </p>
+            )}
             <p className="text-[11px] text-slate-400 font-bold mt-2">
               Custos fixos recorrentes e gastos variáveis
             </p>
@@ -419,12 +441,18 @@ export function NutritionFinance() {
                             </div>
                           </td>
                           <td className="px-8 py-4 text-right">
-                            <p className={cn("text-lg font-black", t.type === 'income' ? "text-emerald-600" : "text-rose-600")}>
-                              {t.type === 'income' ? '+' : '-'} R$ {(Number(t.amount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                            {t.currency === 'MZN' && t.original_amount && (
-                              <p className="text-[11px] font-black text-emerald-700 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
-                                {(Number(t.original_amount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                            {t.currency === 'MZN' ? (
+                              <>
+                                <p className="text-lg font-black text-emerald-700">
+                                  {t.type === 'income' ? '+' : '-'} {(Number(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                                </p>
+                                <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
+                                  ~ R$ {(Number(t.amount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </>
+                            ) : (
+                              <p className={cn("text-lg font-black", t.type === 'income' ? "text-emerald-600" : "text-rose-600")}>
+                                {t.type === 'income' ? '+' : '-'} R$ {(Number(t.amount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </p>
                             )}
                           </td>

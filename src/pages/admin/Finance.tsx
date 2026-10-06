@@ -354,14 +354,29 @@ export function Finance() {
     }
   };
 
-  const handleUpdatePayment = async (id: string, updates: { status?: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string; category_id?: string }) => {
+  const handleUpdatePayment = async (
+    id: string, 
+    updates: { 
+      status?: 'completed' | 'pending'; 
+      amount?: number; 
+      original_amount?: number; 
+      exchange_rate?: number; 
+      currency?: 'BRL' | 'MZN';
+      date?: string; 
+      notes?: string; 
+      category_id?: string;
+      description?: string;
+    }
+  ) => {
     try {
       const payload: any = {
         ...(updates.status ? { status: updates.status } : {}),
         ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
+        ...(updates.currency ? { currency: updates.currency } : {}),
         ...(updates.date ? { date: updates.date } : {}),
         ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
-        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {})
+        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {}),
+        ...(updates.description ? { description: updates.description } : {})
       };
 
       let { error } = await supabase.from('finance_transactions').update({
@@ -757,15 +772,21 @@ export function Finance() {
                           {t.account}
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <p className={cn(
-                            "text-lg font-black tracking-tighter",
-                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
-                          )}>
-                            {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                          {t.currency === 'MZN' && t.original_amount && (
-                            <p className="text-[11px] font-black text-emerald-700 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
-                              {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                          {t.currency === 'MZN' ? (
+                            <>
+                              <p className="text-lg font-black tracking-tighter text-emerald-700">
+                                {t.type === 'income' ? '+' : '-'} {(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                              </p>
+                              <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
+                                ~ R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </>
+                          ) : (
+                            <p className={cn(
+                              "text-lg font-black tracking-tighter",
+                              t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                            )}>
+                              {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
                           )}
                         </td>

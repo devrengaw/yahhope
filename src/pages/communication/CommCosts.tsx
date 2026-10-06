@@ -166,13 +166,29 @@ export function CommCosts() {
     }
   };
 
-  const handleUpdatePayment = async (id: string, updates: { status: 'completed' | 'pending'; amount?: number; original_amount?: number; exchange_rate?: number; date?: string; notes?: string }) => {
+  const handleUpdatePayment = async (
+    id: string, 
+    updates: { 
+      status?: 'completed' | 'pending'; 
+      amount?: number; 
+      original_amount?: number; 
+      exchange_rate?: number; 
+      currency?: 'BRL' | 'MZN';
+      date?: string; 
+      notes?: string;
+      category_id?: string;
+      description?: string;
+    }
+  ) => {
     try {
       const payload: any = {
-        status: updates.status,
+        ...(updates.status ? { status: updates.status } : {}),
         ...(updates.amount !== undefined ? { amount: updates.amount } : {}),
+        ...(updates.currency ? { currency: updates.currency } : {}),
         ...(updates.date ? { date: updates.date } : {}),
-        ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+        ...(updates.category_id !== undefined ? { category_id: updates.category_id } : {}),
+        ...(updates.description ? { description: updates.description } : {})
       };
 
       let { error } = await supabase.from('finance_transactions').update({

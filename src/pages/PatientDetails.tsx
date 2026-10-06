@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2 } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2, History } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate, formatDisplayDate } from '../lib/utils';
@@ -410,6 +410,11 @@ export function PatientDetails() {
   
   // For the diagnosis/Z-score, we use the latest clinical visit (not ACS visit and not observer notes)
   const latestClinicalEvent = patientEvents.find(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation') || patientEvents[0];
+
+  // Previous clinical consultation for displaying on new follow-up form
+  const lastConsultation = editingEventId 
+    ? patientEvents.find(e => e.id !== editingEventId && e.event_type !== 'acs_visit' && e.event_type !== 'observation')
+    : (patientEvents.find(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation') || null);
 
   const handleSaveObservation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1460,6 +1465,7 @@ export function PatientDetails() {
                         <th className="p-4 text-center">Peso (kg)</th>
                         <th className="p-4 text-center">Est. (cm)</th>
                         <th className="p-4 text-center">PB (cm)</th>
+                        <th className="p-4 text-center">PC (cm)</th>
                         <th className="p-4 text-center">P/E (Z)</th>
                         <th className="p-4">Status</th>
                         <th className="p-4 text-center">Visita Domiciliar</th>
@@ -1482,6 +1488,9 @@ export function PatientDetails() {
                             </td>
                             <td className="p-4 text-center text-sm font-semibold text-slate-700">
                               {event.muac || '--'}
+                            </td>
+                            <td className="p-4 text-center text-sm font-semibold text-slate-700">
+                              {event.head_circumference || '--'}
                             </td>
                             <td className="p-4 text-center text-sm">
                                <span className={cn(
@@ -1528,12 +1537,14 @@ export function PatientDetails() {
                                   {!isObserver && (
                                     <button
                                       onClick={async () => {
-                                        await agendarVisita(patient.id, event.date);
-                                        sendNotification(
-                                          'Visita Agendada',
-                                          `A visita de ${patient.name} foi colocada na fila para a semana seguinte (${parseLocalDate(formatLocalDate(addDays(parseLocalDate(event.date), 7))).toLocaleDateString('pt-BR')}).`,
-                                          'success'
-                                        );
+                                        const success = await agendarVisita(patient.id, event.date);
+                                        if (success) {
+                                          sendNotification(
+                                            'Visita Agendada',
+                                            `A visita de ${patient.name} foi colocada na fila para a semana seguinte (${parseLocalDate(formatLocalDate(addDays(parseLocalDate(event.date), 7))).toLocaleDateString('pt-BR')}).`,
+                                            'success'
+                                          );
+                                        }
                                       }}
                                       className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-xs hover:scale-105 active:scale-95 cursor-pointer"
                                       title="Colocar na fila de visitas domiciliares"
@@ -1845,6 +1856,79 @@ export function PatientDetails() {
                         Modo histórico ativo: Você pode selecionar <strong>medicamentos e kits mesmo que estejam sem estoque atual</strong>. O registro não deduzirá do estoque físico de hoje.
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Last Consultation Info Card */}
+                {lastConsultation ? (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                          <History size={16} />
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                            Dados da Última Consulta
+                          </h4>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            {parseLocalDate(lastConsultation.date).toLocaleDateString('pt-BR')} • {formatProfessionalName(lastConsultation.professional)}
+                          </p>
+                        </div>
+                      </div>
+                      {lastConsultation.nutritional_status && (
+                        <StatusBadge status={lastConsultation.nutritional_status} />
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peso</p>
+                        <p className="text-xs font-black text-slate-800 mt-0.5">
+                          {lastConsultation.weight ? `${lastConsultation.weight} kg` : '--'}
+                        </p>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estatura</p>
+                        <p className="text-xs font-black text-slate-800 mt-0.5">
+                          {lastConsultation.height ? `${lastConsultation.height} cm` : '--'}
+                        </p>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">P. Braquial (PB)</p>
+                        <p className="text-xs font-black text-slate-800 mt-0.5">
+                          {lastConsultation.muac ? `${lastConsultation.muac} cm` : '--'}
+                        </p>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">P. Cefálico (PC)</p>
+                        <p className="text-xs font-black text-slate-800 mt-0.5">
+                          {lastConsultation.head_circumference ? `${lastConsultation.head_circumference} cm` : '--'}
+                        </p>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs col-span-2 sm:col-span-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">P/E (Z-Score)</p>
+                        <p className={cn(
+                          "text-xs font-black mt-0.5",
+                          lastConsultation.z_score_weight_height && lastConsultation.z_score_weight_height < -2 ? "text-red-500" :
+                          lastConsultation.z_score_weight_height && lastConsultation.z_score_weight_height < -1 ? "text-amber-500" : "text-emerald-600"
+                        )}>
+                          {lastConsultation.z_score_weight_height !== undefined ? lastConsultation.z_score_weight_height : '--'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {lastConsultation.notes && (
+                      <div className="bg-white/80 p-2.5 rounded-xl border border-slate-100 text-xs text-slate-600">
+                        <span className="font-bold text-slate-700">Observações Anteriores: </span>
+                        <span className="italic">{lastConsultation.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-xs text-slate-500 flex items-center gap-2">
+                    <History size={15} className="text-slate-400 shrink-0" />
+                    <span>Primeiro acompanhamento clínico da criança (sem consultas anteriores registradas).</span>
                   </div>
                 )}
                 

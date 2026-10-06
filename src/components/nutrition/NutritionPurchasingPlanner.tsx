@@ -58,7 +58,9 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       p.status === 'Risco' ||
       p.status === 'Adequado'
     );
-    return active.length > 0 ? active.length : (patients.length > 0 ? patients.length : 9);
+    if (active.length > 0) return active.length;
+    if (patients.length > 0) return patients.length;
+    return 0;
   }, [patients]);
 
   // Estatísticas demográficas e clínicas dos pacientes cadastrados
@@ -96,16 +98,6 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       }
     });
 
-    // Se não tiver dados suficientes em cadastro, adota perfil típico da Casa Nutri (ex: 9 crianças)
-    if (under6m === 0 && between6and24m === 0 && over24m === 0) {
-      under6m = 2;
-      between6and24m = 4;
-      over24m = 3;
-    }
-    if (hivCount === 0) {
-      hivCount = 2; // Perfil de vigilância epidemiológica
-    }
-
     return {
       totalFamilies: activeChildrenCount,
       under6m,
@@ -115,13 +107,38 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
     };
   }, [patients, activeChildrenCount]);
 
+  const STORAGE_KIT_TARGETS_KEY = 'yah_hope_nutrition_kit_targets_v1';
+
   // Metas de distribuição de cada Kit no mês (kitId -> quantidade)
-  const [kitTargets, setKitTargets] = useState<Record<string, number>>({});
+  const [kitTargets, setKitTargets] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('yah_hope_nutrition_kit_targets_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      console.warn('Erro ao ler kitTargets do localStorage:', e);
+    }
+    return {};
+  });
   const [hasInitializedTargets, setHasInitializedTargets] = useState(false);
 
-  // Inicializa as metas de kits com inteligência clínica
+  // Inicializa as metas de kits caso ainda não estejam salvas no localStorage
   useEffect(() => {
     if (kits.length === 0 || hasInitializedTargets) return;
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KIT_TARGETS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Object.keys(parsed).length > 0) {
+          setKitTargets(parsed);
+          setHasInitializedTargets(true);
+          return;
+        }
+      }
+    } catch (e) {}
 
     const initial: Record<string, number> = {};
     kits.forEach(kit => {
@@ -153,14 +170,23 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
     });
 
     setKitTargets(initial);
+    try {
+      localStorage.setItem(STORAGE_KIT_TARGETS_KEY, JSON.stringify(initial));
+    } catch (e) {}
     setHasInitializedTargets(true);
   }, [kits, patientStats, hasInitializedTargets]);
 
   const handleUpdateKitTarget = (kitId: string, val: number) => {
-    setKitTargets(prev => ({
-      ...prev,
-      [kitId]: Math.max(0, val)
-    }));
+    setKitTargets(prev => {
+      const updated = {
+        ...prev,
+        [kitId]: Math.max(0, val)
+      };
+      try {
+        localStorage.setItem(STORAGE_KIT_TARGETS_KEY, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const handleResetKitTargets = () => {
@@ -182,6 +208,9 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       }
     });
     setKitTargets(initial);
+    try {
+      localStorage.setItem(STORAGE_KIT_TARGETS_KEY, JSON.stringify(initial));
+    } catch (e) {}
   };
 
   // Modo de visualização: Consolidado (todos os kits), Kit Específico ou Insumos Zerados / Sem Preço
@@ -635,8 +664,8 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
               Previsão & Gestão de Custos por Insumo
             </h2>
             <p className="text-emerald-100/90 text-sm mt-2 leading-relaxed">
-              O sistema consolida a demanda de todos os kits das <strong>{activeChildrenCount} crianças</strong> atendidas 
-              (Cesta Básica para 100% das famílias + kits segmentados por faixa etária e condição clínica/HIV). 
+              O sistema consolida a demanda de todos os kits das <strong>{activeChildrenCount > 0 ? `${activeChildrenCount} crianças` : 'crianças'}</strong> atendidas 
+              (Cesta Básica para 100% das famílias atendidas + kits segmentados por faixa etária e condição clínica/HIV). 
               Defina o <strong>preço unitário</strong> de cada alimento diretamente aqui para alimentar automaticamente 
               o custo de todos os kits e cruzar com o saldo disponível na despensa.
             </p>
