@@ -116,37 +116,63 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   // Calcula o progresso dinâmico de qualquer campanha considerando se é Mensal ou Específica
   const calculateCampaignProgress = useCallback((camp: Campaign): CampaignProgressStats => {
     const isMonthly = camp.type !== 'specific'; // Padrão é mensal
-    const campDonations = donations.filter(d => 
-      (d.campaign_id === camp.id || (!d.campaign_id && camp.is_active && (camp.priority === 1 || camp.id === '1'))) && d.status === 'paid'
-    );
 
-    const totalHistorical = campDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
+    // Filtra doações aprovadas desta campanha
+    const campDonations = donations.filter(d => {
+      if (d.status !== 'paid') return false;
+      if (d.campaign_id) {
+        return d.campaign_id === camp.id;
+      }
+      return camp.is_active && (camp.priority === 1 || camp.id === '1');
+    });
 
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
 
-    // Se houve reset manual neste mês, considera a partir da data de reset
-    let effectiveStart = startOfMonth;
-    if (camp.last_reset_at) {
-      const resetDate = new Date(camp.last_reset_at);
-      if (resetDate > startOfMonth) {
-        effectiveStart = resetDate;
-      }
-    }
-
+    // Filtra doações ocorridas estritamente dentro do mês e ano atuais
     const monthDonations = campDonations.filter(d => {
-      const donationDate = new Date(d.paid_at || d.date);
-      return donationDate >= effectiveStart;
+      const rawDate = d.date || d.paid_at;
+      if (!rawDate) return false;
+      const donationDate = new Date(rawDate);
+      if (isNaN(donationDate.getTime())) return false;
+
+      // Deve pertencer estritamente ao mês e ano vigentes
+      const isCurrentMonth = 
+        donationDate.getFullYear() === currentYear &&
+        donationDate.getMonth() === currentMonth;
+
+      if (!isCurrentMonth) return false;
+
+      // Se houve reset manual no mês atual, só considera doações posteriores ao reset
+      if (camp.last_reset_at) {
+        const resetDate = new Date(camp.last_reset_at);
+        if (
+          resetDate.getFullYear() === currentYear &&
+          resetDate.getMonth() === currentMonth &&
+          donationDate < resetDate
+        ) {
+          return false;
+        }
+      }
+
+      return true;
     });
 
     const currentMonthTotal = monthDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
+    const totalHistorical = campDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
 
-    // Se for mensal, calcula apenas o total do mês atual. 
-    // Se for específica, é o histórico total permanente (NUNCA zera ao virar o mês).
-    const baseManualAmount = Number(camp.current_amount || 0);
+    // REGRA DE OURO:
+    // 1. Campanha Mensal (recorrente):
+    //    - Zera automaticamente todo mês. APENAS doações do mês corrente (currentMonthTotal) entram.
+    //    - Entradas de meses anteriores JAMAIS entram na campanha deste mês.
+    //
+    // 2. Campanha Específica (meta pontual/não mensal):
+    //    - NUNCA zera ao passar o mês.
+    //    - Acumula todo o histórico de arrecadação continuamente.
     const currentAmount = isMonthly 
-      ? Math.max(currentMonthTotal, (camp.last_reset_at && new Date(camp.last_reset_at) < startOfMonth ? 0 : baseManualAmount))
-      : Math.max(totalHistorical, baseManualAmount);
+      ? currentMonthTotal 
+      : Math.max(totalHistorical, Number(camp.current_amount || 0));
 
     const targetAmount = Math.max(camp.target_amount || 1, 1);
     const percentage = Math.min(Math.round((currentAmount / targetAmount) * 100), 100);
@@ -157,7 +183,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       percentage,
       isMonthly,
       currentMonthTotal,
-      totalHistorical: Math.max(totalHistorical, baseManualAmount)
+      totalHistorical: isMonthly ? currentMonthTotal : Math.max(totalHistorical, Number(camp.current_amount || 0))
     };
   }, [donations]);
 
