@@ -120,6 +120,18 @@ export function Campaign() {
     return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
   }, [stagesData]);
 
+  // Permite selecionar qual estágio visualizar na área detalhada (padrão: o estágio ativo)
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+
+  // Estágio atualmente exibido na área de detalhes
+  const displayedStage = useMemo(() => {
+    if (selectedStageId) {
+      const found = stagesData.find(s => s.campaign.id === selectedStageId);
+      if (found) return found;
+    }
+    return currentActiveStage || stagesData[0] || null;
+  }, [selectedStageId, stagesData, currentActiveStage]);
+
   // A doação única entra diretamente na régua, impulsionando o estágio ativo atual
   const targetCampaign = useMemo(() => {
     return currentActiveStage?.campaign || availableCampaigns[0] || defaultCamp || FALLBACK_CAMPAIGN;
@@ -558,68 +570,93 @@ export function Campaign() {
               </div>
             </div>
 
-            {/* Grid dos Estágios como marcos visuais na régua */}
+            {/* Grid dos Estágios como marcos visuais na régua (clicáveis para visualizar) */}
             <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-              {stagesData.map((stage) => (
-                <div
-                  key={stage.campaign.id}
-                  className={cn(
-                    "p-2.5 rounded-xl border text-left transition-all relative",
-                    stage.isCurrent
-                      ? "border-amber-400 bg-amber-50/60 shadow-xs ring-1 ring-amber-400/30"
-                      : stage.isReached
-                        ? "border-emerald-200 bg-emerald-50/50"
-                        : "border-slate-100 bg-slate-50/70"
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className={cn(
-                      "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded",
-                      stage.isReached 
-                        ? "bg-emerald-100 text-emerald-800" 
-                        : stage.isCurrent 
-                          ? "bg-amber-100 text-amber-800 animate-pulse" 
-                          : "bg-slate-200 text-slate-600"
-                    )}>
-                      Estágio {stage.stageNumber}
-                    </span>
-                    {stage.isReached ? (
-                      <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-                    ) : stage.isCurrent ? (
-                      <span className="text-[9px] font-black text-amber-600 uppercase">Ativo 🔥</span>
-                    ) : (
-                      <Lock size={11} className="text-slate-400 shrink-0" />
+              {stagesData.map((stage) => {
+                const isSelected = displayedStage?.campaign.id === stage.campaign.id;
+
+                return (
+                  <button
+                    type="button"
+                    key={stage.campaign.id}
+                    onClick={() => setSelectedStageId(stage.campaign.id)}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all relative cursor-pointer group",
+                      isSelected
+                        ? "border-emerald-600 bg-emerald-50/90 shadow-md ring-2 ring-emerald-600/30 -translate-y-0.5"
+                        : stage.isCurrent
+                          ? "border-amber-400 bg-amber-50/60 shadow-xs ring-1 ring-amber-400/30 hover:border-amber-500"
+                          : stage.isReached
+                            ? "border-emerald-200 bg-emerald-50/40 hover:border-emerald-300"
+                            : "border-slate-100 bg-slate-50/70 hover:border-slate-200"
                     )}
-                  </div>
-                  <p className="text-xs font-bold text-slate-800 line-clamp-1">
-                    {stage.campaign.title}
-                  </p>
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 mt-0.5 font-medium">
-                    <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
-                    <span className="font-bold text-emerald-600">{stage.stageProgress}%</span>
-                  </div>
-                </div>
-              ))}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className={cn(
+                        "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded",
+                        isSelected
+                          ? "bg-emerald-600 text-white"
+                          : stage.isReached 
+                            ? "bg-emerald-100 text-emerald-800" 
+                            : stage.isCurrent 
+                              ? "bg-amber-100 text-amber-800 animate-pulse" 
+                              : "bg-slate-200 text-slate-600"
+                      )}>
+                        Estágio {stage.stageNumber}
+                      </span>
+                      {stage.isReached ? (
+                        <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                      ) : stage.isCurrent ? (
+                        <span className="text-[9px] font-black text-amber-600 uppercase">Ativo 🔥</span>
+                      ) : (
+                        <Lock size={11} className="text-slate-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className={cn(
+                      "text-xs font-bold line-clamp-1 transition-colors",
+                      isSelected ? "text-emerald-950 font-black" : "text-slate-800 group-hover:text-slate-950"
+                    )}>
+                      {stage.campaign.title}
+                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 mt-0.5 font-medium">
+                      <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
+                      <span className={cn("font-bold", isSelected ? "text-emerald-700 font-black" : "text-emerald-600")}>
+                        {stage.stageProgress}%
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-emerald-600 rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* 2. GRID PRINCIPAL: ESTÁGIOS (ESQUERDA) + DOAÇÃO (DIREITA) */}
+        {/* 2. GRID PRINCIPAL: ESTÁGIO SELECIONADO (ESQUERDA) + DOAÇÃO (DIREITA) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Coluna Esquerda (lg:col-span-7): Jornada de Estágios da Régua */}
+          {/* Coluna Esquerda (lg:col-span-7): Detalhes do Estágio Selecionado */}
           <div className="lg:col-span-7 space-y-6">
             <div className="flex items-center justify-between px-1">
               <div>
-                <h3 className="text-xl font-black text-slate-900">Estágios da Régua de Arrecadação</h3>
-                <p className="text-xs text-slate-500">Conheça as fases que a sua doação viabiliza nesta jornada.</p>
+                <h3 className="text-xl font-black text-slate-900">
+                  {displayedStage ? `Estágio ${displayedStage.stageNumber}: ${displayedStage.campaign.title}` : 'Estágio da Régua'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {displayedStage?.isCurrent 
+                    ? 'Estágio atualmente sendo financiado pelas doações pontuais.' 
+                    : 'Clique nos estágios da régua acima para explorar cada fase.'}
+                </p>
               </div>
               <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                {stagesData.length} Estágios Cadastrados
+                {displayedStage?.isCurrent ? 'Estágio Ativo 🔥' : displayedStage?.isReached ? 'Conquistado ✓' : 'Próxima Fase'}
               </span>
             </div>
 
-            {stagesData.map((stage) => {
+            {displayedStage && (() => {
+              const stage = displayedStage;
               const camp = stage.campaign;
               const campStats = stage.campStats;
 
@@ -779,7 +816,7 @@ export function Campaign() {
                   </div>
                 </div>
               );
-            })}
+            })()}
           </div>
 
           {/* Coluna Direita (lg:col-span-5): Caixa Fixa de Doação para a Régua */}
