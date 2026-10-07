@@ -1,8 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { Heart, Target, ChevronRight, CheckCircle2, TrendingUp, DollarSign, Calendar, Sparkles } from 'lucide-react';
-import { useFundraising } from '../../contexts/FundraisingContext';
+import { 
+  Heart, 
+  Target, 
+  ChevronRight, 
+  CheckCircle2, 
+  TrendingUp, 
+  DollarSign, 
+  Calendar, 
+  Sparkles, 
+  Layers, 
+  Flag, 
+  Lock, 
+  Award,
+  ArrowRight,
+  CreditCard,
+  Flame
+} from 'lucide-react';
+import { useFundraising, Campaign as CampaignType } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { SEO } from '../../components/common/SEO';
 
 const QUOTAS = [
@@ -11,7 +27,7 @@ const QUOTAS = [
   { amount: 300, label: 'Cesta básica + Suplementos', icon: TrendingUp },
 ];
 
-const FALLBACK_CAMPAIGN: Campaign = {
+const FALLBACK_CAMPAIGN: CampaignType = {
   id: '1',
   title: 'Campanha de Nutrição Infantil',
   description: 'Ajude-nos a combater a desnutrição infantil e transformar vidas.',
@@ -24,6 +40,7 @@ const FALLBACK_CAMPAIGN: Campaign = {
 
 export function Campaign() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlCampaignId = searchParams.get('id') || searchParams.get('campaign');
 
   const { 
@@ -35,7 +52,7 @@ export function Campaign() {
     calculateCampaignProgress 
   } = useFundraising();
 
-  // Lista de campanhas ativas
+  // Lista de todas as campanhas ativas (cada uma é um estágio na régua)
   const availableCampaigns = useMemo(() => {
     const list = campaigns || [];
     const active = list.filter(c => c && c.is_active !== false);
@@ -45,11 +62,71 @@ export function Campaign() {
     return [FALLBACK_CAMPAIGN];
   }, [campaigns, defaultCamp]);
 
+  // Cálculos da Régua Geral de Arrecadação Cumulativa
+  const totalRulerGoal = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => sum + (c.target_amount || 0), 0);
+  }, [availableCampaigns]);
+
+  const totalRulerRaised = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => {
+      const p = calculateCampaignProgress(c);
+      return sum + p.currentAmount;
+    }, 0);
+  }, [availableCampaigns, calculateCampaignProgress]);
+
+  const rulerOverallPercentage = totalRulerGoal > 0 
+    ? Math.min(Math.round((totalRulerRaised / totalRulerGoal) * 100), 100) 
+    : 0;
+
+  // Cada campanha criada é um estágio na régua de arrecadação
+  const stagesData = useMemo(() => {
+    let runningTarget = 0;
+    return availableCampaigns.map((camp, idx) => {
+      const prevTarget = runningTarget;
+      runningTarget += (camp.target_amount || 0);
+      const threshold = runningTarget;
+      const isReached = totalRulerRaised >= threshold;
+      const isCurrent = !isReached && totalRulerRaised >= prevTarget;
+      const isUpcoming = totalRulerRaised < prevTarget;
+      
+      const campStats = calculateCampaignProgress(camp);
+      const stageNumber = idx + 1;
+
+      // Progresso percentual dentro deste estágio
+      let stageProgress = 0;
+      if (isReached) {
+        stageProgress = 100;
+      } else if (isCurrent && camp.target_amount > 0) {
+        const raisedInThisStage = Math.max(0, totalRulerRaised - prevTarget);
+        stageProgress = Math.min(100, Math.round((raisedInThisStage / camp.target_amount) * 100));
+      }
+
+      return {
+        campaign: camp,
+        stageNumber,
+        prevTarget,
+        threshold,
+        isReached,
+        isCurrent,
+        isUpcoming,
+        campStats,
+        stageProgress
+      };
+    });
+  }, [availableCampaigns, totalRulerRaised, calculateCampaignProgress]);
+
+  // Identifica o estágio ativo em andamento
+  const currentActiveStage = useMemo(() => {
+    return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
+  }, [stagesData]);
+
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>(() => {
     if (urlCampaignId) {
       const found = campaigns?.find(c => c && c.id === urlCampaignId);
       if (found) return found.id;
     }
+    // Por padrão seleciona o estágio atualmente em andamento
+    if (currentActiveStage) return currentActiveStage.campaign.id;
     return activeCampaign?.id || defaultCamp?.id || campaigns?.[0]?.id || FALLBACK_CAMPAIGN.id;
   });
 
@@ -59,10 +136,14 @@ export function Campaign() {
     }
   }, [urlCampaignId, availableCampaigns]);
 
-  // Campanha selecionada atualmente
+  // Campanha/Estágio selecionado atualmente para detalhes
   const currentCampaign = useMemo(() => {
     return availableCampaigns.find(c => c && c.id === selectedCampaignId) || availableCampaigns[0] || defaultCamp || FALLBACK_CAMPAIGN;
   }, [availableCampaigns, selectedCampaignId, defaultCamp]);
+
+  const currentStageInfo = useMemo(() => {
+    return stagesData.find(s => s.campaign.id === currentCampaign.id) || stagesData[0];
+  }, [stagesData, currentCampaign.id]);
 
   const handleSelectCampaign = (campId: string) => {
     setSelectedCampaignId(campId);
@@ -76,10 +157,6 @@ export function Campaign() {
     }, 50);
   };
 
-  const stats = useMemo(() => {
-    return calculateCampaignProgress(currentCampaign);
-  }, [calculateCampaignProgress, currentCampaign]);
-
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
@@ -87,9 +164,19 @@ export function Campaign() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card'>('pix');
-  const [isMonthly, setIsMonthly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Redireciona para o fluxo de Mantenedor com o valor selecionado
+  const handleBecomeMonthlyDonor = () => {
+    let finalAmount = selectedAmount;
+    if (isCustom && customAmount) {
+      const numericString = customAmount.replace(/\./g, '').replace(',', '.');
+      const parsed = parseFloat(numericString);
+      if (!isNaN(parsed) && parsed > 0) finalAmount = parsed;
+    }
+    navigate(`/mantenedor?amount=${finalAmount}`);
+  };
 
   const handleCustomAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '');
@@ -157,7 +244,7 @@ export function Campaign() {
         body: JSON.stringify({
           campaignId: currentCampaign.id,
           amount: finalAmount,
-          isMonthly,
+          isMonthly: false,
           paymentMethod, // 'pix' ou 'credit_card'
           donorName: name,
           donorEmail: email,
@@ -359,37 +446,48 @@ export function Campaign() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setIsMonthly(!isMonthly)}
-              className={cn(
-                "w-5 h-5 rounded flex items-center justify-center border-2 transition-colors cursor-pointer",
-                isMonthly ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"
-              )}
-            >
-              {isMonthly && <CheckCircle2 size={14} />}
-            </button>
-            <div className="text-xs">
-              <span className="font-bold text-slate-700">Tornar essa doação mensal recorrente</span>
-              <p className="text-slate-400 text-[11px]">Contribua todos os meses com essa causa</p>
-            </div>
-          </div>
-
+          {/* Botão de Doação Única para a Régua */}
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-slate-900 hover:bg-emerald-600 disabled:opacity-70 text-white font-black text-base py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all mt-4 shadow-lg shadow-slate-900/10 cursor-pointer"
+            className="w-full bg-[#0F172A] hover:bg-emerald-600 disabled:opacity-70 text-white font-black text-base py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all mt-4 shadow-lg shadow-slate-900/10 cursor-pointer"
           >
             {isLoading ? (
               <span className="animate-pulse">Processando...</span>
             ) : (
               <>
-                Doar R$ {isCustom ? (customAmount || '0') : selectedAmount} {isMonthly && '/ mês'}
+                Doar R$ {isCustom ? (customAmount || '0') : selectedAmount} para a Régua
                 <ChevronRight size={18} />
               </>
             )}
           </button>
+
+          {/* Botão Seja um Mantenedor Mensal (Custo Mensal do Projeto) */}
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleBecomeMonthlyDonor}
+              className="w-full bg-gradient-to-r from-[#F49853] to-orange-500 hover:from-[#e0853d] hover:to-orange-600 text-white p-3.5 rounded-2xl shadow-md transition-all flex items-center justify-between group cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Heart size={18} fill="currentColor" />
+                </div>
+                <div>
+                  <span className="text-xs font-black uppercase tracking-wider block">
+                    Seja um Mantenedor Mensal
+                  </span>
+                  <span className="text-[11px] text-white/95 font-medium">
+                    Apoiar com R$ {isCustom ? (customAmount || '50') : selectedAmount}/mês
+                  </span>
+                </div>
+              </div>
+              <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <p className="text-[10px] text-slate-400 mt-2 text-center font-medium">
+              * Mantenedores mensais cobrem os custos fixos dos projetos que zeram todo mês.
+            </p>
+          </div>
         </form>
       </div>
     </div>
@@ -437,15 +535,123 @@ export function Campaign() {
         </h1>
       </div>
 
-      {/* Main Content: 2 Colunas */}
+      {/* Main Content: Régua Global + 2 Colunas */}
       <div className="max-w-7xl mx-auto px-4 -mt-24 relative z-20">
+
+        {/* 1. RÉGUA GLOBAL DE ARRECADAÇÃO POR ESTÁGIOS */}
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 md:p-8 mb-8 relative overflow-hidden ring-1 ring-slate-900/5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-200/60 shadow-xs">
+                <Flame size={14} className="text-emerald-600 animate-pulse" />
+                <span>Régua Unificada de Arrecadação</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                Jornada de Estágios de Transformação
+              </h2>
+              <p className="text-xs md:text-sm text-slate-500 mt-1.5 max-w-2xl font-gotham-regular leading-relaxed">
+                Cada campanha é um estágio sequencial na nossa régua geral de impacto. As doações únicas acumulam sequencialmente, desbloqueando cada fase do projeto!
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 bg-slate-50/90 p-4 rounded-2xl border border-slate-200/70 self-start lg:self-auto shadow-inner">
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  Total Geral Arrecadado
+                </span>
+                <span className="text-xl md:text-2xl font-black text-emerald-600">
+                  R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs text-slate-400 block font-medium">
+                  de R$ {totalRulerGoal.toLocaleString('pt-BR')} ({rulerOverallPercentage}%)
+                </span>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex flex-col items-center justify-center font-black text-sm shrink-0 shadow-md shadow-emerald-500/25">
+                <span>{rulerOverallPercentage}%</span>
+                <span className="text-[9px] font-bold uppercase text-white/80">concluído</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra Contínua Global com Efeito Shimmer */}
+          <div className="relative pt-2 pb-6">
+            <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+              <span className="flex items-center gap-1 text-slate-700">
+                <Layers size={13} className="text-emerald-600" />
+                Progresso Geral na Régua
+              </span>
+              <span className="text-emerald-700">
+                {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} em andamento` : 'Régua Concluída'}
+              </span>
+            </div>
+
+            <div className="h-5 bg-slate-100 rounded-full overflow-hidden shadow-inner ring-1 ring-slate-200/80 relative">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-[#F49853] rounded-full transition-all duration-1000 ease-out relative"
+                style={{ width: `${rulerOverallPercentage}%` }}
+              >
+                <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+              </div>
+            </div>
+
+            {/* Grid dos Estágios como botões de navegação rápida na régua */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {stagesData.map((stage) => {
+                const isSelected = stage.campaign.id === currentCampaign.id;
+                return (
+                  <button
+                    key={stage.campaign.id}
+                    type="button"
+                    onClick={() => handleSelectCampaign(stage.campaign.id)}
+                    className={cn(
+                      "p-3 rounded-2xl border text-left transition-all cursor-pointer relative",
+                      isSelected
+                        ? "border-emerald-500 bg-emerald-50/60 shadow-sm ring-2 ring-emerald-500/20"
+                        : "border-slate-100 bg-slate-50/70 hover:bg-slate-100/80"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
+                        stage.isReached 
+                          ? "bg-emerald-100 text-emerald-800" 
+                          : stage.isCurrent 
+                            ? "bg-amber-100 text-amber-800 animate-pulse" 
+                            : "bg-slate-200 text-slate-600"
+                      )}>
+                        Estágio {stage.stageNumber}
+                      </span>
+                      {stage.isReached ? (
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                      ) : stage.isCurrent ? (
+                        <span className="text-[10px] font-black text-amber-600 uppercase">Ativo 🔥</span>
+                      ) : (
+                        <Lock size={12} className="text-slate-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                      {stage.campaign.title}
+                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 font-medium">
+                      <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
+                      <span className="font-bold text-emerald-600">{stage.stageProgress}%</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. GRID PRINCIPAL: ESTÁGIOS DETALHADOS (ESQUERDA) + FORMULÁRIO DE APOIO (DIREITA) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Coluna Esquerda (lg:col-span-7): Campanhas uma embaixo da outra */}
+          {/* Coluna Esquerda (lg:col-span-7): Estágios da Régua */}
           <div className="lg:col-span-7 space-y-6">
-            {availableCampaigns.map((camp, index) => {
+            {stagesData.map((stage) => {
+              const camp = stage.campaign;
               const isSelected = camp.id === currentCampaign.id;
-              const campStats = calculateCampaignProgress(camp);
+              const campStats = stage.campStats;
 
               if (isSelected) {
                 return (
@@ -457,22 +663,31 @@ export function Campaign() {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2">
-                        {campStats.isMonthly ? (
-                          <span className="bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                            <Calendar size={12} /> Meta do Mês • {currentMonthName}
+                        <span className="bg-slate-900 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                          <Layers size={12} /> ESTÁGIO #{stage.stageNumber}
+                        </span>
+
+                        {stage.isReached ? (
+                          <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Estágio Conquistado
+                          </span>
+                        ) : stage.isCurrent ? (
+                          <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 animate-pulse">
+                            <Flame size={12} /> Estágio em Andamento
                           </span>
                         ) : (
-                          <span className="bg-purple-100 text-purple-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                            <Target size={12} /> Campanha Especial
+                          <span className="bg-slate-100 text-slate-600 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
+                            <Lock size={12} /> Próximo na Régua
                           </span>
                         )}
-                        <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                          <Sparkles size={12} /> Selecionada
+
+                        <span className="bg-emerald-50 text-emerald-700 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
+                          <Sparkles size={11} /> Selecionado
                         </span>
                       </div>
 
                       <span className="text-xs font-bold text-slate-400">
-                        #{index + 1}
+                        Faixa: R$ {stage.prevTarget.toLocaleString('pt-BR')} - R$ {stage.threshold.toLocaleString('pt-BR')}
                       </span>
                     </div>
 
@@ -486,23 +701,23 @@ export function Campaign() {
                       </p>
                     )}
 
-                    {/* Régua de Arrecadação Crescida / Expandida */}
+                    {/* Régua de Arrecadação do Estágio */}
                     <div className="bg-emerald-50/40 rounded-2xl p-5 border border-emerald-100">
                       <div className="flex justify-between items-end mb-4">
                         <div>
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                            {campStats.isMonthly ? 'Arrecadado no Mês' : 'Total Arrecadado'}
+                            Progresso deste Estágio
                           </p>
                           <p className="text-3xl md:text-4xl font-black text-emerald-600">
-                            {campStats.percentage}%
+                            {stage.stageProgress}%
                           </p>
                           <p className="text-xs text-slate-500 font-bold mt-0.5">
-                            R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} acumulados
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                            Objetivo
+                            Meta do Estágio
                           </p>
                           <p className="text-xl md:text-2xl font-black text-slate-900">
                             R$ {campStats.targetAmount.toLocaleString('pt-BR')}
@@ -510,18 +725,18 @@ export function Campaign() {
                         </div>
                       </div>
 
-                      {/* Barra de Progresso Crescida com Milestones */}
+                      {/* Barra de Progresso do Estágio */}
                       <div className="relative pt-6 pb-2">
                         <div className="h-6 bg-slate-200/80 rounded-full overflow-hidden relative z-10 shadow-inner ring-1 ring-slate-300/60">
                           <div 
                             className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000 ease-out relative"
-                            style={{ width: `${campStats.percentage}%` }}
+                            style={{ width: `${stage.stageProgress}%` }}
                           >
                             <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
                           </div>
                         </div>
 
-                        {/* Marcadores de Milestones */}
+                        {/* Marcos do Estágio */}
                         {camp.milestones?.map((m) => {
                           const percent = Math.min((m.target_amount / campStats.targetAmount) * 100, 100);
                           const isReached = campStats.currentAmount >= m.target_amount;
@@ -547,11 +762,11 @@ export function Campaign() {
                         })}
                       </div>
 
-                      {/* Lista de Marcos da Régua se existirem */}
+                      {/* Sub-marcos se existirem */}
                       {camp.milestones && camp.milestones.length > 0 && (
                         <div className="mt-8 pt-4 border-t border-emerald-100/80 space-y-3">
                           <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                            Estágios da meta:
+                            Fases internas deste estágio:
                           </h4>
                           <div className="space-y-2">
                             {camp.milestones.map((m, idx) => {
@@ -584,7 +799,7 @@ export function Campaign() {
                 );
               }
 
-              // Card Não Selecionado (embaixo da selecionada)
+              // Card Não Selecionado
               return (
                 <div 
                   key={camp.id}
@@ -594,13 +809,21 @@ export function Campaign() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
-                      {campStats.isMonthly ? (
-                        <span className="bg-blue-50 text-blue-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-blue-100">
-                          <Calendar size={12} /> Meta do Mês • {currentMonthName}
+                      <span className="bg-slate-100 text-slate-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                        <Layers size={12} /> ESTÁGIO #{stage.stageNumber}
+                      </span>
+
+                      {stage.isReached ? (
+                        <span className="bg-emerald-50 text-emerald-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-emerald-100">
+                          <CheckCircle2 size={12} /> Concluído
+                        </span>
+                      ) : stage.isCurrent ? (
+                        <span className="bg-amber-50 text-amber-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-amber-100">
+                          <Flame size={12} /> Em Andamento
                         </span>
                       ) : (
-                        <span className="bg-purple-50 text-purple-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-purple-100">
-                          <Target size={12} /> Campanha Especial
+                        <span className="bg-slate-50 text-slate-500 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-slate-100">
+                          <Lock size={12} /> Próximo
                         </span>
                       )}
                     </div>
@@ -613,7 +836,7 @@ export function Campaign() {
                       }}
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 group-hover:bg-emerald-600 text-slate-700 group-hover:text-white font-bold text-xs uppercase tracking-wider transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
                     >
-                      <span>Apoiar esta</span>
+                      <span>Apoiar este estágio</span>
                       <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </div>
@@ -628,26 +851,25 @@ export function Campaign() {
                     </p>
                   )}
 
-                  {/* Régua de Arrecadação Compacta da Campanha */}
+                  {/* Régua Compacta do Estágio */}
                   <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 group-hover:border-emerald-100 transition-colors">
                     <div className="flex justify-between items-center mb-2.5 text-xs">
                       <div className="flex items-baseline gap-2">
-                        <span className="font-black text-lg text-emerald-600">{campStats.percentage}%</span>
+                        <span className="font-black text-lg text-emerald-600">{stage.stageProgress}%</span>
                         <span className="text-slate-500 font-bold">
                           R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} arrecadados
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-slate-400 font-medium">Meta: </span>
+                        <span className="text-slate-400 font-medium">Meta do estágio: </span>
                         <span className="font-black text-slate-800">R$ {campStats.targetAmount.toLocaleString('pt-BR')}</span>
                       </div>
                     </div>
 
-                    {/* Barra de Progresso Compacta */}
                     <div className="h-3.5 bg-slate-200/80 rounded-full overflow-hidden relative">
                       <div 
                         className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${campStats.percentage}%` }}
+                        style={{ width: `${stage.stageProgress}%` }}
                       />
                     </div>
                   </div>
@@ -661,11 +883,11 @@ export function Campaign() {
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
               <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-4">Faça sua contribuição</h2>
               
-              {/* Identificação Clara da Campanha Clicada */}
+              {/* Identificação Clara do Estágio Clicado */}
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 mb-6">
                 <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-black uppercase tracking-wider mb-1">
-                  <Sparkles size={14} className="text-emerald-600" />
-                  Você está apoiando:
+                  <Flame size={14} className="text-emerald-600" />
+                  Você está impulsionando o Estágio #{currentStageInfo.stageNumber}:
                 </div>
                 <h3 className="font-black text-slate-900 text-lg leading-snug">
                   {currentCampaign.title}
@@ -673,7 +895,7 @@ export function Campaign() {
                 <p className="text-xs text-slate-500 mt-1 font-medium">
                   {currentCampaign.description 
                     ? (currentCampaign.description.length > 90 ? `${currentCampaign.description.substring(0, 90)}...` : currentCampaign.description)
-                    : 'Sua doação será destinada diretamente a este projeto.'}
+                    : 'Sua doação única avança a régua geral e financia este estágio.'}
                 </p>
               </div>
 

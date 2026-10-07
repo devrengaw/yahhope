@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, CreditCard, Sparkles } from 'lucide-react';
+import { X, ArrowRight, CreditCard, Sparkles, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDonationModal } from '../../contexts/DonationModalContext';
 
@@ -11,6 +11,7 @@ const STRIPE_QUOTAS = [
 
 export function DonationModal() {
   const { isOpen, options, closeDonationModal } = useDonationModal();
+  const [frequency, setFrequency] = useState<'single' | 'monthly'>('single');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const navigate = useNavigate();
 
@@ -22,13 +23,18 @@ export function DonationModal() {
   const imageUrl = options?.imageUrl || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif';
   const description = options?.description;
 
-  const handleStripeCheckout = async (amount: number) => {
+  const handleCheckout = async (amount: number) => {
     setIsCheckingOut(true);
+    const isMonthly = frequency === 'monthly';
+    const fallbackUrl = isMonthly 
+      ? `/mantenedor?amount=${amount}` 
+      : `/campanha?amount=${amount}&isMonthly=false&method=card`;
+
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
         closeDonationModal();
-        navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
+        navigate(fallbackUrl);
         return;
       }
 
@@ -41,8 +47,10 @@ export function DonationModal() {
         },
         body: JSON.stringify({
           amount,
-          isMonthly: true,
-          successUrl: `${window.location.origin}/campanha?status=success`,
+          isMonthly,
+          successUrl: isMonthly
+            ? `${window.location.origin}/mantenedor?status=success`
+            : `${window.location.origin}/campanha?status=success`,
           cancelUrl: `${window.location.origin}/?status=cancel`
         })
       });
@@ -52,22 +60,26 @@ export function DonationModal() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
+        navigate(fallbackUrl);
       }
     } catch {
       closeDonationModal();
-      navigate(`/campanha?amount=${amount}&isMonthly=true&method=card`);
+      navigate(fallbackUrl);
     } finally {
       setIsCheckingOut(false);
     }
   };
 
-  const handleGoToCampaign = () => {
+  const handleSecondaryAction = () => {
     closeDonationModal();
-    const target = options?.link && options.link.startsWith('/campanha') 
-      ? options.link 
-      : '/campanha';
-    navigate(target);
+    if (frequency === 'monthly') {
+      navigate('/mantenedor');
+    } else {
+      const target = options?.link && options.link.startsWith('/campanha') 
+        ? options.link 
+        : '/campanha';
+      navigate(target);
+    }
   };
 
   return (
@@ -112,6 +124,33 @@ export function DonationModal() {
         </div>
 
         <div className="p-6 sm:p-7 overflow-y-auto">
+          {/* Toggle Doação Única vs Mensal (Mantenedor) */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl mb-4 text-xs font-gotham-bold">
+            <button
+              type="button"
+              onClick={() => setFrequency('single')}
+              className={`py-2.5 rounded-xl transition-all ${
+                frequency === 'single'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Doação Única (Campanha)
+            </button>
+            <button
+              type="button"
+              onClick={() => setFrequency('monthly')}
+              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                frequency === 'monthly'
+                  ? 'bg-[#F49853] text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Heart size={13} fill="currentColor" />
+              <span>Mensal (Mantenedor)</span>
+            </button>
+          </div>
+
           {description && (
             <p className="text-slate-500 text-xs sm:text-sm font-gotham-light leading-relaxed mb-4 line-clamp-2">
               {description}
@@ -120,7 +159,9 @@ export function DonationModal() {
 
           <p className="text-slate-700 text-xs sm:text-sm font-gotham-bold mb-3 flex items-center gap-1.5">
             <Sparkles size={16} className="text-[#F49853]" />
-            Selecione uma cota de apoio rápido:
+            {frequency === 'monthly'
+              ? 'Escolha sua cota de mantenedor mensal:'
+              : 'Selecione uma cota de apoio rápido à campanha:'}
           </p>
 
           <div className="space-y-2.5 mb-5">
@@ -129,11 +170,13 @@ export function DonationModal() {
                 key={q.amount}
                 type="button"
                 disabled={isCheckingOut}
-                onClick={() => handleStripeCheckout(q.amount)}
+                onClick={() => handleCheckout(q.amount)}
                 className="w-full flex items-center justify-between p-3.5 rounded-2xl border-2 border-slate-100 hover:border-[#F49853] hover:bg-orange-50/50 transition-all text-left group cursor-pointer"
               >
                 <div>
-                  <span className="text-sm font-gotham-bold text-slate-900 block">R$ {q.amount}</span>
+                  <span className="text-sm font-gotham-bold text-slate-900 block">
+                    R$ {q.amount} {frequency === 'monthly' ? '/ mês' : ''}
+                  </span>
                   <span className="text-xs text-slate-500 font-gotham-regular">{q.label}</span>
                 </div>
                 <ArrowRight size={16} className="text-slate-400 group-hover:text-[#F49853] group-hover:translate-x-1 transition-all" />
@@ -143,11 +186,20 @@ export function DonationModal() {
 
           <div className="space-y-2">
             <button
-              onClick={handleGoToCampaign}
+              onClick={handleSecondaryAction}
               className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3.5 rounded-2xl font-gotham-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
             >
-              <CreditCard size={15} />
-              <span>Outro Valor / Doar via PIX ou Cartão</span>
+              {frequency === 'monthly' ? (
+                <>
+                  <Heart size={15} fill="currentColor" />
+                  <span>Seja um Mantenedor Mensal (Outro Valor)</span>
+                </>
+              ) : (
+                <>
+                  <CreditCard size={15} />
+                  <span>Outro Valor / Doar para a Campanha</span>
+                </>
+              )}
             </button>
           </div>
         </div>

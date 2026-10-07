@@ -149,7 +149,7 @@ export function CampaignDisplay() {
 
                 <span className="bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={12} className="text-amber-400" />
-                  Prioridade #{currentSlide.priority ?? (currentSlideIndex + 1)}
+                  Estágio #{currentSlideIndex + 1} de {activeCampaigns.length}
                 </span>
               </div>
 
@@ -247,12 +247,12 @@ export function CampaignDisplay() {
                   R$ {totalGoal.toLocaleString('pt-BR')}
                 </p>
                 <p className="text-[11px] text-emerald-300/80 font-medium">
-                  {activeCampaigns.length} {activeCampaigns.length === 1 ? 'campanha ativa' : 'campanhas ativas'}
+                  {activeCampaigns.length} {activeCampaigns.length === 1 ? 'estágio na régua' : 'estágios na régua'}
                 </p>
               </div>
             </div>
 
-            {/* Barra Cumulativa Gigante com Marcadores das Campanhas */}
+            {/* Barra Cumulativa Gigante com Marcadores dos Estágios */}
             <div className="relative pt-6 pb-20">
               <div className="h-9 bg-black/40 rounded-full overflow-hidden relative z-10 backdrop-blur-md border border-white/15 shadow-inner">
                 <div 
@@ -263,7 +263,7 @@ export function CampaignDisplay() {
                 </div>
               </div>
 
-              {/* Marcadores de Cada Campanha ao longo da barra em ordem de prioridade */}
+              {/* Marcadores de Cada Estágio ao longo da barra em ordem de prioridade */}
               {cumulativeMilestones.map((m) => {
                 const isCurrentSlide = m.campaign.id === currentSlide.id;
                 const isAlternate = m.index % 2 === 1;
@@ -287,7 +287,7 @@ export function CampaignDisplay() {
                       {m.isReached ? (
                         <CheckCircle2 size={16} />
                       ) : (
-                        <span className="text-[11px] font-black">#{m.index + 1}</span>
+                        <span className="text-[11px] font-black">E{m.index + 1}</span>
                       )}
                     </div>
 

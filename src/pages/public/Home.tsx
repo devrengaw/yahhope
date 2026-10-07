@@ -96,9 +96,14 @@ export function Home() {
     setIsCheckingOut(true);
 
     try {
+      const isMonthly = donationFrequency === 'monthly';
+      const redirectFallback = isMonthly 
+        ? `/mantenedor?amount=${finalVal}` 
+        : `/campanha?amount=${finalVal}&isMonthly=false&method=card`;
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
-        window.location.href = `/campanha?amount=${finalVal}&isMonthly=${donationFrequency === 'monthly'}&method=card`;
+        window.location.href = redirectFallback;
         return;
       }
 
@@ -111,8 +116,10 @@ export function Home() {
         },
         body: JSON.stringify({
           amount: finalVal,
-          isMonthly: donationFrequency === 'monthly',
-          successUrl: `${window.location.origin}/campanha?status=success`,
+          isMonthly,
+          successUrl: isMonthly
+            ? `${window.location.origin}/mantenedor?status=success`
+            : `${window.location.origin}/campanha?status=success`,
           cancelUrl: `${window.location.origin}/?status=cancel`
         })
       });
@@ -122,12 +129,15 @@ export function Home() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.warn('Fallback to campaign page:', data);
-        window.location.href = `/campanha?amount=${finalVal}&isMonthly=${donationFrequency === 'monthly'}&method=card`;
+        console.warn('Fallback redirection:', data);
+        window.location.href = redirectFallback;
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      window.location.href = `/campanha?amount=${finalVal}&isMonthly=${donationFrequency === 'monthly'}&method=card`;
+      const isMonthly = donationFrequency === 'monthly';
+      window.location.href = isMonthly 
+        ? `/mantenedor?amount=${finalVal}` 
+        : `/campanha?amount=${finalVal}&isMonthly=false&method=card`;
     } finally {
       setIsCheckingOut(false);
     }
@@ -247,8 +257,12 @@ export function Home() {
                   </button>
                 </div>
 
-                <p className="text-center text-xs text-slate-500 mb-3.5 font-gotham-regular">
-                  Sua doação leva saúde e <strong className="font-gotham-bold text-[#F49853]">ESPERANÇA</strong>
+                <p className="text-center text-xs text-slate-500 mb-3.5 font-gotham-regular min-h-[1.5rem] flex items-center justify-center">
+                  {donationFrequency === 'monthly' ? (
+                    <span>Sua contribuição mensal sustenta o <strong className="font-gotham-bold text-[#F49853]">custo vital dos projetos</strong></span>
+                  ) : (
+                    <span>Sua doação única impulsiona a <strong className="font-gotham-bold text-[#F49853]">régua de arrecadação</strong></span>
+                  )}
                 </p>
 
                 {/* The EXACT STRIPE QUOTAS BUTTONS */}
@@ -355,17 +369,22 @@ export function Home() {
                 <button
                   onClick={handleStripeCheckout}
                   disabled={isCheckingOut}
-                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3.5 rounded-2xl font-gotham-bold text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-[#F49853]/30 flex items-center justify-center gap-2 group disabled:opacity-80 active:scale-[0.99]"
+                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3.5 rounded-2xl font-gotham-bold text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-[#F49853]/30 flex items-center justify-center gap-2 group disabled:opacity-80 active:scale-[0.99] cursor-pointer"
                 >
                   {isCheckingOut ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
                       <span>Conectando...</span>
                     </>
+                  ) : donationFrequency === 'monthly' ? (
+                    <>
+                      <Heart size={16} fill="currentColor" />
+                      <span>SER MANTENEDOR MENSAL</span>
+                    </>
                   ) : (
                     <>
                       <CreditCard size={16} />
-                      <span>DOAR</span>
+                      <span>DOAR PARA A CAMPANHA</span>
                     </>
                   )}
                 </button>

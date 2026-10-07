@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Heart, 
   ShieldCheck, 
@@ -124,6 +124,9 @@ const FAQS = [
 ];
 
 export function MonthlyDonor() {
+  const [searchParams] = useSearchParams();
+  const urlAmount = searchParams.get('amount');
+
   const { activeCampaign, campaign: defaultCamp, createDonation } = useFundraising();
   const currentCampaign = activeCampaign || defaultCamp;
 
@@ -131,6 +134,30 @@ export function MonthlyDonor() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('guardiao');
   const [isCustom, setIsCustom] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
+
+  // Sincroniza plano ou valor vindo da URL
+  useEffect(() => {
+    if (urlAmount) {
+      const parsed = parseFloat(urlAmount);
+      if (!isNaN(parsed) && parsed > 0) {
+        const matchingPlan = PLANS.find(p => p.amount === parsed);
+        if (matchingPlan) {
+          setSelectedPlanId(matchingPlan.id);
+          setIsCustom(false);
+        } else {
+          setIsCustom(true);
+          setCustomAmount(parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        }
+
+        setTimeout(() => {
+          const el = document.getElementById('adesao-mantenedor');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 150);
+      }
+    }
+  }, [urlAmount]);
 
   // Formulário do Mantenedor
   const [donorName, setDonorName] = useState('');
@@ -891,15 +918,6 @@ export function MonthlyDonor() {
                   alt="Mãe e filho acolhidos e recuperados na Casa Nutri" 
                   className="w-full h-[450px] sm:h-[520px] object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
-                <div className="absolute bottom-6 left-6 right-6 text-white">
-                  <span className="text-xs font-gotham-bold uppercase tracking-wider text-[#F49853] block mb-1">
-                    História de Superação • Nampula
-                  </span>
-                  <p className="text-lg font-heading font-bold">
-                    "Ele chegou pesando 4,8 kg com 1 ano e 2 meses. Hoje, ele corre, brinca e sonha."
-                  </p>
-                </div>
               </div>
             </div>
 

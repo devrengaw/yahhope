@@ -380,8 +380,8 @@ export function FundraisingManager() {
               • {currentMonthName}
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Régua de Doações & Campanhas</h1>
-          <p className="text-slate-500 font-medium">Controle metas mensais recorrentes com zeramento automático ou crie campanhas específicas.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Régua de Arrecadação por Estágios</h1>
+          <p className="text-slate-500 font-medium">Cada campanha atua como um estágio na régua unificada. Mantenedores mensais sustentam o custo mensal contínuo do projeto.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -390,7 +390,7 @@ export function FundraisingManager() {
             target="_blank"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-sm text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
-            <ExternalLink size={16} /> Ver Página Pública
+            <ExternalLink size={16} /> Ver Régua Pública
           </Link>
           <Link
             to={`/campanha-display?id=${selectedCampaign.id}`}
@@ -408,7 +408,7 @@ export function FundraisingManager() {
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
-              {combinedStats.activeCount > 1 ? 'Total Arrecadado' : 'Arrecadado no Mês'}
+              {combinedStats.activeCount > 1 ? 'Total Geral na Régua' : 'Arrecadado no Mês'}
             </span>
             <Calendar size={18} className="text-emerald-500" />
           </div>
@@ -418,8 +418,8 @@ export function FundraisingManager() {
             </p>
             <p className="text-xs text-slate-500 mt-1">
               {combinedStats.activeCount > 1 
-                ? `${combinedStats.activeCount} campanhas ativas (R$ ${combinedStats.totalMonthRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} neste mês)`
-                : `Campanha Ativa: ${activeCampaign?.title || selectedCampaign.title}`
+                ? `${combinedStats.activeCount} estágios ativos na régua (R$ ${combinedStats.totalMonthRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no mês)`
+                : `Estágio Atual: ${activeCampaign?.title || selectedCampaign.title}`
               }
             </p>
           </div>
@@ -429,7 +429,7 @@ export function FundraisingManager() {
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">
-              {combinedStats.activeCount > 1 ? 'Metas & Evolução Total' : 'Meta & Evolução'}
+              {combinedStats.activeCount > 1 ? 'Evolução da Régua Geral' : 'Meta & Evolução'}
             </span>
             <Target size={18} className="text-blue-500" />
           </div>
@@ -448,7 +448,7 @@ export function FundraisingManager() {
             </div>
             {combinedStats.activeCount > 1 && (
               <p className="text-[11px] text-slate-400 mt-1.5">
-                Total conjunto de {combinedStats.activeCount} campanhas ativas
+                Total acumulado somando todos os {combinedStats.activeCount} estágios
               </p>
             )}
           </div>
@@ -457,13 +457,13 @@ export function FundraisingManager() {
         {/* Card 3: Campanhas Criadas / Ativas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Campanhas Criadas</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Estágios na Régua</span>
             <Layers size={18} className="text-purple-500" />
           </div>
           <div>
             <p className="text-2xl font-black text-slate-900">{campaigns.length}</p>
             <p className="text-xs text-slate-500 mt-1">
-              <span className="font-bold text-emerald-700">{combinedStats.activeCount} ativas</span> • {combinedStats.specificCount} específicas, {combinedStats.monthlyCount} mensais
+              <span className="font-bold text-emerald-700">{combinedStats.activeCount} estágios ativos</span>
             </p>
           </div>
         </div>
@@ -486,13 +486,13 @@ export function FundraisingManager() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <Flag size={20} className="text-emerald-500" />
-            <h2 className="text-base font-black text-slate-900">Selecione a Campanha para Gerenciar</h2>
+            <h2 className="text-base font-black text-slate-900">Estágios da Régua de Arrecadação</h2>
           </div>
           <button
             onClick={() => setIsNewCampaignModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm cursor-pointer"
           >
-            <Plus size={16} /> Nova Campanha
+            <Plus size={16} /> Novo Estágio da Régua
           </button>
         </div>
 
@@ -1203,18 +1203,21 @@ export function FundraisingManager() {
         )}
       </div>
 
-      {/* Modal: Nova Campanha */}
+      {/* Modal: Novo Estágio da Régua */}
       {isNewCampaignModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-5">
               <div className="flex items-center gap-2">
                 <Flag size={20} className="text-emerald-500" />
-                <h3 className="text-lg font-black text-slate-900">Criar Nova Campanha</h3>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Criar Novo Estágio da Régua</h3>
+                  <p className="text-xs text-slate-500">Este estágio será somado à régua global de arrecadação.</p>
+                </div>
               </div>
               <button 
                 onClick={() => setIsNewCampaignModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -1222,11 +1225,11 @@ export function FundraisingManager() {
 
             <form onSubmit={handleCreateCampaign} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Título da Campanha</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Título do Estágio</label>
                 <input 
                   type="text" required
                   value={newCampTitle} onChange={e => setNewCampTitle(e.target.value)}
-                  placeholder="Ex: Reforma do Refeitório Infantil"
+                  placeholder="Ex: Fase 2 • Cozinha Comunitária e Nutrição"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium"
                 />
               </div>
