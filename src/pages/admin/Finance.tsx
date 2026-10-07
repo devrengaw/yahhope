@@ -68,12 +68,51 @@ import {
   deleteCategory as removePersistedCategory 
 } from '../../services/financeCategoryService';
 
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+function parseDateParts(dateStr?: string) {
+  if (!dateStr) return { year: 0, month: 0, key: 'unknown', label: 'Sem data' };
+  const match = dateStr.match(/^(\d{4})-(\d{2})/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    return {
+      year,
+      month,
+      key: `${year}-${String(month + 1).padStart(2, '0')}`,
+      label: `${MONTH_NAMES[month] || ''} de ${year}`
+    };
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    return {
+      year,
+      month,
+      key: `${year}-${String(month + 1).padStart(2, '0')}`,
+      label: `${MONTH_NAMES[month] || ''} de ${year}`
+    };
+  }
+  return { year: 0, month: 0, key: 'unknown', label: 'Sem data' };
+}
+
 export function Finance() {
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>(getLocalCategories());
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    try {
+      const cached = localStorage.getItem('yah_hope_projects_v2');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -85,6 +124,7 @@ export function Finance() {
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterExpenseType, setFilterExpenseType] = useState<'all' | 'fixed' | 'variable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   const fetchData = async () => {
     try {
@@ -95,7 +135,14 @@ export function Finance() {
       ]);
       if (txRes.data) setTransactions(txRes.data);
       if (syncedCategories) setCategories(syncedCategories);
-      if (projRes.data) setProjects(projRes.data);
+      if (projRes.data && projRes.data.length > 0) {
+        setProjects(projRes.data);
+      } else {
+        try {
+          const cached = localStorage.getItem('yah_hope_projects_v2');
+          if (cached) setProjects(JSON.parse(cached));
+        } catch (e) {}
+      }
     } catch (e) {
       console.error('Error fetching finance data:', e);
     }
@@ -114,29 +161,91 @@ export function Finance() {
     };
   }, []);
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const currentMonthName = `${MONTH_NAMES[currentMonth]} de ${currentYear}`;
+
   const stats = useMemo(() => {
-    const income = transactions
-      .filter(t => t.type === 'income')
+    // 1. Entradas
+    const allIncome = transactions.filter(t => t.type === 'income');
+    const totalIncome = allIncome.reduce((acc, t) => acc + t.amount, 0);
+
+    const completedIncome = allIncome
+      .filter(t => t.status === 'completed')
       .reduce((acc, t) => acc + t.amount, 0);
-    const expense = transactions
-      .filter(t => t.type === 'expense')
+
+    // Total de entradas do mês corrente
+    const monthlyIncome = allIncome
+      .filter(t => {
+        const { year, month, key } = parseDateParts(t.date);
+        return key !== 'unknown' && year === currentYear && month === currentMonth;
+      })
       .reduce((acc, t) => acc + t.amount, 0);
-    const fixedExpense = transactions
-      .filter(t => t.type === 'expense' && t.expense_type === 'fixed')
+
+    // 2. Saídas
+    const allExpenses = transactions.filter(t => t.type === 'expense');
+    const totalExpense = allExpenses.reduce((acc, t) => acc + t.amount, 0);
+
+    // Saídas Realizadas (efetivadas)
+    const completedExpensesList = allExpenses.filter(t => t.status === 'completed');
+    const completedExpenses = completedExpensesList.reduce((acc, t) => acc + t.amount, 0);
+
+    // Saídas a Realizar (pendentes)
+    const pendingExpensesList = allExpenses.filter(t => t.status === 'pending');
+    const pendingExpenses = pendingExpensesList.reduce((acc, t) => acc + t.amount, 0);
+
+    // 3. Saldo em Caixa Efetivo
+    const effectiveIncome = completedIncome > 0 ? completedIncome : totalIncome;
+    const cashBalance = effectiveIncome - completedExpenses;
+    const projectedBalance = totalIncome - totalExpense;
+
+    // 4. Custo Fixo Mensal (transações fixas amortizadas + cadastrados nos projetos)
+    const fixedExpensesList = allExpenses.filter(t => t.expense_type === 'fixed');
+    const fixedExpense = fixedExpensesList.reduce((acc, t) => {
+      const rec = t.recurrence || 'monthly';
+      if (rec === 'bimonthly') return acc + (t.amount / 2);
+      if (rec === 'quarterly') return acc + (t.amount / 3);
+      if (rec === 'semiannual') return acc + (t.amount / 6);
+      if (rec === 'yearly') return acc + (t.amount / 12);
+      return acc + t.amount;
+    }, 0);
+
+    const variableExpense = allExpenses
+      .filter(t => t.expense_type === 'variable')
       .reduce((acc, t) => acc + t.amount, 0);
-    const variableExpense = transactions
-      .filter(t => t.type === 'expense' && t.expense_type === 'variable')
-      .reduce((acc, t) => acc + t.amount, 0);
-    
+
+    // Custos cadastrados nos projetos ativos e em planejamento
+    const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
+    const projectsFixedCost = activeProjects.reduce((acc, p) => acc + (Number(p.budget) || 0), 0);
+
+    // Custo Fixo Mensal Total = Custos Fixos Operacionais + Custos Cadastrados nos Projetos
+    const totalMonthlyFixed = fixedExpense + projectsFixedCost;
+
+    // Cobertura do custo fixo mensal pela receita do mês
+    const fixedCoverage = totalMonthlyFixed > 0 ? Math.min((monthlyIncome / totalMonthlyFixed) * 100, 100) : 100;
+
     return {
-      totalIncome: income,
-      totalExpense: expense,
-      balance: income - expense,
+      totalIncome,
+      monthlyIncome,
+      completedIncome,
+      totalExpense,
+      completedExpenses,
+      completedExpenseCount: completedExpensesList.length,
+      pendingExpenses,
+      pendingExpenseCount: pendingExpensesList.length,
+      cashBalance,
+      balance: cashBalance,
+      projectedBalance,
       fixedExpense,
+      projectsFixedCost,
+      activeProjectsCount: activeProjects.length,
+      totalMonthlyFixed,
       variableExpense,
-      fixedPercentage: expense > 0 ? (fixedExpense / expense) * 100 : 0
+      fixedCoverage,
+      fixedPercentage: totalExpense > 0 ? (totalMonthlyFixed / totalExpense) * 100 : 0
     };
-  }, [transactions]);
+  }, [transactions, projects, currentMonth, currentYear]);
 
   const projectStats = useMemo(() => {
     const currentMonth = new Date().getMonth();
@@ -188,6 +297,24 @@ export function Finance() {
     };
   }, [transactions]);
 
+  const availableMonths = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; count: number; incomeTotal: number; expenseTotal: number }>();
+    
+    transactions.forEach(t => {
+      const { key, label } = parseDateParts(t.date);
+      if (key === 'unknown') return;
+      if (!map.has(key)) {
+        map.set(key, { key, label, count: 0, incomeTotal: 0, expenseTotal: 0 });
+      }
+      const item = map.get(key)!;
+      item.count += 1;
+      if (t.type === 'income') item.incomeTotal += t.amount;
+      else item.expenseTotal += t.amount;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [transactions]);
+
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter(t => {
@@ -195,14 +322,57 @@ export function Finance() {
         const matchesExpenseType = filterExpenseType === 'all' || t.expense_type === filterExpenseType;
         const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              t.account.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesType && matchesExpenseType && matchesSearch;
+        const { key } = parseDateParts(t.date);
+        const matchesMonth = selectedMonth === 'all' || key === selectedMonth;
+        return matchesType && matchesExpenseType && matchesSearch && matchesMonth;
       })
       .sort((a, b) => {
         const timeA = new Date(a.date).getTime() || 0;
         const timeB = new Date(b.date).getTime() || 0;
         return timeB - timeA;
       });
-  }, [transactions, filterType, filterExpenseType, searchTerm]);
+  }, [transactions, filterType, filterExpenseType, searchTerm, selectedMonth]);
+
+  const transactionsByMonth = useMemo(() => {
+    const groups: {
+      key: string;
+      label: string;
+      transactions: Transaction[];
+      totalIncome: number;
+      totalExpense: number;
+      balance: number;
+    }[] = [];
+
+    const map = new Map<string, typeof groups[0]>();
+
+    filteredTransactions.forEach(t => {
+      const { key, label } = parseDateParts(t.date);
+
+      if (!map.has(key)) {
+        const group = {
+          key,
+          label,
+          transactions: [],
+          totalIncome: 0,
+          totalExpense: 0,
+          balance: 0
+        };
+        map.set(key, group);
+        groups.push(group);
+      }
+
+      const group = map.get(key)!;
+      group.transactions.push(t);
+      if (t.type === 'income') {
+        group.totalIncome += t.amount;
+      } else {
+        group.totalExpense += t.amount;
+      }
+      group.balance = group.totalIncome - group.totalExpense;
+    });
+
+    return groups;
+  }, [filteredTransactions]);
 
   const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
     const { error } = await supabase.from('finance_transactions').insert([newTx]);
@@ -463,75 +633,131 @@ export function Finance() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform">
-              <TrendingUp size={24} />
-            </div>
-            <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-lg">
-              <ArrowUpRight size={14} />
-              +12%
-            </div>
-          </div>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Total de Entradas</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">
-            R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform">
-              <TrendingDown size={24} />
-            </div>
-            <div className="flex items-center gap-1 text-rose-600 font-bold text-xs bg-rose-50 px-2 py-1 rounded-lg">
-              <ArrowDownRight size={14} />
-              -5%
-            </div>
-          </div>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Total de Saídas</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">
-            R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform">
-              <Wallet size={24} />
-            </div>
-          </div>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Saldo em Caixa</p>
-          <p className={cn(
-            "text-2xl font-black mt-1",
-            stats.balance >= 0 ? "text-slate-900" : "text-rose-600"
-          )}>
-            R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-
-        <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl shadow-slate-200 transition-all relative overflow-hidden group">
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-white/10 rounded-2xl text-white">
-                <Layers size={24} />
+      {/* Stats Cards: Entradas do Mês, Saídas Realizadas, Saídas a Realizar, Saldo em Caixa, Custo Fixo Mensal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+        {/* Card 1: Total de Entradas do Mês */}
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform">
+                <TrendingUp size={22} />
+              </div>
+              <div className="flex items-center gap-1 text-emerald-700 font-black text-[10px] bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                Mês Atual
               </div>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Custo Fixo Mensal</p>
-            <p className="text-2xl font-black text-white mt-1">
-              R$ {stats.fixedExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Entradas do Mês</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              R$ {stats.monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
-            <div className="mt-4 bg-white/10 h-1.5 rounded-full overflow-hidden">
+          </div>
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <span>Histórico total:</span>
+            <strong className="text-slate-700">R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+          </div>
+        </div>
+
+        {/* Card 2: Saídas Realizadas */}
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform">
+                <CheckCircle2 size={22} />
+              </div>
+              <div className="flex items-center gap-1 text-rose-700 font-black text-[10px] bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                {stats.completedExpenseCount} efetivadas
+              </div>
+            </div>
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Saídas Realizadas</p>
+            <p className="text-2xl font-black text-rose-600 mt-1">
+              R$ {stats.completedExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <span>Status:</span>
+            <span className="text-emerald-700 font-bold">✓ Pagamentos quitados</span>
+          </div>
+        </div>
+
+        {/* Card 3: Saídas a Realizar */}
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform">
+                <Clock size={22} />
+              </div>
+              <div className="flex items-center gap-1 text-amber-700 font-black text-[10px] bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                {stats.pendingExpenseCount} a pagar
+              </div>
+            </div>
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Saídas a Realizar</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">
+              R$ {stats.pendingExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <span>Total despesas:</span>
+            <span className="text-slate-700 font-bold">R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        {/* Card 4: Saldo em Caixa */}
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 group hover:border-slate-200 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform">
+                <Wallet size={22} />
+              </div>
+              <div className={cn(
+                "flex items-center gap-1 font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider border",
+                stats.cashBalance >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
+              )}>
+                {stats.cashBalance >= 0 ? 'Disponível' : 'Déficit'}
+              </div>
+            </div>
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Saldo em Caixa</p>
+            <p className={cn(
+              "text-2xl font-black mt-1",
+              stats.cashBalance >= 0 ? "text-slate-900" : "text-rose-600"
+            )}>
+              R$ {stats.cashBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <span>Saldo previsto:</span>
+            <strong className={cn(
+              stats.projectedBalance >= 0 ? "text-slate-700" : "text-rose-600"
+            )}>
+              R$ {stats.projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </strong>
+          </div>
+        </div>
+
+        {/* Card 5: Custo Fixo Mensal (inclui projetos cadastrados) */}
+        <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl shadow-slate-200 transition-all relative overflow-hidden group flex flex-col justify-between text-white">
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-white/10 rounded-2xl text-white">
+                <Layers size={22} />
+              </div>
+              <span className="px-2.5 py-1 bg-white/10 text-indigo-300 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                {stats.activeProjectsCount} Projetos
+              </span>
+            </div>
+            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Custo Fixo Mensal</p>
+            <p className="text-2xl font-black text-white mt-1">
+              R$ {stats.totalMonthlyFixed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="mt-2.5 bg-white/10 h-1.5 rounded-full overflow-hidden">
               <div 
                 className="bg-indigo-400 h-full rounded-full transition-all duration-1000" 
-                style={{ width: `${stats.fixedPercentage}%` }}
+                style={{ width: `${Math.min(stats.fixedCoverage, 100)}%` }}
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider text-right">
-              {stats.fixedPercentage.toFixed(1)}% das despesas totais
-            </p>
+          </div>
+          <div className="pt-3 mt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-300 relative z-10 font-bold">
+            <span title="Custos fixos operacionais">Fixos: R$ {stats.fixedExpense.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span>
+            <span title="Custos cadastrados nos projetos">Projetos: R$ {stats.projectsFixedCost.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span>
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
         </div>
@@ -662,6 +888,19 @@ export function Finance() {
                     <option value="variable">Apenas Variáveis</option>
                   </select>
 
+                  <select 
+                    className="bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-600 focus:outline-none hover:bg-slate-50 transition-colors shadow-sm outline-none"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  >
+                    <option value="all">📅 Todos os Meses ({transactions.length})</option>
+                    {availableMonths.map(m => (
+                      <option key={m.key} value={m.key}>
+                        {m.label} ({m.count})
+                      </option>
+                    ))}
+                  </select>
+
                   <button className="p-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-all shadow-sm active:scale-95">
                     <Filter size={20} />
                   </button>
@@ -669,147 +908,195 @@ export function Finance() {
               </div>
             </div>
 
-            {/* Transactions Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] border-b border-slate-100">
-                    <th className="px-8 py-5">Status / Data</th>
-                    <th className="px-8 py-5">Descrição / Categoria</th>
-                    <th className="px-8 py-5">Tipo / Recorrência</th>
-                    <th className="px-8 py-5">Conta / Origem</th>
-                    <th className="px-8 py-5 text-right">Valor</th>
-                    <th className="px-8 py-5 text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredTransactions.map((t) => {
-                    const category = categories.find(c => c.id === t.category_id);
-                    return (
-                      <tr key={t.id} className="hover:bg-slate-50/80 transition-all group/row">
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-4">
-                            <div className={cn(
-                              "w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover/row:scale-110",
-                              t.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                            )}>
-                              {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{t.date}</p>
-                              <p className={cn(
-                                "text-[10px] font-bold uppercase",
-                                t.status === 'completed' ? "text-emerald-500" : "text-amber-500"
-                              )}>
-                                {t.status === 'completed' ? 'Efetivado' : 'Pendente'}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-slate-900 leading-tight group-hover/row:text-slate-600 transition-colors uppercase text-sm tracking-tight">{t.description}</p>
-                            {t.currency === 'MZN' && (
-                              <span 
-                                className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
-                                title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
-                              >
-                                🇲🇿 MZN
-                              </span>
-                            )}
-                            {t.module && t.module !== 'global' && (
-                              <span className={cn(
-                                "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
-                                t.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                                t.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
-                                "bg-slate-100 text-slate-700 border border-slate-200"
-                              )}>
-                                {t.module === 'nutrition' ? 'Casa Nutri' : t.module === 'communication' ? 'Comunicação' : t.module}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
-                            {category?.name || (t.type === 'income' && t.module ? `Repasse ${t.module === 'nutrition' ? 'Nutrição' : 'Comunicação'}` : 'Sem Categoria')}
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex flex-col gap-2">
-                            {t.type === 'expense' ? (
-                              <span className={cn(
-                                "inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm",
-                                t.expense_type === 'fixed' 
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-100" 
-                                  : "bg-amber-50 text-amber-700 border-amber-100"
-                              )}>
-                                {t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
-                              </span>
-                            ) : (
-                              <span className={cn(
-                                "inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm",
-                                t.module && t.module !== 'global'
-                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                              )}>
-                                {t.module && t.module !== 'global' ? `Repasse ${t.module === 'nutrition' ? 'Nutrição' : 'Comunicação'}` : 'Receita'}
-                              </span>
-                            )}
-                            {t.recurrence && t.recurrence !== 'none' && (
-                              <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50/70 px-2 py-0.5 rounded-md w-fit">
-                                <Calendar size={11} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">
-                                  {t.recurrence === 'monthly' ? 'Mensal' :
-                                   t.recurrence === 'bimonthly' ? 'Bimestral' :
-                                   t.recurrence === 'quarterly' ? 'Trimestral' :
-                                   t.recurrence === 'semiannual' ? 'Semestral' :
-                                   t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-8 py-6 text-sm font-bold text-slate-500 uppercase tracking-widest">
-                          {t.account}
-                        </td>
-                        <td className="px-8 py-6 text-right">
-                          {t.currency === 'MZN' ? (
-                            <>
-                              <p className="text-lg font-black tracking-tighter text-emerald-700">
-                                {t.type === 'income' ? '+' : '-'} {(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
-                              </p>
-                              <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
-                                ~ R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </>
-                          ) : (
-                            <p className={cn(
-                              "text-lg font-black tracking-tighter",
-                              t.type === 'income' ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                              {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-8 py-6 text-center">
-                          <button className="p-3 text-slate-300 hover:text-slate-900 hover:bg-white rounded-xl transition-all active:scale-95 shadow-none hover:shadow-lg hover:shadow-slate-100">
-                            <MoreVertical size={20} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Empty State */}
-            {filteredTransactions.length === 0 && (
+            {/* Transactions Grouped by Month */}
+            {filteredTransactions.length === 0 ? (
               <div className="p-20 text-center">
                 <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
                   <Filter className="text-slate-200" size={40} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">Nenhum lançamento encontrado</h3>
-                <p className="text-slate-400 mt-2 font-medium max-w-xs mx-auto">Tente ajustar seus filtros ou busca para encontrar o que procura.</p>
+                <p className="text-slate-400 mt-2 font-medium max-w-xs mx-auto">
+                  {selectedMonth !== 'all' 
+                    ? 'Não foram encontrados lançamentos no mês selecionado.' 
+                    : 'Tente ajustar seus filtros ou busca para encontrar o que procura.'}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {transactionsByMonth.map((monthGroup) => (
+                  <div key={monthGroup.key} className="space-y-0">
+                    {/* Month Section Header */}
+                    <div className="bg-slate-50/90 px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 border-y border-slate-100 sticky top-0 z-10 backdrop-blur-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-white rounded-lg border border-slate-200 text-slate-700 shadow-2xs">
+                          <Calendar size={14} />
+                        </div>
+                        <span className="font-black text-xs text-slate-900 uppercase tracking-wider">
+                          {monthGroup.label}
+                        </span>
+                        <span className="text-[11px] bg-slate-200/80 text-slate-700 font-bold px-2.5 py-0.5 rounded-full">
+                          {monthGroup.transactions.length} {monthGroup.transactions.length === 1 ? 'lançamento' : 'lançamentos'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                        {(filterType === 'all' || filterType === 'income') && (
+                          <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                            Entradas: + R$ {monthGroup.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        {(filterType === 'all' || filterType === 'expense') && (
+                          <span className="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
+                            Saídas: - R$ {monthGroup.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        {filterType === 'all' && (
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-lg border font-black",
+                            monthGroup.balance >= 0 
+                              ? "text-slate-800 bg-white border-slate-200" 
+                              : "text-rose-700 bg-white border-rose-200"
+                          )}>
+                            Saldo: R$ {monthGroup.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Table for this Month */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/40 text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] border-b border-slate-100">
+                            <th className="px-8 py-4">Status / Data</th>
+                            <th className="px-8 py-4">Descrição / Categoria</th>
+                            <th className="px-8 py-4">Tipo / Recorrência</th>
+                            <th className="px-8 py-4">Conta / Origem</th>
+                            <th className="px-8 py-4 text-right">Valor</th>
+                            <th className="px-8 py-4 text-center">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {monthGroup.transactions.map((t) => {
+                            const category = categories.find(c => c.id === t.category_id);
+                            return (
+                              <tr key={t.id} className="hover:bg-slate-50/80 transition-all group/row">
+                                <td className="px-8 py-6">
+                                  <div className="flex items-center gap-4">
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover/row:scale-110",
+                                      t.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                    )}>
+                                      {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{t.date}</p>
+                                      <p className={cn(
+                                        "text-[10px] font-bold uppercase",
+                                        t.status === 'completed' ? "text-emerald-500" : "text-amber-500"
+                                      )}>
+                                        {t.status === 'completed' ? 'Efetivado' : 'Pendente'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-slate-900 leading-tight group-hover/row:text-slate-600 transition-colors uppercase text-sm tracking-tight">{t.description}</p>
+                                    {t.currency === 'MZN' && (
+                                      <span 
+                                        className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
+                                        title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                                      >
+                                        🇲🇿 MZN
+                                      </span>
+                                    )}
+                                    {t.module && t.module !== 'global' && (
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
+                                        t.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                                        t.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                                        "bg-slate-100 text-slate-700 border border-slate-200"
+                                      )}>
+                                        {t.module === 'nutrition' ? 'Casa Nutri' : t.module === 'communication' ? 'Comunicação' : t.module}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    <span className={cn("w-2 h-2 rounded-full", category?.color || 'bg-slate-300')}></span>
+                                    {category?.name || (t.type === 'income' && t.module ? `Repasse ${t.module === 'nutrition' ? 'Nutrição' : 'Comunicação'}` : 'Sem Categoria')}
+                                  </div>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <div className="flex flex-col gap-2">
+                                    {t.type === 'expense' ? (
+                                      <span className={cn(
+                                        "inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm",
+                                        t.expense_type === 'fixed' 
+                                          ? "bg-indigo-50 text-indigo-700 border-indigo-100" 
+                                          : "bg-amber-50 text-amber-700 border-amber-100"
+                                      )}>
+                                        {t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
+                                      </span>
+                                    ) : (
+                                      <span className={cn(
+                                        "inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm",
+                                        t.module && t.module !== 'global'
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                          : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      )}>
+                                        {t.module && t.module !== 'global' ? `Repasse ${t.module === 'nutrition' ? 'Nutrição' : 'Comunicação'}` : 'Receita'}
+                                      </span>
+                                    )}
+                                    {t.recurrence && t.recurrence !== 'none' && (
+                                      <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50/70 px-2 py-0.5 rounded-md w-fit">
+                                        <Calendar size={11} />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                                          {t.recurrence === 'monthly' ? 'Mensal' :
+                                           t.recurrence === 'bimonthly' ? 'Bimestral' :
+                                           t.recurrence === 'quarterly' ? 'Trimestral' :
+                                           t.recurrence === 'semiannual' ? 'Semestral' :
+                                           t.recurrence === 'yearly' ? 'Anual' : t.recurrence}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-8 py-6 text-sm font-bold text-slate-500 uppercase tracking-widest">
+                                  {t.account}
+                                </td>
+                                <td className="px-8 py-6 text-right">
+                                  {t.currency === 'MZN' ? (
+                                    <>
+                                      <p className="text-lg font-black tracking-tighter text-emerald-700">
+                                        {t.type === 'income' ? '+' : '-'} {(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                                      </p>
+                                      <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
+                                        ~ R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className={cn(
+                                      "text-lg font-black tracking-tighter",
+                                      t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                                    )}>
+                                      {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="px-8 py-6 text-center">
+                                  <button className="p-3 text-slate-300 hover:text-slate-900 hover:bg-white rounded-xl transition-all active:scale-95 shadow-none hover:shadow-lg hover:shadow-slate-100">
+                                    <MoreVertical size={20} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>

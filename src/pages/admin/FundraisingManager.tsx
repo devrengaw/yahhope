@@ -278,7 +278,94 @@ export function FundraisingManager() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  const MONTH_NAMES = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const parseDonationDate = (rawDate?: string) => {
+    if (!rawDate) return { key: 'unknown', label: 'Sem Data' };
+    const match = rawDate.match(/^(\d{4})-(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      return {
+        key: `${year}-${String(month + 1).padStart(2, '0')}`,
+        label: `${MONTH_NAMES[month] || ''} de ${year}`
+      };
+    }
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      return {
+        key: `${year}-${String(month + 1).padStart(2, '0')}`,
+        label: `${MONTH_NAMES[month] || ''} de ${year}`
+      };
+    }
+    return { key: 'unknown', label: 'Sem Data' };
+  };
+
+  const [donationMonthFilter, setDonationMonthFilter] = useState<string>('all');
   const displayedDonations = donationFilter === 'selected' ? donations : allDonations;
+
+  const availableDonationMonths = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; count: number; total: number }>();
+    displayedDonations.forEach(d => {
+      const { key, label } = parseDonationDate(d.date || d.paid_at);
+      if (key === 'unknown') return;
+      if (!map.has(key)) {
+        map.set(key, { key, label, count: 0, total: 0 });
+      }
+      const item = map.get(key)!;
+      item.count += 1;
+      if (d.status === 'paid') item.total += d.amount;
+    });
+    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }, [displayedDonations]);
+
+  const donationsByMonth = useMemo(() => {
+    const filtered = donationMonthFilter === 'all'
+      ? displayedDonations
+      : displayedDonations.filter(d => parseDonationDate(d.date || d.paid_at).key === donationMonthFilter);
+
+    const groups: {
+      key: string;
+      label: string;
+      donations: typeof displayedDonations;
+      total: number;
+      paidCount: number;
+      pendingCount: number;
+    }[] = [];
+
+    const map = new Map<string, typeof groups[0]>();
+
+    filtered.forEach(d => {
+      const { key, label } = parseDonationDate(d.date || d.paid_at);
+      if (!map.has(key)) {
+        const group = {
+          key,
+          label,
+          donations: [],
+          total: 0,
+          paidCount: 0,
+          pendingCount: 0
+        };
+        map.set(key, group);
+        groups.push(group);
+      }
+      const group = map.get(key)!;
+      group.donations.push(d);
+      if (d.status === 'paid') {
+        group.total += d.amount;
+        group.paidCount += 1;
+      } else {
+        group.pendingCount += 1;
+      }
+    });
+
+    return groups;
+  }, [displayedDonations, donationMonthFilter]);
 
   return (
     <div className="space-y-8 pb-16">
@@ -504,6 +591,12 @@ export function FundraisingManager() {
                       style={{ width: `${stats.percentage}%` }}
                     />
                   </div>
+                  {isMonthly && stats.totalHistorical > 0 && stats.totalHistorical !== stats.currentAmount && (
+                    <p className="text-[10px] text-slate-400 mt-1.5 flex items-center justify-between">
+                      <span>Mês Vigente: <strong>R$ {stats.currentMonthTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+                      <span>Histórico Geral: <strong>R$ {stats.totalHistorical.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -942,14 +1035,14 @@ export function FundraisingManager() {
 
         {/* Tab 3: Donations */}
         {activeTab === 'donations' && (
-          <div className="p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
+          <div className="p-6 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setDonationFilter('selected')}
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-xs font-bold transition-colors",
-                    donationFilter === 'selected' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    donationFilter === 'selected' ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                   )}
                 >
                   Desta Campanha ({donations.length})
@@ -958,20 +1051,40 @@ export function FundraisingManager() {
                   onClick={() => setDonationFilter('all')}
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-xs font-bold transition-colors",
-                    donationFilter === 'all' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    donationFilter === 'all' ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                   )}
                 >
                   Todas as Doações ({allDonations.length})
                 </button>
+
+                {/* Filtro por Mês */}
+                <select
+                  value={donationMonthFilter}
+                  onChange={(e) => setDonationMonthFilter(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 shadow-2xs"
+                >
+                  <option value="all">📅 Todos os Meses ({displayedDonations.length})</option>
+                  {availableDonationMonths.map(m => (
+                    <option key={m.key} value={m.key}>
+                      {m.label} ({m.count} doações)
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="text-xs text-slate-500 font-medium">
-                Total nesta lista: <strong className="text-slate-900 font-black">
-                  R$ {displayedDonations
-                    .filter(d => d.status === 'paid')
-                    .reduce((acc, d) => acc + d.amount, 0)
-                    .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </strong>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-slate-500 font-medium">
+                  Total confirmado: <strong className="text-emerald-700 font-black">
+                    R$ {displayedDonations
+                      .filter(d => {
+                        if (d.status !== 'paid') return false;
+                        if (donationMonthFilter === 'all') return true;
+                        return parseDonationDate(d.date || d.paid_at).key === donationMonthFilter;
+                      })
+                      .reduce((acc, d) => acc + d.amount, 0)
+                      .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </strong>
+                </span>
               </div>
             </div>
 
@@ -981,63 +1094,101 @@ export function FundraisingManager() {
                 <p className="font-bold text-slate-600">Nenhuma doação registrada nesta visualização.</p>
                 <p className="text-xs text-slate-400 mt-1">As doações realizadas via PIX ou Cartão aparecerão listadas aqui.</p>
               </div>
+            ) : donationsByMonth.length === 0 ? (
+              <div className="text-center p-12 text-slate-400 border border-dashed rounded-2xl">
+                <Calendar size={48} className="mx-auto mb-4 opacity-20" />
+                <p className="font-bold text-slate-600">Nenhuma doação encontrada no mês selecionado.</p>
+              </div>
             ) : (
-              <div className="overflow-x-auto border border-slate-100 rounded-xl">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/70 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                      <th className="p-4">Doador</th>
-                      <th className="p-4">Valor</th>
-                      <th className="p-4">Método</th>
-                      <th className="p-4">Data</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {displayedDonations.map(d => (
-                      <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4">
-                          <p className="font-bold text-sm text-slate-900">{d.donor_name}</p>
-                          <p className="text-xs text-slate-500">{d.donor_email || 'E-mail não informado'}</p>
-                        </td>
-                        <td className="p-4 font-black text-slate-900">
-                          R$ {d.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-4">
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-bold uppercase tracking-wider">
-                            {d.payment_method}
+              <div className="space-y-6">
+                {donationsByMonth.map((monthGroup) => (
+                  <div key={monthGroup.key} className="space-y-2">
+                    {/* Cabeçalho do Mês */}
+                    <div className="bg-slate-50/90 px-4 py-3 rounded-xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-white rounded-lg border border-slate-200 text-emerald-600 shadow-2xs">
+                          <Calendar size={14} />
+                        </div>
+                        <span className="font-black text-xs text-slate-900 uppercase tracking-wide">
+                          {monthGroup.label}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                          {monthGroup.donations.length} {monthGroup.donations.length === 1 ? 'doação' : 'doações'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 text-xs font-bold">
+                        <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                          Total Pago: R$ {monthGroup.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {monthGroup.pendingCount > 0 && (
+                          <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
+                            {monthGroup.pendingCount} pendente{monthGroup.pendingCount > 1 ? 's' : ''}
                           </span>
-                        </td>
-                        <td className="p-4 text-xs text-slate-500">
-                          {new Date(d.date).toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="p-4">
-                          {d.status === 'paid' ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-bold">
-                              <CheckCircle2 size={12} /> Pago
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full font-bold">
-                              <Clock size={12} /> Pendente
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right">
-                          {d.status === 'pending' && (
-                            <button 
-                              onClick={() => approveDonation(d.id)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold shadow-xs"
-                              title="Aprovar Pagamento Manualmente"
-                            >
-                              <Check size={14} /> Aprovar
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tabela do Mês */}
+                    <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/70 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <th className="p-4">Doador</th>
+                            <th className="p-4">Valor</th>
+                            <th className="p-4">Método</th>
+                            <th className="p-4">Data</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4 text-right">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {monthGroup.donations.map(d => (
+                            <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-4">
+                                <p className="font-bold text-sm text-slate-900">{d.donor_name}</p>
+                                <p className="text-xs text-slate-500">{d.donor_email || 'E-mail não informado'}</p>
+                              </td>
+                              <td className="p-4 font-black text-slate-900">
+                                R$ {d.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-4">
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-bold uppercase tracking-wider">
+                                  {d.payment_method}
+                                </span>
+                              </td>
+                              <td className="p-4 text-xs text-slate-500">
+                                {new Date(d.date).toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="p-4">
+                                {d.status === 'paid' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-bold">
+                                    <CheckCircle2 size={12} /> Pago
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full font-bold">
+                                    <Clock size={12} /> Pendente
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-4 text-right">
+                                {d.status === 'pending' && (
+                                  <button 
+                                    onClick={() => approveDonation(d.id)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold shadow-xs"
+                                    title="Aprovar Pagamento Manualmente"
+                                  >
+                                    <Check size={14} /> Aprovar
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

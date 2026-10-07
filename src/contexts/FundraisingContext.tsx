@@ -134,20 +134,33 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     const monthDonations = campDonations.filter(d => {
       const rawDate = d.date || d.paid_at;
       if (!rawDate) return false;
-      const donationDate = new Date(rawDate);
-      if (isNaN(donationDate.getTime())) return false;
+
+      // Extração robusta de ano e mês evitando deslocamento de fuso horário UTC
+      let dYear: number;
+      let dMonth: number;
+      const match = rawDate.match(/^(\d{4})-(\d{2})/);
+      if (match) {
+        dYear = parseInt(match[1], 10);
+        dMonth = parseInt(match[2], 10) - 1;
+      } else {
+        const dObj = new Date(rawDate);
+        if (isNaN(dObj.getTime())) return false;
+        dYear = dObj.getFullYear();
+        dMonth = dObj.getMonth();
+      }
 
       // Deve pertencer estritamente ao mês e ano vigentes
-      const isCurrentMonth = 
-        donationDate.getFullYear() === currentYear &&
-        donationDate.getMonth() === currentMonth;
+      const isCurrentMonth = dYear === currentYear && dMonth === currentMonth;
 
       if (!isCurrentMonth) return false;
 
       // Se houve reset manual no mês atual, só considera doações posteriores ao reset
       if (camp.last_reset_at) {
         const resetDate = new Date(camp.last_reset_at);
+        const donationDate = new Date(rawDate);
         if (
+          !isNaN(resetDate.getTime()) &&
+          !isNaN(donationDate.getTime()) &&
           resetDate.getFullYear() === currentYear &&
           resetDate.getMonth() === currentMonth &&
           donationDate < resetDate
@@ -164,8 +177,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
 
     // REGRA DE OURO:
     // 1. Campanha Mensal (recorrente):
-    //    - Zera automaticamente todo mês. APENAS doações do mês corrente (currentMonthTotal) entram.
-    //    - Entradas de meses anteriores JAMAIS entram na campanha deste mês.
+    //    - Zera automaticamente todo mês. APENAS doações do mês corrente (currentMonthTotal) entram na meta/régua do mês.
+    //    - Entradas de meses anteriores (ex: junho, julho) JAMAIS entram na arrecadação deste mês.
     //
     // 2. Campanha Específica (meta pontual/não mensal):
     //    - NUNCA zera ao passar o mês.
@@ -183,7 +196,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       percentage,
       isMonthly,
       currentMonthTotal,
-      totalHistorical: isMonthly ? currentMonthTotal : Math.max(totalHistorical, Number(camp.current_amount || 0))
+      totalHistorical: Math.max(totalHistorical, Number(camp.current_amount || 0))
     };
   }, [donations]);
 
