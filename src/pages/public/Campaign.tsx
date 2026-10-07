@@ -464,15 +464,15 @@ export function Campaign() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <SEO 
-        title={`${currentCampaign.title} | Faça sua Doação - YAH Hope`}
-        description={currentCampaign.description || "Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos sociais."}
+        title={`${targetCampaign.title} | Faça sua Doação - YAH Hope`}
+        description={targetCampaign.description || "Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos sociais."}
         keywords="doação humanitária, doar para ONG, combate à desnutrição, doação Moçambique, apadrinhar criança YAH Hope"
-        canonical={`https://yahhope.org/campanha?id=${currentCampaign.id}`}
+        canonical={`https://yahhope.org/campanha?id=${targetCampaign.id}`}
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "DonateAction",
-          "name": currentCampaign.title,
-          "description": currentCampaign.description || "Contribua com a campanha solidária da YAH Hope.",
+          "name": targetCampaign.title,
+          "description": targetCampaign.description || "Contribua com a campanha solidária da YAH Hope.",
           "recipient": {
             "@type": "NGO",
             "name": "YAH Hope",
@@ -499,7 +499,7 @@ export function Campaign() {
             textShadow: '0 4px 20px rgba(0,0,0,0.6)'
           }}
         >
-          {availableCampaigns.length > 1 ? 'Participe' : (currentCampaign.type === 'specific' ? currentCampaign.title : 'Participe')}
+          {availableCampaigns.length > 1 ? 'Participe' : (targetCampaign.type === 'specific' ? targetCampaign.title : 'Participe')}
         </h1>
       </div>
 
