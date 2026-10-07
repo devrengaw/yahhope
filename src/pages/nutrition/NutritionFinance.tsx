@@ -101,24 +101,91 @@ export function NutritionFinance() {
     };
   }, []);
 
+  const [periodMode, setPeriodMode] = useState<'month' | 'all'>('month');
+
+  const currentMonthKey = useMemo(() => new Date().toISOString().substring(0, 7), []);
+
+  const currentMonthLabel = useMemo(() => {
+    const parts = currentMonthKey.split('-');
+    if (parts.length === 2) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const dateObj = new Date(year, month, 1);
+      const raw = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+    return currentMonthKey;
+  }, [currentMonthKey]);
+
   const stats = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const fixedExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'fixed').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const variableExpense = transactions.filter(t => t.type === 'expense' && t.expense_type === 'variable').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const expenseMzn = transactions
-      .filter(t => t.type === 'expense' && t.currency === 'MZN')
+    // 1. Métricas de Todos os Meses (Geral / Acumulado Histórico)
+    const allIncomes = transactions.filter(t => t.type === 'income');
+    const allExpenses = transactions.filter(t => t.type === 'expense');
+
+    const totalIncome = allIncomes.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const totalExpense = allExpenses.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const totalExpenseMzn = allExpenses
+      .filter(t => t.currency === 'MZN')
       .reduce((acc, t) => acc + (t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)), 0);
-    
+    const totalBalance = totalIncome - totalExpense;
+
+    // 2. Métricas do Mês Atual (Operacional do Mês)
+    const fixedExpenses = allExpenses.filter(t => t.expense_type === 'fixed');
+    const monthlyEquivalentFixed = fixedExpenses.reduce((acc, t) => {
+      const rec = t.recurrence || 'monthly';
+      if (rec === 'bimonthly') return acc + (t.amount / 2);
+      if (rec === 'quarterly') return acc + (t.amount / 3);
+      if (rec === 'semiannual') return acc + (t.amount / 6);
+      if (rec === 'yearly') return acc + (t.amount / 12);
+      return acc + t.amount;
+    }, 0);
+
+    const monthlyEquivalentFixedMzn = fixedExpenses
+      .filter(t => t.currency === 'MZN')
+      .reduce((acc, t) => {
+        const val = t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount);
+        const rec = t.recurrence || 'monthly';
+        if (rec === 'bimonthly') return acc + (val / 2);
+        if (rec === 'quarterly') return acc + (val / 3);
+        if (rec === 'semiannual') return acc + (val / 6);
+        if (rec === 'yearly') return acc + (val / 12);
+        return acc + val;
+      }, 0);
+
+    const currentMonthVariables = allExpenses.filter(t => 
+      t.expense_type === 'variable' && 
+      t.date && t.date.startsWith(currentMonthKey)
+    );
+    const monthlyVariable = currentMonthVariables.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const monthlyVariableMzn = currentMonthVariables
+      .filter(t => t.currency === 'MZN')
+      .reduce((acc, t) => acc + (t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)), 0);
+
+    const monthlyExpense = monthlyEquivalentFixed + monthlyVariable;
+    const monthlyExpenseMzn = monthlyEquivalentFixedMzn + monthlyVariableMzn;
+    const monthlyExpenseItemsCount = fixedExpenses.length + currentMonthVariables.length;
+
+    const currentMonthIncomes = allIncomes.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const monthlyIncome = currentMonthIncomes.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const monthlyBalance = monthlyIncome - monthlyExpense;
+
     return {
-      totalIncome: income, // Valor total repassado ao projeto
-      totalExpense: expense,
-      fixedExpense,
-      variableExpense,
-      expenseMzn,
-      balance: income - expense
+      // Geral (Todos os meses)
+      totalIncome,
+      totalExpense,
+      totalExpenseMzn,
+      totalBalance,
+      totalExpenseCount: allExpenses.length,
+      // Mês atual
+      monthlyIncome,
+      monthlyExpense,
+      monthlyExpenseMzn,
+      monthlyBalance,
+      monthlyFixed: monthlyEquivalentFixed,
+      monthlyVariable,
+      monthlyExpenseCount: monthlyExpenseItemsCount
     };
-  }, [transactions]);
+  }, [transactions, currentMonthKey]);
 
   const filteredTransactions = useMemo(() => {
     return transactions
@@ -244,66 +311,154 @@ export function NutritionFinance() {
           </div>
         </div>
 
-        {/* Stats Cards (3 Colunas - Sem RH/Voluntários) */}
+        {/* Filtro de Período e Indicadores */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/80 backdrop-blur-sm p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-wider pl-1">Visualização:</span>
+            <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setPeriodMode('month')}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5",
+                  periodMode === 'month' 
+                    ? "bg-white text-emerald-900 shadow-sm border border-emerald-100" 
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                <Calendar size={13} className={periodMode === 'month' ? "text-emerald-600" : "text-slate-400"} />
+                Mês Atual ({currentMonthLabel})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriodMode('all')}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5",
+                  periodMode === 'all' 
+                    ? "bg-white text-emerald-900 shadow-sm border border-emerald-100" 
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                <Layers size={13} className={periodMode === 'all' ? "text-emerald-600" : "text-slate-400"} />
+                Todos os Meses (Acumulado)
+              </button>
+            </div>
+          </div>
+          <div className="text-xs font-bold text-slate-400 pr-1">
+            {periodMode === 'month' 
+              ? `Exibindo custos operacionais de ${currentMonthLabel}`
+              : 'Exibindo histórico acumulado de todos os meses'
+            }
+          </div>
+        </div>
+
+        {/* Stats Cards (3 Colunas) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* Valor Repassado para o Projeto */}
-          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-xl shadow-emerald-50/60 hover:border-emerald-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><TrendingUp size={24} /></div>
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-                Repasse Finanças
+          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-xl shadow-emerald-50/60 hover:border-emerald-200 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><TrendingUp size={24} /></div>
+                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                  {periodMode === 'month' ? 'Repasse do Mês' : 'Repasses Acumulados'}
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                {periodMode === 'month' ? 'Valor Repassado (Mês Atual)' : 'Valor Repassado (Geral)'}
+              </p>
+              <p className="text-3xl font-black text-slate-900 mt-1">
+                R$ {(periodMode === 'month' ? stats.monthlyIncome : stats.totalIncome).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-slate-400 font-bold mt-2">
+                Recursos transferidos pela gestão financeira
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-emerald-50 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-bold">
+                {periodMode === 'month' ? 'Todos os Meses:' : `Mês Atual (${currentMonthLabel}):`}
+              </span>
+              <span className="font-extrabold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60">
+                R$ {(periodMode === 'month' ? stats.totalIncome : stats.monthlyIncome).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Valor Repassado ao Projeto</p>
-            <p className="text-3xl font-black text-slate-900 mt-1">
-              R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-[11px] text-slate-400 font-bold mt-2">
-              Recursos transferidos pela gestão financeira
-            </p>
           </div>
           
           {/* Despesas da Nutrição */}
-          <div className="bg-white p-6 rounded-3xl border border-rose-100 shadow-xl shadow-rose-50/60 hover:border-rose-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-rose-50 rounded-2xl text-rose-600"><TrendingDown size={24} /></div>
-              <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-                {transactions.filter(t => t.type === 'expense').length} itens
+          <div className="bg-white p-6 rounded-3xl border border-rose-100 shadow-xl shadow-rose-50/60 hover:border-rose-200 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-rose-50 rounded-2xl text-rose-600"><TrendingDown size={24} /></div>
+                <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                  {periodMode === 'month' ? `${stats.monthlyExpenseCount} itens no mês` : `${stats.totalExpenseCount} itens no total`}
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                {periodMode === 'month' ? `Despesas Nutrição (${currentMonthLabel})` : 'Despesas Nutrição (Todos os Meses)'}
+              </p>
+              <p className="text-3xl font-black text-slate-900 mt-1">
+                R$ {(periodMode === 'month' ? stats.monthlyExpense : stats.totalExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              {(periodMode === 'month' ? stats.monthlyExpenseMzn : stats.totalExpenseMzn) > 0 && (
+                <p className="text-xs font-bold text-emerald-600 mt-1">
+                  ~ {(periodMode === 'month' ? stats.monthlyExpenseMzn : stats.totalExpenseMzn).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais
+                </p>
+              )}
+              <p className="text-[11px] text-slate-400 font-bold mt-2">
+                {periodMode === 'month' 
+                  ? 'Custo fixo estrutural + despesas variáveis de ' + currentMonthLabel
+                  : 'Custos fixos recorrentes e gastos variáveis acumulados'}
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-rose-50 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-bold">
+                {periodMode === 'month' ? 'Todos os Meses (Acumulado):' : `Mês Atual (${currentMonthLabel}):`}
+              </span>
+              <span className="font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
+                R$ {(periodMode === 'month' ? stats.totalExpense : stats.monthlyExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {periodMode === 'month' && ` (${stats.totalExpenseCount} itens)`}
               </span>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Despesas Nutrição</p>
-            <p className="text-3xl font-black text-slate-900 mt-1">
-              R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            {stats.expenseMzn > 0 && (
-              <p className="text-xs font-bold text-emerald-600 mt-1">
-                ~ {stats.expenseMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT em Meticais
-              </p>
-            )}
-            <p className="text-[11px] text-slate-400 font-bold mt-2">
-              Custos fixos recorrentes e gastos variáveis
-            </p>
           </div>
 
           {/* Saldo Disponível no Setor */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-50/60 hover:border-slate-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Wallet size={24} /></div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-50/60 hover:border-slate-200 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Wallet size={24} /></div>
+                <span className={cn(
+                  "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider",
+                  (periodMode === 'month' ? stats.monthlyBalance : stats.totalBalance) >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                )}>
+                  {(periodMode === 'month' ? stats.monthlyBalance : stats.totalBalance) >= 0 ? 'Superávit' : 'Déficit'}
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                {periodMode === 'month' ? 'Saldo no Setor (Mês Atual)' : 'Saldo no Setor (Acumulado)'}
+              </p>
+              <p className={cn("text-3xl font-black mt-1", (periodMode === 'month' ? stats.monthlyBalance : stats.totalBalance) >= 0 ? "text-slate-900" : "text-rose-600")}>
+                R$ {(periodMode === 'month' ? stats.monthlyBalance : stats.totalBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-slate-400 font-bold mt-2">
+                Repasses recebidos menos despesas efetuadas
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-bold">
+                {periodMode === 'month' ? 'Saldo Geral (Acumulado):' : `Saldo Mês (${currentMonthLabel}):`}
+              </span>
               <span className={cn(
-                "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider",
-                stats.balance >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                "font-extrabold px-2 py-0.5 rounded-lg border",
+                (periodMode === 'month' ? stats.totalBalance : stats.monthlyBalance) >= 0 
+                  ? "text-emerald-700 bg-emerald-50 border-emerald-100" 
+                  : "text-rose-700 bg-rose-50 border-rose-100"
               )}>
-                {stats.balance >= 0 ? 'Superávit' : 'Déficit'}
+                R$ {(periodMode === 'month' ? stats.totalBalance : stats.monthlyBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Saldo Disponível no Setor</p>
-            <p className={cn("text-3xl font-black mt-1", stats.balance >= 0 ? "text-slate-900" : "text-rose-600")}>
-              R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-[11px] text-slate-400 font-bold mt-2">
-              Repasses recebidos menos despesas efetuadas
-            </p>
           </div>
 
         </div>
@@ -360,7 +515,7 @@ export function NutritionFinance() {
             <MonthlyExpensesManager
               transactions={transactions}
               categories={categories}
-              totalIncome={stats.totalIncome}
+              totalIncome={periodMode === 'month' ? stats.monthlyIncome : stats.totalIncome}
               onSaveExpense={handleSaveExpense}
               onDeleteTransaction={handleDeleteTransaction}
               onToggleStatus={handleToggleStatus}
