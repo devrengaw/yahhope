@@ -257,9 +257,9 @@ export function MonthlyDonor() {
         {/* Background visual imersivo */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif" 
-            alt="Crianças e acolhimento na Casa Nutri YAH Hope" 
-            className="w-full h-full object-cover object-center filter brightness-[0.35] contrast-110 scale-105 transition-transform duration-1000"
+            src="/mantenedor_hero.jpg" 
+            alt="Criança sorrindo acolhida pela YAH Hope" 
+            className="w-full h-full object-cover object-top filter brightness-[0.38] contrast-105 scale-105 transition-transform duration-1000"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-transparent"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A] via-[#0F172A]/75 to-transparent"></div>

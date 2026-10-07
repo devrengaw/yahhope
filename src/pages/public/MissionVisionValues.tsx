@@ -78,11 +78,18 @@ export function MissionVisionValues() {
 
       {/* 1. Hero Section */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 bg-[#0F172A] text-white overflow-hidden font-gotham-regular">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/90 via-[#0F172A]/95 to-[#0F172A]"></div>
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105"
+          style={{ backgroundImage: `url('/missao_visao_valores_hero.jpg')` }}
+        />
+        
+        {/* Overlay Filters to ensure perfect text contrast and brand tone */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/85 via-[#0F172A]/80 to-[#0F172A]/95 backdrop-blur-[1px]"></div>
         
         {/* Subtle decorative background circles */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#F49853]/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute top-1/2 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#F49853]/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-1/2 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight leading-tight text-white mb-6 max-w-4xl mx-auto">

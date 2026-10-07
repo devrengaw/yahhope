@@ -205,31 +205,44 @@ export function VolunteerAndPartnerships() {
       />
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-36 lg:pb-24 overflow-hidden bg-gradient-to-b from-orange-50/70 via-white to-slate-50 border-b border-slate-100">
+      <section className="relative pt-32 pb-20 lg:pt-38 lg:pb-26 overflow-hidden bg-[#0F172A] text-white border-b border-slate-100">
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105"
+          style={{ backgroundImage: `url('/voluntariado_hero.jpg')` }}
+        />
+        
+        {/* Overlay Filters to ensure perfect text contrast and brand tone */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/85 via-[#0F172A]/80 to-[#0F172A]/95 backdrop-blur-[1px]"></div>
+        
+        {/* Subtle decorative background circles */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#F49853]/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-1/2 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-orange-200/80 shadow-sm text-xs font-gotham-bold text-[#F49853] mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-sm text-xs font-gotham-bold text-[#F49853] mb-6">
             <Sparkles size={14} className="animate-spin-slow" />
             <span>Faça Parte Desta Transformação</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight max-w-4xl mx-auto font-gotham-bold">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto font-gotham-bold">
             Una seu talento pessoal ou <span className="text-[#F49853]">sua empresa</span> à missão de transformar vidas.
           </h1>
 
-          <p className="mt-5 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto font-gotham-light leading-relaxed">
-            Seja atuando diretamente como voluntário no <strong className="font-gotham-bold text-slate-800">Brasil</strong> ou em <strong className="font-gotham-bold text-slate-800">Moçambique</strong>, ou conectando sua empresa para doar recursos e construir um futuro com dignidade.
+          <p className="mt-5 text-base sm:text-lg text-slate-200 max-w-2xl mx-auto font-gotham-light leading-relaxed">
+            Seja atuando diretamente como voluntário no <strong className="font-gotham-bold text-white">Brasil</strong> ou em <strong className="font-gotham-bold text-white">Moçambique</strong>, ou conectando sua empresa para doar recursos e construir um futuro com dignidade.
           </p>
 
           {/* Abas Alternadoras no Topo */}
-          <div className="mt-10 inline-flex p-1.5 rounded-2xl bg-white border border-slate-200 shadow-md">
+          <div className="mt-10 inline-flex p-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-xl">
             <button
               onClick={() => setActiveTab('voluntariado')}
               className={cn(
                 "flex items-center gap-2.5 px-6 sm:px-8 py-3 rounded-xl font-gotham-bold text-xs sm:text-sm transition-all cursor-pointer",
                 activeTab === 'voluntariado'
-                  ? "bg-[#F49853] text-white shadow-md shadow-orange-500/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  ? "bg-[#F49853] text-white shadow-md shadow-orange-500/30"
+                  : "text-slate-300 hover:text-white hover:bg-white/10"
               )}
             >
               <Users size={18} />
@@ -241,8 +254,8 @@ export function VolunteerAndPartnerships() {
               className={cn(
                 "flex items-center gap-2.5 px-6 sm:px-8 py-3 rounded-xl font-gotham-bold text-xs sm:text-sm transition-all cursor-pointer",
                 activeTab === 'parcerias'
-                  ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  ? "bg-white text-slate-900 shadow-md shadow-white/10"
+                  : "text-slate-300 hover:text-white hover:bg-white/10"
               )}
             >
               <Building2 size={18} />
