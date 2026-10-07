@@ -22,6 +22,8 @@ serve(async (req) => {
       isMonthly, 
       donorName, 
       donorEmail, 
+      donorPhone,
+      donorWhatsapp,
       successUrl, 
       cancelUrl,
       paymentMethod 
@@ -84,6 +86,7 @@ serve(async (req) => {
       metadata: {
         donorName: donorName || '',
         donorEmail: donorEmail || '',
+        donorPhone: donorPhone || donorWhatsapp || '',
         isMonthly: isMonthly ? 'true' : 'false',
         paymentMethod: isPix ? 'pix' : (isSubscription ? 'card_subscription' : 'card'),
         amount: amount.toString()

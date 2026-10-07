@@ -116,26 +116,86 @@ export function Login() {
       </div>
 
       {/* Centered Login Box */}
-      <div className="w-full max-w-md space-y-8 bg-white/95 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl border border-white/20 relative z-10 overflow-hidden">
-        <div className={`absolute top-0 right-0 w-32 h-32 bg-${themeColor}-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl`}></div>
+      <div className="w-full max-w-md space-y-6 bg-white/95 backdrop-blur-xl p-8 sm:p-10 rounded-[2.5rem] shadow-2xl border border-white/20 relative z-10 overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
         
         <div className="relative z-10 text-center flex flex-col items-center">
           <h2 className="text-4xl font-black text-slate-900 tracking-tight">
             Ihale!
           </h2>
           <h3 className="text-xl font-bold text-slate-700 mt-1">
-            {activeTab === 'recovery' ? 'Recuperar Senha' : 'Bem-Vindo'}
-          </h3>
-          <p className="mt-2 text-sm text-slate-500 font-medium">
             {activeTab === 'recovery' 
-              ? 'Insira seu email para receber um link de redefinição de senha.' 
-              : 'Insira suas credenciais para acessar a plataforma.'}
+              ? 'Recuperar Senha' 
+              : activeTab === 'register' 
+                ? 'Cadastro de Mantenedor' 
+                : 'Portal do Mantenedor'}
+          </h3>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
+            {activeTab === 'recovery' 
+              ? 'Insira seu e-mail para receber as instruções de recuperação.' 
+              : activeTab === 'register'
+                ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
+                : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
           </p>
         </div>
+
+        {/* Abas Alternadoras: Entrar vs Quero me Cadastrar */}
+        {activeTab !== 'recovery' && (
+          <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('login')}
+              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'login'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <LogIn size={14} />
+              <span>Já sou Mantenedor</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('register')}
+              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'register'
+                  ? 'bg-[#F49853] text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Heart size={14} fill={activeTab === 'register' ? 'currentColor' : 'none'} />
+              <span>Quero me Cadastrar</span>
+            </button>
+          </div>
+        )}
         
-        <form className="mt-8 space-y-5 relative z-10" onSubmit={handleAuth}>
+        <form className="space-y-4 relative z-10" onSubmit={handleAuth}>
+            {/* Campo Nome (Apenas no Cadastro) */}
+            {activeTab === 'register' && (
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">
+                  Nome Completo
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <UserPlus className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 sm:text-sm transition-all"
+                    placeholder="Seu nome completo"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Email</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">
+                E-mail
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
@@ -145,22 +205,27 @@ export function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
+                  className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 sm:text-sm transition-all"
                   placeholder="seu@email.com"
                 />
               </div>
             </div>
+
             {activeTab !== 'recovery' && (
               <div>
                 <div className="flex justify-between items-center mb-1.5 px-1">
-                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">Senha</label>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('recovery')}
-                    className={`text-xs font-bold text-${themeColor}-600 hover:text-${themeColor}-700`}
-                  >
-                    Esqueceu?
-                  </button>
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Senha
+                  </label>
+                  {activeTab === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('recovery')}
+                      className="text-xs font-bold text-orange-600 hover:text-orange-700"
+                    >
+                      Esqueceu?
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -169,12 +234,18 @@ export function Login() {
                   <input
                     type="password"
                     required
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
+                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 sm:text-sm transition-all"
                     placeholder="••••••••"
                   />
                 </div>
+                {activeTab === 'register' && (
+                  <p className="text-[11px] text-slate-400 mt-1 px-1">
+                    Mínimo de 6 caracteres.
+                  </p>
+                )}
               </div>
             )}
 
@@ -182,23 +253,52 @@ export function Login() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-500 hover:bg-${themeColor}-600 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70`}
+                className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-[#F49853] hover:bg-[#e0853d] focus:outline-none focus:ring-4 focus:ring-orange-500/20 transition-all shadow-lg shadow-orange-500/20 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
               >
-                {isLoading ? 'Aguarde...' : activeTab === 'recovery' ? 'Enviar Link de Recuperação' : 'Entrar na Plataforma'}
+                {isLoading 
+                  ? 'Aguarde...' 
+                  : activeTab === 'recovery' 
+                    ? 'Enviar Link de Recuperação' 
+                    : activeTab === 'register' 
+                      ? 'Criar Conta de Mantenedor' 
+                      : 'Entrar na Plataforma'}
               </button>
             </div>
 
-            {activeTab === 'recovery' && (
-              <div className="text-center pt-2">
+            {/* Alternador de rodapé */}
+            <div className="text-center pt-2">
+              {activeTab === 'login' ? (
+                <p className="text-xs text-slate-500">
+                  Ainda não tem conta?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('register')}
+                    className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                  >
+                    Cadastre-se como Mantenedor
+                  </button>
+                </p>
+              ) : activeTab === 'register' ? (
+                <p className="text-xs text-slate-500">
+                  Já possui conta cadastrada?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('login')}
+                    className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                  >
+                    Fazer Login
+                  </button>
+                </p>
+              ) : (
                 <button
                   type="button"
                   onClick={() => setActiveTab('login')}
-                  className={`text-xs font-bold text-${themeColor}-600 hover:text-${themeColor}-700 transition-all`}
+                  className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-all cursor-pointer"
                 >
                   Voltar para o login
                 </button>
-              </div>
-            )}
+              )}
+            </div>
 
           </form>
 

@@ -24,7 +24,10 @@ import {
   TrendingUp,
   CreditCard,
   Lock,
-  Loader2
+  Loader2,
+  User,
+  Mail,
+  Phone
 } from 'lucide-react';
 import { useHomeHighlights, HomeHighlightItem, deduplicateHighlights } from '../../contexts/HomeHighlightsContext';
 import { useNewsletter } from '../../contexts/NewsletterContext';
@@ -53,6 +56,12 @@ export function Home() {
   const [isCustom, setIsCustom] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Campos de contato do doador no header
+  const [donorName, setDonorName] = useState('');
+  const [donorEmail, setDonorEmail] = useState('');
+  const [donorWhatsapp, setDonorWhatsapp] = useState('');
+  const [donorFormError, setDonorFormError] = useState('');
   
   const { addSubscriber } = useNewsletter();
   const [emailInput, setEmailInput] = useState('');
@@ -81,9 +90,36 @@ export function Home() {
     setCarouselIndex((prev) => (prev + 1) % carouselItems.length);
   };
 
+  // Formata o número do WhatsApp com máscara brasileira (XX) XXXXX-XXXX
+  const handleWhatsappChange = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 11);
+    let formatted = raw;
+    if (raw.length > 2) {
+      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+    }
+    if (raw.length > 7) {
+      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
+    }
+    setDonorWhatsapp(formatted);
+  };
+
   // Handle Stripe Checkout directly via Supabase Edge Function or fallback
   const handleStripeCheckout = async (e?: React.FormEvent, overrideAmount?: number) => {
     if (e) e.preventDefault();
+    setDonorFormError('');
+
+    if (!donorName.trim()) {
+      setDonorFormError('Por favor, informe seu nome completo.');
+      return;
+    }
+    if (!donorEmail.trim() || !donorEmail.includes('@')) {
+      setDonorFormError('Por favor, informe um e-mail válido.');
+      return;
+    }
+    if (!donorWhatsapp.trim() || donorWhatsapp.replace(/\D/g, '').length < 10) {
+      setDonorFormError('Por favor, informe seu WhatsApp com DDD.');
+      return;
+    }
     
     let finalVal = overrideAmount !== undefined 
       ? overrideAmount 
@@ -98,8 +134,8 @@ export function Home() {
     try {
       const isMonthly = donationFrequency === 'monthly';
       const redirectFallback = isMonthly 
-        ? `/mantenedor?amount=${finalVal}` 
-        : `/campanha?amount=${finalVal}&isMonthly=false&method=card`;
+        ? `/mantenedor?amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
+        : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
@@ -117,6 +153,10 @@ export function Home() {
         body: JSON.stringify({
           amount: finalVal,
           isMonthly,
+          donorName: donorName.trim(),
+          donorEmail: donorEmail.trim(),
+          donorPhone: donorWhatsapp.trim(),
+          donorWhatsapp: donorWhatsapp.trim(),
           successUrl: isMonthly
             ? `${window.location.origin}/mantenedor?status=success`
             : `${window.location.origin}/campanha?status=success`,
@@ -136,8 +176,8 @@ export function Home() {
       console.error('Checkout error:', err);
       const isMonthly = donationFrequency === 'monthly';
       window.location.href = isMonthly 
-        ? `/mantenedor?amount=${finalVal}` 
-        : `/campanha?amount=${finalVal}&isMonthly=false&method=card`;
+        ? `/mantenedor?amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
+        : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
     } finally {
       setIsCheckingOut(false);
     }
@@ -364,6 +404,62 @@ export function Home() {
                     </span>
                   </div>
                 )}
+
+                {/* Dados do Doador: Nome, E-mail, WhatsApp */}
+                <div className="mt-3.5 mb-3 pt-3 border-t border-slate-100 space-y-2.5">
+                  <p className="text-[11px] font-gotham-bold text-slate-500 uppercase tracking-wider">
+                    Seus Dados para Identificação
+                  </p>
+
+                  <div className="relative">
+                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Nome completo"
+                      value={donorName}
+                      onChange={(e) => {
+                        setDonorName(e.target.value);
+                        if (donorFormError) setDonorFormError('');
+                      }}
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      placeholder="Seu melhor e-mail"
+                      value={donorEmail}
+                      onChange={(e) => {
+                        setDonorEmail(e.target.value);
+                        if (donorFormError) setDonorFormError('');
+                      }}
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="tel"
+                      placeholder="WhatsApp (DDD + Número)"
+                      value={donorWhatsapp}
+                      onChange={(e) => {
+                        handleWhatsappChange(e.target.value);
+                        if (donorFormError) setDonorFormError('');
+                      }}
+                      maxLength={15}
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {donorFormError && (
+                    <p className="text-[11px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">
+                      {donorFormError}
+                    </p>
+                  )}
+                </div>
 
                 {/* YAH Hope Brand Orange Donation Button */}
                 <button

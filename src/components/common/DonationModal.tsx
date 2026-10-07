@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, CreditCard, Sparkles, Heart } from 'lucide-react';
+import { X, ArrowRight, CreditCard, Sparkles, Heart, User, Mail, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDonationModal } from '../../contexts/DonationModalContext';
 
@@ -13,6 +13,10 @@ export function DonationModal() {
   const { isOpen, options, closeDonationModal } = useDonationModal();
   const [frequency, setFrequency] = useState<'single' | 'monthly'>('single');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [donorName, setDonorName] = useState('');
+  const [donorEmail, setDonorEmail] = useState('');
+  const [donorWhatsapp, setDonorWhatsapp] = useState('');
+  const [formError, setFormError] = useState('');
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -23,12 +27,38 @@ export function DonationModal() {
   const imageUrl = options?.imageUrl || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif';
   const description = options?.description;
 
+  const handleWhatsappChange = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 11);
+    let formatted = raw;
+    if (raw.length > 2) {
+      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+    }
+    if (raw.length > 7) {
+      formatted = `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
+    }
+    setDonorWhatsapp(formatted);
+  };
+
   const handleCheckout = async (amount: number) => {
+    setFormError('');
+    if (!donorName.trim()) {
+      setFormError('Por favor, informe seu nome.');
+      return;
+    }
+    if (!donorEmail.trim() || !donorEmail.includes('@')) {
+      setFormError('Por favor, informe um e-mail válido.');
+      return;
+    }
+    if (!donorWhatsapp.trim() || donorWhatsapp.replace(/\D/g, '').length < 10) {
+      setFormError('Por favor, informe seu WhatsApp com DDD.');
+      return;
+    }
+
     setIsCheckingOut(true);
     const isMonthly = frequency === 'monthly';
     const fallbackUrl = isMonthly 
-      ? `/mantenedor?amount=${amount}` 
-      : `/campanha?amount=${amount}&isMonthly=false&method=card`;
+      ? `/mantenedor?amount=${amount}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
+      : `/campanha?amount=${amount}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -48,6 +78,10 @@ export function DonationModal() {
         body: JSON.stringify({
           amount,
           isMonthly,
+          donorName: donorName.trim(),
+          donorEmail: donorEmail.trim(),
+          donorPhone: donorWhatsapp.trim(),
+          donorWhatsapp: donorWhatsapp.trim(),
           successUrl: isMonthly
             ? `${window.location.origin}/mantenedor?status=success`
             : `${window.location.origin}/campanha?status=success`,
@@ -156,6 +190,61 @@ export function DonationModal() {
               {description}
             </p>
           )}
+
+          <div className="mb-4 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 space-y-2">
+            <p className="text-[11px] font-gotham-bold text-slate-600 uppercase tracking-wider">
+              Seus Dados para Contato
+            </p>
+
+            <div className="relative">
+              <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Nome completo"
+                value={donorName}
+                onChange={(e) => {
+                  setDonorName(e.target.value);
+                  if (formError) setFormError('');
+                }}
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+              />
+            </div>
+
+            <div className="relative">
+              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="email"
+                placeholder="Seu melhor e-mail"
+                value={donorEmail}
+                onChange={(e) => {
+                  setDonorEmail(e.target.value);
+                  if (formError) setFormError('');
+                }}
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+              />
+            </div>
+
+            <div className="relative">
+              <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="tel"
+                placeholder="WhatsApp (DDD + Número)"
+                value={donorWhatsapp}
+                onChange={(e) => {
+                  handleWhatsappChange(e.target.value);
+                  if (formError) setFormError('');
+                }}
+                maxLength={15}
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+              />
+            </div>
+
+            {formError && (
+              <p className="text-[11px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">
+                {formError}
+              </p>
+            )}
+          </div>
 
           <p className="text-slate-700 text-xs sm:text-sm font-gotham-bold mb-3 flex items-center gap-1.5">
             <Sparkles size={16} className="text-[#F49853]" />
