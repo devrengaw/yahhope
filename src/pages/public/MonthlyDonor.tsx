@@ -271,13 +271,12 @@ export function MonthlyDonor() {
             {/* Coluna Texto: Proposta de Valor e Emoção */}
             <div className="lg:col-span-7 text-center lg:text-left space-y-6">
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
-                Uma doação alimenta hoje. <br />
-                <span className="text-[#F49853]">Sua fidelidade mensal</span> <br className="hidden sm:inline" />
-                salva vidas todos os dias.
+                Sua doação <br />
+                <span className="text-[#F49853]">mantém a esperança viva</span>.
               </h1>
 
-              <p className="text-lg sm:text-xl text-slate-300 font-gotham-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                A desnutrição grave não faz pausa no fim de semana e a fome não espera uma campanha sazonal. O que mantém a Casa Nutri aberta, o leite terapêutico no leito e a equipe médica em ação em Moçambique é a <strong>certeza de mantenedores fiéis</strong> como você.
+              <p className="text-lg sm:text-xl text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                A esperança não é apenas um sentimento: ela ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você acende a luz de um novo futuro para crianças e famílias inteiras, garantindo que o cuidado, a dignidade e a vida nunca deixem de florescer.
               </p>
 
               {/* Métricas Rápidas de Impacto e Confiança */}
