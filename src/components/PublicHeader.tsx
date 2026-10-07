@@ -280,7 +280,7 @@ export function PublicHeader() {
                     </li>
                     <li><Link to="/campanha" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Campanhas em Andamento</Link></li>
                     <li><Link to="/loja" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Loja Solidária</Link></li>
-                    <li><Link to="/projetos" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Voluntariado & Parcerias</Link></li>
+                    <li><Link to="/voluntariado-e-parcerias" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Voluntariado & Parcerias</Link></li>
                   </ul>
                 </div>
               </div>
@@ -475,6 +475,13 @@ export function PublicHeader() {
                     className="block text-xs text-slate-600 hover:text-[#F49853] py-0.5"
                   >
                     Loja Solidária
+                  </Link>
+                  <Link 
+                    to="/voluntariado-e-parcerias" 
+                    onClick={() => setMobileMenuOpen(false)} 
+                    className="block text-xs text-slate-600 hover:text-[#F49853] py-0.5"
+                  >
+                    Voluntariado & Parcerias
                   </Link>
                 </div>
               </div>

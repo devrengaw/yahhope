@@ -73,6 +73,7 @@ export function PublicFooter() {
               <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Campanhas Ativas & Doações</Link></li>
               <li><Link to="/blog" className="hover:text-[#F49853] transition-colors">Notícias & Histórias</Link></li>
               <li><Link to="/loja" className="hover:text-[#F49853] transition-colors">Loja Solidária</Link></li>
+              <li><Link to="/voluntariado-e-parcerias" className="hover:text-[#F49853] transition-colors">Voluntariado & Parcerias</Link></li>
               <li><Link to="/login" className="text-slate-300 font-gotham-medium hover:text-[#F49853]">Portal do Doador / Login</Link></li>
             </ul>
           </div>

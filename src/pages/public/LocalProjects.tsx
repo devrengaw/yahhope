@@ -279,10 +279,10 @@ export function LocalProjects() {
                 Hoje todo o nosso atendimento assistencial de campo está concentrado na emergência em Nampula (Moçambique). Deseja propor uma parceria institucional ou atuar como voluntário no Brasil?
               </p>
               <Link 
-                to="/sobre-nos" 
+                to="/voluntariado-e-parcerias" 
                 className="text-xs font-gotham-bold text-[#F49853] hover:underline inline-flex items-center gap-1"
               >
-                <span>Fale com a nossa equipe de coordenação</span>
+                <span>Inscreva-se como voluntário ou proponha uma parceria</span>
                 <ArrowRight size={13} />
               </Link>
             </div>
