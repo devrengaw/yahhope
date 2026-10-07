@@ -17,6 +17,7 @@ import {
   Flame
 } from 'lucide-react';
 import { useFundraising, Campaign as CampaignType } from '../../contexts/FundraisingContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { SEO } from '../../components/common/SEO';
@@ -39,6 +40,7 @@ const FALLBACK_CAMPAIGN: CampaignType = {
 };
 
 export function Campaign() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlCampaignId = searchParams.get('id') || searchParams.get('campaign');
@@ -255,20 +257,65 @@ export function Campaign() {
     }
   };
 
-  if (isSubmitted) {
+  const isSuccessUrl = searchParams.get('status') === 'success';
+
+  if (isSubmitted || isSuccessUrl) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-xl border border-emerald-100">
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-xl border border-emerald-100 animate-fade-in">
+          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 size={40} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Obrigado pela sua doação!</h2>
-          <p className="text-slate-500 mb-8">
-            Seu apoio impulsiona a nossa régua de arrecadação e transforma vidas na comunidade.
+          <h2 className="text-2xl font-black text-slate-900 mb-2">Doação Realizada com Sucesso!</h2>
+          <p className="text-slate-500 mb-6 text-sm leading-relaxed">
+            Seu apoio impulsiona a nossa régua de arrecadação e viabiliza a transformação de vidas na comunidade.
           </p>
-          <Link to="/" className="inline-block bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors">
-            Voltar ao Início
-          </Link>
+
+          {/* Convite para cadastro no Portal caso não tenha login */}
+          {!user ? (
+            <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-5 mb-6 text-left">
+              <div className="flex items-center gap-2 text-orange-800 font-black text-xs uppercase tracking-wider mb-1.5">
+                <Heart size={14} className="fill-orange-600 text-orange-600" />
+                <span>Portal do Mantenedor</span>
+              </div>
+              <h3 className="font-black text-slate-900 text-base mb-1">
+                Deseja criar seu acesso agora?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                No portal você pode acompanhar relatórios de transparência, crianças atendidas e o histórico de suas doações.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                <Link
+                  to={`/login?tab=register&email=${encodeURIComponent(email || searchParams.get('email') || '')}&name=${encodeURIComponent(name || searchParams.get('name') || '')}`}
+                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl transition-all shadow-md text-center block"
+                >
+                  Sim, Quero Criar Minha Conta
+                </Link>
+                <Link
+                  to="/"
+                  className="w-full bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 rounded-xl border border-slate-200 text-center block transition-colors"
+                >
+                  Não, continuar sem cadastro
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Link
+                to="/portal/dashboard"
+                className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-md block"
+              >
+                Ir para o Portal do Mantenedor
+              </Link>
+              <Link
+                to="/"
+                className="inline-block text-xs font-bold text-slate-500 hover:text-slate-700 py-1"
+              >
+                Voltar à Página Inicial
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     );

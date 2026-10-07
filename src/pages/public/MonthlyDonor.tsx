@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 import { useFundraising } from '../../contexts/FundraisingContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
 interface PlanOption {
@@ -126,7 +127,11 @@ const FAQS = [
 export function MonthlyDonor() {
   const [searchParams] = useSearchParams();
   const urlAmount = searchParams.get('amount');
+  const isSuccessUrl = searchParams.get('status') === 'success';
+  const urlName = searchParams.get('name') || '';
+  const urlEmail = searchParams.get('email') || '';
 
+  const { user } = useAuth();
   const { activeCampaign, campaign: defaultCamp, createDonation } = useFundraising();
   const currentCampaign = activeCampaign || defaultCamp;
 
@@ -243,7 +248,7 @@ export function MonthlyDonor() {
           paymentMethod, // 'pix' ou 'card'
           donorName,
           donorEmail,
-          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}`,
+          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}`,
           cancelUrl: `${window.location.origin}/mantenedor?status=cancel`
         })
       });
@@ -572,7 +577,7 @@ export function MonthlyDonor() {
             </p>
           </div>
 
-          {isSuccess ? (
+          {(isSuccess || isSuccessUrl) ? (
             /* Tela de Confirmação & Boas-Vindas */
             <div className="max-w-2xl mx-auto bg-white text-slate-900 rounded-3xl p-8 sm:p-12 shadow-2xl border border-emerald-200 text-center animate-fade-in">
               <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-6">
@@ -583,14 +588,14 @@ export function MonthlyDonor() {
                 Gratidão Imensa • Aliança Firmada
               </span>
               <h3 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 mb-3">
-                Bem-vindo à Família YAH Hope, {donorName || 'Apoiador'}!
+                Bem-vindo à Família YAH Hope, {donorName || urlName || 'Apoiador'}!
               </h3>
               
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
-                O seu compromisso mensal de <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo que crianças desnutridas recebam tratamento digno.
+                O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo que crianças desnutridas recebam tratamento digno.
               </p>
 
-              {paymentMethod === 'pix' && (
+              {paymentMethod === 'pix' && !isSuccessUrl && (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left mb-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="font-gotham-bold text-sm text-slate-800">Próximo Passo: Concluir seu PIX</span>
@@ -615,21 +620,53 @@ export function MonthlyDonor() {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  to="/login"
-                  className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-3.5 rounded-full font-gotham-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                >
-                  <Users size={16} />
-                  <span>Acessar Portal do Mantenedor</span>
-                </Link>
-                <button
-                  onClick={() => setIsSuccess(false)}
-                  className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3.5 rounded-full font-gotham-medium text-sm transition-all"
-                >
-                  Fazer Outra Contribuição
-                </button>
-              </div>
+              {/* Convite para cadastro no Portal caso não tenha login */}
+              {!user ? (
+                <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-6 mb-6 text-left">
+                  <div className="flex items-center gap-2 text-orange-800 font-gotham-bold text-xs uppercase tracking-wider mb-1.5">
+                    <Heart size={14} className="fill-[#F49853] text-[#F49853]" />
+                    <span>Portal do Mantenedor</span>
+                  </div>
+                  <h3 className="font-heading font-black text-slate-900 text-lg mb-1">
+                    Deseja criar seu acesso agora?
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-4 font-gotham-light">
+                    No portal você pode acompanhar relatórios de transparência, crianças atendidas, certificados e o histórico de suas contribuições mensais.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <Link
+                      to={`/login?tab=register&email=${encodeURIComponent(donorEmail || urlEmail)}&name=${encodeURIComponent(donorName || urlName)}`}
+                      className="w-full sm:w-auto flex-1 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md text-center flex items-center justify-center gap-2"
+                    >
+                      <Users size={16} />
+                      <span>Sim, Quero Criar Minha Conta</span>
+                    </Link>
+                    <Link
+                      to="/"
+                      className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-600 text-xs font-gotham-medium py-3.5 px-6 rounded-xl border border-slate-200 text-center transition-colors"
+                    >
+                      Não, continuar sem cadastro
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <Link
+                    to="/portal/dashboard"
+                    className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-3.5 rounded-full font-gotham-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <Users size={16} />
+                    <span>Acessar Portal do Mantenedor</span>
+                  </Link>
+                  <Link
+                    to="/"
+                    className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3.5 rounded-full font-gotham-medium text-sm transition-all text-center"
+                  >
+                    Voltar ao Início
+                  </Link>
+                </div>
+              )}
             </div>
           ) : (
             /* Formulário Principal de Escolha de Planos e Pagamento */

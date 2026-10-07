@@ -1,19 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Heart, Lock, Mail, UserPlus, LogIn } from 'lucide-react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Heart, Lock, Mail, UserPlus, LogIn, CheckSquare, Square } from 'lucide-react';
 
 export function Login() {
   const { loginWithEmail, loginWithGoogle, registerWithEmail, sendPasswordResetEmail, user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'recovery'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [acceptCommunications, setAcceptCommunications] = useState(true);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+  const [consentError, setConsentError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Preenche dados vindos da URL caso venha de um fluxo pós-doação (?register=true ou ?tab=register&email=...)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') || (searchParams.get('register') === 'true' ? 'register' : null);
+    if (tabParam === 'register' || tabParam === 'recovery' || tabParam === 'login') {
+      setActiveTab(tabParam);
+    }
+    const emailParam = searchParams.get('email');
+    if (emailParam) setEmail(emailParam);
+    const nameParam = searchParams.get('name');
+    if (nameParam) setName(nameParam);
+  }, [searchParams]);
+
   // If user is already logged in, redirect them
-  React.useEffect(() => {
+  useEffect(() => {
     if (!loading && user) {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
@@ -66,6 +83,7 @@ export function Login() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setConsentError('');
     setIsLoading(true);
     
     try {
@@ -76,6 +94,12 @@ export function Login() {
           alert('Credenciais inválidas! Verifique seu e-mail e senha.');
         }
       } else if (activeTab === 'register') {
+        if (!acceptPrivacy) {
+          setConsentError('Você precisa aceitar a Política de Privacidade para criar sua conta.');
+          setIsLoading(false);
+          return;
+        }
+
         // Registration is strictly for Sponsors on the public page
         const success = await registerWithEmail(name, email, password);
         
@@ -244,6 +268,55 @@ export function Login() {
                 {activeTab === 'register' && (
                   <p className="text-[11px] text-slate-400 mt-1 px-1">
                     Mínimo de 6 caracteres.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Checkboxes de Autorização e Termos (Apenas no Cadastro) */}
+            {activeTab === 'register' && (
+              <div className="space-y-3 pt-2 text-left">
+                {/* Autorização de mensagens e contato */}
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptCommunications}
+                    onChange={(e) => setAcceptCommunications(e.target.checked)}
+                    className="mt-0.5 rounded text-orange-500 focus:ring-orange-500 border-slate-300 w-4 h-4 cursor-pointer"
+                  />
+                  <span>
+                    Autorizo o contato e o recebimento de mensagens, atualizações de projetos e novidades da plataforma YAH Hope via WhatsApp e e-mail.
+                  </span>
+                </label>
+
+                {/* Política de Privacidade (Obrigatório) */}
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 select-none">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={acceptPrivacy}
+                    onChange={(e) => {
+                      setAcceptPrivacy(e.target.checked);
+                      if (consentError) setConsentError('');
+                    }}
+                    className="mt-0.5 rounded text-orange-500 focus:ring-orange-500 border-slate-300 w-4 h-4 cursor-pointer"
+                  />
+                  <span>
+                    Concordo com os{' '}
+                    <Link to="/termos-de-servico" target="_blank" className="font-bold text-orange-600 hover:underline">
+                      Termos de Serviço
+                    </Link>{' '}
+                    e a{' '}
+                    <Link to="/politica-de-privacidade" target="_blank" className="font-bold text-orange-600 hover:underline">
+                      Política de Privacidade
+                    </Link>{' '}
+                    da YAH Hope. *
+                  </span>
+                </label>
+
+                {consentError && (
+                  <p className="text-[11px] font-bold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                    {consentError}
                   </p>
                 )}
               </div>
