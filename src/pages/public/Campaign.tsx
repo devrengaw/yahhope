@@ -120,42 +120,10 @@ export function Campaign() {
     return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
   }, [stagesData]);
 
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>(() => {
-    if (urlCampaignId) {
-      const found = campaigns?.find(c => c && c.id === urlCampaignId);
-      if (found) return found.id;
-    }
-    // Por padrão seleciona o estágio atualmente em andamento
-    if (currentActiveStage) return currentActiveStage.campaign.id;
-    return activeCampaign?.id || defaultCamp?.id || campaigns?.[0]?.id || FALLBACK_CAMPAIGN.id;
-  });
-
-  React.useEffect(() => {
-    if (urlCampaignId && availableCampaigns.some(c => c && c.id === urlCampaignId)) {
-      setSelectedCampaignId(urlCampaignId);
-    }
-  }, [urlCampaignId, availableCampaigns]);
-
-  // Campanha/Estágio selecionado atualmente para detalhes
-  const currentCampaign = useMemo(() => {
-    return availableCampaigns.find(c => c && c.id === selectedCampaignId) || availableCampaigns[0] || defaultCamp || FALLBACK_CAMPAIGN;
-  }, [availableCampaigns, selectedCampaignId, defaultCamp]);
-
-  const currentStageInfo = useMemo(() => {
-    return stagesData.find(s => s.campaign.id === currentCampaign.id) || stagesData[0];
-  }, [stagesData, currentCampaign.id]);
-
-  const handleSelectCampaign = (campId: string) => {
-    setSelectedCampaignId(campId);
-    setSearchParams({ id: campId }, { replace: true });
-    
-    setTimeout(() => {
-      const el = document.getElementById(`campaign-card-${campId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 50);
-  };
+  // A doação única entra diretamente na régua, impulsionando o estágio ativo atual
+  const targetCampaign = useMemo(() => {
+    return currentActiveStage?.campaign || availableCampaigns[0] || defaultCamp || FALLBACK_CAMPAIGN;
+  }, [currentActiveStage, availableCampaigns, defaultCamp]);
 
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
   const [customAmount, setCustomAmount] = useState<string>('');
@@ -194,12 +162,12 @@ export function Campaign() {
   };
 
   React.useEffect(() => {
-    if (currentCampaign.accept_pix === false && currentCampaign.accept_card !== false) {
+    if (targetCampaign.accept_pix === false && targetCampaign.accept_card !== false) {
       setPaymentMethod('credit_card');
-    } else if (currentCampaign.accept_card === false && currentCampaign.accept_pix !== false) {
+    } else if (targetCampaign.accept_card === false && targetCampaign.accept_pix !== false) {
       setPaymentMethod('pix');
     }
-  }, [currentCampaign.accept_pix, currentCampaign.accept_card]);
+  }, [targetCampaign.accept_pix, targetCampaign.accept_card]);
 
   const handleDonate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,7 +189,7 @@ export function Campaign() {
         // Modo Demonstração sem Supabase configurado
         setTimeout(() => {
           createDonation({
-            campaign_id: currentCampaign.id,
+            campaign_id: targetCampaign.id,
             donor_name: name,
             donor_email: email,
             amount: finalAmount,
@@ -242,14 +210,14 @@ export function Campaign() {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
-          campaignId: currentCampaign.id,
+          campaignId: targetCampaign.id,
           amount: finalAmount,
           isMonthly: false,
           paymentMethod, // 'pix' ou 'credit_card'
           donorName: name,
           donorEmail: email,
-          successUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=success`,
-          cancelUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=cancel`
+          successUrl: `${window.location.origin}/campanha?status=success`,
+          cancelUrl: `${window.location.origin}/campanha?status=cancel`
         })
       });
 
@@ -259,7 +227,7 @@ export function Campaign() {
       } else {
         console.error('Error starting checkout:', data);
         createDonation({
-          campaign_id: currentCampaign.id,
+          campaign_id: targetCampaign.id,
           donor_name: name,
           donor_email: email,
           amount: finalAmount,
@@ -284,7 +252,7 @@ export function Campaign() {
           </div>
           <h2 className="text-2xl font-black text-slate-900 mb-2">Obrigado pela sua doação!</h2>
           <p className="text-slate-500 mb-8">
-            Seu apoio à campanha <strong>{currentCampaign.title}</strong> transforma vidas e restaura a esperança.
+            Seu apoio impulsiona a nossa régua de arrecadação e transforma vidas na comunidade.
           </p>
           <Link to="/" className="inline-block bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors">
             Voltar ao Início
@@ -294,7 +262,7 @@ export function Campaign() {
     );
   }
 
-  const renderDonationForm = (camp: Campaign) => (
+  const renderDonationForm = (camp: CampaignType) => (
     <div className="flex flex-col h-full justify-between">
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -594,312 +562,251 @@ export function Campaign() {
               </div>
             </div>
 
-            {/* Grid dos Estágios como botões de navegação rápida na régua */}
+            {/* Grid dos Estágios como marcos visuais na régua */}
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {stagesData.map((stage) => {
-                const isSelected = stage.campaign.id === currentCampaign.id;
-                return (
-                  <button
-                    key={stage.campaign.id}
-                    type="button"
-                    onClick={() => handleSelectCampaign(stage.campaign.id)}
-                    className={cn(
-                      "p-3 rounded-2xl border text-left transition-all cursor-pointer relative",
-                      isSelected
-                        ? "border-emerald-500 bg-emerald-50/60 shadow-sm ring-2 ring-emerald-500/20"
-                        : "border-slate-100 bg-slate-50/70 hover:bg-slate-100/80"
+              {stagesData.map((stage) => (
+                <div
+                  key={stage.campaign.id}
+                  className={cn(
+                    "p-3 rounded-2xl border text-left transition-all relative",
+                    stage.isCurrent
+                      ? "border-amber-400 bg-amber-50/60 shadow-xs ring-2 ring-amber-400/20"
+                      : stage.isReached
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : "border-slate-100 bg-slate-50/70"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
+                      stage.isReached 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : stage.isCurrent 
+                          ? "bg-amber-100 text-amber-800 animate-pulse" 
+                          : "bg-slate-200 text-slate-600"
+                    )}>
+                      Estágio {stage.stageNumber}
+                    </span>
+                    {stage.isReached ? (
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    ) : stage.isCurrent ? (
+                      <span className="text-[10px] font-black text-amber-600 uppercase">Ativo 🔥</span>
+                    ) : (
+                      <Lock size={12} className="text-slate-400 shrink-0" />
                     )}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1.5">
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
-                        stage.isReached 
-                          ? "bg-emerald-100 text-emerald-800" 
-                          : stage.isCurrent 
-                            ? "bg-amber-100 text-amber-800 animate-pulse" 
-                            : "bg-slate-200 text-slate-600"
-                      )}>
-                        Estágio {stage.stageNumber}
-                      </span>
-                      {stage.isReached ? (
-                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      ) : stage.isCurrent ? (
-                        <span className="text-[10px] font-black text-amber-600 uppercase">Ativo 🔥</span>
-                      ) : (
-                        <Lock size={12} className="text-slate-400 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 line-clamp-1">
-                      {stage.campaign.title}
-                    </p>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 font-medium">
-                      <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
-                      <span className="font-bold text-emerald-600">{stage.stageProgress}%</span>
-                    </div>
-                  </button>
-                );
-              })}
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                    {stage.campaign.title}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 font-medium">
+                    <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
+                    <span className="font-bold text-emerald-600">{stage.stageProgress}%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* 2. GRID PRINCIPAL: ESTÁGIOS DETALHADOS (ESQUERDA) + FORMULÁRIO DE APOIO (DIREITA) */}
+        {/* 2. GRID PRINCIPAL: JORNADA DE ESTÁGIOS (ESQUERDA) + DOAÇÃO PARA A RÉGUA (DIREITA) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Coluna Esquerda (lg:col-span-7): Estágios da Régua */}
+          {/* Coluna Esquerda (lg:col-span-7): Jornada de Estágios da Régua */}
           <div className="lg:col-span-7 space-y-6">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Estágios da Régua de Arrecadação</h3>
+                <p className="text-xs text-slate-500">Conheça as fases que a sua doação viabiliza nesta jornada.</p>
+              </div>
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                {stagesData.length} Estágios Cadastrados
+              </span>
+            </div>
+
             {stagesData.map((stage) => {
               const camp = stage.campaign;
-              const isSelected = camp.id === currentCampaign.id;
               const campStats = stage.campStats;
 
-              if (isSelected) {
-                return (
-                  <div 
-                    key={camp.id}
-                    id={`campaign-card-${camp.id}`}
-                    onClick={() => handleSelectCampaign(camp.id)}
-                    className="bg-white rounded-3xl shadow-xl border-2 border-emerald-500 ring-4 ring-emerald-500/10 p-6 md:p-8 transition-all duration-300 relative overflow-hidden"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-slate-900 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                          <Layers size={12} /> ESTÁGIO #{stage.stageNumber}
-                        </span>
-
-                        {stage.isReached ? (
-                          <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
-                            <CheckCircle2 size={12} /> Estágio Conquistado
-                          </span>
-                        ) : stage.isCurrent ? (
-                          <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 animate-pulse">
-                            <Flame size={12} /> Estágio em Andamento
-                          </span>
-                        ) : (
-                          <span className="bg-slate-100 text-slate-600 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
-                            <Lock size={12} /> Próximo na Régua
-                          </span>
-                        )}
-
-                        <span className="bg-emerald-50 text-emerald-700 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
-                          <Sparkles size={11} /> Selecionado
-                        </span>
-                      </div>
-
-                      <span className="text-xs font-bold text-slate-400">
-                        Faixa: R$ {stage.prevTarget.toLocaleString('pt-BR')} - R$ {stage.threshold.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-
-                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-2">
-                      {camp.title}
-                    </h2>
-
-                    {camp.description && (
-                      <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                        {camp.description}
-                      </p>
-                    )}
-
-                    {/* Régua de Arrecadação do Estágio */}
-                    <div className="bg-emerald-50/40 rounded-2xl p-5 border border-emerald-100">
-                      <div className="flex justify-between items-end mb-4">
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                            Progresso deste Estágio
-                          </p>
-                          <p className="text-3xl md:text-4xl font-black text-emerald-600">
-                            {stage.stageProgress}%
-                          </p>
-                          <p className="text-xs text-slate-500 font-bold mt-0.5">
-                            R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} acumulados
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                            Meta do Estágio
-                          </p>
-                          <p className="text-xl md:text-2xl font-black text-slate-900">
-                            R$ {campStats.targetAmount.toLocaleString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Barra de Progresso do Estágio */}
-                      <div className="relative pt-6 pb-2">
-                        <div className="h-6 bg-slate-200/80 rounded-full overflow-hidden relative z-10 shadow-inner ring-1 ring-slate-300/60">
-                          <div 
-                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000 ease-out relative"
-                            style={{ width: `${stage.stageProgress}%` }}
-                          >
-                            <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
-                          </div>
-                        </div>
-
-                        {/* Marcos do Estágio */}
-                        {camp.milestones?.map((m) => {
-                          const percent = Math.min((m.target_amount / campStats.targetAmount) * 100, 100);
-                          const isReached = campStats.currentAmount >= m.target_amount;
-                          return (
-                            <div 
-                              key={m.id} 
-                              className="absolute top-0 flex flex-col items-center -ml-3.5"
-                              style={{ left: `${percent}%` }}
-                            >
-                              <div className={cn(
-                                "w-7 h-7 rounded-full border-4 border-white shadow-md flex items-center justify-center z-20 relative transition-transform hover:scale-125",
-                                isReached ? "bg-emerald-500 text-white" : "bg-slate-300 text-transparent"
-                              )}>
-                                {isReached && <CheckCircle2 size={13} />}
-                              </div>
-                              <div className="absolute top-12 w-24 text-center">
-                                <p className={cn("text-[10px] font-black uppercase tracking-tight", isReached ? "text-emerald-700" : "text-slate-400")}>
-                                  R$ {m.target_amount >= 1000 ? `${m.target_amount / 1000}k` : m.target_amount}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Sub-marcos se existirem */}
-                      {camp.milestones && camp.milestones.length > 0 && (
-                        <div className="mt-8 pt-4 border-t border-emerald-100/80 space-y-3">
-                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                            Fases internas deste estágio:
-                          </h4>
-                          <div className="space-y-2">
-                            {camp.milestones.map((m, idx) => {
-                              const isReached = campStats.currentAmount >= m.target_amount;
-                              return (
-                                <div key={m.id} className="flex items-start gap-2.5 text-xs">
-                                  <div className={cn(
-                                    "w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-black text-[10px] mt-0.5",
-                                    isReached ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
-                                  )}>
-                                    {isReached ? <CheckCircle2 size={12} /> : idx + 1}
-                                  </div>
-                                  <div>
-                                    <span className={cn("font-bold", isReached ? "text-emerald-950 font-black" : "text-slate-700")}>
-                                      {m.title}
-                                    </span>
-                                    <span className="text-slate-400 font-semibold ml-1.5">
-                                      (R$ {m.target_amount.toLocaleString('pt-BR')})
-                                    </span>
-                                    {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
-              // Card Não Selecionado
               return (
                 <div 
                   key={camp.id}
                   id={`campaign-card-${camp.id}`}
-                  onClick={() => handleSelectCampaign(camp.id)}
-                  className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-200/80 hover:border-emerald-300 transition-all duration-300 p-6 md:p-7 cursor-pointer group"
+                  className={cn(
+                    "bg-white rounded-3xl shadow-md border-2 p-6 md:p-8 transition-all duration-300 relative overflow-hidden",
+                    stage.isCurrent 
+                      ? "border-amber-400 ring-4 ring-amber-400/10 shadow-xl" 
+                      : stage.isReached 
+                        ? "border-emerald-200 bg-emerald-50/20" 
+                        : "border-slate-200/80"
+                  )}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="bg-slate-100 text-slate-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
+                      <span className="bg-slate-900 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
                         <Layers size={12} /> ESTÁGIO #{stage.stageNumber}
                       </span>
 
                       {stage.isReached ? (
-                        <span className="bg-emerald-50 text-emerald-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-emerald-100">
-                          <CheckCircle2 size={12} /> Concluído
+                        <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Estágio Conquistado
                         </span>
                       ) : stage.isCurrent ? (
-                        <span className="bg-amber-50 text-amber-700 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-amber-100">
-                          <Flame size={12} /> Em Andamento
+                        <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 animate-pulse">
+                          <Flame size={12} /> Estágio em Andamento na Régua
                         </span>
                       ) : (
-                        <span className="bg-slate-50 text-slate-500 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 border border-slate-100">
-                          <Lock size={12} /> Próximo
+                        <span className="bg-slate-100 text-slate-600 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
+                          <Lock size={12} /> Próximo na Fila
                         </span>
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectCampaign(camp.id);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 group-hover:bg-emerald-600 text-slate-700 group-hover:text-white font-bold text-xs uppercase tracking-wider transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
-                    >
-                      <span>Apoiar este estágio</span>
-                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                    </button>
+                    <span className="text-xs font-bold text-slate-400">
+                      Faixa: R$ {stage.prevTarget.toLocaleString('pt-BR')} - R$ {stage.threshold.toLocaleString('pt-BR')}
+                    </span>
                   </div>
 
-                  <h3 className="text-xl md:text-2xl font-black text-slate-900 group-hover:text-emerald-700 transition-colors mb-2">
+                  <h3 className="text-2xl font-black text-slate-900 mb-2">
                     {camp.title}
                   </h3>
 
                   {camp.description && (
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                    <p className="text-sm text-slate-600 mb-6 leading-relaxed">
                       {camp.description}
                     </p>
                   )}
 
-                  {/* Régua Compacta do Estágio */}
-                  <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 group-hover:border-emerald-100 transition-colors">
-                    <div className="flex justify-between items-center mb-2.5 text-xs">
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-black text-lg text-emerald-600">{stage.stageProgress}%</span>
-                        <span className="text-slate-500 font-bold">
-                          R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} arrecadados
-                        </span>
+                  {/* Régua de Arrecadação do Estágio */}
+                  <div className={cn(
+                    "rounded-2xl p-5 border",
+                    stage.isCurrent ? "bg-amber-50/40 border-amber-200/60" : "bg-slate-50/80 border-slate-100"
+                  )}>
+                    <div className="flex justify-between items-end mb-4">
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+                          Progresso deste Estágio
+                        </p>
+                        <p className={cn(
+                          "text-3xl md:text-4xl font-black",
+                          stage.isReached ? "text-emerald-600" : stage.isCurrent ? "text-amber-600" : "text-slate-500"
+                        )}>
+                          {stage.stageProgress}%
+                        </p>
+                        <p className="text-xs text-slate-500 font-bold mt-0.5">
+                          R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} acumulados
+                        </p>
                       </div>
                       <div className="text-right">
-                        <span className="text-slate-400 font-medium">Meta do estágio: </span>
-                        <span className="font-black text-slate-800">R$ {campStats.targetAmount.toLocaleString('pt-BR')}</span>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
+                          Meta do Estágio
+                        </p>
+                        <p className="text-xl md:text-2xl font-black text-slate-900">
+                          R$ {campStats.targetAmount.toLocaleString('pt-BR')}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="h-3.5 bg-slate-200/80 rounded-full overflow-hidden relative">
-                      <div 
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${stage.stageProgress}%` }}
-                      />
+                    {/* Barra de Progresso do Estágio */}
+                    <div className="relative pt-6 pb-2">
+                      <div className="h-6 bg-slate-200/80 rounded-full overflow-hidden relative z-10 shadow-inner ring-1 ring-slate-300/60">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-1000 ease-out relative",
+                            stage.isReached 
+                              ? "bg-gradient-to-r from-emerald-500 to-teal-500" 
+                              : "bg-gradient-to-r from-amber-500 to-[#F49853]"
+                          )}
+                          style={{ width: `${stage.stageProgress}%` }}
+                        >
+                          <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+                        </div>
+                      </div>
+
+                      {/* Marcos do Estágio */}
+                      {camp.milestones?.map((m) => {
+                        const percent = Math.min((m.target_amount / campStats.targetAmount) * 100, 100);
+                        const isReached = campStats.currentAmount >= m.target_amount;
+                        return (
+                          <div 
+                            key={m.id} 
+                            className="absolute top-0 flex flex-col items-center -ml-3.5"
+                            style={{ left: `${percent}%` }}
+                          >
+                            <div className={cn(
+                              "w-7 h-7 rounded-full border-4 border-white shadow-md flex items-center justify-center z-20 relative transition-transform hover:scale-125",
+                              isReached ? "bg-emerald-500 text-white" : "bg-slate-300 text-transparent"
+                            )}>
+                              {isReached && <CheckCircle2 size={13} />}
+                            </div>
+                            <div className="absolute top-12 w-24 text-center">
+                              <p className={cn("text-[10px] font-black uppercase tracking-tight", isReached ? "text-emerald-700" : "text-slate-400")}>
+                                R$ {m.target_amount >= 1000 ? `${m.target_amount / 1000}k` : m.target_amount}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    {/* Sub-marcos se existirem */}
+                    {camp.milestones && camp.milestones.length > 0 && (
+                      <div className="mt-8 pt-4 border-t border-slate-200/60 space-y-3">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Fases internas deste estágio:
+                        </h4>
+                        <div className="space-y-2">
+                          {camp.milestones.map((m, idx) => {
+                            const isReached = campStats.currentAmount >= m.target_amount;
+                            return (
+                              <div key={m.id} className="flex items-start gap-2.5 text-xs">
+                                <div className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-black text-[10px] mt-0.5",
+                                  isReached ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                                )}>
+                                  {isReached ? <CheckCircle2 size={12} /> : idx + 1}
+                                </div>
+                                <div>
+                                  <span className={cn("font-bold", isReached ? "text-emerald-950 font-black" : "text-slate-700")}>
+                                    {m.title}
+                                  </span>
+                                  <span className="text-slate-400 font-semibold ml-1.5">
+                                    (R$ {m.target_amount.toLocaleString('pt-BR')})
+                                  </span>
+                                  {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Coluna Direita (lg:col-span-5): Caixa Fixa "Faça sua contribuição" */}
+          {/* Coluna Direita (lg:col-span-5): Caixa Fixa de Doação para a Régua */}
           <div className="lg:col-span-5 lg:sticky lg:top-24">
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-4">Faça sua contribuição</h2>
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Faça sua contribuição</h2>
+              <p className="text-xs text-slate-500 mb-5">Sua doação única entra diretamente na régua de arrecadação.</p>
               
-              {/* Identificação Clara do Estágio Clicado */}
+              {/* Identificação da Fase que está sendo impulsionada agora */}
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 mb-6">
                 <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-black uppercase tracking-wider mb-1">
-                  <Flame size={14} className="text-emerald-600" />
-                  Você está impulsionando o Estágio #{currentStageInfo.stageNumber}:
+                  <Flame size={14} className="text-emerald-600 animate-pulse" />
+                  Fase sendo financiada na régua:
                 </div>
-                <h3 className="font-black text-slate-900 text-lg leading-snug">
-                  {currentCampaign.title}
+                <h3 className="font-black text-slate-900 text-base leading-snug">
+                  Estágio #{currentActiveStage?.stageNumber || 1}: {targetCampaign.title}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-medium">
-                  {currentCampaign.description 
-                    ? (currentCampaign.description.length > 90 ? `${currentCampaign.description.substring(0, 90)}...` : currentCampaign.description)
-                    : 'Sua doação única avança a régua geral e financia este estágio.'}
+                  Cada doação única avança a régua geral e financia este estágio até desbloquear o próximo.
                 </p>
               </div>
 
-              {renderDonationForm(currentCampaign)}
+              {renderDonationForm(targetCampaign)}
             </div>
           </div>
 
