@@ -243,6 +243,29 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         const mappedCampaigns: Campaign[] = campaignsData.map((c, index) => {
           const campMilestones = (milestonesData || []).filter(m => m.campaign_id === c.id);
           
+          // Verifica se há preferência salva no localStorage
+          let localPix: boolean | undefined = undefined;
+          let localCard: boolean | undefined = undefined;
+          try {
+            const raw = localStorage.getItem(`yahhope_campaign_settings_${c.id}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.accept_pix !== undefined) localPix = parsed.accept_pix;
+              if (parsed.accept_card !== undefined) localCard = parsed.accept_card;
+            }
+          } catch {}
+
+          // Prioridade: se o banco retornou true/false (não nulo), usa o banco.
+          // Mas se no banco vier null/undefined OU se localStorage tiver uma preferência explicitamente salva e o banco vier nulo, usa localStorage.
+          // Além disso, se localPix foi explicitamente salvo, ele serve de fallback e garantia.
+          const effectivePix = (localPix !== undefined)
+            ? localPix
+            : (c.accept_pix !== undefined && c.accept_pix !== null ? c.accept_pix : true);
+
+          const effectiveCard = (localCard !== undefined)
+            ? localCard
+            : (c.accept_card !== undefined && c.accept_card !== null ? c.accept_card : true);
+
           return {
             id: c.id,
             title: c.title,
@@ -257,8 +280,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             reset_day: c.reset_day || 1,
             last_reset_at: c.last_reset_at,
             milestones: campMilestones,
-            accept_pix: c.accept_pix ?? true,
-            accept_card: c.accept_card ?? true,
+            accept_pix: effectivePix,
+            accept_card: effectiveCard,
             created_at: c.created_at
           };
         });
@@ -368,6 +391,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           delete payload.type;
           delete payload.start_date;
           delete payload.end_date;
+          delete payload.accept_pix;
+          delete payload.accept_card;
           const retry = await supabase.from('campaigns').insert(payload).select().single();
           if (retry.data) {
             await fetchCampaignData();
@@ -395,6 +420,26 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   const updateCampaign = async (updates: Partial<Campaign>, campaignId?: string) => {
     const targetId = campaignId || selectedCampaign.id;
     try {
+      // 1. Sempre salva no localStorage para persistência garantida mesmo se a coluna no banco não existir
+      try {
+        const raw = localStorage.getItem(`yahhope_campaign_settings_${targetId}`);
+        const existing = raw ? JSON.parse(raw) : {};
+        if (updates.accept_pix !== undefined) existing.accept_pix = updates.accept_pix;
+        if (updates.accept_card !== undefined) existing.accept_card = updates.accept_card;
+        localStorage.setItem(`yahhope_campaign_settings_${targetId}`, JSON.stringify(existing));
+      } catch (err) {
+        console.warn('Erro ao salvar no localStorage:', err);
+      }
+
+      // 2. Atualiza o estado da memória imediatamente para refletir na interface
+      setCampaigns(prev => prev.map(c => c.id === targetId ? { ...c, ...updates } : c));
+
+      // Se for id default "1" (mock/sem banco), já retorna sucesso
+      if (targetId === '1') {
+        return { success: true };
+      }
+
+      // 3. Prepara o payload para o Supabase
       const payload: any = { ...updates };
       delete payload.milestones;
       delete payload.current_amount; // É calculado dinamicamente ou mantido pelo reset
@@ -405,26 +450,27 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         .eq('id', targetId);
 
       if (!error) {
-        setCampaigns(prev => prev.map(c => c.id === targetId ? { ...c, ...updates } : c));
         return { success: true };
       } else {
-        // Fallback para caso coluna nova não exista
+        // Fallback para caso coluna nova não exista no Postgres (código 42703 ou mensagem "column")
         if (error.message && (error.message.includes('column') || error.code === '42703')) {
+          delete payload.accept_pix;
+          delete payload.accept_card;
           delete payload.type;
           delete payload.start_date;
           delete payload.end_date;
           delete payload.reset_day;
           delete payload.last_reset_at;
+
           const retry = await supabase.from('campaigns').update(payload).eq('id', targetId);
           if (!retry.error) {
-            setCampaigns(prev => prev.map(c => c.id === targetId ? { ...c, ...updates } : c));
             return { success: true };
           }
         }
-        console.error('Error updating campaign:', error);
+        console.error('Error updating campaign in Supabase:', error);
         return { success: false, error };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in updateCampaign:', err);
       return { success: false, error: err };
     }

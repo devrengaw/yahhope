@@ -837,7 +837,11 @@ export function FundraisingManager() {
                     <input 
                       type="checkbox" 
                       checked={acceptPix}
-                      onChange={(e) => setAcceptPix(e.target.checked)}
+                      onChange={async (e) => {
+                        const val = e.target.checked;
+                        setAcceptPix(val);
+                        await updateCampaign({ accept_pix: val }, selectedCampaign.id);
+                      }}
                       className="w-5 h-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
                     />
                     <span className="text-sm font-medium text-slate-700">PIX</span>
@@ -846,7 +850,11 @@ export function FundraisingManager() {
                     <input 
                       type="checkbox" 
                       checked={acceptCard}
-                      onChange={(e) => setAcceptCard(e.target.checked)}
+                      onChange={async (e) => {
+                        const val = e.target.checked;
+                        setAcceptCard(val);
+                        await updateCampaign({ accept_card: val }, selectedCampaign.id);
+                      }}
                       className="w-5 h-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
                     />
                     <span className="text-sm font-medium text-slate-700">Cartão de Crédito</span>

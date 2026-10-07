@@ -103,7 +103,7 @@ const FAQS = [
   },
   {
     question: 'Como funciona a cobrança mensal no Cartão de Crédito?',
-    answer: 'A cobrança é realizada de forma automática e segura todo mês pela plataforma Stripe, líder mundial em pagamentos. O valor é debitado como uma assinatura mensal, sem comprometer o limite total do seu cartão de crédito (apenas o valor da parcela mensal é utilizado).'
+    answer: 'A cobrança é realizada de forma automática e 100% segura todo mês. O valor é debitado como uma assinatura mensal, sem comprometer o limite total do seu cartão de crédito (apenas o valor da parcela mensal é utilizado).'
   },
   {
     question: 'Posso ser mantenedor utilizando PIX?',
@@ -193,7 +193,7 @@ export function MonthlyDonor() {
               donor_name: donorName,
               donor_email: donorEmail,
               amount: currentAmount,
-              payment_method: paymentMethod === 'pix' ? 'pix_stripe' : 'cartao_mensal'
+              payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
             });
           }
           setIsLoading(false);
@@ -363,7 +363,7 @@ export function MonthlyDonor() {
                 <div className="mt-6 pt-5 border-t border-white/15 flex items-center justify-between text-xs text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <Lock size={14} className="text-[#F49853]" />
-                    Stripe 256-Bit SSL
+                    Criptografia 256-Bit SSL
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Clock size={14} className="text-[#92BF78]" />
@@ -822,7 +822,7 @@ export function MonthlyDonor() {
                         )}
                       >
                         <QrCode size={18} />
-                        <span>PIX (via Stripe)</span>
+                        <span>PIX</span>
                       </button>
                     </div>
                   </div>
@@ -831,20 +831,20 @@ export function MonthlyDonor() {
                     <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs space-y-2 text-emerald-900">
                       <p className="font-gotham-bold flex items-center gap-1.5">
                         <CheckCircle2 size={14} className="text-emerald-700" />
-                        PIX Integrado via Stripe com Confirmação Instantânea
+                        PIX com Confirmação Instantânea
                       </p>
                       <p className="text-[11px] text-emerald-800 leading-relaxed">
-                        Ao clicar no botão abaixo, você será direcionado para o checkout seguro da Stripe, onde será gerado o QR Code dinâmico e o código Copia e Cola oficial do PIX com compensação em segundos e recibo automático.
+                        Ao clicar no botão abaixo, será gerado o QR Code dinâmico e o código Copia e Cola oficial do PIX com compensação em segundos e recibo automático.
                       </p>
                     </div>
                   ) : (
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1.5 text-slate-600">
                       <p className="font-gotham-bold text-slate-800 flex items-center gap-1.5">
                         <Lock size={13} className="text-[#F49853]" />
-                        Cobrança Mensal Recorrente no Cartão (Stripe)
+                        Cobrança Mensal Recorrente no Cartão
                       </p>
                       <p className="text-[11px]">
-                        Você será direcionado ao ambiente seguro da Stripe para cadastrar seu cartão. Cancelamento com 1 clique no Portal do Doador sem travar o limite total.
+                        Você será direcionado ao ambiente seguro e criptografado para cadastrar seu cartão. Cancelamento com 1 clique no Portal do Doador sem travar o limite total.
                       </p>
                     </div>
                   )}
@@ -861,7 +861,7 @@ export function MonthlyDonor() {
                         <Heart size={18} className="fill-white" />
                         <span>
                           {paymentMethod === 'pix' 
-                            ? 'Gerar PIX Seguro no Stripe' 
+                            ? 'Gerar PIX Seguro' 
                             : 'Confirmar e Ser Mantenedor Mensal'}
                         </span>
                       </>
