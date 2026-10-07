@@ -274,9 +274,8 @@ export function PublicHeader() {
                 <div className="absolute top-full right-0 w-72 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
                     <li>
-                      <Link to="/mantenedor" className="flex items-center justify-between font-gotham-bold text-[#F49853] hover:translate-x-1 transition-all py-1">
-                        <span>Seja Mantenedor Mensal</span>
-                        <span className="text-[10px] bg-orange-50 text-[#F49853] border border-orange-200 px-2 py-0.5 rounded-full font-gotham-bold">Impacto Contínuo</span>
+                      <Link to="/mantenedor" className="block font-gotham-bold text-[#F49853] hover:translate-x-1 transition-all py-1">
+                        Seja Mantenedor Mensal
                       </Link>
                     </li>
                     <li><Link to="/campanha" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Campanhas em Andamento</Link></li>
@@ -458,10 +457,9 @@ export function PublicHeader() {
                 <Link 
                   to="/mantenedor" 
                   onClick={() => setMobileMenuOpen(false)} 
-                  className="flex items-center justify-between py-2 text-[#F49853] font-gotham-bold"
+                  className="block py-2 text-[#F49853] font-gotham-bold hover:translate-x-1 transition-all"
                 >
-                  <span>Seja Mantenedor Mensal</span>
-                  <span className="text-[10px] bg-orange-100 text-[#F49853] px-2 py-0.5 rounded-full font-gotham-bold">Impacto Contínuo</span>
+                  Seja Mantenedor Mensal
                 </Link>
                 <div className="pl-3 border-l-2 border-slate-100 space-y-1.5 py-1">
                   <Link 

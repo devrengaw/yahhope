@@ -128,7 +128,49 @@ export function Campaign() {
     setIsLoading(true);
 
     try {
-      if (paymentMethod === 'pix') {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+
+      if (!supabaseUrl) {
+        // Modo Demonstração sem Supabase configurado
+        setTimeout(() => {
+          createDonation({
+            campaign_id: currentCampaign.id,
+            donor_name: name,
+            donor_email: email,
+            amount: finalAmount,
+            payment_method: paymentMethod
+          });
+          setIsLoading(false);
+          setIsSubmitted(true);
+        }, 1200);
+        return;
+      }
+
+      // Processamento oficial via Stripe (PIX ou Cartão)
+      const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          campaignId: currentCampaign.id,
+          amount: finalAmount,
+          isMonthly,
+          paymentMethod, // 'pix' ou 'credit_card'
+          donorName: name,
+          donorEmail: email,
+          successUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=success`,
+          cancelUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=cancel`
+        })
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error('Error starting checkout:', data);
         createDonation({
           campaign_id: currentCampaign.id,
           donor_name: name,
@@ -136,56 +178,8 @@ export function Campaign() {
           amount: finalAmount,
           payment_method: paymentMethod
         });
-
-        setTimeout(() => {
-          setIsLoading(false);
-          setIsSubmitted(true);
-        }, 1500);
-      } else {
-        // Pagamento por Cartão (Stripe)
-        if (!import.meta.env.VITE_SUPABASE_URL) {
-          setTimeout(() => {
-            setIsLoading(false);
-            alert('Integração com Cartão de Crédito (Stripe) em modo de demonstração.\nA doação será registrada como pendente.');
-            createDonation({
-              campaign_id: currentCampaign.id,
-              donor_name: name,
-              donor_email: email,
-              amount: finalAmount,
-              payment_method: paymentMethod
-            });
-            setIsSubmitted(true);
-          }, 1500);
-          return;
-        }
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            campaignId: currentCampaign.id,
-            amount: finalAmount,
-            isMonthly,
-            donorName: name,
-            donorEmail: email,
-            successUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=success`,
-            cancelUrl: `${window.location.origin}/campanha?id=${currentCampaign.id}&status=cancel`
-          })
-        });
-
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          console.error('Error starting checkout:', data);
-          alert('Erro ao iniciar o pagamento. Tente via PIX ou verifique a conexão.');
-          setIsLoading(false);
-        }
+        setIsLoading(false);
+        setIsSubmitted(true);
       }
     } catch (error: any) {
       console.error('Donation error:', error);

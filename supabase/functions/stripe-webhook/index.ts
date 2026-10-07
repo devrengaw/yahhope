@@ -64,6 +64,9 @@ serve(async (req) => {
       const campaignId = campaigns && campaigns.length > 0 ? campaigns[0].id : null
 
       if (campaignId) {
+        const isPixPayment = session.metadata?.paymentMethod === 'pix' || session.payment_method_types?.includes('pix');
+        const paymentMethodRecord = isPixPayment ? 'pix' : (session.payment_method_types?.[0] || 'credit_card');
+
         // Insert donation record
         await supabase.from('donations').insert({
           campaign_id: campaignId,
@@ -71,7 +74,7 @@ serve(async (req) => {
           donor_email: donorEmail,
           amount: amount,
           status: 'paid',
-          payment_method: session.payment_method_types?.[0] || 'card',
+          payment_method: paymentMethodRecord,
           paid_at: new Date().toISOString()
         })
 
@@ -91,7 +94,7 @@ serve(async (req) => {
         
         // Registrar também no Módulo Financeiro
         await supabase.from('finance_transactions').insert({
-          description: `Doação via Stripe - ${donorName}`,
+          description: `Doação via Stripe (${isPixPayment ? 'PIX' : 'Cartão'}) - ${donorName}`,
           amount: amount,
           type: 'income',
           category_id: 'cat_donation',

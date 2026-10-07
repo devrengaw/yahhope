@@ -182,67 +182,52 @@ export function MonthlyDonor() {
     setIsLoading(true);
 
     try {
-      if (paymentMethod === 'pix') {
-        // Registrar mantenedor PIX
-        if (createDonation && currentCampaign) {
-          await createDonation({
-            campaign_id: currentCampaign.id,
-            donor_name: donorName,
-            donor_email: donorEmail,
-            amount: currentAmount,
-            payment_method: 'pix_mensal'
-          });
-        }
-        setIsLoading(false);
-        setIsSuccess(true);
-      } else {
-        // Pagamento por Cartão (Stripe Subscription)
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-        
-        if (!supabaseUrl) {
-          // Modo Demonstração / Sem backend configurado
-          setTimeout(() => {
-            if (createDonation && currentCampaign) {
-              createDonation({
-                campaign_id: currentCampaign.id,
-                donor_name: donorName,
-                donor_email: donorEmail,
-                amount: currentAmount,
-                payment_method: 'cartao_mensal'
-              });
-            }
-            setIsLoading(false);
-            setIsSuccess(true);
-          }, 1200);
-          return;
-        }
-
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            campaignId: currentCampaign?.id || '1',
-            amount: currentAmount,
-            isMonthly: true,
-            donorName,
-            donorEmail,
-            successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}`,
-            cancelUrl: `${window.location.origin}/mantenedor?status=cancel`
-          })
-        });
-
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          // Fallback gracioso
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      
+      if (!supabaseUrl) {
+        // Modo Demonstração / Sem backend configurado
+        setTimeout(() => {
+          if (createDonation && currentCampaign) {
+            createDonation({
+              campaign_id: currentCampaign.id,
+              donor_name: donorName,
+              donor_email: donorEmail,
+              amount: currentAmount,
+              payment_method: paymentMethod === 'pix' ? 'pix_stripe' : 'cartao_mensal'
+            });
+          }
           setIsLoading(false);
           setIsSuccess(true);
-        }
+        }, 1200);
+        return;
+      }
+
+      const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          campaignId: currentCampaign?.id || '1',
+          amount: currentAmount,
+          isMonthly: true,
+          paymentMethod, // 'pix' ou 'card'
+          donorName,
+          donorEmail,
+          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}`,
+          cancelUrl: `${window.location.origin}/mantenedor?status=cancel`
+        })
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        // Fallback gracioso
+        setIsLoading(false);
+        setIsSuccess(true);
       }
     } catch (err) {
       console.error('Erro ao processar adesão de mantenedor:', err);
@@ -285,12 +270,6 @@ export function MonthlyDonor() {
             
             {/* Coluna Texto: Proposta de Valor e Emoção */}
             <div className="lg:col-span-7 text-center lg:text-left space-y-6">
-              
-              <div className="inline-flex items-center gap-2.5 bg-[#F49853]/20 border border-[#F49853]/40 px-4 py-2 rounded-full text-xs font-gotham-bold text-[#F49853] uppercase tracking-wider backdrop-blur-md">
-                <Heart size={14} className="fill-[#F49853]" />
-                <span>Aliança de Fidelidade • Resgate Contínuo</span>
-              </div>
-
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
                 Uma doação alimenta hoje. <br />
                 <span className="text-[#F49853]">Sua fidelidade mensal</span> <br className="hidden sm:inline" />
@@ -843,7 +822,7 @@ export function MonthlyDonor() {
                         )}
                       >
                         <QrCode size={18} />
-                        <span>PIX Recorrente</span>
+                        <span>PIX (via Stripe)</span>
                       </button>
                     </div>
                   </div>
@@ -852,20 +831,20 @@ export function MonthlyDonor() {
                     <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs space-y-2 text-emerald-900">
                       <p className="font-gotham-bold flex items-center gap-1.5">
                         <CheckCircle2 size={14} className="text-emerald-700" />
-                        Chave PIX Oficial: {pixKey}
+                        PIX Integrado via Stripe com Confirmação Instantânea
                       </p>
-                      <p className="text-[11px] text-emerald-800">
-                        Ao clicar no botão abaixo, seus dados serão registrados na rede de mantenedores e você receberá o QR Code e instruções para agendar a recorrência no seu banco.
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        Ao clicar no botão abaixo, você será direcionado para o checkout seguro da Stripe, onde será gerado o QR Code dinâmico e o código Copia e Cola oficial do PIX com compensação em segundos e recibo automático.
                       </p>
                     </div>
                   ) : (
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1.5 text-slate-600">
                       <p className="font-gotham-bold text-slate-800 flex items-center gap-1.5">
                         <Lock size={13} className="text-[#F49853]" />
-                        Cobrança mensal segura sem travar o limite
+                        Cobrança Mensal Recorrente no Cartão (Stripe)
                       </p>
                       <p className="text-[11px]">
-                        Você será direcionado ao ambiente seguro da Stripe para cadastrar seu cartão. Cancelamento com 1 clique no Portal do Doador.
+                        Você será direcionado ao ambiente seguro da Stripe para cadastrar seu cartão. Cancelamento com 1 clique no Portal do Doador sem travar o limite total.
                       </p>
                     </div>
                   )}
@@ -880,7 +859,11 @@ export function MonthlyDonor() {
                     ) : (
                       <>
                         <Heart size={18} className="fill-white" />
-                        <span>Confirmar e Ser Mantenedor Mensal</span>
+                        <span>
+                          {paymentMethod === 'pix' 
+                            ? 'Gerar PIX Seguro no Stripe' 
+                            : 'Confirmar e Ser Mantenedor Mensal'}
+                        </span>
                       </>
                     )}
                   </button>
