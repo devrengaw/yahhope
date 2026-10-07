@@ -439,7 +439,7 @@ export function Campaign() {
             textShadow: '0 4px 20px rgba(0,0,0,0.6)'
           }}
         >
-          {availableCampaigns.length > 1 ? 'Campanhas Solidárias' : (currentCampaign.type === 'specific' ? currentCampaign.title : 'Participe')}
+          {availableCampaigns.length > 1 ? 'Participe' : (currentCampaign.type === 'specific' ? currentCampaign.title : 'Participe')}
         </h1>
       </div>
 
