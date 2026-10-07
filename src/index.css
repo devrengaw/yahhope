@@ -24,15 +24,27 @@
 
 @font-face {
   font-family: 'Antipol VF';
-  src: local('Antipol VF'), local('Antipol-VF'), local('AntipolVF'), local('Antipol Variable'), local('Antipol');
+  src: url('/fonts/Antipol-VF.otf') format('opentype'),
+       local('Antipol VF'), local('Antipol-VF'), local('AntipolVF'), local('Antipol Variable'), local('Antipol');
   font-weight: 100 900;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Antipol VF';
+  src: url('/fonts/Antipol-VF-Italic.otf') format('opentype'),
+       local('Antipol VF Italic'), local('Antipol-VF-Italic');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Antipol';
-  src: local('Antipol'), local('Antipol VF'), local('Antipol Bold'), local('Antipol-Bold');
+  src: url('/fonts/Antipol-VF.otf') format('opentype'),
+       local('Antipol'), local('Antipol VF'), local('Antipol Bold'), local('Antipol-Bold');
   font-weight: 100 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @theme {

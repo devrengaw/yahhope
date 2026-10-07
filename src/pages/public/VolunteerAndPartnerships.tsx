@@ -220,12 +220,6 @@ export function VolunteerAndPartnerships() {
         <div className="absolute top-1/2 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-sm text-xs font-gotham-bold text-[#F49853] mb-6">
-            <Sparkles size={14} className="animate-spin-slow" />
-            <span>Faça Parte Desta Transformação</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto font-gotham-bold">
             Una seu talento pessoal ou <span className="text-[#F49853]">sua empresa</span> à missão de transformar vidas.
           </h1>
