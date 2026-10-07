@@ -503,10 +503,112 @@ export function Campaign() {
         </h1>
       </div>
 
-      {/* Main Content: 2 Colunas */}
+      {/* Main Content: Régua Global + 2 Colunas */}
       <div className="max-w-7xl mx-auto px-4 -mt-24 relative z-20">
 
-        {/* GRID PRINCIPAL: ESTÁGIOS (ESQUERDA) + DOAÇÃO (DIREITA) */}
+        {/* 1. CABEÇALHO E EXPLICAÇÃO DOS ESTÁGIOS DA RÉGUA */}
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 md:p-8 mb-8 relative overflow-hidden ring-1 ring-slate-900/5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-200/60 shadow-xs">
+                <Flame size={14} className="text-emerald-600 animate-pulse" />
+                <span>Régua de Arrecadação por Estágios</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                Como funcionam os estágios do projeto
+              </h2>
+              <p className="text-xs md:text-sm text-slate-500 mt-1.5 max-w-2xl font-gotham-regular leading-relaxed">
+                Cada campanha representa um estágio sequencial de transformação. As doações pontuais acumuladas avançam a régua geral passo a passo, viabilizando e desbloqueando cada fase do nosso trabalho em campo!
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4 bg-slate-50/90 p-4 rounded-2xl border border-slate-200/70 self-start lg:self-auto shadow-inner">
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  Total Geral Arrecadado
+                </span>
+                <span className="text-xl md:text-2xl font-black text-emerald-600">
+                  R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs text-slate-400 block font-medium">
+                  de R$ {totalRulerGoal.toLocaleString('pt-BR')} ({rulerOverallPercentage}%)
+                </span>
+              </div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex flex-col items-center justify-center font-black text-sm shrink-0 shadow-md shadow-emerald-500/25">
+                <span>{rulerOverallPercentage}%</span>
+                <span className="text-[9px] font-bold uppercase text-white/80">concluído</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra Contínua Global com Efeito Shimmer */}
+          <div className="relative pt-2 pb-6">
+            <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+              <span className="flex items-center gap-1 text-slate-700">
+                <Layers size={13} className="text-emerald-600" />
+                Progresso Geral na Régua
+              </span>
+              <span className="text-emerald-700">
+                {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} em andamento` : 'Régua Concluída'}
+              </span>
+            </div>
+
+            <div className="h-5 bg-slate-100 rounded-full overflow-hidden shadow-inner ring-1 ring-slate-200/80 relative">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-[#F49853] rounded-full transition-all duration-1000 ease-out relative"
+                style={{ width: `${rulerOverallPercentage}%` }}
+              >
+                <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+              </div>
+            </div>
+
+            {/* Grid dos Estágios como marcos visuais na régua */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {stagesData.map((stage) => (
+                <div
+                  key={stage.campaign.id}
+                  className={cn(
+                    "p-3 rounded-2xl border text-left transition-all relative",
+                    stage.isCurrent
+                      ? "border-amber-400 bg-amber-50/60 shadow-xs ring-2 ring-amber-400/20"
+                      : stage.isReached
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : "border-slate-100 bg-slate-50/70"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
+                      stage.isReached 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : stage.isCurrent 
+                          ? "bg-amber-100 text-amber-800 animate-pulse" 
+                          : "bg-slate-200 text-slate-600"
+                    )}>
+                      Estágio {stage.stageNumber}
+                    </span>
+                    {stage.isReached ? (
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    ) : stage.isCurrent ? (
+                      <span className="text-[10px] font-black text-amber-600 uppercase">Ativo 🔥</span>
+                    ) : (
+                      <Lock size={12} className="text-slate-400 shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                    {stage.campaign.title}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 font-medium">
+                    <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
+                    <span className="font-bold text-emerald-600">{stage.stageProgress}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. GRID PRINCIPAL: ESTÁGIOS (ESQUERDA) + DOAÇÃO (DIREITA) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Coluna Esquerda (lg:col-span-7): Jornada de Estágios da Régua */}
