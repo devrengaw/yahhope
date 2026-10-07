@@ -26,6 +26,7 @@ import { SupporterStore } from './pages/portal/SupporterStore';
 import { PortalMessages } from './pages/portal/PortalMessages';
 import { PortalGifts } from './pages/portal/PortalGifts';
 import { SupporterLanding } from './pages/public/SupporterLanding';
+import { MonthlyDonor } from './pages/public/MonthlyDonor';
 import { LocalProjects } from './pages/public/LocalProjects';
 import { Blog } from './pages/public/Blog';
 import { Ecommerce } from './pages/public/Ecommerce';
@@ -238,6 +239,9 @@ export default function App() {
                                           <Route path="/set-password" element={<SetPassword />} />
                                           <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
                                           <Route path="/apoiador" element={<SupporterLanding />} />
+                                          <Route path="/mantenedor" element={<MonthlyDonor />} />
+                                          <Route path="/seja-mantenedor" element={<Navigate to="/mantenedor" replace />} />
+                                          <Route path="/como-ajudar/mantenedor" element={<Navigate to="/mantenedor" replace />} />
                                           <Route path="/campanha" element={<Campaign />} />
                                           <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
                                           <Route path="/termos-de-servico" element={<TermsOfService />} />

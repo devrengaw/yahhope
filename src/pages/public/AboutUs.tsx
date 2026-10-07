@@ -376,7 +376,7 @@ export function AboutUs() {
               <Heart size={18} className="fill-white" />
             </button>
             <Link
-              to="/campanha"
+              to="/mantenedor"
               className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 px-8 py-4 rounded-full font-gotham-bold text-sm tracking-wide transition-all"
             >
               <span>Seja Mantenedor Mensal</span>

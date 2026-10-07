@@ -69,11 +69,11 @@ export function PublicFooter() {
               <li><Link to="/sobre-nos" className="hover:text-[#F49853] transition-colors">Sobre Nós & Manifesto</Link></li>
               <li><Link to="/missao-visao-valores" className="hover:text-[#F49853] transition-colors">Missão, Visão e Valores</Link></li>
               <li><Link to="/projetos" className="hover:text-[#F49853] transition-colors">Nossos Projetos</Link></li>
-              <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Formas de Doar</Link></li>
-              <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Campanhas Ativas</Link></li>
+              <li><Link to="/mantenedor" className="text-[#F49853] font-gotham-bold hover:underline">Seja Mantenedor Mensal</Link></li>
+              <li><Link to="/campanha" className="hover:text-[#F49853] transition-colors">Campanhas Ativas & Doações</Link></li>
               <li><Link to="/blog" className="hover:text-[#F49853] transition-colors">Notícias & Histórias</Link></li>
               <li><Link to="/loja" className="hover:text-[#F49853] transition-colors">Loja Solidária</Link></li>
-              <li><Link to="/login" className="text-[#F49853] font-gotham-bold hover:underline">Portal do Doador / Login</Link></li>
+              <li><Link to="/login" className="text-slate-300 font-gotham-medium hover:text-[#F49853]">Portal do Doador / Login</Link></li>
             </ul>
           </div>
 

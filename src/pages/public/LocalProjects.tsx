@@ -221,7 +221,7 @@ export function LocalProjects() {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
-                  to="/campanha"
+                  to="/mantenedor"
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-sm transition-all shadow-lg shadow-orange-500/25"
                 >
                   <span>Seja Mantenedor Mensal</span>
