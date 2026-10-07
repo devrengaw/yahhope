@@ -254,15 +254,15 @@ export function MonthlyDonor() {
 
       {/* 1. HERO SECTION COM COPY CATIVANTE E PROFUNDA */}
       <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 bg-[#0F172A] text-white overflow-hidden">
-        {/* Background visual imersivo */}
+        {/* Background visual imersivo com maior transparência */}
         <div className="absolute inset-0 z-0">
           <img 
             src="/mantenedor_hero.jpg" 
             alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-top filter brightness-[0.38] contrast-105 scale-105 transition-transform duration-1000"
+            className="w-full h-full object-cover object-top filter brightness-[0.72] contrast-105 scale-105 transition-transform duration-1000"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-transparent"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A] via-[#0F172A]/75 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/45 to-black/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/85 via-[#0F172A]/35 to-transparent"></div>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -111,7 +111,7 @@ export function LocalProjects() {
   );
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20">
+    <div className="min-h-screen bg-white">
       <SEO 
         title="Nossos Projetos e Alcance Global | YAH Hope"
         description="Conheça os projetos humanitários da YAH Hope: combate à desnutrição, acesso a água limpa e educação em Moçambique, e nossa base de mobilização e governança no Brasil."
@@ -119,66 +119,81 @@ export function LocalProjects() {
         canonical="https://yahhope.org/projetos"
       />
 
-      {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 text-center">
-        <div className="inline-flex items-center justify-center p-3 bg-amber-50 text-[#F49853] rounded-2xl mb-6 shadow-xs">
-          <Globe2 size={32} />
-        </div>
-        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-slate-900 tracking-tighter mb-6 uppercase">
-          Nossos Projetos & <span className="text-[#F49853]">Alcance</span>
-        </h1>
-        <p className="text-lg sm:text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-medium">
-          Iniciativas de alto impacto que transformam realidades. Do socorro humanitário e resgate infantil em Moçambique à nossa base institucional e de mobilização no Brasil.
-        </p>
+      {/* Hero Section com Imagem de Fundo e Filtro */}
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 bg-[#0F172A] text-white overflow-hidden mb-12">
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105"
+          style={{ backgroundImage: `url('/projetos_hero.jpg')` }}
+        />
+        
+        {/* Overlay Filters to ensure text readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/85 via-[#0F172A]/80 to-[#0F172A]/95 backdrop-blur-[1px]"></div>
+        
+        {/* Subtle decorative background circles */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#F49853]/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-1/2 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
-        {/* Region Filter Tabs */}
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-8">
-          <button
-            onClick={() => handleRegionChange('todos')}
-            className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all cursor-pointer ${
-              activeRegion === 'todos'
-                ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Todos os Projetos
-          </button>
-          <button
-            onClick={() => handleRegionChange('mocambique')}
-            className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeRegion === 'mocambique'
-                ? 'bg-[#F49853] text-white shadow-md shadow-orange-500/20'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <span>🇲🇿</span>
-            <span>Moçambique (Nampula)</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-              activeRegion === 'mocambique' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {projects.filter(p => !isBrazilProject(p)).length}
-            </span>
-          </button>
-          <button
-            onClick={() => handleRegionChange('brasil')}
-            className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeRegion === 'brasil'
-                ? 'bg-[#F49853] text-white shadow-md shadow-orange-500/20'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <span>🇧🇷</span>
-            <span>Brasil (Sede & Expansão)</span>
-            {projects.filter(isBrazilProject).length > 0 && (
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center justify-center p-3 bg-white/10 backdrop-blur-md text-[#F49853] border border-white/20 rounded-2xl mb-6 shadow-xs">
+            <Globe2 size={32} />
+          </div>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 uppercase font-heading">
+            Nossos Projetos & <span className="text-[#F49853]">Alcance</span>
+          </h1>
+          <p className="text-lg sm:text-xl text-slate-200 max-w-3xl mx-auto leading-relaxed font-gotham-light">
+            Iniciativas de alto impacto que transformam realidades. Do socorro humanitário e resgate infantil em Moçambique à nossa base institucional e de mobilização no Brasil.
+          </p>
+
+          {/* Region Filter Tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-10">
+            <button
+              onClick={() => handleRegionChange('todos')}
+              className={`px-6 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all cursor-pointer ${
+                activeRegion === 'todos'
+                  ? 'bg-[#F49853] text-white shadow-lg shadow-orange-500/30'
+                  : 'bg-white/10 backdrop-blur-md text-slate-200 hover:bg-white/20 hover:text-white border border-white/15'
+              }`}
+            >
+              Todos os Projetos
+            </button>
+            <button
+              onClick={() => handleRegionChange('mocambique')}
+              className={`px-6 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeRegion === 'mocambique'
+                  ? 'bg-[#F49853] text-white shadow-lg shadow-orange-500/30'
+                  : 'bg-white/10 backdrop-blur-md text-slate-200 hover:bg-white/20 hover:text-white border border-white/15'
+              }`}
+            >
+              <span>🇲🇿</span>
+              <span>Moçambique (Nampula)</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                activeRegion === 'brasil' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                activeRegion === 'mocambique' ? 'bg-white/25 text-white' : 'bg-white/15 text-slate-200'
               }`}>
-                {projects.filter(isBrazilProject).length}
+                {projects.filter(p => !isBrazilProject(p)).length}
               </span>
-            )}
-          </button>
+            </button>
+            <button
+              onClick={() => handleRegionChange('brasil')}
+              className={`px-6 py-2.5 rounded-full text-xs sm:text-sm font-gotham-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeRegion === 'brasil'
+                  ? 'bg-[#F49853] text-white shadow-lg shadow-orange-500/30'
+                  : 'bg-white/10 backdrop-blur-md text-slate-200 hover:bg-white/20 hover:text-white border border-white/15'
+              }`}
+            >
+              <span>🇧🇷</span>
+              <span>Brasil (Sede & Expansão)</span>
+              {projects.filter(isBrazilProject).length > 0 && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  activeRegion === 'brasil' ? 'bg-white/25 text-white' : 'bg-white/15 text-slate-200'
+                }`}>
+                  {projects.filter(isBrazilProject).length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Mozambique Context Ribbon */}
       {activeRegion === 'mocambique' && (
