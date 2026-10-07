@@ -385,10 +385,10 @@ export function MonthlyDonor() {
               A Diferença Entre Sobreviver e Prosperar
             </span>
             <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-              Por que a Casa Nutri depende da sua constância mensal?
+              Por que nossos projetos dependem da sua constância mensal?
             </h2>
             <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
-              Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza contra a fome e a mortalidade infantil.
+              Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza duradoura que mantém todas as nossas frentes humanitárias ativas todos os dias.
             </p>
           </div>
 
@@ -405,15 +405,15 @@ export function MonthlyDonor() {
               <ul className="space-y-4 text-slate-600 text-sm">
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>A equipe médica vive sob a tensão de não saber se terá estoque de leite terapêutico no mês seguinte.</span>
+                  <span>Incerteza para planejar novas perfurações de poços de água potável e manter a manutenção das bombas ativas.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Dificuldade para acolher novas crianças internadas por medo de interromper o tratamento na metade.</span>
+                  <span>Risco de interrupção no tratamento clínico de crianças desnutridas e nas bolsas de estudo de jovens universitários.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Custos logísticos mais altos por compras de emergência em vez de planejamento com fornecedores.</span>
+                  <span>Dificuldade para estruturar novas frentes comunitárias e comprar insumos essenciais com antecedência e economia.</span>
                 </li>
               </ul>
             </div>
@@ -431,15 +431,15 @@ export function MonthlyDonor() {
               <ul className="space-y-4 text-slate-200 text-sm">
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Portas Sempre Abertas:</strong> Nenhuma mãe em desespero é devolvida com seu filho sem acolhimento e nutrição.</span>
+                  <span><strong>Todas as Portas Abertas:</strong> Acolhimento médico ininterrupto, clínicas móveis nos vilarejos e atendimento digno para cada família.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Tratamento Clínico Completo:</strong> Garantia do ciclo integral de 45 a 90 dias com F-75, F-100, ferro, zinco e vacinas.</span>
+                  <span><strong>Água, Nutrição e Saúde Plena:</strong> Poços artesianos operando sem parar e ciclo integral de recuperação para erradicar a desnutrição.</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Futuro Além da Fome:</strong> Apoio a poços de água limpa, hortas comunitárias e bolsas universitárias para quebrar o ciclo da miséria.</span>
+                  <span><strong>Futuro, Educação e Autonomia:</strong> Continuidade de bolsas universitárias, capacitação profissional de mães e hortas comunitárias sustentáveis.</span>
                 </li>
               </ul>
             </div>
