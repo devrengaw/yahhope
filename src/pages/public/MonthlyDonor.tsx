@@ -338,7 +338,7 @@ export function MonthlyDonor() {
                     <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-white block font-gotham-medium">Previsibilidade que Salva</strong>
-                      <span className="text-xs text-slate-300">Garante a compra antecipada de fórmulas terapêuticas F-75 e Plumpy'Nut direto dos laboratórios.</span>
+                      <span className="text-xs text-slate-300">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
                     </div>
                   </div>
 
