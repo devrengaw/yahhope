@@ -43,9 +43,9 @@ export function PortalLogin() {
 
     try {
       if (activeTab === 'login') {
-        const success = await loginWithEmail(email, password);
-        if (!success) {
-          setErrorMessage('E-mail ou senha incorretos. Por favor, tente novamente.');
+        const res = await loginWithEmail(email, password);
+        if (!res.success) {
+          setErrorMessage(res.error || 'E-mail ou senha incorretos. Por favor, tente novamente.');
         }
       } else if (activeTab === 'register') {
         if (!name.trim()) {
@@ -53,11 +53,11 @@ export function PortalLogin() {
           setIsLoading(false);
           return;
         }
-        const success = await registerWithEmail(name, email, password);
-        if (!success) {
-          setErrorMessage('Não foi possível criar a conta. Este e-mail pode já estar cadastrado.');
+        const res = await registerWithEmail(name, email, password);
+        if (!res.success) {
+          setErrorMessage(res.error || 'Não foi possível criar a conta.');
         } else {
-          setSuccessMessage('Conta de Apoiador criada com sucesso! Redirecionando...');
+          setSuccessMessage('Conta criada com sucesso! Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada.');
         }
       } else if (activeTab === 'recovery') {
         const success = await sendPasswordResetEmail(email);

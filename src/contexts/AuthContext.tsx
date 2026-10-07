@@ -18,9 +18,9 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  loginWithEmail: (email: string, password?: string) => Promise<boolean>;
+  loginWithEmail: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<void>;
-  registerWithEmail: (name: string, email: string, password?: string) => Promise<boolean>;
+  registerWithEmail: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   sendPasswordResetEmail: (email: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (updates: { name?: string; phone?: string; avatar_url?: string; about?: string }) => Promise<boolean>;
@@ -154,10 +154,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithEmail = async (email: string, password?: string): Promise<boolean> => {
-    if (!password) return false;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return !error;
+  const loginWithEmail = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    if (!password) return { success: false, error: 'Por favor, informe sua senha.' };
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email: email.trim().toLowerCase(), 
+      password 
+    });
+    if (error) {
+      if (error.message.includes('Email not confirmed')) {
+        return { 
+          success: false, 
+          error: 'E-mail não confirmado! Para fazer login, clique no link de confirmação que enviamos para o seu e-mail.' 
+        };
+      }
+      if (error.message.includes('Invalid login credentials')) {
+        return { 
+          success: false, 
+          error: 'E-mail ou senha incorretos. Verifique os dados digitados.' 
+        };
+      }
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   };
 
   const loginWithGoogle = async (): Promise<void> => {
@@ -174,23 +192,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const registerWithEmail = async (name: string, email: string, password?: string): Promise<boolean> => {
-    if (!password) return false;
+  const registerWithEmail = async (name: string, email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    if (!password) return { success: false, error: 'Por favor, informe uma senha.' };
     
     // Create the user in Supabase Auth
+    const cleanEmail = email.trim().toLowerCase();
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
+      email: cleanEmail,
       password,
       options: {
         data: {
           full_name: name
-        }
+        },
+        emailRedirectTo: `${window.location.origin}/portal/dashboard`
       }
     });
 
-    if (authError || !authData.user) {
+    if (authError) {
       console.error("Error signing up:", authError);
-      return false;
+      if (authError.message?.toLowerCase().includes('already registered') || authError.message?.toLowerCase().includes('already been taken')) {
+        return { success: false, error: 'Este e-mail já está cadastrado. Tente fazer login ou recuperar sua senha.' };
+      }
+      return { success: false, error: authError.message };
+    }
+
+    if (!authData.user) {
+      return { success: false, error: 'Não foi possível criar o usuário no Supabase.' };
     }
 
     // Immediately insert into public.users as SPONSOR.
@@ -198,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error: dbError } = await supabase.from('users').insert({
       id: authData.user.id,
       name,
-      email,
+      email: cleanEmail,
       role: 'SPONSOR'
     });
 
@@ -206,7 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error inserting public user on register:", dbError);
     }
 
-    return true;
+    return { success: true };
   };
 
   const sendPasswordResetEmail = async (email: string): Promise<boolean> => {

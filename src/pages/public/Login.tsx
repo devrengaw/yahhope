@@ -16,6 +16,7 @@ export function Login() {
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [consentError, setConsentError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegisteredSuccess, setIsRegisteredSuccess] = useState(false);
 
   // Preenche dados vindos da URL caso venha de um fluxo pós-doação (?register=true ou ?tab=register&email=...)
   useEffect(() => {
@@ -88,10 +89,10 @@ export function Login() {
     
     try {
       if (activeTab === 'login') {
-        const success = await loginWithEmail(email, password);
+        const res = await loginWithEmail(email, password);
         
-        if (!success) {
-          alert('Credenciais inválidas! Verifique seu e-mail e senha.');
+        if (!res.success) {
+          alert(res.error || 'Credenciais inválidas! Verifique seu e-mail e senha.');
         }
       } else if (activeTab === 'register') {
         if (!acceptPrivacy) {
@@ -101,10 +102,12 @@ export function Login() {
         }
 
         // Registration is strictly for Sponsors on the public page
-        const success = await registerWithEmail(name, email, password);
+        const res = await registerWithEmail(name, email, password);
         
-        if (!success) {
-          alert('Ocorreu um erro ou este e-mail já está cadastrado!');
+        if (!res.success) {
+          alert(res.error || 'Ocorreu um erro ao realizar o cadastro.');
+        } else {
+          setIsRegisteredSuccess(true);
         }
       } else if (activeTab === 'recovery') {
         const success = await sendPasswordResetEmail(email);
@@ -143,55 +146,109 @@ export function Login() {
       <div className="w-full max-w-md space-y-6 bg-white/95 backdrop-blur-xl p-8 sm:p-10 rounded-[2.5rem] shadow-2xl border border-white/20 relative z-10 overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
         
-        <div className="relative z-10 text-center flex flex-col items-center">
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight">
-            Ihale!
-          </h2>
-          <h3 className="text-xl font-bold text-slate-700 mt-1">
-            {activeTab === 'recovery' 
-              ? 'Recuperar Senha' 
-              : activeTab === 'register' 
-                ? 'Cadastro de Mantenedor' 
-                : 'Portal do Mantenedor'}
-          </h3>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
-            {activeTab === 'recovery' 
-              ? 'Insira seu e-mail para receber as instruções de recuperação.' 
-              : activeTab === 'register'
-                ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
-                : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
-          </p>
-        </div>
+        {isRegisteredSuccess ? (
+          <div className="relative z-10 text-center py-2 space-y-5 animate-fade-in">
+            <div className="w-20 h-20 bg-orange-100 text-[#F49853] rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-orange-500/10">
+              <Mail size={40} className="animate-pulse" />
+            </div>
 
-        {/* Abas Alternadoras: Entrar vs Quero me Cadastrar */}
-        {activeTab !== 'recovery' && (
-          <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setActiveTab('login')}
-              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                activeTab === 'login'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <LogIn size={14} />
-              <span>Já sou Mantenedor</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('register')}
-              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                activeTab === 'register'
-                  ? 'bg-[#F49853] text-white shadow-md'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Heart size={14} fill={activeTab === 'register' ? 'currentColor' : 'none'} />
-              <span>Quero me Cadastrar</span>
-            </button>
+            <div>
+              <span className="text-xs font-black uppercase tracking-widest text-[#F49853] block mb-1">
+                Quase Pronto!
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Confirme seu E-mail
+              </h2>
+            </div>
+
+            <div className="bg-orange-50/80 border border-orange-200/80 rounded-2xl p-4 text-left space-y-2">
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                Enviamos um link de confirmação para:
+              </p>
+              <p className="text-sm sm:text-base font-bold text-slate-900 bg-white px-3 py-2 rounded-xl border border-orange-200 break-all text-center">
+                {email}
+              </p>
+              <p className="text-xs text-slate-600 leading-relaxed pt-1">
+                Para ativar sua conta e liberar o acesso ao <strong>Portal do Mantenedor</strong>, abra seu e-mail e clique no botão de confirmação.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100 text-left text-xs text-slate-500 space-y-1">
+              <p className="font-bold text-slate-700">Não encontrou o e-mail?</p>
+              <p>Verifique sua caixa de <strong>Spam</strong> ou <strong>Lixo Eletrônico</strong>. Pode levar alguns instantes para chegar.</p>
+            </div>
+
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisteredSuccess(false);
+                  setActiveTab('login');
+                }}
+                className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogIn size={18} />
+                <span>Já confirmei, ir para Login</span>
+              </button>
+              <Link
+                to="/"
+                className="block text-xs font-bold text-slate-500 hover:text-slate-800 py-1 transition-colors"
+              >
+                Voltar à Página Inicial
+              </Link>
+            </div>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="relative z-10 text-center flex flex-col items-center">
+              <h2 className="text-4xl font-black text-slate-900 tracking-tight">
+                Ihale!
+              </h2>
+              <h3 className="text-xl font-bold text-slate-700 mt-1">
+                {activeTab === 'recovery' 
+                  ? 'Recuperar Senha' 
+                  : activeTab === 'register' 
+                    ? 'Cadastro de Mantenedor' 
+                    : 'Portal do Mantenedor'}
+              </h3>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
+                {activeTab === 'recovery' 
+                  ? 'Insira seu e-mail para receber as instruções de recuperação.' 
+                  : activeTab === 'register'
+                    ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
+                    : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
+              </p>
+            </div>
+
+            {/* Abas Alternadoras: Entrar vs Quero me Cadastrar */}
+            {activeTab !== 'recovery' && (
+              <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === 'login'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <LogIn size={14} />
+                  <span>Já sou Mantenedor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('register')}
+                  className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === 'register'
+                      ? 'bg-[#F49853] text-white shadow-md'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Heart size={14} fill={activeTab === 'register' ? 'currentColor' : 'none'} />
+                  <span>Quero me Cadastrar</span>
+                </button>
+              </div>
+            )}
         
         <form className="space-y-4 relative z-10" onSubmit={handleAuth}>
             {/* Campo Nome (Apenas no Cadastro) */}
@@ -374,6 +431,8 @@ export function Login() {
             </div>
 
           </form>
+          </>
+        )}
 
       </div>
     </div>
