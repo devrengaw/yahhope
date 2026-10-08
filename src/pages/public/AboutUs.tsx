@@ -47,7 +47,7 @@ export function AboutUs() {
             </h1>
 
             <p className="text-base sm:text-lg md:text-xl text-slate-200 font-gotham-light leading-relaxed mb-8">
-              A YAH Hope é uma agência humanitária nascida para transformar realidades de extrema vulnerabilidade em histórias de esperança, resiliência e autonomia. Onde muitos veem impossibilidade, nós enxergamos futuros preciosos.
+              A YAH Hope é uma iniciativa da YAH Church nascida para transformar realidades de extrema vulnerabilidade em histórias de esperança, resiliência e autonomia. Onde muitos veem impossibilidade, nós enxergamos futuros preciosos.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 justify-center md:justify-start">
@@ -119,7 +119,7 @@ export function AboutUs() {
               </h2>
 
               <p className="text-slate-600 leading-relaxed text-base sm:text-lg font-gotham-light">
-                A <strong>YAH Hope</strong> é uma Organização da Sociedade Civil sem fins lucrativos que atua diretamente nas frentes mais críticas de vulnerabilidade social e desnutrição. Nascida com a convicção inegociável de que a fé deve se traduzir em obras práticas e amor ativo, a agência desenvolve programas integrados de assistência, saúde e capacitação.
+                Nascida com a convicção inegociável de que a fé deve se traduzir em obras práticas e amor ativo, a agência desenvolve programas integrados de assistência, saúde e capacitação.
               </p>
 
               <p className="text-slate-600 leading-relaxed text-sm sm:text-base font-gotham-light">
