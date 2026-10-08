@@ -20,7 +20,7 @@ interface AuthContextType {
   loading: boolean;
   loginWithEmail: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<void>;
-  registerWithEmail: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithEmail: (name: string, email: string, password?: string, consents?: { communication?: boolean; privacy?: boolean }) => Promise<{ success: boolean; error?: string }>;
   sendPasswordResetEmail: (email: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (updates: { name?: string; phone?: string; avatar_url?: string; about?: string }) => Promise<boolean>;
@@ -192,7 +192,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const registerWithEmail = async (name: string, email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+  const registerWithEmail = async (
+    name: string, 
+    email: string, 
+    password?: string,
+    consents?: { communication?: boolean; privacy?: boolean }
+  ): Promise<{ success: boolean; error?: string }> => {
     if (!password) return { success: false, error: 'Por favor, informe uma senha.' };
     
     // Create the user in Supabase Auth
@@ -202,7 +207,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         data: {
-          full_name: name
+          full_name: name,
+          consent_communication: consents?.communication ?? false,
+          consent_privacy: consents?.privacy ?? true
         },
         emailRedirectTo: `${window.location.origin}/portal/dashboard`
       }
@@ -222,12 +229,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Immediately insert into public.users as SPONSOR.
     // Auth Listener might also try to do this, but doing it here guarantees it before redirect.
-    const { error: dbError } = await supabase.from('users').insert({
+    const userPayload: any = {
       id: authData.user.id,
       name,
       email: cleanEmail,
       role: 'SPONSOR'
-    });
+    };
+    if (consents) {
+      userPayload.consent_communication = consents.communication ?? false;
+      userPayload.consent_privacy = consents.privacy ?? true;
+      userPayload.consent_date = new Date().toISOString();
+    }
+
+    const { error: dbError } = await supabase.from('users').insert(userPayload);
 
     if (dbError) {
       console.error("Error inserting public user on register:", dbError);

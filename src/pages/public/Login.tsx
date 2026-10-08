@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Heart, Lock, Mail, UserPlus, LogIn, CheckSquare, Square } from 'lucide-react';
+import { Heart, Lock, Mail, UserPlus, LogIn, CheckSquare, Square, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export function Login() {
   const { loginWithEmail, loginWithGoogle, registerWithEmail, sendPasswordResetEmail, user, loading } = useAuth();
@@ -17,6 +17,15 @@ export function Login() {
   const [consentError, setConsentError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRegisteredSuccess, setIsRegisteredSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+
+  const switchTab = (tab: 'login' | 'register' | 'recovery') => {
+    setActiveTab(tab);
+    setErrorMessage('');
+    setInfoMessage('');
+    setConsentError('');
+  };
 
   // Preenche dados vindos da URL caso venha de um fluxo pós-doação (?register=true ou ?tab=register&email=...)
   useEffect(() => {
@@ -85,6 +94,8 @@ export function Login() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setConsentError('');
+    setErrorMessage('');
+    setInfoMessage('');
     setIsLoading(true);
     
     try {
@@ -92,7 +103,7 @@ export function Login() {
         const res = await loginWithEmail(email, password);
         
         if (!res.success) {
-          alert(res.error || 'Credenciais inválidas! Verifique seu e-mail e senha.');
+          setErrorMessage(res.error || 'Credenciais inválidas! Verifique seu e-mail e senha.');
         }
       } else if (activeTab === 'register') {
         if (!acceptPrivacy) {
@@ -102,10 +113,17 @@ export function Login() {
         }
 
         // Registration is strictly for Sponsors on the public page
-        const res = await registerWithEmail(name, email, password);
+        const res = await registerWithEmail(name, email, password, {
+          communication: allowContact,
+          privacy: acceptPrivacy
+        });
         
         if (!res.success) {
-          alert(res.error || 'Ocorreu um erro ao realizar o cadastro.');
+          if (res.error?.includes('Error sending confirmation email')) {
+            setErrorMessage('Não foi possível enviar o e-mail de confirmação pelo servidor (SMTP). Verifique as configurações de SMTP no Supabase ou os dados do domínio.');
+          } else {
+            setErrorMessage(res.error || 'Ocorreu um erro ao realizar o cadastro.');
+          }
         } else {
           setIsRegisteredSuccess(true);
         }
@@ -113,15 +131,15 @@ export function Login() {
         const success = await sendPasswordResetEmail(email);
         
         if (success) {
-          alert('Link de recuperação enviado com sucesso! Verifique sua caixa de entrada.');
-          setActiveTab('login');
+          setInfoMessage('Link de recuperação enviado com sucesso! Verifique sua caixa de entrada.');
+          switchTab('login');
         } else {
-          alert('Erro ao enviar o link de recuperação. Por favor, verifique se o email é válido.');
+          setErrorMessage('Erro ao enviar o link de recuperação. Por favor, verifique se o e-mail é válido.');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Ocorreu um erro inesperado.');
+      setErrorMessage(error?.message || 'Ocorreu um erro inesperado.');
     } finally {
       setIsLoading(false);
     }
@@ -225,7 +243,7 @@ export function Login() {
               <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('login')}
+                  onClick={() => switchTab('login')}
                   className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     activeTab === 'login'
                       ? 'bg-white text-slate-900 shadow-sm'
@@ -237,7 +255,7 @@ export function Login() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('register')}
+                  onClick={() => switchTab('register')}
                   className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     activeTab === 'register'
                       ? 'bg-[#F49853] text-white shadow-md'
@@ -251,6 +269,28 @@ export function Login() {
             )}
         
         <form className="space-y-4 relative z-10" onSubmit={handleAuth}>
+            {/* Mensagem de Erro Integrada (Sem alert do navegador) */}
+            {errorMessage && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs flex items-start gap-2.5 text-left animate-shake">
+                <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-bold text-rose-900">Atenção</p>
+                  <p className="text-rose-700 font-medium leading-relaxed mt-0.5">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Mensagem de Sucesso/Informativa Integrada */}
+            {infoMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs flex items-start gap-2.5 text-left animate-fade-in">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-bold text-emerald-950">Sucesso</p>
+                  <p className="text-emerald-800 font-medium leading-relaxed mt-0.5">{infoMessage}</p>
+                </div>
+              </div>
+            )}
+
             {/* Campo Nome (Apenas no Cadastro) */}
             {activeTab === 'register' && (
               <div>
@@ -301,7 +341,7 @@ export function Login() {
                   {activeTab === 'login' && (
                     <button
                       type="button"
-                      onClick={() => setActiveTab('recovery')}
+                      onClick={() => switchTab('recovery')}
                       className="text-xs font-bold text-orange-600 hover:text-orange-700"
                     >
                       Esqueceu?
@@ -402,7 +442,7 @@ export function Login() {
                   Ainda não tem conta?{' '}
                   <button
                     type="button"
-                    onClick={() => setActiveTab('register')}
+                    onClick={() => switchTab('register')}
                     className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
                   >
                     Cadastre-se como Mantenedor
@@ -413,7 +453,7 @@ export function Login() {
                   Já possui conta cadastrada?{' '}
                   <button
                     type="button"
-                    onClick={() => setActiveTab('login')}
+                    onClick={() => switchTab('login')}
                     className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
                   >
                     Fazer Login
@@ -422,7 +462,7 @@ export function Login() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setActiveTab('login')}
+                  onClick={() => switchTab('login')}
                   className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-all cursor-pointer"
                 >
                   Voltar para o login

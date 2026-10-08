@@ -36,11 +36,12 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const navItems = [
-    { label: 'Início', path: '/portal/dashboard', icon: Home },
+    { label: 'Visão Geral', path: '/portal/dashboard', icon: Home },
     { label: 'Crianças', path: '/portal/sponsorship', icon: Heart },
     { label: 'Projetos', path: '/portal/projects', icon: Briefcase },
+    { label: 'Fazer Doação', path: '/portal/donations', icon: DollarSign },
+    { label: 'Minhas Doações', path: '/portal/my-donations', icon: Receipt },
     { label: 'Blog', path: '/portal/blog', icon: Newspaper },
-    { label: 'Doações', path: '/portal/donations', icon: DollarSign },
   ];
 
   const isActive = (path: string) => {
@@ -58,30 +59,64 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none">
-      {/* Mobile Top Header (Fixed with Safe Area) */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 pt-safe transition-all shadow-xs">
-        <div className="max-w-md md:max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Logo & App Tag */}
-          <Link to="/portal/dashboard" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center shadow-md shadow-amber-500/20">
-              <Heart className="text-white" size={18} fill="currentColor" />
-            </div>
-            <div>
-              <span className="font-black text-slate-900 tracking-tight text-base block leading-none">
-                YAH Hope
-              </span>
-              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest leading-none">
-                Apoiador
-              </span>
-            </div>
-          </Link>
+      {/* Top Header Responsivo: Mobile & Desktop */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 pt-safe transition-all shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* Logo & Tag YAH Hope */}
+          <div className="flex items-center gap-8">
+            <Link to="/portal/dashboard" className="flex items-center gap-3 group">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#F49853] to-orange-400 flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
+                <Heart className="text-white" size={22} fill="currentColor" />
+              </div>
+              <div>
+                <span className="font-heading font-black text-slate-900 tracking-tight text-xl block leading-tight">
+                  YAH Hope
+                </span>
+                <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none">
+                  Portal do Mantenedor
+                </span>
+              </div>
+            </Link>
 
-          {/* Right Action Icons: Notification & Profile */}
-          <div className="flex items-center gap-2">
-            {/* Notification Bell */}
+            {/* Menu de Navegação Superior (Desktop md:flex) */}
+            <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+              {navItems.map((item) => {
+                const active = isActive(item.path);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-2 ${
+                      active
+                        ? 'bg-orange-50 text-[#F49853] shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? 'text-[#F49853]' : 'text-slate-400'} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Ações da Direita: Visitar Site, Notificação e Perfil */}
+          <div className="flex items-center gap-3">
+            {/* Link para o site principal (apenas desktop) */}
+            <Link
+              to="/"
+              className="hidden lg:flex items-center gap-1.5 text-xs font-gotham-bold text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 px-3.5 py-2 rounded-xl transition-all"
+            >
+              <span>Site Principal</span>
+              <ExternalLink size={13} />
+            </Link>
+
+            {/* Sino de Notificações */}
             <button
               onClick={() => setIsNotifOpen(true)}
-              className="relative p-2.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all active:scale-95"
+              className="relative p-2.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
               aria-label="Notificações"
             >
               <Bell size={20} />
@@ -92,26 +127,32 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               )}
             </button>
 
-            {/* Profile Avatar / Menu */}
+            {/* Avatar / Menu do Usuário */}
             <button
               onClick={() => setIsProfileOpen(true)}
-              className="w-9 h-9 rounded-full bg-amber-100 border border-amber-200 text-amber-800 font-black text-xs flex items-center justify-center shadow-xs active:scale-95 transition-all"
+              className="flex items-center gap-2.5 p-1 pl-1.5 pr-3 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-200/60"
             >
-              {user?.name ? user.name[0].toUpperCase() : 'A'}
+              <div className="w-8 h-8 rounded-full bg-orange-100 border border-orange-200 text-[#F49853] font-black text-xs flex items-center justify-center shadow-xs">
+                {user?.name ? user.name[0].toUpperCase() : 'M'}
+              </div>
+              <span className="hidden sm:inline text-xs font-gotham-bold text-slate-700 max-w-[120px] truncate">
+                {user?.name?.split(' ')[0] || 'Mantenedor'}
+              </span>
             </button>
           </div>
+
         </div>
       </header>
 
-      {/* Main Content View with padding for bottom nav */}
-      <main className="flex-1 max-w-md md:max-w-2xl mx-auto w-full px-4 pt-4 pb-28">
+      {/* Main Content View Amplo e Responsivo */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-16">
         {children || <Outlet />}
       </main>
 
-      {/* Bottom Navigation Bar (Fixed for Mobile Native Feel) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 pb-safe shadow-lg shadow-slate-900/5">
-        <div className="max-w-md md:max-w-2xl mx-auto px-2 flex items-center justify-around h-16">
-          {navItems.map((item) => {
+      {/* Bottom Navigation Bar (Visível APENAS no Mobile md:hidden) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 pb-safe shadow-lg shadow-slate-900/5">
+        <div className="max-w-md mx-auto px-2 flex items-center justify-around h-16">
+          {navItems.slice(0, 5).map((item) => {
             const active = isActive(item.path);
             const Icon = item.icon;
 
@@ -120,12 +161,12 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={`relative flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all ${
-                  active ? 'text-amber-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+                  active ? 'text-[#F49853] font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
                 }`}
               >
                 <div
                   className={`relative p-1.5 rounded-xl transition-all ${
-                    active ? 'bg-amber-50 scale-105' : ''
+                    active ? 'bg-orange-50 scale-105' : ''
                   }`}
                 >
                   <Icon size={20} strokeWidth={active ? 2.5 : 2} />
@@ -133,7 +174,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full"></span>
                   )}
                 </div>
-                <span className="text-[10px] mt-0.5 tracking-tight font-black">
+                <span className="text-[10px] mt-0.5 tracking-tight font-black truncate max-w-[58px]">
                   {item.label}
                 </span>
               </button>
