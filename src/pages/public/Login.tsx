@@ -8,6 +8,7 @@ export function Login() {
   const { loginWithEmail, loginWithGoogle, registerWithEmail, sendPasswordResetEmail, user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isAdminMode = searchParams.get('mode') === 'admin';
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'recovery'>('login');
   const [email, setEmail] = useState('');
@@ -30,6 +31,10 @@ export function Login() {
 
   // Preenche dados vindos da URL caso venha de um fluxo pós-doação (?register=true ou ?tab=register&email=...)
   useEffect(() => {
+    if (isAdminMode) {
+      if (activeTab === 'register') setActiveTab('login');
+      return;
+    }
     const tabParam = searchParams.get('tab') || (searchParams.get('register') === 'true' ? 'register' : null);
     if (tabParam === 'register' || tabParam === 'recovery' || tabParam === 'login') {
       setActiveTab(tabParam);
@@ -38,9 +43,9 @@ export function Login() {
     if (emailParam) setEmail(emailParam);
     const nameParam = searchParams.get('name');
     if (nameParam) setName(nameParam);
-  }, [searchParams]);
+  }, [searchParams, isAdminMode]);
 
-  // If user is already logged in, redirect them
+  // If user is already logged in, redirect them based on mode
   useEffect(() => {
     if (!loading && user) {
       const hash = window.location.hash || '';
@@ -50,39 +55,47 @@ export function Login() {
         return;
       }
 
-      if (user.role === 'SPONSOR') {
+      // Se entrou pelo modo administrativo (/login?mode=admin)
+      if (isAdminMode) {
+        if (user.role === 'ADMIN') {
+          navigate('/workspace');
+          return;
+        }
+
+        if (user.role === 'OBSERVER') {
+          navigate('/nutrition/patients');
+          return;
+        }
+
+        if (user.role === 'USER') {
+          const hasNutrition = user.permissions?.some(p => ['patients', 'attendance', 'inventory', 'management', 'waiting-list', 'atendimento', 'updates', 'visits'].includes(p));
+          const hasCommunication = user.permissions?.some(p => ['projects', 'chat', 'blog'].includes(p));
+          const hasSettings = user.permissions?.includes('settings');
+
+          const accessibleCount = [hasNutrition, hasCommunication, hasSettings].filter(Boolean).length;
+
+          if (accessibleCount > 1 || accessibleCount === 0) {
+            navigate('/workspace');
+          } else if (hasNutrition) {
+            navigate('/nutrition/patients');
+          } else if (hasCommunication) {
+            navigate('/communication/projects');
+          } else if (hasSettings) {
+            navigate('/admin/settings');
+          }
+          return;
+        }
+
+        // Se for SPONSOR (não tem cargo administrativo), direciona para o portal do mantenedor
         navigate('/portal/dashboard');
         return;
       }
 
-      if (user.role === 'OBSERVER') {
-        navigate('/nutrition/patients');
-        return;
-      }
-
-      if (user.role === 'ADMIN') {
-        navigate('/workspace');
-        return;
-      }
-
-      // Calculate accessible modules for USER role
-      const hasNutrition = user.permissions?.some(p => ['patients', 'attendance', 'inventory', 'management', 'waiting-list', 'atendimento', 'updates', 'visits'].includes(p));
-      const hasCommunication = user.permissions?.some(p => ['projects', 'chat', 'blog'].includes(p));
-      const hasSettings = user.permissions?.includes('settings');
-
-      const accessibleCount = [hasNutrition, hasCommunication, hasSettings].filter(Boolean).length;
-
-      if (accessibleCount > 1 || accessibleCount === 0) {
-        navigate('/workspace');
-      } else if (hasNutrition) {
-        navigate('/nutrition/patients');
-      } else if (hasCommunication) {
-        navigate('/communication/projects');
-      } else if (hasSettings) {
-        navigate('/admin/settings');
-      }
+      // Se entrou pelo login geral do Mantenedor (/login)
+      // Permite que qualquer mantenedor ou colaborador acesse o portal do mantenedor
+      navigate('/portal/dashboard');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, isAdminMode]);
 
   if (loading) {
     return (
@@ -162,8 +175,8 @@ export function Login() {
   return (
     <div className="relative flex-1 min-h-[calc(100vh-140px)] flex items-center justify-center font-gotham-regular py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <SEO 
-        title={activeTab === 'register' ? "Cadastro de Mantenedor | YAH Hope" : "Entrar | Portal do Mantenedor - YAH Hope"}
-        description="Acesse sua área exclusiva para acompanhar crianças atendidas pela Casa Nutri, projetos e relatórios de transparência."
+        title={isAdminMode ? "Área Administrativa | YAH Hope" : activeTab === 'register' ? "Cadastro de Mantenedor | YAH Hope" : "Entrar | Portal do Mantenedor - YAH Hope"}
+        description={isAdminMode ? "Acesso administrativo restrito para colaboradores e gestão da YAH Hope." : "Acesse sua área exclusiva para acompanhar crianças atendidas pela Casa Nutri, projetos e relatórios de transparência."}
         canonical="https://yahhope.com/login"
       />
 
@@ -238,30 +251,31 @@ export function Login() {
         ) : (
           <>
             <div className="relative z-10 text-center flex flex-col items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#F49853] bg-orange-50/90 px-3 py-1 rounded-full border border-orange-200/60 mb-2">
-                YAH Hope • Moçambique & Brasil
-              </span>
               <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight">
-                Ihale!
+                {isAdminMode ? 'Área Administrativa' : 'Ihale!'}
               </h2>
               <h3 className="text-lg sm:text-xl font-bold text-slate-700 mt-1">
-                {activeTab === 'recovery' 
-                  ? 'Recuperar Senha' 
-                  : activeTab === 'register' 
-                    ? 'Cadastro de Mantenedor' 
-                    : 'Portal do Mantenedor'}
+                {isAdminMode 
+                  ? (activeTab === 'recovery' ? 'Recuperar Acesso' : 'Gestão & Operações')
+                  : activeTab === 'recovery' 
+                    ? 'Recuperar Senha' 
+                    : activeTab === 'register' 
+                      ? 'Cadastro de Mantenedor' 
+                      : 'Portal do Mantenedor'}
               </h3>
-              <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
-                {activeTab === 'recovery' 
-                  ? 'Insira seu e-mail para receber as instruções de recuperação.' 
-                  : activeTab === 'register'
-                    ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
-                    : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
+              <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium max-w-sm">
+                {isAdminMode 
+                  ? 'Acesso restrito para colaboradores, equipe técnica e liderança da YAH Hope.'
+                  : activeTab === 'recovery' 
+                    ? 'Insira seu e-mail para receber as instruções de recuperação.' 
+                    : activeTab === 'register'
+                      ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
+                      : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
               </p>
             </div>
 
-            {/* Abas Alternadoras: Entrar vs Quero me Cadastrar */}
-            {activeTab !== 'recovery' && (
+            {/* Abas Alternadoras (Apenas no Login do Mantenedor) */}
+            {!isAdminMode && activeTab !== 'recovery' && (
               <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl text-xs font-bold border border-slate-200/60">
                 <button
                   type="button"
@@ -487,37 +501,60 @@ export function Login() {
             </div>
 
             {/* Alternador de rodapé */}
-            <div className="text-center pt-2">
-              {activeTab === 'login' ? (
-                <p className="text-xs text-slate-500">
-                  Ainda não tem conta?{' '}
-                  <button
-                    type="button"
-                    onClick={() => switchTab('register')}
-                    className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+            <div className="text-center pt-2 space-y-2.5">
+              {isAdminMode ? (
+                <div>
+                  <Link
+                    to="/login"
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 underline"
                   >
-                    Cadastre-se como Mantenedor
-                  </button>
-                </p>
-              ) : activeTab === 'register' ? (
-                <p className="text-xs text-slate-500">
-                  Já possui conta cadastrada?{' '}
-                  <button
-                    type="button"
-                    onClick={() => switchTab('login')}
-                    className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
-                  >
-                    Fazer Login
-                  </button>
-                </p>
+                    ← É mantenedor ou doador? Acessar Portal do Mantenedor
+                  </Link>
+                </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => switchTab('login')}
-                  className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-all cursor-pointer"
-                >
-                  Voltar para o login
-                </button>
+                <>
+                  {activeTab === 'login' ? (
+                    <p className="text-xs text-slate-500">
+                      Ainda não tem conta?{' '}
+                      <button
+                        type="button"
+                        onClick={() => switchTab('register')}
+                        className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                      >
+                        Cadastre-se como Mantenedor
+                      </button>
+                    </p>
+                  ) : activeTab === 'register' ? (
+                    <p className="text-xs text-slate-500">
+                      Já possui conta cadastrada?{' '}
+                      <button
+                        type="button"
+                        onClick={() => switchTab('login')}
+                        className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
+                      >
+                        Fazer Login
+                      </button>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => switchTab('login')}
+                      className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-all cursor-pointer"
+                    >
+                      Voltar para o login
+                    </button>
+                  )}
+
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <Link
+                      to="/login?mode=admin"
+                      className="text-[11px] font-bold text-slate-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <Lock size={12} className="text-orange-500" />
+                      <span>Colaborador da YAH Hope? Acessar Área Administrativa</span>
+                    </Link>
+                  </div>
+                </>
               )}
             </div>
 

@@ -236,6 +236,7 @@ export default function App() {
                                           <Route path="/loja" element={<Ecommerce />} />
                                           <Route path="/projetos" element={<LocalProjects />} />
                                           <Route path="/login" element={<Login />} />
+                                          <Route path="/admin/login" element={<Navigate to="/login?mode=admin" replace />} />
                                           <Route path="/set-password" element={<SetPassword />} />
                                           <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
                                           <Route path="/apoiador" element={<SupporterLanding />} />
@@ -351,7 +352,7 @@ export default function App() {
                                               <Route path="/dashboard" element={<MobileDonorHome />} />
                                               <Route path="/sponsorship" element={<MobileDonorChildren />} />
                                               <Route path="/projects" element={<MobileDonorProjects />} />
-                                              <Route path="/blog" element={<MobileDonorBlog />} />
+                                              <Route path="/blog" element={<Navigate to="/blog" replace />} />
                                               <Route path="/donations" element={<MobileDonorDonate />} />
                                               <Route path="/my-donations" element={<PortalMyDonations />} />
                                               <Route path="/shop" element={<SupporterStore />} />

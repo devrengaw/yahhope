@@ -13,7 +13,8 @@ import {
   X,
   CheckCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -41,7 +42,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
     { label: 'Projetos', path: '/portal/projects', icon: Briefcase },
     { label: 'Fazer Doação', path: '/portal/donations', icon: DollarSign },
     { label: 'Minhas Doações', path: '/portal/my-donations', icon: Receipt },
-    { label: 'Blog', path: '/portal/blog', icon: Newspaper },
+    { label: 'Blog', path: '/blog', icon: Newspaper },
   ];
 
   const isActive = (path: string) => {
@@ -104,6 +105,17 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
 
           {/* Ações da Direita: Visitar Site, Notificação e Perfil */}
           <div className="flex items-center gap-3">
+            {/* Atalho para Área Administrativa (se for admin ou colaborador) */}
+            {(user?.role === 'ADMIN' || user?.role === 'USER') && (
+              <Link
+                to="/workspace"
+                className="hidden sm:flex items-center gap-1.5 text-xs font-gotham-bold text-slate-700 hover:text-white bg-slate-100 hover:bg-slate-900 px-3.5 py-2 rounded-xl transition-all shadow-xs"
+              >
+                <ShieldCheck size={14} className="text-[#F49853]" />
+                <span>Área Administrativa</span>
+              </Link>
+            )}
+
             {/* Link para o site principal (apenas desktop) */}
             <Link
               to="/"
@@ -293,6 +305,20 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
 
             {/* Profile Menu Links */}
             <div className="p-4 space-y-2 flex-1">
+              {(user?.role === 'ADMIN' || user?.role === 'USER') && (
+                <Link
+                  to="/workspace"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-orange-50/80 border border-orange-200/60 text-slate-800 hover:bg-orange-100/80 transition-all text-xs font-bold"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck size={18} className="text-[#F49853]" />
+                    <span>Painel Administrativo</span>
+                  </div>
+                  <ChevronRight size={16} className="text-orange-400" />
+                </Link>
+              )}
+
               <Link
                 to="/portal/donations"
                 onClick={() => setIsProfileOpen(false)}

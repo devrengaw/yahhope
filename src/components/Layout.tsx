@@ -644,6 +644,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               </div>
             </Link>
 
+            {/* Atalho para o Portal do Mantenedor */}
+            <div className="pt-2 pb-1">
+              <Link
+                to="/portal/dashboard"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-orange-500/10 hover:bg-[#F49853] text-[#F49853] hover:text-white text-xs font-bold transition-all border border-orange-500/20 shadow-xs"
+              >
+                <Heart size={14} fill="currentColor" />
+                <span>Portal do Mantenedor</span>
+              </Link>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 onClick={() => setIsMobileMenuOpen(false)}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Heart, 
@@ -33,10 +33,13 @@ import { useHomeHighlights, HomeHighlightItem, deduplicateHighlights } from '../
 import { useNewsletter } from '../../contexts/NewsletterContext';
 import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { useImpactMetrics } from '../../contexts/ImpactMetricsContext';
+import { useFundraising } from '../../contexts/FundraisingContext';
+import { sponsorshipService, SponsorshipMetrics } from '../../services/sponsorshipService';
 import { ImpactIcon } from '../../components/common/ImpactIcon';
 import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
 import { useDonationModal } from '../../contexts/DonationModalContext';
+import { Layers } from 'lucide-react';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
 const STRIPE_QUOTAS = [
@@ -49,13 +52,22 @@ export function Home() {
   const navigate = useNavigate();
   const { openDonationModal } = useDonationModal();
 
-  // Interactive UI States
+  // Interactive Donation Header States
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [donationFrequency, setDonationFrequency] = useState<'monthly' | 'single'>('monthly');
-  const [selectedAmount, setSelectedAmount] = useState<number>(120);
+  const [headerTab, setHeaderTab] = useState<'sponsorship' | 'general' | 'single'>('sponsorship');
+  const [sponsorshipQuotas, setSponsorshipQuotas] = useState<number>(1);
+  const [sponsorshipMetrics, setSponsorshipMetrics] = useState<SponsorshipMetrics | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('guardiao');
+  const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [isCustom, setIsCustom] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  useEffect(() => {
+    sponsorshipService.getMetrics().then(m => {
+      setSponsorshipMetrics(m);
+    }).catch(err => console.error('Erro ao carregar métricas:', err));
+  }, []);
 
   // Campos de contato do doador no header
   const [donorName, setDonorName] = useState('');
@@ -78,6 +90,76 @@ export function Home() {
 
   // Dynamic Projects managed via /admin/local-projects and /projetos
   const { projects: websiteProjects } = useWebsiteProjects();
+
+  // Régua Geral de Arrecadação Cumulativa
+  const { 
+    campaigns, 
+    campaign: defaultCamp, 
+    calculateCampaignProgress 
+  } = useFundraising();
+
+  const availableCampaigns = useMemo(() => {
+    const list = campaigns || [];
+    const active = list.filter(c => c && c.is_active !== false);
+    if (active.length > 0) return active;
+    if (list.length > 0) return list;
+    if (defaultCamp) return [defaultCamp];
+    return [];
+  }, [campaigns, defaultCamp]);
+
+  const totalRulerGoal = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => sum + (c.target_amount || 0), 0);
+  }, [availableCampaigns]);
+
+  const totalRulerRaised = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => {
+      const p = calculateCampaignProgress(c);
+      return sum + p.currentAmount;
+    }, 0);
+  }, [availableCampaigns, calculateCampaignProgress]);
+
+  const rulerOverallPercentage = totalRulerGoal > 0 
+    ? Math.min(Math.round((totalRulerRaised / totalRulerGoal) * 100), 100) 
+    : 0;
+
+  const stagesData = useMemo(() => {
+    let runningTarget = 0;
+    return availableCampaigns.map((camp, idx) => {
+      const prevTarget = runningTarget;
+      runningTarget += (camp.target_amount || 0);
+      const threshold = runningTarget;
+      const isReached = totalRulerRaised >= threshold;
+      const isCurrent = !isReached && totalRulerRaised >= prevTarget;
+      const isUpcoming = totalRulerRaised < prevTarget;
+      
+      const campStats = calculateCampaignProgress(camp);
+      const stageNumber = idx + 1;
+
+      let stageProgress = 0;
+      if (isReached) {
+        stageProgress = 100;
+      } else if (isCurrent && camp.target_amount > 0) {
+        const raisedInThisStage = Math.max(0, totalRulerRaised - prevTarget);
+        stageProgress = Math.min(100, Math.round((raisedInThisStage / camp.target_amount) * 100));
+      }
+
+      return {
+        campaign: camp,
+        stageNumber,
+        prevTarget,
+        threshold,
+        isReached,
+        isCurrent,
+        isUpcoming,
+        campStats,
+        stageProgress
+      };
+    });
+  }, [availableCampaigns, totalRulerRaised, calculateCampaignProgress]);
+
+  const currentActiveStage = useMemo(() => {
+    return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
+  }, [stagesData]);
 
   // Carousel Navigation Handlers
   const handlePrevSlide = () => {
@@ -103,7 +185,13 @@ export function Home() {
     setDonorWhatsapp(formatted);
   };
 
-  // Handle Stripe Checkout directly via Supabase Edge Function or fallback
+  const quotaCost = sponsorshipMetrics?.quotaCost || 90;
+  const sponsorshipTotal = sponsorshipQuotas * quotaCost;
+  const currentTotalAmount = headerTab === 'sponsorship'
+    ? sponsorshipTotal
+    : (isCustom && customAmount ? parseFloat(customAmount) : selectedAmount);
+
+  // Handle Checkout directly or redirect with params
   const handleStripeCheckout = async (e?: React.FormEvent, overrideAmount?: number) => {
     if (e) e.preventDefault();
     setDonorFormError('');
@@ -121,21 +209,21 @@ export function Home() {
       return;
     }
     
-    let finalVal = overrideAmount !== undefined 
-      ? overrideAmount 
-      : (isCustom && customAmount ? parseFloat(customAmount) : selectedAmount);
+    let finalVal = overrideAmount !== undefined ? overrideAmount : currentTotalAmount;
 
     if (!finalVal || isNaN(finalVal) || finalVal <= 0) {
-      finalVal = 120;
+      finalVal = headerTab === 'sponsorship' ? quotaCost : 100;
     }
 
     setIsCheckingOut(true);
 
     try {
-      const isMonthly = donationFrequency === 'monthly';
-      const redirectFallback = isMonthly 
-        ? `/mantenedor?amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
-        : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
+      const isMonthly = headerTab !== 'single';
+      const redirectFallback = headerTab === 'sponsorship'
+        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+        : isMonthly
+          ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+          : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
@@ -174,10 +262,13 @@ export function Home() {
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      const isMonthly = donationFrequency === 'monthly';
-      window.location.href = isMonthly 
-        ? `/mantenedor?amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
-        : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
+      const isMonthly = headerTab !== 'single';
+      const redirectFallback = headerTab === 'sponsorship'
+        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+        : isMonthly
+          ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+          : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
+      window.location.href = redirectFallback;
     } finally {
       setIsCheckingOut(false);
     }
@@ -268,125 +359,295 @@ export function Home() {
 
             {/* Right Column: Hero Donation Box with EXACT STRIPE BUTTONS (YAH Hope Branding) */}
             <div id="hero-donation-card" className="lg:col-span-5 xl:col-span-5 flex justify-center lg:justify-end">
-              <div className="bg-white text-slate-800 rounded-3xl shadow-2xl p-6 sm:p-7 w-full max-w-sm sm:max-w-md border border-orange-100">
+              <div className="bg-white text-slate-800 rounded-3xl shadow-2xl p-5 sm:p-6 w-full max-w-sm sm:max-w-md border border-orange-100">
                 
-                {/* One-time vs Monthly Toggle */}
-                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl mb-4 text-xs font-gotham-bold">
+                {/* 3 Modos: Apadrinhar Criança, Mantenedor Geral, Doação Única (Sem Recorrência) */}
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl mb-3 text-[11px] font-gotham-bold">
                   <button
                     type="button"
-                    onClick={() => setDonationFrequency('single')}
-                    className={`py-2.5 rounded-xl transition-all ${
-                      donationFrequency === 'single'
-                        ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={() => {
+                      setHeaderTab('sponsorship');
+                      setIsCustom(false);
+                    }}
+                    className={cn(
+                      "py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-center truncate",
+                      headerTab === 'sponsorship'
+                        ? "bg-[#F49853] text-white shadow-md"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
                   >
-                    Doação Única
+                    <Heart size={11} fill={headerTab === 'sponsorship' ? "currentColor" : "none"} />
+                    <span className="truncate">Apadrinhar</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setDonationFrequency('monthly')}
-                    className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                      donationFrequency === 'monthly'
-                        ? 'bg-[#F49853] text-white shadow-md'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={() => {
+                      setHeaderTab('general');
+                      setIsCustom(false);
+                      setSelectedAmount(100);
+                    }}
+                    className={cn(
+                      "py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-center truncate",
+                      headerTab === 'general'
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
                   >
-                    <Heart size={12} fill="currentColor" />
-                    <span>Mensal</span>
+                    <Users size={11} />
+                    <span className="truncate">Mantenedor</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeaderTab('single');
+                      setIsCustom(false);
+                      setSelectedAmount(50);
+                    }}
+                    className={cn(
+                      "py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-center truncate",
+                      headerTab === 'single'
+                        ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <CreditCard size={11} />
+                    <span className="truncate">Doação Única</span>
                   </button>
                 </div>
 
-                <p className="text-center text-xs text-slate-500 mb-3.5 font-gotham-regular min-h-[1.5rem] flex items-center justify-center">
-                  {donationFrequency === 'monthly' ? (
-                    <span>Sua contribuição mensal sustenta o <strong className="font-gotham-bold text-[#F49853]">custo vital dos projetos</strong></span>
+                <p className="text-center text-[11px] text-slate-500 mb-3 font-gotham-regular min-h-[1.25rem] flex items-center justify-center">
+                  {headerTab === 'sponsorship' ? (
+                    <span>Cotas mensais de R$ {quotaCost} • <strong className="font-gotham-bold text-[#F49853]">Alocação justa e perfil por e-mail</strong></span>
+                  ) : headerTab === 'general' ? (
+                    <span>Recorrência mensal que sustenta o <strong className="font-gotham-bold text-slate-900">custo global do projeto</strong></span>
                   ) : (
-                    <span>Sua doação única impulsiona a <strong className="font-gotham-bold text-[#F49853]">régua de arrecadação</strong></span>
+                    <span>Doação pontual sem mensalidade que impulsiona a <strong className="font-gotham-bold text-[#F49853]">régua de arrecadação</strong></span>
                   )}
                 </p>
 
-                {/* The EXACT STRIPE QUOTAS BUTTONS */}
-                <div className="space-y-2 mb-3">
-                  {STRIPE_QUOTAS.map((q) => {
-                    const isSelected = !isCustom && selectedAmount === q.amount;
-                    const IconComponent = q.icon;
-                    return (
-                      <button
-                        key={q.amount}
-                        type="button"
-                        onClick={() => {
-                          setIsCustom(false);
-                          setSelectedAmount(q.amount);
-                        }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border-2 transition-all ${
-                          isSelected
-                            ? 'border-[#F49853] bg-orange-50/70 text-[#F49853] shadow-xs ring-1 ring-[#F49853]'
-                            : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-[#F49853] text-white' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            <IconComponent size={15} />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-sm font-gotham-bold text-slate-900 block leading-tight">
-                              R$ {q.amount}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-gotham-regular">
-                              {q.label}
-                            </span>
-                          </div>
+                {/* CONTEÚDO DA ABA 1: APADRINHAMENTO DE CRIANÇA (COTAS) */}
+                {headerTab === 'sponsorship' && (
+                  <div className="space-y-2.5 mb-3 animate-fade-in">
+                    {sponsorshipMetrics?.isFullySponsored ? (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs text-emerald-800">
+                        🎉 Todas as crianças estão 100% apadrinhadas!
+                        <button
+                          type="button"
+                          onClick={() => setHeaderTab('general')}
+                          className="mt-1 block mx-auto text-[11px] font-gotham-bold underline text-emerald-950"
+                        >
+                          Seja um Mantenedor Geral do Projeto →
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                          <span>Selecione quantas crianças:</span>
+                          <span className="text-[#F49853]">R$ {quotaCost}/mês por cota</span>
                         </div>
 
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                          isSelected ? 'border-[#F49853]' : 'border-slate-300'
-                        }`}>
-                          {isSelected && <div className="w-2 h-2 rounded-full bg-[#F49853]" />}
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[1, 2, 3, 4].map((q) => {
+                            const isSelected = sponsorshipQuotas === q;
+                            const total = q * quotaCost;
+                            return (
+                              <button
+                                key={q}
+                                type="button"
+                                onClick={() => setSponsorshipQuotas(q)}
+                                className={cn(
+                                  "py-2 px-1 rounded-xl border-2 transition-all flex flex-col items-center justify-center cursor-pointer",
+                                  isSelected
+                                    ? "border-[#F49853] bg-orange-50 text-[#F49853] ring-1 ring-[#F49853] shadow-xs"
+                                    : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                                )}
+                              >
+                                <span className="text-[10px] font-gotham-bold uppercase leading-tight">
+                                  {q} {q === 1 ? 'Criança' : 'Crianças'}
+                                </span>
+                                <span className="text-xs font-black text-slate-900 mt-0.5">
+                                  R$ {total}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                      </button>
-                    );
-                  })}
 
-                  {/* Outro Valor Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsCustom(true)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border-2 transition-all ${
-                      isCustom
-                        ? 'border-[#F49853] bg-orange-50/70 text-[#F49853] shadow-xs ring-1 ring-[#F49853]'
-                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        isCustom ? 'bg-[#F49853] text-white' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        <Sparkles size={15} />
-                      </div>
-                      <div className="text-left">
-                        <span className="text-sm font-gotham-bold text-slate-900 block leading-tight">
-                          Outro Valor
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-gotham-regular">
-                          Defina uma quantia personalizada
-                        </span>
-                      </div>
-                    </div>
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-900 leading-snug flex items-center gap-2">
+                          <Sparkles size={14} className="text-[#F49853] shrink-0" />
+                          <span>Distribuição justa: o perfil do afilhado é enviado após a confirmação.</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      isCustom ? 'border-[#F49853]' : 'border-slate-300'
-                    }`}>
-                      {isCustom && <div className="w-2 h-2 rounded-full bg-[#F49853]" />}
-                    </div>
-                  </button>
-                </div>
+                {/* CONTEÚDO DA ABA 2: MANTENEDOR GERAL (RECORRÊNCIA MENSAL) */}
+                {headerTab === 'general' && (
+                  <div className="space-y-2 mb-3 animate-fade-in">
+                    {[
+                      { amount: 50, label: 'Nutrição Essencial • R$ 1,66/dia', icon: Heart },
+                      { amount: 100, label: 'Guardião da Vida • R$ 3,33/dia', icon: Target, isPopular: true },
+                      { amount: 200, label: 'Transformação Integral + Bolsas', icon: TrendingUp },
+                    ].map((plan) => {
+                      const isSelected = !isCustom && selectedAmount === plan.amount;
+                      const IconComp = plan.icon;
+                      return (
+                        <button
+                          key={plan.amount}
+                          type="button"
+                          onClick={() => {
+                            setIsCustom(false);
+                            setSelectedAmount(plan.amount);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 transition-all cursor-pointer",
+                            isSelected
+                              ? "border-slate-900 bg-slate-50 text-slate-900 shadow-xs ring-1 ring-slate-900"
+                              : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                              isSelected ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                            )}>
+                              <IconComp size={13} />
+                            </div>
+                            <div className="text-left">
+                              <span className="text-xs font-gotham-bold text-slate-900 block leading-tight">
+                                R$ {plan.amount}/mês
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-gotham-regular">
+                                {plan.label}
+                              </span>
+                            </div>
+                          </div>
+                          <div className={cn(
+                            "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                            isSelected ? "border-slate-900" : "border-slate-300"
+                          )}>
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCustom(true)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 transition-all cursor-pointer",
+                        isCustom
+                          ? "border-slate-900 bg-slate-50 text-slate-900 ring-1 ring-slate-900"
+                          : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                          isCustom ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                        )}>
+                          <Sparkles size={13} />
+                        </div>
+                        <span className="text-xs font-gotham-bold text-slate-900">Outro Valor Mensal</span>
+                      </div>
+                      <div className={cn(
+                        "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                        isCustom ? "border-slate-900" : "border-slate-300"
+                      )}>
+                        {isCustom && <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />}
+                      </div>
+                    </button>
+                  </div>
+                )}
+
+                {/* CONTEÚDO DA ABA 3: DOAÇÃO ÚNICA (SEM RECORRÊNCIA MENSAL) */}
+                {headerTab === 'single' && (
+                  <div className="space-y-2 mb-3 animate-fade-in">
+                    {[
+                      { amount: 30, label: 'Suplementos e Leite Terapêutico', icon: Heart },
+                      { amount: 50, label: 'Cesta Alimentar Emergencial', icon: Target },
+                      { amount: 150, label: 'Insumos Médicos e Água Potável', icon: TrendingUp },
+                    ].map((q) => {
+                      const isSelected = !isCustom && selectedAmount === q.amount;
+                      const IconComp = q.icon;
+                      return (
+                        <button
+                          key={q.amount}
+                          type="button"
+                          onClick={() => {
+                            setIsCustom(false);
+                            setSelectedAmount(q.amount);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 transition-all cursor-pointer",
+                            isSelected
+                              ? "border-[#F49853] bg-orange-50/70 text-[#F49853] shadow-xs ring-1 ring-[#F49853]"
+                              : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                              isSelected ? "bg-[#F49853] text-white" : "bg-slate-100 text-slate-500"
+                            )}>
+                              <IconComp size={13} />
+                            </div>
+                            <div className="text-left">
+                              <span className="text-xs font-gotham-bold text-slate-900 block leading-tight">
+                                R$ {q.amount} (Pontual)
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-gotham-regular">
+                                {q.label}
+                              </span>
+                            </div>
+                          </div>
+                          <div className={cn(
+                            "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                            isSelected ? "border-[#F49853]" : "border-slate-300"
+                          )}>
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#F49853]" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCustom(true)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 transition-all cursor-pointer",
+                        isCustom
+                          ? "border-[#F49853] bg-orange-50/70 text-[#F49853] ring-1 ring-[#F49853]"
+                          : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                          isCustom ? "bg-[#F49853] text-white" : "bg-slate-100 text-slate-500"
+                        )}>
+                          <Sparkles size={13} />
+                        </div>
+                        <span className="text-xs font-gotham-bold text-slate-900">Outro Valor Pontual</span>
+                      </div>
+                      <div className={cn(
+                        "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                        isCustom ? "border-[#F49853]" : "border-slate-300"
+                      )}>
+                        {isCustom && <div className="w-1.5 h-1.5 rounded-full bg-[#F49853]" />}
+                      </div>
+                    </button>
+                  </div>
+                )}
 
                 {/* Custom Amount Input Field when isCustom is selected */}
-                {isCustom && (
+                {isCustom && headerTab !== 'sponsorship' && (
                   <div className="relative mb-3 animate-fade-in">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">
                       R$
                     </span>
                     <input 
@@ -396,23 +657,23 @@ export function Home() {
                       placeholder="0,00"
                       value={customAmount}
                       onChange={(e) => setCustomAmount(e.target.value)}
-                      className="w-full pl-10 pr-14 py-2.5 rounded-xl border-2 border-[#F49853] focus:outline-hidden text-sm font-gotham-bold text-slate-800"
+                      className="w-full pl-9 pr-12 py-2 rounded-xl border-2 border-[#F49853] focus:outline-hidden text-xs font-gotham-bold text-slate-800"
                       autoFocus
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-gotham-bold text-xs">
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-gotham-bold text-[10px]">
                       BRL
                     </span>
                   </div>
                 )}
 
                 {/* Dados do Doador: Nome, E-mail, WhatsApp */}
-                <div className="mt-3.5 mb-3 pt-3 border-t border-slate-100 space-y-2.5">
-                  <p className="text-[11px] font-gotham-bold text-slate-500 uppercase tracking-wider">
+                <div className="mt-2.5 mb-3 pt-2.5 border-t border-slate-100 space-y-2">
+                  <p className="text-[10px] font-gotham-bold text-slate-500 uppercase tracking-wider">
                     Seus Dados para Identificação
                   </p>
 
                   <div className="relative">
-                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Nome completo"
@@ -421,12 +682,12 @@ export function Home() {
                         setDonorName(e.target.value);
                         if (donorFormError) setDonorFormError('');
                       }}
-                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
                     />
                   </div>
 
                   <div className="relative">
-                    <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="email"
                       placeholder="Seu melhor e-mail"
@@ -435,12 +696,12 @@ export function Home() {
                         setDonorEmail(e.target.value);
                         if (donorFormError) setDonorFormError('');
                       }}
-                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
                     />
                   </div>
 
                   <div className="relative">
-                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="tel"
                       placeholder="WhatsApp (DDD + Número)"
@@ -450,37 +711,42 @@ export function Home() {
                         if (donorFormError) setDonorFormError('');
                       }}
                       maxLength={15}
-                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
                     />
                   </div>
 
                   {donorFormError && (
-                    <p className="text-[11px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">
+                    <p className="text-[10px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">
                       {donorFormError}
                     </p>
                   )}
                 </div>
 
-                {/* YAH Hope Brand Orange Donation Button */}
+                {/* Botão de Finalização Dinâmico */}
                 <button
                   onClick={handleStripeCheckout}
                   disabled={isCheckingOut}
-                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3.5 rounded-2xl font-gotham-bold text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-[#F49853]/30 flex items-center justify-center gap-2 group disabled:opacity-80 active:scale-[0.99] cursor-pointer"
+                  className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3 rounded-2xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-lg hover:shadow-[#F49853]/30 flex items-center justify-center gap-2 group disabled:opacity-80 active:scale-[0.99] cursor-pointer"
                 >
                   {isCheckingOut ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={15} className="animate-spin" />
                       <span>Conectando...</span>
                     </>
-                  ) : donationFrequency === 'monthly' ? (
+                  ) : headerTab === 'sponsorship' ? (
                     <>
-                      <Heart size={16} fill="currentColor" />
-                      <span>SER MANTENEDOR MENSAL</span>
+                      <Heart size={15} fill="currentColor" />
+                      <span>APADRINHAR ({sponsorshipQuotas} {sponsorshipQuotas === 1 ? 'CRIANÇA' : 'CRIANÇAS'} • R$ {sponsorshipTotal}/mês)</span>
+                    </>
+                  ) : headerTab === 'general' ? (
+                    <>
+                      <Users size={15} />
+                      <span>SER MANTENEDOR MENSAL (R$ {currentTotalAmount}/mês)</span>
                     </>
                   ) : (
                     <>
-                      <CreditCard size={16} />
-                      <span>DOAR PARA A CAMPANHA</span>
+                      <CreditCard size={15} />
+                      <span>DOAR R$ {currentTotalAmount} PARA A RÉGUA</span>
                     </>
                   )}
                 </button>
@@ -662,14 +928,174 @@ export function Home() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="text-center max-w-3xl mx-auto mb-12">
             <span className="text-[#F49853] font-gotham-bold uppercase tracking-widest text-xs block mb-2">
               Resultados Reais & Metas Alcançadas
             </span>
             <h2 className="text-3xl md:text-5xl font-heading font-black text-slate-900 tracking-tight">
               O impacto da sua solidariedade.
             </h2>
+            <p className="text-sm sm:text-base text-slate-600 font-gotham-light mt-3">
+              Acompanhe a régua oficial de arrecadação cumulativa. Cada doação desbloqueia um novo estágio de transformação humanitária em Moçambique e no Brasil.
+            </p>
           </div>
+
+          {/* RÉGUA GERAL DE ARRECADAÇÃO */}
+          {availableCampaigns.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 md:p-10 shadow-xl border border-orange-100 mb-16 relative overflow-hidden">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
+                <div>
+                  <span className="text-[11px] font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-1">
+                    Campanhas Humanitárias • Régua Geral
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-slate-900 tracking-tight">
+                    Progresso das Metas em Campo
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 font-gotham-light mt-1 max-w-xl">
+                    As doações pontuais e cotas mensais de apadrinhamento avançam a régua continuamente, financiando desde a nutrição clínica até poços artesianos e bolsas.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4 bg-orange-50/70 py-3 px-5 rounded-2xl border border-orange-200/80 shrink-0 self-start lg:self-auto">
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-gotham-bold text-slate-400 block tracking-wider">
+                      Arrecadação Global
+                    </span>
+                    <span className="text-xl sm:text-2xl font-black text-[#F49853] block leading-tight">
+                      R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-xs text-slate-500 font-gotham-medium">
+                      de R$ {totalRulerGoal.toLocaleString('pt-BR')} ({rulerOverallPercentage}%)
+                    </span>
+                  </div>
+                  <div className="w-13 h-13 rounded-2xl bg-[#F49853] text-white flex flex-col items-center justify-center font-black text-sm shrink-0 shadow-md shadow-[#F49853]/30">
+                    <span>{rulerOverallPercentage}%</span>
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-white/90">meta</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra Contínua Global com Shimmer */}
+              <div className="space-y-2 mb-8">
+                <div className="flex justify-between items-center text-xs font-gotham-bold">
+                  <span className="flex items-center gap-1.5 text-slate-700">
+                    <Layers size={14} className="text-[#F49853]" />
+                    <span>Régua Contínua de Arrecadação</span>
+                  </span>
+                  <span className="text-[#F49853]">
+                    {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} em andamento: ${currentActiveStage.campaign.title}` : 'Metas 100% Alcançadas'}
+                  </span>
+                </div>
+
+                <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner ring-1 ring-slate-200/80 relative">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#F49853] via-amber-500 to-emerald-500 rounded-full transition-all duration-1000 ease-out relative"
+                    style={{ width: `${Math.max(4, rulerOverallPercentage)}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid dos Estágios da Régua */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {stagesData.map((stage) => (
+                  <div
+                    key={stage.campaign.id}
+                    className={cn(
+                      "p-4 rounded-2xl border transition-all relative flex flex-col justify-between text-left",
+                      stage.isCurrent
+                        ? "border-[#F49853] bg-orange-50/50 shadow-md ring-1 ring-[#F49853]/40"
+                        : stage.isReached
+                          ? "border-emerald-200 bg-emerald-50/40"
+                          : "border-slate-100 bg-slate-50/80 opacity-80"
+                    )}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <span className={cn(
+                          "text-[9px] font-gotham-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
+                          stage.isReached
+                            ? "bg-emerald-100 text-emerald-800"
+                            : stage.isCurrent
+                              ? "bg-[#F49853] text-white shadow-xs"
+                              : "bg-slate-200 text-slate-600"
+                        )}>
+                          Estágio {stage.stageNumber}
+                        </span>
+                        {stage.isReached ? (
+                          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                        ) : stage.isCurrent ? (
+                          <span className="text-[10px] font-black text-[#F49853] uppercase flex items-center gap-1">
+                            Ativo 🔥
+                          </span>
+                        ) : (
+                          <Lock size={13} className="text-slate-400 shrink-0" />
+                        )}
+                      </div>
+
+                      <h4 className="font-heading font-black text-slate-900 text-sm line-clamp-1 mb-1">
+                        {stage.campaign.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-gotham-light line-clamp-2 leading-relaxed mb-3">
+                        {stage.campaign.description || 'Ações de impacto social e combate à desnutrição.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-baseline text-[11px] font-gotham-bold mb-1">
+                        <span className="text-slate-600">
+                          {stage.isReached ? 'Meta Concluída' : stage.isCurrent ? 'Em Andamento' : 'Meta Futura'}
+                        </span>
+                        <span className="text-slate-900 font-black">
+                          R$ {stage.campaign.target_amount?.toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-700",
+                            stage.isReached 
+                              ? "bg-emerald-500" 
+                              : stage.isCurrent 
+                                ? "bg-[#F49853]" 
+                                : "bg-slate-300"
+                          )}
+                          style={{ width: `${stage.stageProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Botões de Ação da Régua */}
+              <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-xs text-slate-500 font-gotham-light text-center sm:text-left">
+                  Todas as doações são auditadas com 100% de transparência e relatórios de campo.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                  <Link
+                    to="/campanha"
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-sm"
+                  >
+                    <span>Ver Régua Completa</span>
+                    <ArrowRight size={14} />
+                  </Link>
+
+                  <Link
+                    to="/mantenedor"
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-[#F49853]/20"
+                  >
+                    <Heart size={14} fill="currentColor" />
+                    <span>Seja Mantenedor Mensal</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className={cn(
             "grid gap-8 lg:gap-12",

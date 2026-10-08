@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useClickUp, CU_Space } from '../../contexts/ClickUpContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   Home, CheckSquare, Inbox, Search, Plus, 
   ChevronRight, ChevronDown, MoreHorizontal, 
-  Hash, Link2, Star, Briefcase, Calendar, Users, X, LogOut
+  Hash, Link2, Star, Briefcase, Calendar, Users, X, LogOut, Heart
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -479,6 +479,18 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
 
       {/* Bottom Footer: Usuário & Logoff no Workspace */}
       <div className="p-3 border-t border-white/20 shrink-0 bg-black/15">
+        {/* Link para o Portal do Mantenedor */}
+        <div className="mb-2">
+          <Link
+            to="/portal/dashboard"
+            onClick={onClose}
+            className="flex items-center gap-2 p-2 rounded-xl bg-white/10 hover:bg-[#F49853] text-white text-xs font-bold transition-all shadow-xs"
+          >
+            <Heart size={14} fill="currentColor" className="text-orange-300" />
+            <span>Portal do Mantenedor</span>
+          </Link>
+        </div>
+
         <div className="flex items-center justify-between gap-2">
           <NavLink 
             to="/profile" 

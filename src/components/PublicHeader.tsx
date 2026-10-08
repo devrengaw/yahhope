@@ -277,7 +277,7 @@ export function PublicHeader() {
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
                     <li>
                       <Link to="/mantenedor" className="block font-gotham-bold text-[#F49853] hover:translate-x-1 transition-all py-1">
-                        Seja Mantenedor Mensal
+                        Seja um Mantenedor Mensal/Apadrinhamento
                       </Link>
                     </li>
                     <li><Link to="/campanha" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Campanhas em Andamento</Link></li>
@@ -461,7 +461,7 @@ export function PublicHeader() {
                   onClick={() => setMobileMenuOpen(false)} 
                   className="block py-2 text-[#F49853] font-gotham-bold hover:translate-x-1 transition-all"
                 >
-                  Seja Mantenedor Mensal
+                  Seja um Mantenedor Mensal/Apadrinhamento
                 </Link>
                 <div className="pl-3 border-l-2 border-slate-100 space-y-1.5 py-1">
                   <Link 

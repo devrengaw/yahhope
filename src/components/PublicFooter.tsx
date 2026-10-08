@@ -7,7 +7,8 @@ import {
   Linkedin, 
   ShieldCheck, 
   CheckCircle2, 
-  Clock 
+  Clock,
+  Lock
 } from 'lucide-react';
 
 export function PublicFooter() {
@@ -74,7 +75,13 @@ export function PublicFooter() {
               <li><Link to="/blog" className="hover:text-[#F49853] transition-colors">Notícias & Histórias</Link></li>
               <li><Link to="/loja" className="hover:text-[#F49853] transition-colors">Loja Solidária</Link></li>
               <li><Link to="/voluntariado-e-parcerias" className="hover:text-[#F49853] transition-colors">Voluntariado & Parcerias</Link></li>
-              <li><Link to="/login" className="text-slate-300 font-gotham-medium hover:text-[#F49853]">Portal do Doador / Login</Link></li>
+              <li><Link to="/login" className="text-slate-300 font-gotham-medium hover:text-[#F49853]">Portal do Mantenedor</Link></li>
+              <li>
+                <Link to="/login?mode=admin" className="text-slate-400 font-gotham-regular hover:text-[#F49853] flex items-center gap-1.5 transition-colors">
+                  <Lock size={12} className="text-[#F49853]" />
+                  <span>Área Administrativa</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -111,7 +118,10 @@ export function PublicFooter() {
           <div className="flex items-center gap-6 font-gotham-regular">
             <Link to="/politica-de-privacidade" className="hover:text-slate-300 transition-colors">Política de Privacidade</Link>
             <Link to="/termos-de-servico" className="hover:text-slate-300 transition-colors">Termos de Serviço</Link>
-            <Link to="/login" className="hover:text-[#F49853] transition-colors font-gotham-bold">Acesso Restrito</Link>
+            <Link to="/login?mode=admin" className="hover:text-[#F49853] transition-colors font-gotham-bold flex items-center gap-1.5">
+              <Lock size={12} className="text-[#F49853]" />
+              <span>Área Administrativa</span>
+            </Link>
           </div>
         </div>
       </div>
