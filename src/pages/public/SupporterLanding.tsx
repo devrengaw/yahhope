@@ -9,11 +9,7 @@ export function SupporterLanding() {
   const navigate = useNavigate();
 
   const handleApadrinhar = () => {
-    if (!user) {
-      navigate('/login?mode=supporter');
-    } else {
-      navigate('/portal/sponsorship');
-    }
+    navigate('/mantenedor?mode=sponsorship');
   };
 
   const handleLoja = () => {

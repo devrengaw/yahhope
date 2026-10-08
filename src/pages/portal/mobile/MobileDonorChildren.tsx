@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   Activity, 
@@ -13,10 +13,12 @@ import {
   Users,
   ShieldCheck,
   TrendingUp,
-  FileText
+  FileText,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
+import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
 import { Link, useNavigate } from 'react-router-dom';
 
 export function MobileDonorChildren() {
@@ -26,6 +28,13 @@ export function MobileDonorChildren() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
+  const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
+
+  useEffect(() => {
+    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
+      .then(children => setMyChildren(children))
+      .catch(e => console.error(e));
+  }, [user?.id, user?.email]);
 
   // Calcula idade a partir do dob
   const calculateAge = (dobString?: string) => {
@@ -57,13 +66,17 @@ export function MobileDonorChildren() {
     return { initial, current };
   };
 
+  const myChildIds = new Set(myChildren.map(c => c.id));
+
   const filteredPatients = patients.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.community && c.community.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (c.registration_number && c.registration_number.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    if (statusFilter === 'all') return matchesSearch;
-    return matchesSearch && c.status === statusFilter;
+    if (!matchesSearch) return false;
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'mine') return myChildIds.has(c.id);
+    return c.status === statusFilter;
   });
 
   return (
@@ -116,6 +129,19 @@ export function MobileDonorChildren() {
           >
             Todos ({patients.length})
           </button>
+          {myChildren.length > 0 && (
+            <button
+              onClick={() => setStatusFilter('mine')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-gotham-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === 'mine'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100'
+              }`}
+            >
+              <Star size={13} className="fill-current" />
+              Minhas Crianças ({myChildren.length})
+            </button>
+          )}
           <button
             onClick={() => setStatusFilter('DAM')}
             className={`px-4 py-2.5 rounded-xl text-xs font-gotham-bold transition-all shrink-0 cursor-pointer ${
@@ -167,13 +193,21 @@ export function MobileDonorChildren() {
                       <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                         {child.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className={`text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                        isRecovered
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {child.status}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {myChildIds.has(child.id) && (
+                          <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs">
+                            <Star size={10} className="fill-current" />
+                            Apadrinhado
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                          isRecovered
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {child.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-4">

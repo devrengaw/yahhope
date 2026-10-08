@@ -12,10 +12,12 @@ import {
 import { useTopBanner } from '../contexts/TopBannerContext';
 import { useWebsiteProjects } from '../contexts/WebsiteProjectsContext';
 import { useDonationModal } from '../contexts/DonationModalContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export function PublicHeader() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { banner: topBanner } = useTopBanner();
   const { projects: websiteProjects } = useWebsiteProjects();
   const { openDonationModal } = useDonationModal();
@@ -299,10 +301,10 @@ export function PublicHeader() {
 
               {/* Portal do Doador / Entrar */}
               <Link 
-                to="/login"
+                to={user ? "/portal/dashboard" : "/login"}
                 className="hidden md:inline-flex items-center gap-1.5 text-xs lg:text-sm font-gotham-bold text-slate-700 hover:text-[#F49853] px-3 py-2 rounded-full hover:bg-orange-50/80 transition-colors whitespace-nowrap"
               >
-                <span>Portal do Doador / Entrar</span>
+                <span>{user ? 'Meu Portal' : 'Entrar / Mantenedor'}</span>
                 <ArrowRight size={13} className="text-[#F49853]" />
               </Link>
 
@@ -488,11 +490,11 @@ export function PublicHeader() {
 
               <div className="pt-4 border-t border-slate-100 space-y-3">
                 <Link 
-                  to="/login" 
+                  to={user ? "/portal/dashboard" : "/login"} 
                   onClick={() => setMobileMenuOpen(false)}
                   className="block text-center py-2.5 px-4 rounded-xl bg-slate-100 text-slate-700 font-gotham-bold hover:bg-slate-200"
                 >
-                  Portal do Doador / Entrar
+                  {user ? 'Meu Portal do Mantenedor' : 'Entrar / Área do Mantenedor'}
                 </Link>
                 <button
                   onClick={() => {

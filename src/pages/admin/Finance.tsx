@@ -28,6 +28,7 @@ import { supabase } from '../../lib/supabase';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
 import { CategoryModal } from '../../components/admin/finance/CategoryModal';
 import { SupportersList } from '../../components/admin/finance/SupportersList';
+import { SponsorshipQuotasManager } from '../../components/admin/finance/SponsorshipQuotasManager';
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { ProjectRepasseModal, RepassePayload } from '../../components/admin/finance/ProjectRepasseModal';
@@ -102,7 +103,7 @@ function parseDateParts(dateStr?: string) {
 
 export function Finance() {
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'categories' | 'projects'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'sponsorship' | 'categories' | 'projects'>('transactions');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>(getLocalCategories());
   const [projects, setProjects] = useState<Project[]>(() => {
@@ -809,6 +810,21 @@ export function Finance() {
           </button>
 
           <button 
+            onClick={() => setActiveTab('sponsorship')}
+            className={cn(
+              "px-5 py-4 font-bold text-sm transition-all relative flex items-center gap-2",
+              activeTab === 'sponsorship' ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            <Users size={15} className={activeTab === 'sponsorship' ? "text-orange-500" : "text-slate-400"} />
+            Apadrinhamento & Cotas
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-700 border border-orange-200">
+              Quotização
+            </span>
+            {activeTab === 'sponsorship' && <div className="absolute bottom-0 left-5 right-5 h-1 bg-orange-500 rounded-t-full"></div>}
+          </button>
+
+          <button 
             onClick={() => setActiveTab('categories')}
             className={cn(
               "px-5 py-4 font-bold text-sm transition-all relative",
@@ -1416,6 +1432,10 @@ export function Finance() {
           />
         ) : activeTab === 'supporters' ? (
           <SupportersList />
+        ) : activeTab === 'sponsorship' ? (
+          <div className="p-8">
+            <SponsorshipQuotasManager />
+          </div>
         ) : null}
 
         <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex justify-between items-center px-10">
@@ -1426,6 +1446,8 @@ export function Finance() {
               ? `Mostrando ${transactions.filter(t => t.type === 'expense').length} despesas mensais gerenciadas`
               : activeTab === 'supporters'
               ? `Base consolidada de apoiadores e padrinhos ativos`
+              : activeTab === 'sponsorship'
+              ? `Gestão de cotas de apadrinhamento e ocupação infantil`
               : activeTab === 'categories'
               ? `Total de ${categories.length} categorias cadastradas`
               : `Total de ${projects.length} projetos monitorados`

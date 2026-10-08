@@ -54,7 +54,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
   const handleLogout = async () => {
     setIsProfileOpen(false);
     await logout();
-    navigate('/portal/login');
+    navigate('/login');
   };
 
   return (

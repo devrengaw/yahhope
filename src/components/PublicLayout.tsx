@@ -4,17 +4,6 @@ import { PublicFooter } from './PublicFooter';
 import { DonationModal } from './common/DonationModal';
 
 export function PublicLayout() {
-  const location = useLocation();
-  const isLoginPage = location.pathname === '/login' || location.pathname === '/set-password' || location.pathname === '/cadastro-apadrinhador' || location.pathname.startsWith('/portal/login') || location.pathname.startsWith('/app/login');
-
-  if (isLoginPage) {
-    return (
-      <main className="min-h-screen bg-slate-900">
-        <Outlet />
-      </main>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-white font-gotham-regular text-slate-800 antialiased selection:bg-[#F49853] selection:text-white">
       <PublicHeader />

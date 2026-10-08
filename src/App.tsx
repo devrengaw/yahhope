@@ -123,8 +123,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
   }
 
   if (!user) {
-    const isPortalOrApp = location.pathname.startsWith('/portal') || isNative;
-    return <Navigate to={isPortalOrApp ? "/portal/login" : "/login"} />;
+    return <Navigate to="/login" />;
   }
   
   // Admin has access to everything
@@ -180,7 +179,7 @@ function RootRedirect() {
   }
 
   if (isNative) {
-    if (!user) return <Navigate to="/portal/login" />;
+    if (!user) return <Navigate to="/login" />;
     return <Navigate to="/portal/dashboard" />;
   }
 
@@ -226,8 +225,8 @@ export default function App() {
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
 
                                         <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
-                                          <Route path="/portal/login" element={<PortalLogin />} />
-                                          <Route path="/app/login" element={<PortalLogin />} />
+                                          <Route path="/portal/login" element={<Navigate to="/login" replace />} />
+                                          <Route path="/app/login" element={<Navigate to="/login" replace />} />
                                           <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
                                           <Route path="/sobre-nos" element={<AboutUs />} />
                                           <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />

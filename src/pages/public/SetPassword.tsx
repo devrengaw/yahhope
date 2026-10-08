@@ -54,20 +54,20 @@ export function SetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center font-sans relative py-12 px-4 sm:px-6 lg:px-8 bg-slate-900 overflow-hidden">
+    <div className="relative flex-1 min-h-[calc(100vh-140px)] flex items-center justify-center font-gotham-regular py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       
-      {/* Background Image Setup */}
-      <div className="absolute inset-0 z-0">
+      {/* Background Image Setup com Alta Transparência */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img 
           src="/login_bg_real.jpg" 
-          alt="Crianças sorrindo" 
+          alt="Crianças sorrindo, YAH Hope" 
           className="w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-[4px]"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/35 via-slate-900/15 to-slate-950/45"></div>
       </div>
 
-      {/* Centered Set Password Box */}
-      <div className="w-full max-w-md space-y-8 bg-white/95 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl border border-white/20 relative z-10 overflow-hidden">
+      {/* Centered Set Password Box com Vidro Fosco Translúcido */}
+      <div className="w-full max-w-md space-y-8 bg-white/85 backdrop-blur-md p-8 sm:p-10 rounded-[2.5rem] shadow-2xl border border-white/60 relative z-10 overflow-hidden">
         
         {/* Decorative elements */}
         <div className={`absolute top-0 right-0 w-32 h-32 bg-${themeColor}-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl`}></div>

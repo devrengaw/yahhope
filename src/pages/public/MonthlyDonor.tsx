@@ -27,6 +27,7 @@ import {
 import { SEO } from '../../components/common/SEO';
 import { useFundraising } from '../../contexts/FundraisingContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail } from '../../services/sponsorshipService';
 import { cn } from '../../lib/utils';
 
 interface PlanOption {
@@ -127,6 +128,7 @@ const FAQS = [
 export function MonthlyDonor() {
   const [searchParams] = useSearchParams();
   const urlAmount = searchParams.get('amount');
+  const urlMode = searchParams.get('mode');
   const isSuccessUrl = searchParams.get('status') === 'success';
   const urlName = searchParams.get('name') || '';
   const urlEmail = searchParams.get('email') || '';
@@ -135,14 +137,32 @@ export function MonthlyDonor() {
   const { activeCampaign, campaign: defaultCamp, createDonation } = useFundraising();
   const currentCampaign = activeCampaign || defaultCamp;
 
-  // Estado do Seletor
+  // Modalidade de Contribuição: 'sponsorship' (Apadrinhar Criança) ou 'general' (Mantenedor Geral do Projeto)
+  const [donationType, setDonationType] = useState<'sponsorship' | 'general'>(
+    urlMode === 'general' ? 'general' : 'sponsorship'
+  );
+
+  // Métricas e Estado do Apadrinhamento
+  const [sponsorshipMetrics, setSponsorshipMetrics] = useState<SponsorshipMetrics | null>(null);
+  const [quotasCount, setQuotasCount] = useState<number>(1);
+  const [assignedChildren, setAssignedChildren] = useState<ChildSponsorshipDetail[]>([]);
+
+  // Estado do Seletor de Mantenedor Geral
   const [selectedPlanId, setSelectedPlanId] = useState<string>('guardiao');
   const [isCustom, setIsCustom] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
 
+  // Carrega métricas e parâmetros de apadrinhamento
+  useEffect(() => {
+    sponsorshipService.getMetrics().then(m => {
+      setSponsorshipMetrics(m);
+    });
+  }, []);
+
   // Sincroniza plano ou valor vindo da URL
   useEffect(() => {
     if (urlAmount) {
+      setDonationType('general');
       const parsed = parseFloat(urlAmount);
       if (!isNaN(parsed) && parsed > 0) {
         const matchingPlan = PLANS.find(p => p.amount === parsed);
@@ -164,7 +184,7 @@ export function MonthlyDonor() {
     }
   }, [urlAmount]);
 
-  // Formulário do Mantenedor
+  // Formulário do Doador / Padrinho
   const [donorName, setDonorName] = useState('');
   const [donorEmail, setDonorEmail] = useState('');
   const [donorPhone, setDonorPhone] = useState('');
@@ -174,10 +194,14 @@ export function MonthlyDonor() {
   const [pixCopied, setPixCopied] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
-  // Valor Atual Selecionado
-  const currentAmount = isCustom 
+  // Cálculos de Valor
+  const quotaCost = sponsorshipMetrics?.quotaCost || 90;
+  const sponsorshipTotal = quotasCount * quotaCost;
+  const generalTotal = isCustom 
     ? (parseFloat(customAmount.replace(/\./g, '').replace(',', '.')) || 0)
     : (PLANS.find(p => p.id === selectedPlanId)?.amount || 100);
+
+  const currentAmount = donationType === 'sponsorship' ? sponsorshipTotal : generalTotal;
 
   const pixKey = 'contato@yahhope.org';
   const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${currentAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
@@ -214,10 +238,43 @@ export function MonthlyDonor() {
     setIsLoading(true);
 
     try {
+      // 1. Caso seja Apadrinhamento de Criança
+      if (donationType === 'sponsorship') {
+        const result = await sponsorshipService.assignChildrenToSponsor({
+          donorName: donorName.trim(),
+          donorEmail: donorEmail.trim(),
+          donorPhone: donorPhone.trim(),
+          quotasCount,
+          amountPerQuota: quotaCost,
+          paymentMethod,
+          sponsorUserId: user?.id
+        });
+
+        if (result.success) {
+          setAssignedChildren(result.assignedChildren);
+          if (createDonation && currentCampaign) {
+            createDonation({
+              campaign_id: currentCampaign.id,
+              donor_name: donorName.trim(),
+              donor_email: donorEmail.trim(),
+              amount: result.totalAmount,
+              payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
+            });
+          }
+          setIsLoading(false);
+          setIsSuccess(true);
+          return;
+        } else {
+          alert(result.message || result.error || 'Erro ao processar apadrinhamento');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // 2. Caso seja Mantenedor Geral do Projeto
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       
       if (!supabaseUrl) {
-        // Modo Demonstração / Sem backend configurado
         setTimeout(() => {
           if (createDonation && currentCampaign) {
             createDonation({
@@ -245,7 +302,7 @@ export function MonthlyDonor() {
           campaignId: currentCampaign?.id || '1',
           amount: currentAmount,
           isMonthly: true,
-          paymentMethod, // 'pix' ou 'card'
+          paymentMethod,
           donorName,
           donorEmail,
           successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}`,
@@ -257,7 +314,15 @@ export function MonthlyDonor() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        // Fallback gracioso
+        if (createDonation && currentCampaign) {
+          createDonation({
+            campaign_id: currentCampaign.id,
+            donor_name: donorName,
+            donor_email: donorEmail,
+            amount: currentAmount,
+            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
+          });
+        }
         setIsLoading(false);
         setIsSuccess(true);
       }
@@ -565,16 +630,52 @@ export function MonthlyDonor() {
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto mb-14">
+          <div className="text-center max-w-3xl mx-auto mb-10">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
               Escolha seu Nível de Aliança
             </span>
             <h2 className="text-3xl sm:text-5xl font-heading font-black text-white leading-tight">
-              Torne-se um Mantenedor Mensal Hoje
+              Transforme Vidas Mensalmente
             </h2>
-            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-4">
-              Selecione o valor com o qual deseja abençoar vidas todos os meses. Cancele ou altere quando quiser sem burocracia.
+            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-3">
+              Escolha entre apadrinhar uma ou mais crianças com cotas acessíveis ou apoiar a sustentação global do projeto.
             </p>
+
+            {/* Alternador de Modalidade: Apadrinhar Criança vs Mantenedor Geral */}
+            <div className="mt-8 inline-flex bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700 shadow-xl">
+              <button
+                type="button"
+                onClick={() => setDonationType('sponsorship')}
+                className={cn(
+                  "px-6 py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer",
+                  donationType === 'sponsorship'
+                    ? "bg-[#F49853] text-white shadow-lg shadow-[#F49853]/25 scale-[1.02]"
+                    : "text-slate-400 hover:text-white"
+                )}
+              >
+                <Heart size={16} className={donationType === 'sponsorship' ? "fill-white" : ""} />
+                <span>Apadrinhar Criança</span>
+                {sponsorshipMetrics?.isFullySponsored && (
+                  <span className="ml-1 text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                    100% Acolhidas
+                  </span>
+                )}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setDonationType('general')}
+                className={cn(
+                  "px-6 py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer",
+                  donationType === 'general'
+                    ? "bg-white text-slate-900 shadow-lg scale-[1.02]"
+                    : "text-slate-400 hover:text-white"
+                )}
+              >
+                <Users size={16} />
+                <span>Mantenedor Geral (Projeto)</span>
+              </button>
+            </div>
           </div>
 
           {(isSuccess || isSuccessUrl) ? (
@@ -592,8 +693,44 @@ export function MonthlyDonor() {
               </h3>
               
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
-                O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo que crianças desnutridas recebam tratamento digno.
+                O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo alimentação e atendimento clínico de qualidade.
               </p>
+
+              {/* Revelação das Crianças Atribuídas pelo Algoritmo */}
+              {assignedChildren.length > 0 && (
+                <div className="my-6 p-6 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-left space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-gotham-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-[#F49853]" />
+                      Sua(s) Criança(s) Apadrinhada(s)
+                    </span>
+                    <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black">
+                      {assignedChildren.length} {assignedChildren.length === 1 ? 'Cota Atribuída' : 'Cotas Atribuídas'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {assignedChildren.map(child => (
+                      <div key={child.id} className="bg-white p-4 rounded-xl border border-amber-200/60 shadow-sm flex items-center gap-4">
+                        <img 
+                          src={child.photo_url} 
+                          alt={child.name} 
+                          className="w-16 h-16 rounded-xl object-cover border-2 border-[#F49853] shrink-0" 
+                        />
+                        <div>
+                          <h4 className="font-heading font-black text-slate-900 text-lg">{child.name}</h4>
+                          <p className="text-xs text-[#F49853] font-gotham-bold">{child.ageText} • {child.community}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{child.story}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-white/80 p-3.5 rounded-xl border border-amber-200/60 text-xs text-amber-950 font-medium">
+                    ✉️ <strong>Perfil Completo Enviado:</strong> Enviamos para <strong>{donorEmail}</strong> o e-mail oficial com a história detalhada, dados médicos e fotos de cada criança!
+                  </div>
+                </div>
+              )}
 
               {paymentMethod === 'pix' && !isSuccessUrl && (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left mb-6 space-y-4">
@@ -631,7 +768,7 @@ export function MonthlyDonor() {
                     Deseja criar seu acesso agora?
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed mb-4 font-gotham-light">
-                    No portal você pode acompanhar relatórios de transparência, crianças atendidas, certificados e o histórico de suas contribuições mensais.
+                    No portal você acompanha em tempo real as novidades exclusivas da sua criança apadrinhada, fotos de campo e relatórios nutricionais.
                   </p>
 
                   <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -640,7 +777,7 @@ export function MonthlyDonor() {
                       className="w-full sm:w-auto flex-1 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md text-center flex items-center justify-center gap-2"
                     >
                       <Users size={16} />
-                      <span>Sim, Quero Criar Minha Conta</span>
+                      <span>Sim, Quero Criar Minha Senha</span>
                     </Link>
                     <Link
                       to="/"
@@ -672,123 +809,249 @@ export function MonthlyDonor() {
             /* Formulário Principal de Escolha de Planos e Pagamento */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* Seleção dos Planos (Coluna Esquerda lg:col-span-7) */}
-              <div className="lg:col-span-7 space-y-4">
-                <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 mb-2">
-                  1. Selecione o Plano de Mantenedor Mensal
-                </p>
+              {/* Coluna Esquerda: Conteúdo Dinâmico por Modalidade (lg:col-span-7) */}
+              <div className="lg:col-span-7 space-y-6">
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {PLANS.map((plan) => {
-                    const isSelected = !isCustom && selectedPlanId === plan.id;
-                    return (
-                      <div
-                        key={plan.id}
-                        onClick={() => {
-                          setIsCustom(false);
-                          setSelectedPlanId(plan.id);
-                        }}
-                        className={cn(
-                          "relative rounded-3xl p-5 border-2 transition-all cursor-pointer flex flex-col justify-between",
-                          isSelected
-                            ? "bg-slate-800/90 border-[#F49853] shadow-lg shadow-[#F49853]/15 scale-[1.01]"
-                            : "bg-slate-800/40 border-slate-700 hover:border-slate-500 hover:bg-slate-800/60"
-                        )}
+                {/* CENÁRIO A: APADRINHAMENTO DE CRIANÇA */}
+                {donationType === 'sponsorship' ? (
+                  sponsorshipMetrics?.isFullySponsored ? (
+                    /* Banner de Lotação / 100% das Cotas Preenchidas */
+                    <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-800 rounded-3xl p-8 sm:p-10 text-white shadow-2xl border border-emerald-400/30 text-center space-y-6">
+                      <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto text-yellow-300 shadow-inner">
+                        <Award size={36} />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-emerald-200 bg-white/10 px-3.5 py-1.5 rounded-full inline-block">
+                          Meta de Cuidado Atingida • 100% Acolhidas!
+                        </span>
+                        <h3 className="text-2xl sm:text-3xl font-heading font-black text-white">
+                          Todas as Nossas Crianças Foram Apadrinhadas! 🎉
+                        </h3>
+                      </div>
+
+                      <p className="text-emerald-100 text-sm sm:text-base leading-relaxed font-gotham-light max-w-lg mx-auto">
+                        Graças a padrinhos fiéis, todas as crianças atualmente acolhidas na Casa Nutri atingiram sua rede completa de cotas mensais.
+                      </p>
+
+                      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-left space-y-3">
+                        <h4 className="font-gotham-bold text-sm text-yellow-300">
+                          Como você pode ajudar agora?
+                        </h4>
+                        <p className="text-xs text-white/90 leading-relaxed font-gotham-light">
+                          Temos uma longa <strong>fila de espera</strong> de aldeias vizinhas precisando de resgate. Ao se tornar um <strong>Mantenedor Mensal Global</strong>, você financia a abertura de novas vagas, expansão da equipe médica e compra de novos leites terapêuticos.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setDonationType('general')}
+                        className="bg-white text-emerald-900 hover:bg-emerald-50 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-black/20 flex items-center justify-center gap-2 mx-auto cursor-pointer"
                       >
-                        {plan.badge && (
+                        <Heart size={18} className="fill-emerald-900" />
+                        <span>Quero Ser Mantenedor Mensal Global</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* Seleção de Cotas de Apadrinhamento */
+                    <div className="space-y-6">
+                      {/* Explicação da Distribuição Equitativa e Cega */}
+                      <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-amber-600/10 border-2 border-[#F49853]/40 rounded-3xl p-6 text-slate-200 space-y-3">
+                        <div className="flex items-center gap-2 text-[#F49853] font-gotham-bold text-xs uppercase tracking-wider">
+                          <Sparkles size={16} />
+                          <span>Distribuição Solidária e Justa</span>
+                        </div>
+                        <h4 className="text-lg font-heading font-black text-white">
+                          Como funciona a alocação do seu afilhado?
+                        </h4>
+                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-gotham-light">
+                          Para garantir que <strong>nenhuma criança fique desassistida</strong> e que todas recebam apoio de forma homogênea, nossa equipe médica distribui os novos padrinhos priorizando as crianças com menor rede de apoio ativa. 
+                        </p>
+                        <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-700/60 text-xs text-amber-200 font-medium">
+                          💌 <strong>Surpresa Especial:</strong> Logo após a confirmação, você receberá por e-mail a <strong>foto, história e o perfil completo</strong> da criança que seu coração acaba de acolher!
+                        </div>
+                      </div>
+
+                      {/* Seletor de Quantidade de Crianças (Multi-Apadrinhamento) */}
+                      <div>
+                        <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 mb-3">
+                          1. Quantas crianças você deseja apadrinhar?
+                        </p>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[1, 2, 3, 4].map(q => {
+                            const isSelected = quotasCount === q;
+                            const total = q * quotaCost;
+                            return (
+                              <button
+                                key={q}
+                                type="button"
+                                onClick={() => setQuotasCount(q)}
+                                className={cn(
+                                  "p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center justify-between cursor-pointer",
+                                  isSelected
+                                    ? "bg-[#F49853] border-white text-white shadow-lg shadow-[#F49853]/30 scale-[1.03]"
+                                    : "bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
+                                )}
+                              >
+                                <span className="text-xs font-gotham-bold uppercase tracking-wider mb-1">
+                                  {q} {q === 1 ? 'Criança' : 'Crianças'}
+                                </span>
+                                <span className="text-xl font-black">
+                                  R$ {total}
+                                </span>
+                                <span className="text-[10px] opacity-80 mt-1 font-gotham-light">
+                                  / mês
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Benefícios Inclusos na Cota */}
+                      <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 text-xs text-slate-300 space-y-2.5">
+                        <span className="font-gotham-bold text-white uppercase tracking-wider block flex items-center gap-1.5 text-[11px]">
+                          <ShieldCheck size={14} className="text-[#92BF78]" />
+                          O que sua cota mensal de R$ {sponsorshipTotal.toFixed(2)} garante:
+                        </span>
+                        <ul className="space-y-2 text-slate-300 font-gotham-light pl-1">
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
+                            <span>Suplementos diários, leites terapêuticos e refeições nutricionais na Casa Nutri</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
+                            <span>Acompanhamento clínico periódico com medição de peso e altura</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
+                            <span><strong>Acesso Exclusivo:</strong> Notícias, cartas e atualizações apenas das crianças ligadas ao seu perfil</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  /* CENÁRIO B: MANTENEDOR DO PROJETO (DOAÇÃO GERAL) */
+                  <div className="space-y-4">
+                    <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 mb-2">
+                      1. Selecione o Plano de Mantenedor Mensal Global
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {PLANS.map((plan) => {
+                        const isSelected = !isCustom && selectedPlanId === plan.id;
+                        return (
+                          <div
+                            key={plan.id}
+                            onClick={() => {
+                              setIsCustom(false);
+                              setSelectedPlanId(plan.id);
+                            }}
+                            className={cn(
+                              "relative rounded-3xl p-5 border-2 transition-all cursor-pointer flex flex-col justify-between",
+                              isSelected
+                                ? "bg-slate-800/90 border-[#F49853] shadow-lg shadow-[#F49853]/15 scale-[1.01]"
+                                : "bg-slate-800/40 border-slate-700 hover:border-slate-500 hover:bg-slate-800/60"
+                            )}
+                          >
+                            {plan.badge && (
+                              <div className={cn(
+                                "absolute -top-3 right-4 px-3 py-0.5 rounded-full text-[10px] font-gotham-bold uppercase tracking-wider shadow-sm",
+                                plan.popular ? "bg-[#F49853] text-white" : "bg-emerald-500 text-slate-950"
+                              )}>
+                                {plan.badge}
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex items-baseline justify-between mb-2">
+                                <div>
+                                  <span className="text-2xl font-black text-white">
+                                    R$ {plan.amount}
+                                  </span>
+                                  <span className="text-xs text-slate-400 font-gotham-light"> / mês</span>
+                                </div>
+                                <span className="text-[11px] font-gotham-bold text-slate-400 bg-slate-700/60 px-2 py-0.5 rounded">
+                                  {plan.dailyEstimate}
+                                </span>
+                              </div>
+
+                              <h4 className="font-gotham-bold text-base text-white mb-1">
+                                {plan.title}
+                              </h4>
+                              <p className="text-xs text-slate-300 font-gotham-light mb-4 leading-relaxed">
+                                {plan.tagline}
+                              </p>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-700/60 space-y-2">
+                              {plan.impact.slice(0, 2).map((item, idx) => (
+                                <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-300 font-gotham-light">
+                                  <CheckCircle2 size={13} className="text-[#92BF78] shrink-0 mt-0.5" />
+                                  <span className="line-clamp-2">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Opção de Outro Valor */}
+                    <div 
+                      onClick={() => setIsCustom(true)}
+                      className={cn(
+                        "rounded-3xl p-5 border-2 transition-all cursor-pointer",
+                        isCustom 
+                          ? "bg-slate-800/90 border-[#F49853] shadow-lg shadow-[#F49853]/15" 
+                          : "bg-slate-800/40 border-slate-700 hover:border-slate-500"
+                      )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
                           <div className={cn(
-                            "absolute -top-3 right-4 px-3 py-0.5 rounded-full text-[10px] font-gotham-bold uppercase tracking-wider shadow-sm",
-                            plan.popular ? "bg-[#F49853] text-white" : "bg-emerald-500 text-slate-950"
+                            "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                            isCustom ? "border-[#F49853]" : "border-slate-500"
                           )}>
-                            {plan.badge}
+                            {isCustom && <div className="w-2.5 h-2.5 bg-[#F49853] rounded-full" />}
+                          </div>
+                          <div>
+                            <span className="font-gotham-bold text-white text-sm block">Definir Outro Valor Mensal</span>
+                            <span className="text-xs text-slate-400 font-gotham-light">Qualquer contribuição mensal gera impacto imediato</span>
+                          </div>
+                        </div>
+
+                        {isCustom && (
+                          <div className="relative max-w-xs w-full">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0,00"
+                              value={customAmount}
+                              onChange={handleCustomChange}
+                              autoFocus
+                              className="w-full bg-slate-900 border border-[#F49853] rounded-xl pl-10 pr-4 py-2.5 text-white font-gotham-bold text-base focus:outline-none"
+                            />
                           </div>
                         )}
-
-                        <div>
-                          <div className="flex items-baseline justify-between mb-2">
-                            <div>
-                              <span className="text-2xl font-black text-white">
-                                R$ {plan.amount}
-                              </span>
-                              <span className="text-xs text-slate-400 font-gotham-light"> / mês</span>
-                            </div>
-                            <span className="text-[11px] font-gotham-bold text-slate-400 bg-slate-700/60 px-2 py-0.5 rounded">
-                              {plan.dailyEstimate}
-                            </span>
-                          </div>
-
-                          <h4 className="font-gotham-bold text-base text-white mb-1">
-                            {plan.title}
-                          </h4>
-                          <p className="text-xs text-slate-300 font-gotham-light mb-4 leading-relaxed">
-                            {plan.tagline}
-                          </p>
-                        </div>
-
-                        <div className="pt-3 border-t border-slate-700/60 space-y-2">
-                          {plan.impact.slice(0, 2).map((item, idx) => (
-                            <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-300 font-gotham-light">
-                              <CheckCircle2 size={13} className="text-[#92BF78] shrink-0 mt-0.5" />
-                              <span className="line-clamp-2">{item}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Opção de Outro Valor */}
-                <div 
-                  onClick={() => setIsCustom(true)}
-                  className={cn(
-                    "rounded-3xl p-5 border-2 transition-all cursor-pointer",
-                    isCustom 
-                      ? "bg-slate-800/90 border-[#F49853] shadow-lg shadow-[#F49853]/15" 
-                      : "bg-slate-800/40 border-slate-700 hover:border-slate-500"
-                  )}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-                        isCustom ? "border-[#F49853]" : "border-slate-500"
-                      )}>
-                        {isCustom && <div className="w-2.5 h-2.5 bg-[#F49853] rounded-full" />}
-                      </div>
-                      <div>
-                        <span className="font-gotham-bold text-white text-sm block">Definir Outro Valor Mensal</span>
-                        <span className="text-xs text-slate-400 font-gotham-light">Qualquer contribuição mensal gera impacto imediato</span>
                       </div>
                     </div>
 
-                    {isCustom && (
-                      <div className="relative max-w-xs w-full">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0,00"
-                          value={customAmount}
-                          onChange={handleCustomChange}
-                          autoFocus
-                          className="w-full bg-slate-900 border border-[#F49853] rounded-xl pl-10 pr-4 py-2.5 text-white font-gotham-bold text-base focus:outline-none"
-                        />
-                      </div>
-                    )}
+                    {/* Resumo do Impacto Selecionado */}
+                    <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 text-xs text-slate-300">
+                      <span className="font-gotham-bold text-white uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                        <ShieldCheck size={14} className="text-[#92BF78]" />
+                        Compromisso de Transparência YAH Hope:
+                      </span>
+                      <p className="leading-relaxed font-gotham-light">
+                        Sua contribuição mensal de <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> financia a equipe médica, compra de insumos clínicos, perfuração de poços e sustentação da Casa Nutri.
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                {/* Resumo do Impacto Selecionado */}
-                <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 text-xs text-slate-300">
-                  <span className="font-gotham-bold text-white uppercase tracking-wider block mb-2 flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-[#92BF78]" />
-                    Compromisso de Transparência YAH Hope:
-                  </span>
-                  <p className="leading-relaxed font-gotham-light">
-                    Sua contribuição mensal de <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> será debitada mensalmente e revertida diretamente para compra de insumos clínicos, tratamento de crianças desnutridas e projetos de autonomia. Você receberá relatórios contínuos de impacto no seu e-mail.
-                  </p>
-                </div>
+                )}
 
               </div>
 
@@ -802,10 +1065,12 @@ export function MonthlyDonor() {
                     </span>
                   </div>
                   <h3 className="text-2xl font-heading font-black text-slate-900">
-                    Dados do Mantenedor
+                    {donationType === 'sponsorship' ? 'Seus Dados de Padrinho' : 'Dados do Mantenedor'}
                   </h3>
                   <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-200/80 flex items-center justify-between">
-                    <span className="text-xs font-gotham-bold text-amber-900">Total Mensal:</span>
+                    <span className="text-xs font-gotham-bold text-amber-900">
+                      {donationType === 'sponsorship' ? `${quotasCount} ${quotasCount === 1 ? 'Criança' : 'Crianças'}` : 'Total Mensal:'}
+                    </span>
                     <span className="text-xl font-heading font-black text-amber-900">
                       R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-normal text-amber-800">/ mês</span>
                     </span>
@@ -829,21 +1094,24 @@ export function MonthlyDonor() {
 
                   <div>
                     <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                      E-mail (para receber relatórios e acesso) *
+                      E-mail *
                     </label>
                     <input
                       type="email"
                       required
                       value={donorEmail}
                       onChange={(e) => setDonorEmail(e.target.value)}
-                      placeholder="seu@email.com"
+                      placeholder="lucas@exemplo.com"
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {donationType === 'sponsorship' ? 'O perfil da sua criança apadrinhada será enviado para este e-mail.' : 'Enviaremos os recibos mensais para este e-mail.'}
+                    </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                      WhatsApp / Celular (opcional para atualizações rápidas)
+                      WhatsApp com DDD (opcional)
                     </label>
                     <input
                       type="tel"
@@ -854,23 +1122,22 @@ export function MonthlyDonor() {
                     />
                   </div>
 
-                  {/* Método de Pagamento */}
-                  <div className="pt-2">
+                  <div>
                     <label className="block text-xs font-gotham-bold text-slate-700 mb-2">
-                      Forma de Cobrança Recorrente
+                      Forma de Pagamento
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setPaymentMethod('card')}
                         className={cn(
-                          "p-3 rounded-xl border text-xs font-gotham-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer",
+                          "py-3 px-3 rounded-xl border-2 flex items-center justify-center gap-2 font-gotham-bold text-xs uppercase tracking-wider transition-all cursor-pointer",
                           paymentMethod === 'card'
-                            ? "bg-[#F49853] text-white border-[#F49853] shadow-sm"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300"
+                            ? "bg-slate-900 border-slate-900 text-white"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                         )}
                       >
-                        <CreditCard size={18} />
+                        <CreditCard size={16} />
                         <span>Cartão de Crédito</span>
                       </button>
 
@@ -878,61 +1145,42 @@ export function MonthlyDonor() {
                         type="button"
                         onClick={() => setPaymentMethod('pix')}
                         className={cn(
-                          "p-3 rounded-xl border text-xs font-gotham-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer",
+                          "py-3 px-3 rounded-xl border-2 flex items-center justify-center gap-2 font-gotham-bold text-xs uppercase tracking-wider transition-all cursor-pointer",
                           paymentMethod === 'pix'
-                            ? "bg-[#F49853] text-white border-[#F49853] shadow-sm"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300"
+                            ? "bg-[#F49853] border-[#F49853] text-white"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                         )}
                       >
-                        <QrCode size={18} />
-                        <span>PIX</span>
+                        <QrCode size={16} />
+                        <span>PIX Mensal</span>
                       </button>
                     </div>
                   </div>
 
-                  {paymentMethod === 'pix' ? (
-                    <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs space-y-2 text-emerald-900">
-                      <p className="font-gotham-bold flex items-center gap-1.5">
-                        <CheckCircle2 size={14} className="text-emerald-700" />
-                        PIX com Confirmação Instantânea
-                      </p>
-                      <p className="text-[11px] text-emerald-800 leading-relaxed">
-                        Ao clicar no botão abaixo, será gerado o QR Code dinâmico e o código Copia e Cola oficial do PIX com compensação em segundos e recibo automático.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1.5 text-slate-600">
-                      <p className="font-gotham-bold text-slate-800 flex items-center gap-1.5">
-                        <Lock size={13} className="text-[#F49853]" />
-                        Cobrança Mensal Recorrente no Cartão
-                      </p>
-                      <p className="text-[11px]">
-                        Você será direcionado ao ambiente seguro e criptografado para cadastrar seu cartão. Cancelamento com 1 clique no Portal do Doador sem travar o limite total.
-                      </p>
-                    </div>
-                  )}
-
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold py-4 px-6 rounded-2xl transition-all shadow-lg shadow-[#F49853]/30 hover:shadow-[#F49853]/50 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
+                    className="w-full py-4 mt-2 bg-[#F49853] hover:bg-[#e0853d] text-white rounded-2xl font-gotham-bold text-sm uppercase tracking-wider shadow-lg shadow-[#F49853]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95"
                   >
                     {isLoading ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Processando...</span>
+                      </div>
                     ) : (
                       <>
-                        <Heart size={18} className="fill-white" />
+                        <Heart size={16} className="fill-white" />
                         <span>
-                          {paymentMethod === 'pix' 
-                            ? 'Gerar PIX Seguro' 
-                            : 'Confirmar e Ser Mantenedor Mensal'}
+                          {donationType === 'sponsorship' 
+                            ? `Confirmar Apadrinhamento (R$ ${currentAmount.toFixed(2)}/mês)`
+                            : `Confirmar Doação Mensal (R$ ${currentAmount.toFixed(2)}/mês)`}
                         </span>
                       </>
                     )}
                   </button>
 
-                  <p className="text-[10px] text-center text-slate-400 font-gotham-light pt-2">
-                    YAH Hope • CNPJ & Registro de Entidade Humanitária • 100% dos recursos geridos com rigor e auditoria contínua.
+                  <p className="text-[10px] text-center text-slate-400 font-gotham-light">
+                    Cancelamento fácil a qualquer momento • 100% Seguro
                   </p>
                 </form>
               </div>

@@ -77,6 +77,14 @@ export function ImpactFeedManager() {
                       </span>
                       <span className="text-slate-300 text-xs">•</span>
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.date}</span>
+                      {item.type === 'child' && (
+                        <>
+                          <span className="text-slate-300 text-xs">•</span>
+                          <span className="text-[9px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            🔒 Privado: Visível aos padrinhos da criança
+                          </span>
+                        </>
+                      )}
                     </div>
                     <h3 className="text-base font-black text-slate-900 leading-tight">{item.title}</h3>
                     <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Autor: {item.author}</p>

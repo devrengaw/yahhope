@@ -1,18 +1,62 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpact } from '../../contexts/ImpactContext';
-import { Heart, Calendar, ArrowRight, Gift, Activity, Star, MessageCircle, BarChart3, TrendingUp, ShoppingBag, Newspaper, ShieldCheck, Briefcase } from 'lucide-react';
+import { sponsorshipService, ChildSponsorshipDetail } from '../../services/sponsorshipService';
+import { Heart, Calendar, ArrowRight, Gift, Activity, Star, MessageCircle, BarChart3, TrendingUp, ShoppingBag, Newspaper, ShieldCheck, Briefcase, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { cn } from '../../lib/utils';
 
 export function SponsorDashboard() {
   const { user } = useAuth();
   const { getPublishedItems } = useImpact();
+  const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(true);
+  const [feedFilter, setFeedFilter] = useState<'all' | 'news' | 'my_children'>('all');
+
+  useEffect(() => {
+    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
+      .then(children => {
+        setMyChildren(children);
+        setIsLoadingChildren(false);
+      })
+      .catch(err => {
+        console.error('Erro ao carregar crianças apadrinhadas:', err);
+        setIsLoadingChildren(false);
+      });
+  }, [user?.id, user?.email]);
 
   const impactStats = [
     { label: 'Refeições Providas', value: '1,240', icon: Gift, color: 'text-amber-600', bg: 'bg-amber-100' },
     { label: 'Consultas Médicas', value: '12', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Crianças Apadrinhadas', value: '2', icon: Heart, color: 'text-rose-600', bg: 'bg-rose-100' },
+    { label: 'Crianças Apadrinhadas', value: myChildren.length.toString(), icon: Heart, color: 'text-rose-600', bg: 'bg-rose-100' },
     { label: 'Horas de Educação', value: '450', icon: Star, color: 'text-blue-600', bg: 'bg-blue-100' },
   ];
+
+  // Filtro de Privacidade Estrita (LGPD e Regra de Padrinhos)
+  const visibleFeedItems = useMemo(() => {
+    const published = getPublishedItems();
+
+    return published.filter(item => {
+      // 1. Notícias de criança específica: APENAS padrinhos daquela criança veem
+      if (item.type === 'child') {
+        const isAdmin = user?.role === 'ADMIN' || user?.role === 'USER';
+        if (isAdmin) return true;
+
+        const targetText = (item.child || item.title).toLowerCase();
+        const isMyChild = myChildren.some(c => 
+          targetText.includes(c.name.toLowerCase()) || 
+          (c.id && targetText.includes(c.id.toLowerCase()))
+        );
+
+        if (!isMyChild) return false;
+      }
+
+      // 2. Filtro de abas
+      if (feedFilter === 'news') return item.type !== 'child';
+      if (feedFilter === 'my_children') return item.type === 'child';
+      return true;
+    });
+  }, [getPublishedItems, myChildren, feedFilter, user?.role]);
 
   return (
     <div className="space-y-10 pb-20">
@@ -23,11 +67,8 @@ export function SponsorDashboard() {
           <p className="text-slate-500 mt-2 font-medium">Sua proximidade transforma realidades todos os dias.</p>
         </div>
         <div className="flex items-center gap-4">
-          <button className="bg-white border border-slate-200 p-3 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-            <Calendar size={20} />
-          </button>
-          <Link to="/campanha" className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all flex items-center gap-2">
-            <Gift size={20} /> Doação Extra
+          <Link to="/mantenedor?mode=sponsorship" className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all flex items-center gap-2">
+            <Plus size={20} /> Apadrinhar Mais Crianças
           </Link>
         </div>
       </div>
@@ -54,49 +95,105 @@ export function SponsorDashboard() {
           <div className="space-y-6">
             <div className="flex justify-between items-center px-2">
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <Heart className="text-rose-500" size={24} fill="currentColor" /> Minhas Crianças
+                <Heart className="text-rose-500" size={24} fill="currentColor" /> Minhas Crianças ({myChildren.length})
               </h3>
               <Link to="/portal/sponsorship" className="text-amber-600 font-bold text-sm hover:underline">Ver todas</Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { name: 'Kofi', age: '4 anos', img: 'https://images.unsplash.com/photo-1489710437720-ebb67ec84dd2?q=80&w=2070&auto=format&fit=crop', status: 'Em Recuperação' },
-                { name: 'Amara', age: '6 anos', img: 'https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?q=80&w=1974&auto=format&fit=crop', status: 'Estável' }
-              ].map(child => (
-                <div key={child.name} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-amber-200 transition-all">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0">
-                    <img src={child.img} alt={child.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-lg font-black text-slate-900">{child.name}, {child.age}</h4>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{child.status}</p>
-                    <button className="text-amber-600 text-xs font-black flex items-center gap-1 hover:gap-2 transition-all">
-                      Ver Detalhes <ArrowRight size={14} />
-                    </button>
-                  </div>
+            {isLoadingChildren ? (
+              <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 text-slate-400 font-medium">
+                Carregando suas crianças apadrinhadas...
+              </div>
+            ) : myChildren.length === 0 ? (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200/80 p-8 rounded-[2.5rem] text-center space-y-4">
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-amber-600 shadow-sm">
+                  <Heart size={32} />
                 </div>
-              ))}
-            </div>
+                <h4 className="text-xl font-black text-slate-900">
+                  Você ainda não possui crianças apadrinhadas
+                </h4>
+                <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                  Com cotas solidárias a partir de R$ 90/mês, você garante nutrição clínica intensiva e recebe notícias e fotos exclusivas da sua criança.
+                </p>
+                <Link
+                  to="/mantenedor?mode=sponsorship"
+                  className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all"
+                >
+                  <Plus size={16} />
+                  <span>Apadrinhar Agora</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {myChildren.map(child => (
+                  <div key={child.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-amber-200 transition-all">
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
+                      <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-lg font-black text-slate-900 truncate">{child.name}</h4>
+                      <p className="text-amber-600 text-xs font-bold uppercase tracking-wider mb-1">{child.ageText}</p>
+                      <p className="text-slate-400 text-[11px] truncate">{child.community}</p>
+                      <Link to="/portal/sponsorship" className="text-slate-700 hover:text-amber-600 text-xs font-black flex items-center gap-1 mt-2 transition-all">
+                        Ver Evolução <ArrowRight size={14} />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Updates Timeline (Impact Feed) */}
+          {/* Updates Timeline (Impact Feed com Segregação Estrita de Notícias) */}
           <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-10">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <TrendingUp className="text-emerald-500" size={24} /> Feed de Impacto
-              </h3>
-              <div className="flex gap-2">
-                <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-black uppercase rounded-full">Tudo</span>
-                <span className="px-3 py-1 text-slate-400 text-[10px] font-black uppercase rounded-full hover:bg-slate-50 cursor-pointer transition-colors">Notícias</span>
-                <span className="px-3 py-1 text-slate-400 text-[10px] font-black uppercase rounded-full hover:bg-slate-50 cursor-pointer transition-colors">Minhas Crianças</span>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <TrendingUp className="text-emerald-500" size={24} /> Feed de Impacto & Notícias
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-1">
+                  Notícias e relatórios clínicos exclusivos das crianças ligadas ao seu perfil
+                </p>
+              </div>
+              <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
+                <button 
+                  onClick={() => setFeedFilter('all')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black uppercase rounded-lg transition-all",
+                    feedFilter === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Tudo
+                </button>
+                <button 
+                  onClick={() => setFeedFilter('news')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black uppercase rounded-lg transition-all",
+                    feedFilter === 'news' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Geral
+                </button>
+                <button 
+                  onClick={() => setFeedFilter('my_children')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black uppercase rounded-lg transition-all",
+                    feedFilter === 'my_children' ? "bg-[#F49853] text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Minhas Crianças ({myChildren.length})
+                </button>
               </div>
             </div>
             
             <div className="space-y-12 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-              {getPublishedItems().length === 0 ? (
-                <div className="text-center py-10 text-slate-400 font-medium">Nenhum impacto publicado ainda.</div>
-              ) : getPublishedItems().map((item, idx) => {
+              {visibleFeedItems.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 font-medium text-sm">
+                  {feedFilter === 'my_children' 
+                    ? 'Nenhuma notícia individual publicada ainda para suas crianças apadrinhadas.' 
+                    : 'Nenhum impacto publicado ainda nesta seção.'}
+                </div>
+              ) : visibleFeedItems.map((item, idx) => {
                   const Icon = item.type === 'child' ? Activity : item.type === 'project' ? Briefcase : Newspaper;
                   const color = item.type === 'child' ? 'bg-amber-100 text-amber-600' : item.type === 'project' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600';
                   return (
@@ -112,9 +209,9 @@ export function SponsorDashboard() {
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.date}</span>
                           </div>
                           {item.type === 'child' && (
-                            <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg">
+                            <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
                               <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-                              <span className="text-[9px] font-black text-amber-700 uppercase">Privado</span>
+                              <span className="text-[9px] font-black text-amber-800 uppercase tracking-wider">Exclusivo do Padrinho</span>
                             </div>
                           )}
                         </div>

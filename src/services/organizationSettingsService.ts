@@ -8,6 +8,8 @@ export interface OrganizationSettings {
   address: string;
   timezone: string;
   locale: string;
+  sponsorship_quota_cost?: number;
+  max_sponsors_per_child?: number;
 }
 
 const STORAGE_KEY = 'yah_hope_org_settings_v2';
@@ -19,7 +21,9 @@ export const DEFAULT_ORG_SETTINGS: OrganizationSettings = {
   phone: '+55 11 99999-9999',
   address: 'Rua da Esperança, 123 - São Paulo, SP',
   timezone: 'America/Sao_Paulo',
-  locale: 'pt-BR'
+  locale: 'pt-BR',
+  sponsorship_quota_cost: 90.00,
+  max_sponsors_per_child: 2
 };
 
 export function getLocalOrgSettings(): OrganizationSettings {
@@ -66,7 +70,13 @@ export async function fetchAndSyncOrgSettings(): Promise<OrganizationSettings> {
         phone: data.phone || local.phone,
         address: data.address || local.address,
         timezone: data.timezone || local.timezone,
-        locale: data.locale || local.locale
+        locale: data.locale || local.locale,
+        sponsorship_quota_cost: data.sponsorship_quota_cost !== undefined && data.sponsorship_quota_cost !== null 
+          ? Number(data.sponsorship_quota_cost) 
+          : local.sponsorship_quota_cost,
+        max_sponsors_per_child: data.max_sponsors_per_child !== undefined && data.max_sponsors_per_child !== null 
+          ? Number(data.max_sponsors_per_child) 
+          : local.max_sponsors_per_child
       };
       saveLocalOrgSettings(remoteSettings);
       return remoteSettings;
@@ -90,19 +100,32 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
 
   // 2. Persiste no Supabase
   try {
-    const { error } = await supabase
+    const payload: any = {
+      id: 'default',
+      name: settings.name,
+      website: settings.website,
+      email: settings.email,
+      phone: settings.phone,
+      address: settings.address,
+      timezone: settings.timezone,
+      locale: settings.locale,
+      sponsorship_quota_cost: settings.sponsorship_quota_cost ?? 90,
+      max_sponsors_per_child: settings.max_sponsors_per_child ?? 2,
+      updated_at: new Date().toISOString()
+    };
+
+    let { error } = await supabase
       .from('organization_settings')
-      .upsert({
-        id: 'default',
-        name: settings.name,
-        website: settings.website,
-        email: settings.email,
-        phone: settings.phone,
-        address: settings.address,
-        timezone: settings.timezone,
-        locale: settings.locale,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
+      .upsert(payload, { onConflict: 'id' });
+
+    // Fallback caso a tabela ainda não tenha as colunas no Supabase remoto
+    if (error && error.message?.includes('column')) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.sponsorship_quota_cost;
+      delete fallbackPayload.max_sponsors_per_child;
+      const retry = await supabase.from('organization_settings').upsert(fallbackPayload, { onConflict: 'id' });
+      error = retry.error;
+    }
 
     if (error) {
       console.warn('Aviso: erro ao salvar no Supabase, mantido em cache local:', error.message);
