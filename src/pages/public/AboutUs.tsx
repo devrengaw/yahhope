@@ -119,11 +119,11 @@ export function AboutUs() {
               </h2>
 
               <p className="text-slate-600 leading-relaxed text-base sm:text-lg font-gotham-light">
-                Nascida com a convicção inegociável de que a fé deve se traduzir em obras práticas e amor ativo, a agência desenvolve programas integrados de assistência, saúde e capacitação.
+                Nascida com a convicção inegociável de que a fé deve se traduzir em obras práticas e amor ativo, a <strong>YAH Hope</strong> desenvolve programas integrados de assistência, saúde e capacitação.
               </p>
 
               <p className="text-slate-600 leading-relaxed text-sm sm:text-base font-gotham-light">
-                Atuamos de forma contínua em <strong>Nampula (Moçambique)</strong> — uma das regiões com os mais elevados índices de desnutrição crônica e extrema pobreza infantil —, bem como em comunidades vulneráveis no <strong>Brasil</strong>. Nossos projetos não oferecem apenas soluções paliativas: fornecem alimentação clínica, abrem poços de água cristalina, garantem escolaridade, custeiam formações universitárias e equipam famílias para a autossuficiência econômica.
+                Atuamos de forma contínua em <strong>Nampula (Moçambique)</strong> — uma das regiões com os mais elevados índices de desnutrição crônica e extrema pobreza infantil —, bem como em comunidades vulneráveis. Nossos projetos não oferecem apenas soluções paliativas: fornecem alimentação clínica, abrem poços de água cristalina, garantem escolaridade, custeiam formações universitárias e equipam famílias para a autossuficiência econômica.
               </p>
 
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
