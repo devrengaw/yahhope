@@ -1052,28 +1052,29 @@ export function MonthlyDonor() {
 
       {/* 3. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
       <section className="py-20 md:py-28 bg-[#0F172A] text-white relative overflow-hidden">
-        {/* Background visual com a foto da criança acolhida */}
+        {/* Background visual com a foto da criança acolhida bem visível */}
         <div className="absolute inset-0 z-0">
           <img 
             src="/mantenedor_hero.jpg" 
             alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-center filter brightness-[0.70] contrast-105 scale-100"
+            className="w-full h-full object-cover object-[center_25%] filter brightness-[0.90] contrast-105 scale-100"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-[#0F172A]/75"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/90 via-[#0F172A]/60 to-[#0F172A]/90"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-transparent to-[#0F172A]/80"></div>
+          {/* Gradientes suaves para destacar a foto com contraste perfeito para os textos */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/45 to-[#0F172A]/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/50 via-transparent to-[#0F172A]/50"></div>
+          <div className="absolute inset-0 bg-black/15"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
+            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2 drop-shadow-md">
               Destinação Real e Auditada
             </span>
-            <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
               Para onde vai a sua contribuição todo mês?
             </h2>
-            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-4">
+            <p className="text-base sm:text-lg text-slate-100 font-gotham-light mt-4 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.
             </p>
           </div>
@@ -1081,7 +1082,7 @@ export function MonthlyDonor() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
             {/* Frente 1 */}
-            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
+            <div className="bg-slate-900/75 backdrop-blur-md hover:bg-slate-900/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-xl">
               <div>
                 <div className="w-14 h-14 rounded-2xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Activity size={28} />
@@ -1100,7 +1101,7 @@ export function MonthlyDonor() {
             </div>
 
             {/* Frente 2 */}
-            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
+            <div className="bg-slate-900/75 backdrop-blur-md hover:bg-slate-900/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-xl">
               <div>
                 <div className="w-14 h-14 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <GraduationCap size={28} />
@@ -1119,7 +1120,7 @@ export function MonthlyDonor() {
             </div>
 
             {/* Frente 3 */}
-            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
+            <div className="bg-slate-900/75 backdrop-blur-md hover:bg-slate-900/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-xl">
               <div>
                 <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-[#92BF78] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Droplets size={28} />
