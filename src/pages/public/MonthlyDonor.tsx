@@ -349,283 +349,8 @@ export function MonthlyDonor() {
         canonical="https://yahhope.org/mantenedor"
       />
 
-      {/* 1. HERO SECTION COM COPY CATIVANTE E PROFUNDA */}
-      <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 bg-[#0F172A] text-white overflow-hidden">
-        {/* Background visual imersivo com maior transparência */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="/mantenedor_hero.jpg" 
-            alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-top filter brightness-[0.72] contrast-105 scale-105 transition-transform duration-1000"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/45 to-black/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/85 via-[#0F172A]/35 to-transparent"></div>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
-            {/* Coluna Texto: Proposta de Valor e Emoção */}
-            <div className="lg:col-span-7 text-center lg:text-left space-y-6">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
-                Sua doação <br />
-                <span className="text-[#F49853]">mantém a esperança viva</span>.
-              </h1>
-
-              <p className="text-lg sm:text-xl text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                A esperança não é apenas um sentimento: ela ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você acende a luz de um novo futuro para crianças e famílias inteiras, garantindo que o cuidado, a dignidade e a vida nunca deixem de florescer.
-              </p>
-
-              {/* Métricas Rápidas de Impacto e Confiança */}
-              <div className="pt-4 grid grid-cols-3 gap-4 border-t border-slate-700/60 max-w-xl mx-auto lg:mx-0">
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-white">500+</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Vidas Resgatadas</p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#92BF78]">100%</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Gestão Auditada</p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#F49853]">R$ 1,66</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Ao dia para mudar tudo</p>
-                </div>
-              </div>
-
-              {/* Botões de Ação Imediata */}
-              <div className="pt-4 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                <button
-                  onClick={scrollToCheckout}
-                  className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-4 rounded-full font-gotham-bold text-sm tracking-wide shadow-xl shadow-[#F49853]/30 hover:shadow-[#F49853]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Sparkles size={18} />
-                  <span>Quero Ser um Mantenedor Mensal</span>
-                  <ArrowRight size={16} />
-                </button>
-
-                <a
-                  href="#como-funciona"
-                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-4 rounded-full font-gotham-medium text-sm tracking-wide transition-all text-center"
-                >
-                  Entenda o Impacto da sua Ajuda
-                </a>
-              </div>
-            </div>
-
-            {/* Coluna Direita: Card Flutuante de Síntese */}
-            <div className="lg:col-span-5">
-              <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative">
-                <div className="absolute -top-3 -right-3 bg-[#92BF78] text-slate-950 font-gotham-bold text-[11px] uppercase tracking-wider px-3 py-1 rounded-full shadow-md flex items-center gap-1.5">
-                  <ShieldCheck size={14} />
-                  Portal Exclusivo
-                </div>
-
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-[#F49853] flex items-center justify-center text-white shrink-0 shadow-lg">
-                    <Heart size={24} className="fill-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-gotham-bold text-lg text-white">Comunidade de Mantenedores</h3>
-                    <p className="text-xs text-slate-300">A aliança que nunca abandona quem precisa</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 text-sm text-slate-200 font-gotham-light">
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">Previsibilidade que Salva</strong>
-                      <span className="text-xs text-slate-300">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">Relatórios Diretos de Campo</strong>
-                      <span className="text-xs text-slate-300">Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">100% Flexível e Seguro</strong>
-                      <span className="text-xs text-slate-300">Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e sem amarras.</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-5 border-t border-white/15 flex items-center justify-between text-xs text-slate-300">
-                  <span className="flex items-center gap-1.5">
-                    <Lock size={14} className="text-[#F49853]" />
-                    Criptografia 256-Bit SSL
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#92BF78]" />
-                    Ativação Imediata
-                  </span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 2. O CONTRASTE: POR QUE O APOIO MENSAL É CRUCIAL */}
-      <section id="como-funciona" className="py-20 md:py-28 bg-slate-50 border-b border-slate-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              A Diferença Entre Sobreviver e Prosperar
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-              Por que nossos projetos dependem da sua constância mensal?
-            </h2>
-            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
-              Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza duradoura que mantém todas as nossas frentes humanitárias ativas todos os dias.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-            
-            {/* Coluna 1: O drama da incerteza */}
-            <div className="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-xs relative overflow-hidden">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 mb-6">
-                <Clock size={24} />
-              </div>
-              <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
-                Quando dependemos apenas de doações pontuais:
-              </h3>
-              <ul className="space-y-4 text-slate-600 text-sm">
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Incerteza para planejar novas perfurações de poços de água potável e manter a manutenção das bombas ativas.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Risco de interrupção no tratamento clínico de crianças desnutridas e nas bolsas de estudo de jovens universitários.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Dificuldade para estruturar novas frentes comunitárias e comprar insumos essenciais com antecedência e economia.</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Coluna 2: O poder da fidelidade mensal */}
-            <div className="bg-gradient-to-br from-[#0F172A] to-slate-900 text-white rounded-3xl p-8 border border-[#F49853]/30 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#F49853]/15 rounded-full blur-2xl"></div>
-              
-              <div className="w-12 h-12 rounded-2xl bg-[#F49853] flex items-center justify-center text-white mb-6 shadow-md shadow-[#F49853]/30">
-                <Sparkles size={24} />
-              </div>
-              <h3 className="text-xl font-heading font-black text-white mb-3">
-                Quando você se torna um Mantenedor Mensal:
-              </h3>
-              <ul className="space-y-4 text-slate-200 text-sm">
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Todas as Portas Abertas:</strong> Acolhimento médico ininterrupto, clínicas móveis nos vilarejos e atendimento digno para cada família.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Água, Nutrição e Saúde Plena:</strong> Poços artesianos operando sem parar e ciclo integral de recuperação para erradicar a desnutrição.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Futuro, Educação e Autonomia:</strong> Continuidade de bolsas universitárias, capacitação profissional de mães e hortas comunitárias sustentáveis.</span>
-                </li>
-              </ul>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 3. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
-      <section className="py-20 md:py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              Destinação Real e Auditada
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-              Para onde vai a sua contribuição todo mês?
-            </h2>
-            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
-              Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            
-            {/* Frente 1 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-orange-100 text-[#F49853] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Activity size={28} />
-                </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
-                  Casa Nutri (Nampula)
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
-                  Compra de fórmulas terapêuticas (F-75, F-100 e Plumpy'Nut), insumos hospitalares, remuneração de nutricionistas locais e monitoramento pediátrico intensivo para erradicar a desnutrição infantil.
-                </p>
-              </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1.5">
-                <CheckCircle2 size={14} />
-                <span>Salva vidas em risco iminente</span>
-              </div>
-            </div>
-
-            {/* Frente 2 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <GraduationCap size={28} />
-                </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
-                  Educação & Bolsas Universitárias
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
-                  Financiamento de bolsas universitárias integrais para jovens órfãos ou em extrema vulnerabilidade se formarem médicos, enfermeiros, professores e engenheiros da sua própria nação.
-                </p>
-              </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-blue-600 flex items-center gap-1.5">
-                <CheckCircle2 size={14} />
-                <span>Quebra o ciclo geracional da pobreza</span>
-              </div>
-            </div>
-
-            {/* Frente 3 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Droplets size={28} />
-                </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
-                  Água Potável & Autonomia Comunitária
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
-                  Perfuração de poços artesianos nas aldeias, saneamento, oficinas de agricultura sustentável para mães e hortas que alimentam centenas de famílias de forma autônoma.
-                </p>
-              </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-emerald-600 flex items-center gap-1.5">
-                <CheckCircle2 size={14} />
-                <span>Saúde preventiva e dignidade básica</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 4. SELETOR DE PLANOS E FORMULÁRIO DE ADESÃO (CALL TO ACTION CENTRAL) */}
-      <section id="adesao-mantenedor" className="py-20 md:py-28 bg-[#0F172A] text-white relative overflow-hidden scroll-mt-20">
+      {/* 1. SELETOR DE PLANOS E FORMULÁRIO DE ADESÃO (DOAÇÃO LOGO APÓS O HEADER) */}
+      <section id="adesao-mantenedor" className="pt-12 pb-20 md:pt-16 md:pb-24 bg-[#0F172A] text-white relative overflow-hidden scroll-mt-20">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-[#0F172A] to-[#0F172A] opacity-90"></div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1188,6 +913,281 @@ export function MonthlyDonor() {
             </div>
           )}
 
+        </div>
+      </section>
+
+      {/* 2. HERO & PROPOSTA DE VALOR */}
+      <section className="relative py-20 md:py-28 bg-[#0F172A] text-white overflow-hidden border-t border-slate-800/80">
+        {/* Background visual imersivo com maior transparência */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/mantenedor_hero.jpg" 
+            alt="Criança sorrindo acolhida pela YAH Hope" 
+            className="w-full h-full object-cover object-top filter brightness-[0.72] contrast-105 scale-105 transition-transform duration-1000"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/45 to-black/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/85 via-[#0F172A]/35 to-transparent"></div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Coluna Texto: Proposta de Valor e Emoção */}
+            <div className="lg:col-span-7 text-center lg:text-left space-y-6">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
+                Sua doação <br />
+                <span className="text-[#F49853]">mantém a esperança viva</span>.
+              </h1>
+
+              <p className="text-lg sm:text-xl text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                A esperança não é apenas um sentimento: ela ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você acende a luz de um novo futuro para crianças e famílias inteiras, garantindo que o cuidado, a dignidade e a vida nunca deixem de florescer.
+              </p>
+
+              {/* Métricas Rápidas de Impacto e Confiança */}
+              <div className="pt-4 grid grid-cols-3 gap-4 border-t border-slate-700/60 max-w-xl mx-auto lg:mx-0">
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-white">500+</p>
+                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Vidas Resgatadas</p>
+                </div>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-[#92BF78]">100%</p>
+                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Gestão Auditada</p>
+                </div>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-[#F49853]">R$ 1,66</p>
+                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Ao dia para mudar tudo</p>
+                </div>
+              </div>
+
+              {/* Botões de Ação Imediata */}
+              <div className="pt-4 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
+                <button
+                  onClick={scrollToCheckout}
+                  className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-4 rounded-full font-gotham-bold text-sm tracking-wide shadow-xl shadow-[#F49853]/30 hover:shadow-[#F49853]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Sparkles size={18} />
+                  <span>Quero Ser um Mantenedor Mensal</span>
+                  <ArrowRight size={16} />
+                </button>
+
+                <a
+                  href="#como-funciona"
+                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-4 rounded-full font-gotham-medium text-sm tracking-wide transition-all text-center"
+                >
+                  Entenda o Impacto da sua Ajuda
+                </a>
+              </div>
+            </div>
+
+            {/* Coluna Direita: Card Flutuante de Síntese */}
+            <div className="lg:col-span-5">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative">
+                <div className="absolute -top-3 -right-3 bg-[#92BF78] text-slate-950 font-gotham-bold text-[11px] uppercase tracking-wider px-3 py-1 rounded-full shadow-md flex items-center gap-1.5">
+                  <ShieldCheck size={14} />
+                  Portal Exclusivo
+                </div>
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-[#F49853] flex items-center justify-center text-white shrink-0 shadow-lg">
+                    <Heart size={24} className="fill-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-gotham-bold text-lg text-white">Comunidade de Mantenedores</h3>
+                    <p className="text-xs text-slate-300">A aliança que nunca abandona quem precisa</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-sm text-slate-200 font-gotham-light">
+                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-white block font-gotham-medium">Previsibilidade que Salva</strong>
+                      <span className="text-xs text-slate-300">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-white block font-gotham-medium">Relatórios Diretos de Campo</strong>
+                      <span className="text-xs text-slate-300">Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-white block font-gotham-medium">100% Flexível e Seguro</strong>
+                      <span className="text-xs text-slate-300">Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e sem amarras.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-5 border-t border-white/15 flex items-center justify-between text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Lock size={14} className="text-[#F49853]" />
+                    Criptografia 256-Bit SSL
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={14} className="text-[#92BF78]" />
+                    Ativação Imediata
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 3. O CONTRASTE: POR QUE O APOIO MENSAL É CRUCIAL */}
+      <section id="como-funciona" className="py-20 md:py-28 bg-slate-50 border-b border-slate-200/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
+              A Diferença Entre Sobreviver e Prosperar
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
+              Por que nossos projetos dependem da sua constância mensal?
+            </h2>
+            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
+              Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza duradoura que mantém todas as nossas frentes humanitárias ativas todos os dias.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+            
+            {/* Coluna 1: O drama da incerteza */}
+            <div className="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-xs relative overflow-hidden">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 mb-6">
+                <Clock size={24} />
+              </div>
+              <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                Quando dependemos apenas de doações pontuais:
+              </h3>
+              <ul className="space-y-4 text-slate-600 text-sm">
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
+                  <span>Incerteza para planejar novas perfurações de poços de água potável e manter a manutenção das bombas ativas.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
+                  <span>Risco de interrupção no tratamento clínico de crianças desnutridas e nas bolsas de estudo de jovens universitários.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
+                  <span>Dificuldade para estruturar novas frentes comunitárias e comprar insumos essenciais com antecedência e economia.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Coluna 2: O poder da fidelidade mensal */}
+            <div className="bg-gradient-to-br from-[#0F172A] to-slate-900 text-white rounded-3xl p-8 border border-[#F49853]/30 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#F49853]/15 rounded-full blur-2xl"></div>
+              
+              <div className="w-12 h-12 rounded-2xl bg-[#F49853] flex items-center justify-center text-white mb-6 shadow-md shadow-[#F49853]/30">
+                <Sparkles size={24} />
+              </div>
+              <h3 className="text-xl font-heading font-black text-white mb-3">
+                Quando você se torna um Mantenedor Mensal:
+              </h3>
+              <ul className="space-y-4 text-slate-200 text-sm">
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
+                  <span><strong>Todas as Portas Abertas:</strong> Acolhimento médico ininterrupto, clínicas móveis nos vilarejos e atendimento digno para cada família.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
+                  <span><strong>Água, Nutrição e Saúde Plena:</strong> Poços artesianos operando sem parar e ciclo integral de recuperação para erradicar a desnutrição.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
+                  <span><strong>Futuro, Educação e Autonomia:</strong> Continuidade de bolsas universitárias, capacitação profissional de mães e hortas comunitárias sustentáveis.</span>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 4. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
+      <section className="py-20 md:py-28 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
+              Destinação Real e Auditada
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
+              Para onde vai a sua contribuição todo mês?
+            </h2>
+            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
+              Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Frente 1 */}
+            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-orange-100 text-[#F49853] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Activity size={28} />
+                </div>
+                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                  Casa Nutri (Nampula)
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                  Compra de fórmulas terapêuticas (F-75, F-100 e Plumpy'Nut), insumos hospitalares, remuneração de nutricionistas locais e monitoramento pediátrico intensivo para erradicar a desnutrição infantil.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1.5">
+                <CheckCircle2 size={14} />
+                <span>Salva vidas em risco iminente</span>
+              </div>
+            </div>
+
+            {/* Frente 2 */}
+            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <GraduationCap size={28} />
+                </div>
+                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                  Educação & Bolsas Universitárias
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                  Financiamento de bolsas universitárias integrais para jovens órfãos ou em extrema vulnerabilidade se formarem médicos, enfermeiros, professores e engenheiros da sua própria nação.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-blue-600 flex items-center gap-1.5">
+                <CheckCircle2 size={14} />
+                <span>Quebra o ciclo geracional da pobreza</span>
+              </div>
+            </div>
+
+            {/* Frente 3 */}
+            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Droplets size={28} />
+                </div>
+                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                  Água Potável & Autonomia Comunitária
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                  Perfuração de poços artesianos nas aldeias, saneamento, oficinas de agricultura sustentável para mães e hortas que alimentam centenas de famílias de forma autônoma.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-emerald-600 flex items-center gap-1.5">
+                <CheckCircle2 size={14} />
+                <span>Saúde preventiva e dignidade básica</span>
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
