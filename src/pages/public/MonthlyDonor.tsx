@@ -356,41 +356,42 @@ export function MonthlyDonor() {
           <img 
             src="/mantenedor_hero.jpg" 
             alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-top filter brightness-[0.70] contrast-105 scale-105 transition-transform duration-1000"
+            className="w-full h-full object-cover object-[center_28%] filter brightness-[0.88] contrast-105 scale-100 transition-transform duration-1000"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-[#0F172A]/70"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/95 via-[#0F172A]/70 to-[#0F172A]/95"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800/40 via-transparent to-[#0F172A]/90"></div>
+          {/* Gradientes equilibrados: foto nítida e iluminada com contraste perfeito para os textos */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/50 to-[#0F172A]/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/60 via-transparent to-[#0F172A]/60"></div>
+          <div className="absolute inset-0 bg-black/15"></div>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Cabeçalho Unificado: Proposta de Valor e Emoção */}
           <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
-            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block">
+            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block drop-shadow-md">
               Comunidade de Mantenedores • Transforme Vidas Mensalmente
             </span>
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12] drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
               Sua doação <br className="hidden sm:inline" />
               <span className="text-[#F49853]">mantém a esperança viva</span>.
             </h1>
-            <p className="text-base sm:text-lg text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-slate-100 font-gotham-light leading-relaxed max-w-2xl mx-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               A esperança ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você garante nutrição diária, atendimento médico e um novo futuro para crianças e famílias em Moçambique e no Brasil.
             </p>
 
             {/* Métricas Rápidas de Impacto e Confiança */}
-            <div className="pt-2 pb-2 grid grid-cols-3 gap-4 border-y border-slate-700/60 max-w-xl mx-auto">
+            <div className="pt-2 pb-2 grid grid-cols-3 gap-4 border-y border-white/20 max-w-xl mx-auto backdrop-blur-xs">
               <div>
-                <p className="text-xl sm:text-3xl font-black text-white">500+</p>
-                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Vidas Resgatadas</p>
+                <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">500+</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Vidas Resgatadas</p>
               </div>
               <div>
-                <p className="text-xl sm:text-3xl font-black text-[#92BF78]">100%</p>
-                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Gestão Auditada</p>
+                <p className="text-xl sm:text-3xl font-black text-[#92BF78] drop-shadow-md">100%</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Gestão Auditada</p>
               </div>
               <div>
-                <p className="text-xl sm:text-3xl font-black text-[#F49853]">R$ 1,66</p>
-                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Ao dia para mudar tudo</p>
+                <p className="text-xl sm:text-3xl font-black text-[#F49853] drop-shadow-md">R$ 1,66</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Ao dia para mudar tudo</p>
               </div>
             </div>
 
