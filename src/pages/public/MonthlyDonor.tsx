@@ -349,25 +349,53 @@ export function MonthlyDonor() {
         canonical="https://yahhope.org/mantenedor"
       />
 
-      {/* 1. SELETOR DE PLANOS E FORMULÁRIO DE ADESÃO (DOAÇÃO LOGO APÓS O HEADER) */}
-      <section id="adesao-mantenedor" className="pt-12 pb-20 md:pt-16 md:pb-24 bg-[#0F172A] text-white relative overflow-hidden scroll-mt-20">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-[#0F172A] to-[#0F172A] opacity-90"></div>
-        
+      {/* 1. SEÇÃO UNIFICADA: HERO & DOAÇÃO DO MANTENEDOR (LOGO APÓS O HEADER) */}
+      <section id="adesao-mantenedor" className="relative pt-10 pb-20 md:pt-14 md:pb-28 bg-[#0F172A] text-white overflow-hidden scroll-mt-20">
+        {/* Background visual imersivo com a foto da criança acolhida */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/mantenedor_hero.jpg" 
+            alt="Criança sorrindo acolhida pela YAH Hope" 
+            className="w-full h-full object-cover object-top filter brightness-[0.70] contrast-105 scale-105 transition-transform duration-1000"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-[#0F172A]/70"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/95 via-[#0F172A]/70 to-[#0F172A]/95"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800/40 via-transparent to-[#0F172A]/90"></div>
+        </div>
+
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              Escolha seu Nível de Aliança
+          {/* Cabeçalho Unificado: Proposta de Valor e Emoção */}
+          <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
+            <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block">
+              Comunidade de Mantenedores • Transforme Vidas Mensalmente
             </span>
-            <h2 className="text-3xl sm:text-5xl font-heading font-black text-white leading-tight">
-              Transforme Vidas Mensalmente
-            </h2>
-            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-3">
-              Escolha entre apadrinhar uma ou mais crianças com cotas acessíveis ou apoiar a sustentação global do projeto.
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
+              Sua doação <br className="hidden sm:inline" />
+              <span className="text-[#F49853]">mantém a esperança viva</span>.
+            </h1>
+            <p className="text-base sm:text-lg text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto">
+              A esperança ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você garante nutrição diária, atendimento médico e um novo futuro para crianças e famílias em Moçambique e no Brasil.
             </p>
 
+            {/* Métricas Rápidas de Impacto e Confiança */}
+            <div className="pt-2 pb-2 grid grid-cols-3 gap-4 border-y border-slate-700/60 max-w-xl mx-auto">
+              <div>
+                <p className="text-xl sm:text-3xl font-black text-white">500+</p>
+                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Vidas Resgatadas</p>
+              </div>
+              <div>
+                <p className="text-xl sm:text-3xl font-black text-[#92BF78]">100%</p>
+                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Gestão Auditada</p>
+              </div>
+              <div>
+                <p className="text-xl sm:text-3xl font-black text-[#F49853]">R$ 1,66</p>
+                <p className="text-[11px] sm:text-xs text-slate-400 font-gotham-medium mt-0.5">Ao dia para mudar tudo</p>
+              </div>
+            </div>
+
             {/* Alternador de Modalidade: Apadrinhar Criança vs Mantenedor Geral */}
-            <div className="mt-8 inline-flex bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700 shadow-xl">
+            <div className="pt-2 inline-flex bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700 shadow-xl">
               <button
                 type="button"
                 onClick={() => setDonationType('sponsorship')}
@@ -913,134 +941,43 @@ export function MonthlyDonor() {
             </div>
           )}
 
-        </div>
-      </section>
-
-      {/* 2. HERO & PROPOSTA DE VALOR */}
-      <section className="relative py-20 md:py-28 bg-[#0F172A] text-white overflow-hidden border-t border-slate-800/80">
-        {/* Background visual imersivo com maior transparência */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="/mantenedor_hero.jpg" 
-            alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-top filter brightness-[0.72] contrast-105 scale-105 transition-transform duration-1000"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/45 to-black/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/85 via-[#0F172A]/35 to-transparent"></div>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
-            {/* Coluna Texto: Proposta de Valor e Emoção */}
-            <div className="lg:col-span-7 text-center lg:text-left space-y-6">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12]">
-                Sua doação <br />
-                <span className="text-[#F49853]">mantém a esperança viva</span>.
-              </h1>
-
-              <p className="text-lg sm:text-xl text-slate-200 font-gotham-light leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                A esperança não é apenas um sentimento: ela ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você acende a luz de um novo futuro para crianças e famílias inteiras, garantindo que o cuidado, a dignidade e a vida nunca deixem de florescer.
-              </p>
-
-              {/* Métricas Rápidas de Impacto e Confiança */}
-              <div className="pt-4 grid grid-cols-3 gap-4 border-t border-slate-700/60 max-w-xl mx-auto lg:mx-0">
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-white">500+</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Vidas Resgatadas</p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#92BF78]">100%</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Gestão Auditada</p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-black text-[#F49853]">R$ 1,66</p>
-                  <p className="text-xs text-slate-400 font-gotham-medium mt-0.5">Ao dia para mudar tudo</p>
-                </div>
+          {/* 3 Garantias e Benefícios da Comunidade de Mantenedores */}
+          <div className="mt-12 pt-8 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 rounded-2xl p-4.5 flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} className="text-[#92BF78]" />
               </div>
-
-              {/* Botões de Ação Imediata */}
-              <div className="pt-4 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                <button
-                  onClick={scrollToCheckout}
-                  className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-4 rounded-full font-gotham-bold text-sm tracking-wide shadow-xl shadow-[#F49853]/30 hover:shadow-[#F49853]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Sparkles size={18} />
-                  <span>Quero Ser um Mantenedor Mensal</span>
-                  <ArrowRight size={16} />
-                </button>
-
-                <a
-                  href="#como-funciona"
-                  className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-4 rounded-full font-gotham-medium text-sm tracking-wide transition-all text-center"
-                >
-                  Entenda o Impacto da sua Ajuda
-                </a>
+              <div>
+                <strong className="text-white block font-gotham-medium text-sm">Previsibilidade que Salva</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
               </div>
             </div>
 
-            {/* Coluna Direita: Card Flutuante de Síntese */}
-            <div className="lg:col-span-5">
-              <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative">
-                <div className="absolute -top-3 -right-3 bg-[#92BF78] text-slate-950 font-gotham-bold text-[11px] uppercase tracking-wider px-3 py-1 rounded-full shadow-md flex items-center gap-1.5">
-                  <ShieldCheck size={14} />
-                  Portal Exclusivo
-                </div>
-
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-[#F49853] flex items-center justify-center text-white shrink-0 shadow-lg">
-                    <Heart size={24} className="fill-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-gotham-bold text-lg text-white">Comunidade de Mantenedores</h3>
-                    <p className="text-xs text-slate-300">A aliança que nunca abandona quem precisa</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 text-sm text-slate-200 font-gotham-light">
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">Previsibilidade que Salva</strong>
-                      <span className="text-xs text-slate-300">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">Relatórios Diretos de Campo</strong>
-                      <span className="text-xs text-slate-300">Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                    <CheckCircle2 size={18} className="text-[#92BF78] shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-white block font-gotham-medium">100% Flexível e Seguro</strong>
-                      <span className="text-xs text-slate-300">Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e sem amarras.</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-5 border-t border-white/15 flex items-center justify-between text-xs text-slate-300">
-                  <span className="flex items-center gap-1.5">
-                    <Lock size={14} className="text-[#F49853]" />
-                    Criptografia 256-Bit SSL
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#92BF78]" />
-                    Ativação Imediata
-                  </span>
-                </div>
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 rounded-2xl p-4.5 flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} className="text-[#92BF78]" />
+              </div>
+              <div>
+                <strong className="text-white block font-gotham-medium text-sm">Relatórios Diretos de Campo</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.</span>
               </div>
             </div>
 
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 rounded-2xl p-4.5 flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <ShieldCheck size={20} className="text-[#92BF78]" />
+              </div>
+              <div>
+                <strong className="text-white block font-gotham-medium text-sm">100% Flexível e Seguro</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e criptografia SSL 256-bit.</span>
+              </div>
+            </div>
           </div>
+
         </div>
       </section>
 
-      {/* 3. O CONTRASTE: POR QUE O APOIO MENSAL É CRUCIAL */}
+      {/* 2. O CONTRASTE: POR QUE O APOIO MENSAL É CRUCIAL */}
       <section id="como-funciona" className="py-20 md:py-28 bg-slate-50 border-b border-slate-200/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -1112,7 +1049,7 @@ export function MonthlyDonor() {
         </div>
       </section>
 
-      {/* 4. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
+      {/* 3. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
       <section className="py-20 md:py-28 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -1191,7 +1128,7 @@ export function MonthlyDonor() {
         </div>
       </section>
 
-      {/* 5. HISTÓRIA REAL DE RESGATE: O PODER DO MANTENEDOR */}
+      {/* 4. HISTÓRIA REAL DE RESGATE: O PODER DO MANTENEDOR */}
       <section className="py-20 md:py-28 bg-white font-gotham-regular">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -1243,7 +1180,7 @@ export function MonthlyDonor() {
         </div>
       </section>
 
-      {/* 6. TRANSPARÊNCIA RADICAL: O QUE VOCÊ GANHA COMO MANTENEDOR */}
+      {/* 5. TRANSPARÊNCIA RADICAL: O QUE VOCÊ GANHA COMO MANTENEDOR */}
       <section className="py-20 md:py-28 bg-slate-50 border-y border-slate-200/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -1305,7 +1242,7 @@ export function MonthlyDonor() {
         </div>
       </section>
 
-      {/* 7. PERGUNTAS FREQUENTES (FAQ) PARA QUEBRAR TODAS AS OBJEÇÕES */}
+      {/* 6. PERGUNTAS FREQUENTES (FAQ) PARA QUEBRAR TODAS AS OBJEÇÕES */}
       <section className="py-20 md:py-28 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -1368,7 +1305,7 @@ export function MonthlyDonor() {
         </div>
       </section>
 
-      {/* 8. CHAMADA FINAL EMOCIONANTE (CTA FOOTER HERO) */}
+      {/* 7. CHAMADA FINAL EMOCIONANTE (CTA FOOTER HERO) */}
       <section className="py-20 md:py-28 bg-[#0F172A] text-white relative overflow-hidden text-center">
         <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A] via-[#0F172A]/90 to-[#0F172A] z-10"></div>
         <img 
