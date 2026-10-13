@@ -351,12 +351,12 @@ export function MonthlyDonor() {
 
       {/* 1. SEÇÃO UNIFICADA: HERO & DOAÇÃO DO MANTENEDOR (LOGO APÓS O HEADER) */}
       <section id="adesao-mantenedor" className="relative pt-10 pb-20 md:pt-14 md:pb-28 bg-[#0F172A] text-white overflow-hidden scroll-mt-20">
-        {/* Background visual imersivo com a foto da criança acolhida */}
+        {/* Background visual imersivo com as crianças */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="/mantenedor_hero.jpg" 
-            alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-[10%_25%] sm:object-[15%_25%] lg:object-[18%_22%] filter brightness-[0.92] contrast-105 scale-100 transition-transform duration-1000"
+            src="/mantenedor_hero_novo.jpg" 
+            alt="Crianças jogando futebol acolhidas pela YAH Hope" 
+            className="w-full h-full object-cover object-[15%_25%] sm:object-[20%_25%] filter brightness-[0.92] contrast-105 scale-100 transition-transform duration-1000"
           />
           {/* Gradientes equilibrados: foto nítida e destacada à esquerda com contraste para o formulário à direita */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/45 to-[#0F172A]/20"></div>
@@ -1052,6 +1052,18 @@ export function MonthlyDonor() {
 
       {/* 3. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
       <section className="py-20 md:py-28 bg-[#0F172A] text-white relative overflow-hidden">
+        {/* Background visual com a foto da criança acolhida */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/mantenedor_hero.jpg" 
+            alt="Criança sorrindo acolhida pela YAH Hope" 
+            className="w-full h-full object-cover object-center filter brightness-[0.70] contrast-105 scale-100"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/85 to-[#0F172A]/75"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/90 via-[#0F172A]/60 to-[#0F172A]/90"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-transparent to-[#0F172A]/80"></div>
+        </div>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
