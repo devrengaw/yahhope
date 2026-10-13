@@ -3,11 +3,12 @@ import {
   X, Save, Image as ImageIcon, Check, FileText, BookOpen, 
   BarChart3, Lock, Plus, Trash2, Eye, Edit3, MapPin, 
   User, Target, Heart, Sparkles, ExternalLink, ShieldCheck,
-  CheckCircle2, Info
+  CheckCircle2, Info, Upload, Loader2
 } from 'lucide-react';
 import { YAHHopeProject } from '../../lib/mockData';
 import { cn } from '../../lib/utils';
 import { RichTextEditor } from '../communication/RichTextEditor';
+import { uploadProjectImage } from '../../lib/imageUpload';
 
 const PRESET_COLORS = [
   { name: 'Verde (Nutrição & Saúde)', hex: '#92BF78' },
@@ -60,6 +61,11 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
   // Tab 4: Internal Admin Notes (Private)
   const [adminNotes, setAdminNotes] = useState('');
 
+  // Upload States
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const [showManualUrl, setShowManualUrl] = useState(false);
+
   useEffect(() => {
     if (editingProject) {
       setTitle(editingProject.title || '');
@@ -108,6 +114,47 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
 
   const handleRemoveGalleryImage = (indexToRemove: number) => {
     setGalleryImages(galleryImages.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingCover(true);
+      const url = await uploadProjectImage(file, editingProject?.id);
+      setImageUrl(url);
+    } catch (err) {
+      console.error('Erro ao fazer upload da imagem de capa:', err);
+      alert('Não foi possível carregar a imagem. Tente novamente.');
+    } finally {
+      setIsUploadingCover(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsUploadingGallery(true);
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const url = await uploadProjectImage(file, editingProject?.id);
+        if (url && !galleryImages.includes(url) && !newUrls.includes(url)) {
+          newUrls.push(url);
+        }
+      }
+      setGalleryImages(prev => [...prev, ...newUrls]);
+    } catch (err) {
+      console.error('Erro ao fazer upload para a galeria:', err);
+      alert('Não foi possível carregar as fotos da galeria.');
+    } finally {
+      setIsUploadingGallery(false);
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -388,40 +435,106 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
                   ></textarea>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">URL da Imagem de Capa Principal</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <ImageIcon size={16} className="text-slate-400" />
-                    </div>
-                    <input 
-                      type="text" 
-                      value={imageUrl} 
-                      onChange={e => setImageUrl(e.target.value)} 
-                      placeholder="https://..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-orange-500/20 focus:border-[#F49853] outline-hidden transition-all" 
-                    />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon size={14} className="text-orange-500" />
+                      Imagem de Capa Principal
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowManualUrl(!showManualUrl)}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                    >
+                      {showManualUrl ? 'Ocultar opções de link manual' : 'Inserir link manual / Presets'}
+                    </button>
                   </div>
 
-                  {/* Presets */}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="text-[11px] font-bold text-slate-400 py-1 mr-1">Presets YAH Hope:</span>
-                    {PRESET_IMAGES.map((img) => (
-                      <button
-                        key={img.url}
-                        type="button"
-                        onClick={() => setImageUrl(img.url)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer",
-                          imageUrl === img.url
-                            ? "bg-orange-100 text-orange-800 border-orange-300"
-                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-                        )}
-                      >
-                        {img.label}
-                      </button>
-                    ))}
+                  {/* Upload do Dispositivo & Status */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                    <label className={cn(
+                      "flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 border-dashed font-bold text-xs transition-all cursor-pointer text-center",
+                      isUploadingCover
+                        ? "bg-orange-50 border-orange-300 text-orange-600 cursor-wait"
+                        : "bg-slate-50 border-slate-300 text-slate-700 hover:bg-orange-50 hover:border-[#F49853] hover:text-[#F49853]"
+                    )}>
+                      {isUploadingCover ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin text-orange-500" />
+                          <span>Otimizando e enviando foto...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={16} className="text-[#F49853]" />
+                          <span>Fazer Upload de Imagem do Dispositivo</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        disabled={isUploadingCover}
+                        onChange={handleCoverUpload}
+                        className="hidden" 
+                      />
+                    </label>
+
+                    {/* Status da Imagem Atual */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600">
+                      <div className="truncate pr-2">
+                        <span className="block font-bold text-slate-700">Status da Capa:</span>
+                        <span className="truncate block text-slate-400 text-[11px]">
+                          {imageUrl ? (imageUrl.startsWith('data:') ? 'Foto carregada do dispositivo' : imageUrl.split('/').pop() || 'Foto definida') : 'Nenhuma imagem selecionada'}
+                        </span>
+                      </div>
+                      {imageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setImageUrl('')}
+                          className="text-red-500 hover:text-red-700 font-bold shrink-0 cursor-pointer text-xs"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inserção por Link Manual / Presets (opcional) */}
+                  {showManualUrl && (
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 mt-2 animate-in fade-in duration-200">
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <ImageIcon size={15} className="text-slate-400" />
+                        </div>
+                        <input 
+                          type="text" 
+                          value={imageUrl} 
+                          onChange={e => setImageUrl(e.target.value)} 
+                          placeholder="Ou cole uma URL externa (https://...)"
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-orange-500/20 focus:border-[#F49853] outline-hidden" 
+                        />
+                      </div>
+
+                      {/* Presets */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="text-[10px] font-bold text-slate-400 py-1 mr-1">Presets YAH Hope:</span>
+                        {PRESET_IMAGES.map((img) => (
+                          <button
+                            key={img.url}
+                            type="button"
+                            onClick={() => setImageUrl(img.url)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer",
+                              imageUrl === img.url
+                                ? "bg-orange-100 text-orange-800 border-orange-300"
+                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                            )}
+                          >
+                            {img.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Preview Mini Card */}
@@ -590,7 +703,7 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
 
                 {/* Additional Gallery Photos */}
                 <div className="space-y-3 pt-4 border-t border-slate-100">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                         <ImageIcon size={14} className="text-blue-500" />
@@ -600,22 +713,51 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
                         Fotos que serão exibidas em destaque para os visitantes conhecerem a rotina do projeto.
                       </p>
                     </div>
+
+                    {/* Botão de Upload Múltiplo para a Galeria */}
+                    <label className={cn(
+                      "px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs",
+                      isUploadingGallery
+                        ? "bg-orange-100 text-orange-700 cursor-wait"
+                        : "bg-slate-900 hover:bg-slate-800 text-white"
+                    )}>
+                      {isUploadingGallery ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin text-orange-500" />
+                          <span>Enviando fotos...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={14} className="text-[#F49853]" />
+                          <span>Fazer Upload de Fotos</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        disabled={isUploadingGallery}
+                        onChange={handleGalleryUpload}
+                        className="hidden" 
+                      />
+                    </label>
                   </div>
 
+                  {/* Opção secundária: Adicionar por link */}
                   <div className="flex gap-2">
                     <input 
                       type="text" 
                       value={newGalleryUrl} 
                       onChange={e => setNewGalleryUrl(e.target.value)} 
-                      placeholder="Cole a URL da foto (https://...)"
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-orange-500/20 focus:border-[#F49853] outline-hidden"
+                      placeholder="Ou adicione por link externo (https://...)"
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-orange-500/20 focus:border-[#F49853] outline-hidden"
                     />
                     <button
                       type="button"
                       onClick={() => handleAddGalleryImage()}
-                      className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Plus size={14} /> Adicionar
+                      <Plus size={13} /> Adicionar Link
                     </button>
                   </div>
 
@@ -642,7 +784,7 @@ export function LocalProjectModal({ isOpen, onClose, onSave, editingProject }: L
                     </div>
                   ) : (
                     <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
-                      Nenhuma foto adicional adicionada à galeria.
+                      Nenhuma foto adicional adicionada à galeria. Clique em "Fazer Upload de Fotos" para adicionar imagens.
                     </div>
                   )}
                 </div>

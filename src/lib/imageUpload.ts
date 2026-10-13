@@ -207,3 +207,70 @@ export async function uploadChildPhoto(
   return optimizedDataUrl;
 }
 
+/**
+ * Compresses and uploads a project photo or cover image (max 1600x1200, quality 0.85).
+ * Attempts Supabase storage buckets ('projects', 'avatars', 'blog-images'),
+ * falling back safely to the client-side optimized WebP/JPEG data URL if buckets are not available.
+ */
+export async function uploadProjectImage(
+  file: File,
+  projectId?: string
+): Promise<string> {
+  const optimizedDataUrl = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 1200,
+    quality: 0.85
+  });
+
+  try {
+    const fileExt = 'webp';
+    const fileName = `proj-${projectId || 'new'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    const filePath = `projects/${fileName}`;
+
+    const response = await fetch(optimizedDataUrl);
+    const blob = await response.blob();
+
+    // 1. Try 'projects' bucket
+    const { error: projErr } = await supabase.storage
+      .from('projects')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: blob.type || 'image/webp'
+      });
+
+    if (!projErr) {
+      const { data: publicUrlData } = supabase.storage
+        .from('projects')
+        .getPublicUrl(filePath);
+
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+
+    // 2. Fallback to 'avatars'
+    const { error: avatarErr } = await supabase.storage
+      .from('avatars')
+      .upload(`projects/${fileName}`, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: blob.type || 'image/webp'
+      });
+
+    if (!avatarErr) {
+      const { data: avatarUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`projects/${fileName}`);
+
+      if (avatarUrlData?.publicUrl) {
+        return avatarUrlData.publicUrl;
+      }
+    }
+  } catch {
+    // Graceful fallback to optimized data URL
+  }
+
+  return optimizedDataUrl;
+}
+
