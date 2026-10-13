@@ -108,6 +108,7 @@ import { MobileDonorChildren } from './pages/portal/mobile/MobileDonorChildren';
 import { MobileDonorProjects } from './pages/portal/mobile/MobileDonorProjects';
 import { MobileDonorBlog } from './pages/portal/mobile/MobileDonorBlog';
 import { MobileDonorDonate } from './pages/portal/mobile/MobileDonorDonate';
+import { MobileDonorSponsor } from './pages/portal/mobile/MobileDonorSponsor';
 import { PortalMyDonations } from './pages/portal/PortalMyDonations';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
@@ -351,6 +352,9 @@ export default function App() {
                                               <Route path="/" element={<Navigate to="/portal/dashboard" replace />} />
                                               <Route path="/dashboard" element={<MobileDonorHome />} />
                                               <Route path="/sponsorship" element={<MobileDonorChildren />} />
+                                              <Route path="/sponsorship/novo" element={<MobileDonorSponsor />} />
+                                              <Route path="/apadrinhar" element={<MobileDonorSponsor />} />
+                                              <Route path="/sponsor" element={<MobileDonorSponsor />} />
                                               <Route path="/projects" element={<MobileDonorProjects />} />
                                               <Route path="/blog" element={<Navigate to="/blog" replace />} />
                                               <Route path="/donations" element={<MobileDonorDonate />} />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ArrowRight, CreditCard, Sparkles, Heart, User, Mail, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDonationModal } from '../../contexts/DonationModalContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const STRIPE_QUOTAS = [
   { amount: 50, label: 'Alimenta uma criança' },
@@ -11,13 +12,22 @@ const STRIPE_QUOTAS = [
 
 export function DonationModal() {
   const { isOpen, options, closeDonationModal } = useDonationModal();
+  const { user } = useAuth();
   const [frequency, setFrequency] = useState<'single' | 'monthly'>('single');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [donorName, setDonorName] = useState('');
-  const [donorEmail, setDonorEmail] = useState('');
-  const [donorWhatsapp, setDonorWhatsapp] = useState('');
+  const [donorName, setDonorName] = useState(user?.name || '');
+  const [donorEmail, setDonorEmail] = useState(user?.email || '');
+  const [donorWhatsapp, setDonorWhatsapp] = useState(user?.phone || '');
   const [formError, setFormError] = useState('');
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.name && !donorName) setDonorName(user.name);
+      if (user.email && !donorEmail) setDonorEmail(user.email);
+      if (user.phone && !donorWhatsapp) setDonorWhatsapp(user.phone);
+    }
+  }, [user]);
 
   if (!isOpen) return null;
 
@@ -41,24 +51,31 @@ export function DonationModal() {
 
   const handleCheckout = async (amount: number) => {
     setFormError('');
-    if (!donorName.trim()) {
-      setFormError('Por favor, informe seu nome.');
-      return;
-    }
-    if (!donorEmail.trim() || !donorEmail.includes('@')) {
-      setFormError('Por favor, informe um e-mail válido.');
-      return;
-    }
-    if (!donorWhatsapp.trim() || donorWhatsapp.replace(/\D/g, '').length < 10) {
-      setFormError('Por favor, informe seu WhatsApp com DDD.');
-      return;
+
+    const finalName = donorName.trim() || user?.name || '';
+    const finalEmail = donorEmail.trim() || user?.email || '';
+    const finalWhatsapp = donorWhatsapp.trim() || user?.phone || '';
+
+    if (!user) {
+      if (!finalName) {
+        setFormError('Por favor, informe seu nome.');
+        return;
+      }
+      if (!finalEmail || !finalEmail.includes('@')) {
+        setFormError('Por favor, informe um e-mail válido.');
+        return;
+      }
+      if (!finalWhatsapp || finalWhatsapp.replace(/\D/g, '').length < 10) {
+        setFormError('Por favor, informe seu WhatsApp com DDD.');
+        return;
+      }
     }
 
     setIsCheckingOut(true);
     const isMonthly = frequency === 'monthly';
     const fallbackUrl = isMonthly 
-      ? `/mantenedor?amount=${amount}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}` 
-      : `/campanha?amount=${amount}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
+      ? `/mantenedor?amount=${amount}&name=${encodeURIComponent(finalName)}&email=${encodeURIComponent(finalEmail)}&whatsapp=${encodeURIComponent(finalWhatsapp)}` 
+      : `/campanha?amount=${amount}&isMonthly=false&method=card&name=${encodeURIComponent(finalName)}&email=${encodeURIComponent(finalEmail)}&whatsapp=${encodeURIComponent(finalWhatsapp)}`;
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -78,10 +95,10 @@ export function DonationModal() {
         body: JSON.stringify({
           amount,
           isMonthly,
-          donorName: donorName.trim(),
-          donorEmail: donorEmail.trim(),
-          donorPhone: donorWhatsapp.trim(),
-          donorWhatsapp: donorWhatsapp.trim(),
+          donorName: finalName,
+          donorEmail: finalEmail,
+          donorPhone: finalWhatsapp,
+          donorWhatsapp: finalWhatsapp,
           successUrl: isMonthly
             ? `${window.location.origin}/mantenedor?status=success`
             : `${window.location.origin}/campanha?status=success`,
@@ -192,52 +209,77 @@ export function DonationModal() {
           )}
 
           <div className="mb-4 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 space-y-2">
-            <p className="text-[11px] font-gotham-bold text-slate-600 uppercase tracking-wider">
-              Seus Dados para Contato
-            </p>
+            {user ? (
+              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/80 flex items-center justify-between text-left">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                    {user.name ? user.name[0].toUpperCase() : 'U'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-gotham-bold text-slate-800 truncate leading-tight">
+                        {user.name || 'Usuário Conectado'}
+                      </p>
+                      <span className="text-[9px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                        Logado ✓
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 truncate font-medium">
+                      {user.email} {user.phone ? `• ${user.phone}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[11px] font-gotham-bold text-slate-600 uppercase tracking-wider">
+                  Seus Dados para Contato
+                </p>
 
-            <div className="relative">
-              <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Nome completo"
-                value={donorName}
-                onChange={(e) => {
-                  setDonorName(e.target.value);
-                  if (formError) setFormError('');
-                }}
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
-              />
-            </div>
+                <div className="relative">
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Nome completo"
+                    value={donorName}
+                    onChange={(e) => {
+                      setDonorName(e.target.value);
+                      if (formError) setFormError('');
+                    }}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+                  />
+                </div>
 
-            <div className="relative">
-              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="email"
-                placeholder="Seu melhor e-mail"
-                value={donorEmail}
-                onChange={(e) => {
-                  setDonorEmail(e.target.value);
-                  if (formError) setFormError('');
-                }}
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
-              />
-            </div>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    placeholder="Seu melhor e-mail"
+                    value={donorEmail}
+                    onChange={(e) => {
+                      setDonorEmail(e.target.value);
+                      if (formError) setFormError('');
+                    }}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+                  />
+                </div>
 
-            <div className="relative">
-              <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="tel"
-                placeholder="WhatsApp (DDD + Número)"
-                value={donorWhatsapp}
-                onChange={(e) => {
-                  handleWhatsappChange(e.target.value);
-                  if (formError) setFormError('');
-                }}
-                maxLength={15}
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
-              />
-            </div>
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="tel"
+                    placeholder="WhatsApp (DDD + Número)"
+                    value={donorWhatsapp}
+                    onChange={(e) => {
+                      handleWhatsappChange(e.target.value);
+                      if (formError) setFormError('');
+                    }}
+                    maxLength={15}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-xs font-gotham-regular text-slate-800 bg-white"
+                  />
+                </div>
+              </>
+            )}
 
             {formError && (
               <p className="text-[11px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">

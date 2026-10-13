@@ -66,22 +66,26 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
           
           {/* Logo & Tag YAH Hope */}
           <div className="flex items-center gap-8">
-            <Link to="/portal/dashboard" className="flex items-center gap-3 group">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#F49853] to-orange-400 flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
+            <Link 
+              to="/portal/dashboard" 
+              className="flex items-center gap-3.5 group outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 rounded-2xl p-1 -m-1"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#F49853] to-amber-400 flex items-center justify-center shadow-md shadow-orange-500/25 group-hover:scale-105 group-hover:shadow-orange-500/35 transition-all">
                 <Heart className="text-white" size={22} fill="currentColor" />
               </div>
               <div>
-                <span className="font-heading font-black text-slate-900 tracking-tight text-xl block leading-tight">
+                <span className="font-heading font-black text-slate-900 tracking-tight text-xl block leading-tight group-hover:text-amber-600 transition-colors">
                   YAH Hope
                 </span>
-                <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none">
+                <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F49853] animate-pulse"></span>
                   Portal do Mantenedor
                 </span>
               </div>
             </Link>
 
             {/* Menu de Navegação Superior (Desktop md:flex) */}
-            <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+            <nav className="hidden md:flex items-center gap-1 lg:gap-1.5">
               {navItems.map((item) => {
                 const active = isActive(item.path);
                 const Icon = item.icon;
@@ -91,8 +95,8 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                     to={item.path}
                     className={`px-3.5 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-2 ${
                       active
-                        ? 'bg-orange-50 text-[#F49853] shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-orange-50/90 text-[#F49853] shadow-xs ring-1 ring-orange-200/60'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                     }`}
                   >
                     <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? 'text-[#F49853]' : 'text-slate-400'} />
@@ -128,7 +132,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
             {/* Sino de Notificações */}
             <button
               onClick={() => setIsNotifOpen(true)}
-              className="relative p-2.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
+              className="relative p-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
               aria-label="Notificações"
             >
               <Bell size={20} />
@@ -142,14 +146,19 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
             {/* Avatar / Menu do Usuário */}
             <button
               onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-2.5 p-1 pl-1.5 pr-3 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-200/60"
+              className="flex items-center gap-2.5 p-1 pl-1.5 pr-3 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-200/80 shadow-xs hover:border-orange-200"
             >
-              <div className="w-8 h-8 rounded-full bg-orange-100 border border-orange-200 text-[#F49853] font-black text-xs flex items-center justify-center shadow-xs">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-100 to-amber-100 border border-orange-200 text-[#F49853] font-black text-xs flex items-center justify-center shadow-xs">
                 {user?.name ? user.name[0].toUpperCase() : 'M'}
               </div>
-              <span className="hidden sm:inline text-xs font-gotham-bold text-slate-700 max-w-[120px] truncate">
-                {user?.name?.split(' ')[0] || 'Mantenedor'}
-              </span>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-xs font-gotham-bold text-slate-800 max-w-[120px] truncate leading-tight">
+                  {user?.name?.split(' ')[0] || 'Mantenedor'}
+                </span>
+                <span className="text-[9px] font-gotham-medium text-amber-600 uppercase tracking-tight leading-none">
+                  Mantenedor
+                </span>
+              </div>
             </button>
           </div>
 
@@ -338,7 +347,19 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <Heart size={18} className="text-rose-500" />
-                  <span>Crianças Apadrinhadas</span>
+                  <span>Minhas Crianças Apadrinhadas</span>
+                </div>
+                <ChevronRight size={16} className="text-slate-400" />
+              </Link>
+
+              <Link
+                to="/portal/apadrinhar"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center justify-between p-3.5 rounded-2xl text-slate-700 hover:bg-slate-100 transition-all text-xs font-bold"
+              >
+                <div className="flex items-center gap-3">
+                  <Heart size={18} className="text-[#F49853]" />
+                  <span>Central de Apadrinhamento</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>

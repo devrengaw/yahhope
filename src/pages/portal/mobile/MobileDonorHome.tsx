@@ -20,7 +20,9 @@ import {
   ShieldCheck,
   Receipt,
   Users,
-  Target
+  Target,
+  MapPin,
+  CheckCircle2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -98,6 +100,13 @@ export function MobileDonorHome() {
     return patients.slice(0, 4);
   }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
 
+  // Crianças para sugestão de apadrinhamento (quando o mantenedor ainda não apadrinha)
+  const suggestedChildren = useMemo(() => {
+    return patients
+      .filter(p => !myChildIds.has(p.id))
+      .slice(0, 2);
+  }, [patients, myChildIds]);
+
   const publishedImpact = getPublishedItems().slice(0, 3);
   const latestPost = posts.find(p => p.status === 'published') || posts[0];
 
@@ -105,53 +114,108 @@ export function MobileDonorHome() {
     <div className="space-y-8 animate-fade-in">
       
       {/* 1. Hero Banner de Boas-Vindas */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-slate-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl border border-slate-800">
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 bg-[#F49853]/20 border border-[#F49853]/40 px-3.5 py-1.5 rounded-full text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider">
-            <Heart size={14} fill="currentColor" />
-            <span>Aliança de Esperança • Mantenedor Ativo</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black tracking-tight leading-tight">
-            Ihale, {user?.name?.split(' ')[0] || 'Mantenedor'}!
-          </h1>
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-[2rem] p-6 sm:p-10 text-white shadow-2xl border border-slate-800/80">
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
-          <p className="text-sm sm:text-base text-slate-300 font-gotham-light leading-relaxed">
-            Sua fidelidade e generosidade sustentam o tratamento de crianças desnutridas na Casa Nutri e geram transformação real para famílias em extrema vulnerabilidade.
-          </p>
+          {/* Lado Esquerdo (7 cols): Saudação & Ações */}
+          <div className="lg:col-span-7 space-y-5">
+            <div className="inline-flex items-center gap-2.5 bg-gradient-to-r from-[#F49853]/25 to-orange-500/10 border border-[#F49853]/40 px-3.5 py-1.5 rounded-full text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider backdrop-blur-sm shadow-xs">
+              <Heart size={14} fill="currentColor" className="animate-pulse text-[#F49853]" />
+              <span>Aliança de Esperança • Mantenedor Ativo</span>
+            </div>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <Link
-              to="/portal/donations"
-              className="bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider px-6 py-3.5 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Heart size={16} fill="currentColor" />
-              <span>Fazer Nova Contribuição</span>
-            </Link>
-            <Link
-              to="/portal/my-donations"
-              className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-gotham-medium text-xs px-5 py-3.5 rounded-xl transition-all flex items-center gap-2"
-            >
-              <Receipt size={16} />
-              <span>Meus Comprovantes & Recibos</span>
-            </Link>
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black tracking-tight leading-tight">
+                Ihale, <span className="bg-gradient-to-r from-white via-orange-50 to-[#F49853] bg-clip-text text-transparent">{user?.name?.split(' ')[0] || 'Mantenedor'}</span>!
+              </h1>
+              <p className="text-sm sm:text-base text-slate-300 font-gotham-light leading-relaxed max-w-xl">
+                Sua fidelidade e generosidade sustentam o tratamento de crianças desnutridas na Casa Nutri e geram transformação real para famílias em extrema vulnerabilidade.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <Link
+                to="/portal/donations"
+                className="group relative overflow-hidden bg-gradient-to-r from-[#F49853] to-orange-500 hover:from-[#e0853d] hover:to-orange-600 text-white font-gotham-bold text-xs uppercase tracking-wider px-6 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-98"
+              >
+                <Heart size={16} fill="currentColor" className="group-hover:scale-110 transition-transform" />
+                <span>Fazer Nova Contribuição</span>
+              </Link>
+              <Link
+                to="/portal/my-donations"
+                className="bg-white/10 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white font-gotham-medium text-xs px-5 py-3.5 rounded-xl transition-all flex items-center gap-2 backdrop-blur-sm shadow-xs active:scale-98"
+              >
+                <Receipt size={16} className="text-orange-300" />
+                <span>Meus Comprovantes & Recibos</span>
+              </Link>
+            </div>
           </div>
+
+          {/* Lado Direito (5 cols): Card de Impacto Social / Selo de Fidelidade */}
+          <div className="lg:col-span-5">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white/[0.08] to-white/[0.03] backdrop-blur-md rounded-2xl p-6 border border-white/15 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-[#F49853]">
+                    <Sparkles size={16} />
+                  </div>
+                  <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-orange-200">
+                    Seu Impacto na Missão
+                  </span>
+                </div>
+                <span className="text-[10px] font-gotham-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Ativo
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-200 font-gotham-light leading-relaxed">
+                Você faz parte da família que mantém a <strong className="font-gotham-bold text-white">Casa Nutri em Boane</strong> funcionando diariamente com alimentação e suporte clínico especializado.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">Local de Atuação</span>
+                  <span className="text-xs font-gotham-bold text-white flex items-center gap-1 mt-0.5">
+                    📍 Boane & Nampula
+                  </span>
+                </div>
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">Transparência</span>
+                  <span className="text-xs font-gotham-bold text-emerald-300 flex items-center gap-1 mt-0.5">
+                    ✓ 100% Auditado
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-1 text-[11px] text-slate-400 font-gotham-light italic flex items-center gap-1.5">
+                <span>"Cada vida recuperada é fruto da sua fidelidade."</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        {/* Efeito decorativo sutil de fundo */}
-        <div className="absolute -right-10 -bottom-10 w-80 h-80 bg-[#F49853]/15 rounded-full blur-3xl pointer-events-none"></div>
+        {/* Efeitos decorativos sutis de fundo */}
+        <div className="absolute -right-16 -bottom-16 w-96 h-96 bg-gradient-to-br from-[#F49853]/20 to-orange-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-0 right-1/3 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
       </div>
 
       {/* 2. Grid de Métricas Reais do Mantenedor */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
         {/* Total Contribuído */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#F49853] flex items-center justify-center mb-3">
-            <Sparkles size={20} />
+        <div className="group bg-white p-5 sm:p-6 rounded-[1.75rem] border border-slate-200/80 shadow-xs hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 transition-all duration-300 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-400 to-[#F49853] text-white flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
+              <Sparkles size={20} />
+            </div>
+            <span className="text-[10px] font-gotham-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100/60">
+              Impacto Direto
+            </span>
           </div>
           <div>
-            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight">
+            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
               {totalUserDonated > 0 ? `R$ ${totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
@@ -161,42 +225,61 @@ export function MobileDonorHome() {
         </div>
 
         {/* Quantidade de Doações */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
-            <Receipt size={20} />
+        <div className="group bg-white p-5 sm:p-6 rounded-[1.75rem] border border-slate-200/80 shadow-xs hover:shadow-lg hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+              <Receipt size={20} />
+            </div>
+            <span className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/60">
+              Confirmadas
+            </span>
           </div>
           <div>
-            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight">
+            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
               {donationsCount}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              Doações Concluídas
+              {donationsCount === 1 ? 'Doação Concluída' : 'Doações Concluídas'}
             </span>
           </div>
         </div>
 
-        {/* Crianças Apadrinhadas ou na Casa Nutri */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
-            <Users size={20} />
+        {/* Crianças Apadrinhadas */}
+        <div className="group bg-white p-5 sm:p-6 rounded-[1.75rem] border border-slate-200/80 shadow-xs hover:shadow-lg hover:shadow-rose-500/5 hover:border-rose-200 transition-all duration-300 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-400 to-pink-600 text-white flex items-center justify-center shadow-md shadow-rose-500/20 group-hover:scale-105 transition-transform">
+              <Heart size={20} fill="currentColor" />
+            </div>
+            <span className={`text-[10px] font-gotham-bold px-2 py-0.5 rounded-full border ${
+              myChildren.length > 0 
+                ? 'text-rose-700 bg-rose-50 border-rose-100' 
+                : 'text-amber-700 bg-amber-50 border-amber-100'
+            }`}>
+              {myChildren.length > 0 ? 'Apadrinhamento' : 'Aguardando'}
+            </span>
           </div>
           <div>
-            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight">
+            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
               {isDonorOrSponsor ? myChildren.length : (patients.length > 0 ? patients.length : '18+')}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              {isDonorOrSponsor ? 'Crianças Apadrinhadas' : 'Crianças na Casa Nutri'}
+              {isDonorOrSponsor ? 'Crianças Apadrinhadas' : 'Crianças Atendidas'}
             </span>
           </div>
         </div>
 
-        {/* Estágio da Régua */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
-            <Target size={20} />
+        {/* Meta do Estágio Atual */}
+        <div className="group bg-white p-5 sm:p-6 rounded-[1.75rem] border border-slate-200/80 shadow-xs hover:shadow-lg hover:shadow-blue-500/5 hover:border-blue-200 transition-all duration-300 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-400 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <Target size={20} />
+            </div>
+            <span className="text-[10px] font-gotham-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60">
+              Casa Nutri
+            </span>
           </div>
           <div>
-            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight">
+            <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
               {currentCampaign 
                 ? `${Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%`
                 : '100%'}
@@ -231,39 +314,92 @@ export function MobileDonorHome() {
               </div>
               <Link
                 to="/portal/sponsorship"
-                className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1"
+                className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
               >
                 <span>Ver todas</span>
-                <ChevronRight size={14} />
+                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
 
             {isLoadingChildren ? (
-              <div className="bg-white rounded-3xl p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
+              <div className="bg-white rounded-[1.75rem] p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
+                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
                 <p className="font-bold text-slate-600">Carregando suas crianças apadrinhadas...</p>
               </div>
             ) : displayedPatients.length === 0 ? (
               isDonorOrSponsor ? (
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200/80 rounded-3xl p-8 text-center space-y-3">
-                  <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mx-auto text-[#F49853] shadow-xs">
-                    <Heart size={28} />
+                /* Card Acolhedor de Convite com Crianças em Espera */
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-br from-amber-50/90 via-orange-50/70 to-amber-50/90 border border-amber-200/80 rounded-[1.75rem] p-6 sm:p-7 shadow-xs space-y-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 text-[#F49853] shadow-sm border border-orange-100">
+                        <Heart size={24} fill="currentColor" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-heading font-black text-slate-900 text-base">
+                          Seja a resposta para uma criança na Casa Nutri
+                        </h4>
+                        <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">
+                          Com o apadrinhamento mensal de R$ 90, você garante tratamento nutricional intensivo, fórmulas terapêuticas e acompanha fotos e relatórios exclusivos de recuperação.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Sugestões de Crianças Aguardando Apadrinhamento */}
+                    {suggestedChildren.length > 0 && (
+                      <div className="pt-2 border-t border-amber-200/60">
+                        <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 block mb-3">
+                          Crianças que aguardam por um padrinho:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {suggestedChildren.map((child) => (
+                            <div 
+                              key={child.id}
+                              className="bg-white/95 rounded-2xl p-3.5 border border-amber-200/80 flex items-center gap-3.5 shadow-xs hover:border-orange-300 hover:shadow-md transition-all"
+                            >
+                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-100 shrink-0 border border-orange-200">
+                                {child.photo_url ? (
+                                  <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[#F49853] font-heading font-black text-sm">
+                                    {child.name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-heading font-black text-slate-900 text-xs truncate">
+                                  {child.name}
+                                </h5>
+                                <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5">
+                                  {calculateAge(child.dob)} • {child.community || 'Boane'}
+                                </p>
+                                 <Link
+                                  to="/portal/apadrinhar"
+                                  className="text-[10px] font-gotham-bold text-[#F49853] hover:text-[#e0853d] mt-1.5 inline-flex items-center gap-1 group"
+                                >
+                                  <span>Apadrinhar esta criança</span>
+                                  <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-1 flex items-center justify-end">
+                      <Link
+                        to="/portal/apadrinhar"
+                        className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 transition-all active:scale-98"
+                      >
+                        <Heart size={14} fill="currentColor" />
+                        <span>Apadrinhar uma Criança Agora</span>
+                      </Link>
+                    </div>
                   </div>
-                  <h4 className="font-heading font-black text-slate-900 text-base">
-                    Você ainda não possui crianças apadrinhadas
-                  </h4>
-                  <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                    Com o apadrinhamento mensal, você garante tratamento nutricional intensivo e acompanha com exclusividade as fotos e a evolução da sua criança.
-                  </p>
-                  <Link
-                    to="/mantenedor"
-                    className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all"
-                  >
-                    <Heart size={14} fill="currentColor" />
-                    <span>Apadrinhar uma Criança</span>
-                  </Link>
                 </div>
               ) : (
-                <div className="bg-white rounded-3xl p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
+                <div className="bg-white rounded-[1.75rem] p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
                   <Users size={32} className="mx-auto mb-2 opacity-40 text-slate-400" />
                   <p className="font-bold text-slate-600">Nenhuma criança registrada no momento.</p>
                   <p className="mt-1">Novos atendimentos da Casa Nutri serão sincronizados em breve.</p>
@@ -275,7 +411,7 @@ export function MobileDonorHome() {
                   <div
                     key={child.id}
                     onClick={() => navigate('/portal/sponsorship')}
-                    className="bg-white p-5 rounded-3xl border border-slate-200/80 hover:border-orange-300 shadow-xs hover:shadow-md transition-all flex items-start gap-4 cursor-pointer group"
+                    className="bg-white p-5 rounded-[1.75rem] border border-slate-200/80 hover:border-orange-300 shadow-xs hover:shadow-md transition-all flex items-start gap-4 cursor-pointer group"
                   >
                     <div className="w-14 h-14 rounded-2xl overflow-hidden bg-orange-100 border border-orange-200 shrink-0 group-hover:scale-105 transition-transform">
                       {child.photo_url ? (
@@ -326,23 +462,23 @@ export function MobileDonorHome() {
               </div>
               <Link
                 to="/portal/projects"
-                className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1"
+                className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
               >
                 <span>Ver projetos</span>
-                <ChevronRight size={14} />
+                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
 
             <div className="space-y-3">
               {publishedImpact.length === 0 ? (
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 text-center text-xs text-slate-400">
+                <div className="bg-white p-6 rounded-[1.75rem] border border-slate-200/80 text-center text-xs text-slate-400">
                   Novos relatórios fotográficos e médicos serão publicados em breve pela coordenação.
                 </div>
               ) : (
                 publishedImpact.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 transition-all"
+                    className="bg-white p-5 rounded-[1.75rem] border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
@@ -367,44 +503,65 @@ export function MobileDonorHome() {
           
           {/* Card Campanha da Régua Ativa */}
           {currentCampaign && (
-            <div className="bg-gradient-to-br from-slate-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl space-y-4 border border-slate-800">
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-900 text-white rounded-[2rem] p-6 sm:p-7 shadow-xl space-y-5 border border-slate-800 hover:border-orange-500/30 transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/15 px-3 py-1 rounded-full border border-orange-500/30">
-                  Meta Atual da Casa Nutri
+                <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/15 px-3 py-1 rounded-full border border-orange-500/30 flex items-center gap-1.5">
+                  <Target size={12} />
+                  Meta da Casa Nutri
                 </span>
-                <span className="text-xs font-gotham-bold text-emerald-400 flex items-center gap-1">
-                  <Activity size={14} /> Ativo
+                <span className="text-xs font-gotham-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Fase Ativa
                 </span>
               </div>
 
-              <h3 className="text-xl font-heading font-black text-white leading-snug">
-                {currentCampaign.title}
-              </h3>
-              
-              <p className="text-xs text-slate-300 font-gotham-light line-clamp-2 leading-relaxed">
-                {currentCampaign.description}
-              </p>
+              <div className="space-y-1.5">
+                <h3 className="text-xl font-heading font-black text-white leading-snug">
+                  {currentCampaign.title}
+                </h3>
+                <p className="text-xs text-slate-300 font-gotham-light leading-relaxed line-clamp-2">
+                  {currentCampaign.description}
+                </p>
+              </div>
 
-              {/* Barra de Progresso Real */}
-              <div className="space-y-1.5 pt-2">
-                <div className="flex justify-between text-xs font-gotham-bold">
-                  <span className="text-slate-400">Progresso</span>
-                  <span className="text-[#F49853]">
-                    R$ {currentCampaign.current_amount.toLocaleString('pt-BR')} / R$ {currentCampaign.target_amount.toLocaleString('pt-BR')}
+              {/* Barra de Progresso Real com Glow */}
+              <div className="space-y-2 pt-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-gotham-medium text-slate-400">Progresso Arrecadado</span>
+                  <span className="font-gotham-bold text-[#F49853] text-sm">
+                    {Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%
                   </span>
                 </div>
                 <div className="h-3 bg-white/10 rounded-full overflow-hidden p-0.5">
                   <div 
-                    className="h-full bg-gradient-to-r from-amber-400 to-[#F49853] rounded-full transition-all duration-700"
+                    className="h-full bg-gradient-to-r from-amber-400 via-[#F49853] to-orange-500 rounded-full shadow-[0_0_12px_rgba(244,152,83,0.5)] transition-all duration-700"
                     style={{ width: `${Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%` }}
                   />
+                </div>
+                <div className="flex justify-between text-[11px] text-slate-400 font-gotham-medium pt-0.5">
+                  <span>R$ {currentCampaign.current_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-slate-300 font-gotham-bold">Alvo: R$ {currentCampaign.target_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+
+              {/* Pilares do Impacto */}
+              <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-gotham-medium text-slate-300">
+                <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
+                  🥣 Nutrição Diária
+                </div>
+                <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
+                  🩺 Exames & Triagem
+                </div>
+                <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
+                  👩‍⚕️ Equipe Clínica
                 </div>
               </div>
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Impacto Direto</span>
-                <Link to="/campanha" className="text-[#F49853] font-gotham-bold hover:underline flex items-center gap-1">
-                  Ver detalhes da régua <ArrowRight size={12} />
+                <span className="text-slate-400 text-[11px]">Transparência total dos recursos</span>
+                <Link to="/campanha" className="text-[#F49853] hover:text-amber-300 font-gotham-bold flex items-center gap-1 group transition-colors">
+                  <span>Ver detalhes da régua</span>
+                  <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
             </div>
@@ -420,16 +577,16 @@ export function MobileDonorHome() {
                 </h3>
                 <Link
                   to="/blog"
-                  className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-0.5"
+                  className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-0.5 group"
                 >
                   <span>Ver todas</span>
-                  <ChevronRight size={14} />
+                  <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
 
               <div
                 onClick={() => navigate(`/blog?post=${latestPost.id}`)}
-                className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs hover:border-orange-300 hover:shadow-md transition-all cursor-pointer group"
+                className="bg-white rounded-[1.75rem] border border-slate-200/80 overflow-hidden shadow-xs hover:border-orange-300 hover:shadow-md transition-all cursor-pointer group"
               >
                 <div className="h-44 w-full relative overflow-hidden">
                   <img

@@ -132,14 +132,34 @@ export function MobileDonorChildren() {
           </p>
         </div>
 
-        {/* Total Badge */}
-        <div className="bg-orange-50 border border-orange-200/80 px-4 py-2 rounded-2xl flex items-center gap-2 self-start md:self-auto">
-          <Users size={16} className="text-[#F49853]" />
-          <span className="text-xs font-gotham-bold text-slate-800">
-            {basePatients.length} {isDonorOrSponsor 
-              ? (basePatients.length === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas') 
-              : (basePatients.length === 1 ? 'Criança Cadastrada' : 'Crianças Cadastradas')}
-          </span>
+        {/* Ações e Alternador de Abas */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 self-start md:self-auto">
+          {/* Alternador de Abas idêntico ao de Doações */}
+          <div className="flex bg-slate-200/70 p-1 rounded-2xl">
+            <Link
+              to="/portal/apadrinhar"
+              className="px-4 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-500 hover:text-slate-800"
+            >
+              <Heart size={14} className="text-[#F49853]" />
+              <span>Apadrinhar Criança</span>
+            </Link>
+            <button
+              className="px-4 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-1.5 cursor-pointer bg-white text-slate-900 shadow-xs"
+            >
+              <Users size={14} className="text-slate-600" />
+              <span>Minhas Crianças</span>
+            </button>
+          </div>
+
+          {/* Total Badge */}
+          <div className="bg-orange-50 border border-orange-200/80 px-4 py-2 rounded-2xl flex items-center gap-2">
+            <Users size={16} className="text-[#F49853]" />
+            <span className="text-xs font-gotham-bold text-slate-800">
+              {basePatients.length} {isDonorOrSponsor 
+                ? (basePatients.length === 1 ? 'Apadrinhada' : 'Apadrinhadas') 
+                : (basePatients.length === 1 ? 'Cadastrada' : 'Cadastradas')}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -222,8 +242,8 @@ export function MobileDonorChildren() {
             </p>
             <div>
               <Link
-                to="/mantenedor"
-                className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all"
+                to="/portal/apadrinhar"
+                className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
               >
                 <Heart size={16} fill="currentColor" />
                 <span>Apadrinhar uma Criança Agora</span>

@@ -143,11 +143,18 @@ export function Campaign() {
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
   
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card'>('pix');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.name && !name) setName(user.name);
+      if (user.email && !email) setEmail(user.email);
+    }
+  }, [user]);
 
   // Redireciona para o fluxo de Mantenedor com o valor selecionado
   const handleBecomeMonthlyDonor = () => {
@@ -194,6 +201,14 @@ export function Campaign() {
 
     if (!finalAmount || isNaN(finalAmount)) return;
 
+    const finalName = name.trim() || user?.name || '';
+    const finalEmail = email.trim() || user?.email || '';
+
+    if (!user && (!finalName || !finalEmail)) {
+      alert('Por favor, informe seu nome e e-mail.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -204,8 +219,8 @@ export function Campaign() {
         setTimeout(() => {
           createDonation({
             campaign_id: targetCampaign.id,
-            donor_name: name,
-            donor_email: email,
+            donor_name: finalName,
+            donor_email: finalEmail,
             amount: finalAmount,
             payment_method: paymentMethod
           });
@@ -228,8 +243,8 @@ export function Campaign() {
           amount: finalAmount,
           isMonthly: false,
           paymentMethod, // 'pix' ou 'credit_card'
-          donorName: name,
-          donorEmail: email,
+          donorName: finalName,
+          donorEmail: finalEmail,
           successUrl: `${window.location.origin}/campanha?status=success`,
           cancelUrl: `${window.location.origin}/campanha?status=cancel`
         })
@@ -242,8 +257,8 @@ export function Campaign() {
         console.error('Error starting checkout:', data);
         createDonation({
           campaign_id: targetCampaign.id,
-          donor_name: name,
-          donor_email: email,
+          donor_name: finalName,
+          donor_email: finalEmail,
           amount: finalAmount,
           payment_method: paymentMethod
         });
@@ -412,28 +427,53 @@ export function Campaign() {
         </div>
 
         <form onSubmit={handleDonate} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
-            <input 
-              type="text" 
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
-              placeholder="Seu nome"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">E-mail</label>
-            <input 
-              type="email" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
-              placeholder="seu@email.com"
-            />
-          </div>
+          {user ? (
+            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                  {user.name ? user.name[0].toUpperCase() : 'U'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {user.name || 'Usuário Conectado'}
+                    </p>
+                    <span className="text-[9px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                      Logado ✓
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate font-medium">
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
+                <input 
+                  type="text" 
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
+                  placeholder="Seu nome"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">E-mail</label>
+                <input 
+                  type="email" 
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
+                  placeholder="seu@email.com"
+                />
+              </div>
+            </>
+          )}
 
           {(camp.accept_pix !== false || camp.accept_card !== false) && (
             <div>

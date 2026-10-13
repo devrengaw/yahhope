@@ -39,6 +39,7 @@ import { ImpactIcon } from '../../components/common/ImpactIcon';
 import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
 import { useDonationModal } from '../../contexts/DonationModalContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Layers } from 'lucide-react';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
@@ -51,6 +52,7 @@ const STRIPE_QUOTAS = [
 export function Home() {
   const navigate = useNavigate();
   const { openDonationModal } = useDonationModal();
+  const { user } = useAuth();
 
   // Interactive Donation Header States
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -64,17 +66,25 @@ export function Home() {
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+  // Campos de contato do doador no header
+  const [donorName, setDonorName] = useState(user?.name || '');
+  const [donorEmail, setDonorEmail] = useState(user?.email || '');
+  const [donorWhatsapp, setDonorWhatsapp] = useState(user?.phone || '');
+  const [donorFormError, setDonorFormError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      if (user.name && !donorName) setDonorName(user.name);
+      if (user.email && !donorEmail) setDonorEmail(user.email);
+      if (user.phone && !donorWhatsapp) setDonorWhatsapp(user.phone);
+    }
+  }, [user]);
+
   useEffect(() => {
     sponsorshipService.getMetrics().then(m => {
       setSponsorshipMetrics(m);
     }).catch(err => console.error('Erro ao carregar métricas:', err));
   }, []);
-
-  // Campos de contato do doador no header
-  const [donorName, setDonorName] = useState('');
-  const [donorEmail, setDonorEmail] = useState('');
-  const [donorWhatsapp, setDonorWhatsapp] = useState('');
-  const [donorFormError, setDonorFormError] = useState('');
   
   const { addSubscriber } = useNewsletter();
   const [emailInput, setEmailInput] = useState('');
@@ -197,17 +207,24 @@ export function Home() {
     if (e) e.preventDefault();
     setDonorFormError('');
 
-    if (!donorName.trim()) {
-      setDonorFormError('Por favor, informe seu nome completo.');
-      return;
-    }
-    if (!donorEmail.trim() || !donorEmail.includes('@')) {
-      setDonorFormError('Por favor, informe um e-mail válido.');
-      return;
-    }
-    if (!donorWhatsapp.trim() || donorWhatsapp.replace(/\D/g, '').length < 10) {
-      setDonorFormError('Por favor, informe seu WhatsApp com DDD.');
-      return;
+    const finalDonorName = donorName.trim() || user?.name || '';
+    const finalDonorEmail = donorEmail.trim() || user?.email || '';
+    const finalDonorWhatsapp = donorWhatsapp.trim() || user?.phone || '';
+
+    // Apenas exige preenchimento se o usuário NÃO estiver logado
+    if (!user) {
+      if (!finalDonorName) {
+        setDonorFormError('Por favor, informe seu nome completo.');
+        return;
+      }
+      if (!finalDonorEmail || !finalDonorEmail.includes('@')) {
+        setDonorFormError('Por favor, informe um e-mail válido.');
+        return;
+      }
+      if (!finalDonorWhatsapp || finalDonorWhatsapp.replace(/\D/g, '').length < 10) {
+        setDonorFormError('Por favor, informe seu WhatsApp com DDD.');
+        return;
+      }
     }
     
     let finalVal = overrideAmount !== undefined ? overrideAmount : currentTotalAmount;
@@ -221,10 +238,10 @@ export function Home() {
     try {
       const isMonthly = headerTab === 'sponsorship' ? true : !isSingleDonation;
       const redirectFallback = headerTab === 'sponsorship'
-        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
         : isMonthly
-          ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
-          : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
+          ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
+          : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`;
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
@@ -242,10 +259,10 @@ export function Home() {
         body: JSON.stringify({
           amount: finalVal,
           isMonthly,
-          donorName: donorName.trim(),
-          donorEmail: donorEmail.trim(),
-          donorPhone: donorWhatsapp.trim(),
-          donorWhatsapp: donorWhatsapp.trim(),
+          donorName: finalDonorName,
+          donorEmail: finalDonorEmail,
+          donorPhone: finalDonorWhatsapp,
+          donorWhatsapp: finalDonorWhatsapp,
           successUrl: isMonthly
             ? `${window.location.origin}/mantenedor?status=success`
             : `${window.location.origin}/campanha?status=success`,
@@ -622,52 +639,75 @@ export function Home() {
 
                 {/* Dados do Doador: Nome, E-mail, WhatsApp */}
                 <div className="mt-2.5 mb-3 pt-2.5 border-t border-slate-100 space-y-2">
-                  <p className="text-[10px] font-gotham-bold text-slate-500 uppercase tracking-wider">
-                    Seus Dados para Identificação
-                  </p>
+                  {user ? (
+                    <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200/80 flex items-center justify-between text-left">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          {user.name ? user.name[0].toUpperCase() : 'U'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-gotham-bold text-slate-800 truncate leading-tight">
+                            {user.name || 'Usuário Conectado'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate font-medium">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                        Logado ✓
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[10px] font-gotham-bold text-slate-500 uppercase tracking-wider">
+                        Seus Dados para Identificação
+                      </p>
 
-                  <div className="relative">
-                    <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Nome completo"
-                      value={donorName}
-                      onChange={(e) => {
-                        setDonorName(e.target.value);
-                        if (donorFormError) setDonorFormError('');
-                      }}
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
-                    />
-                  </div>
+                      <div className="relative">
+                        <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Nome completo"
+                          value={donorName}
+                          onChange={(e) => {
+                            setDonorName(e.target.value);
+                            if (donorFormError) setDonorFormError('');
+                          }}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                        />
+                      </div>
 
-                  <div className="relative">
-                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="email"
-                      placeholder="Seu melhor e-mail"
-                      value={donorEmail}
-                      onChange={(e) => {
-                        setDonorEmail(e.target.value);
-                        if (donorFormError) setDonorFormError('');
-                      }}
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
-                    />
-                  </div>
+                      <div className="relative">
+                        <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          placeholder="Seu melhor e-mail"
+                          value={donorEmail}
+                          onChange={(e) => {
+                            setDonorEmail(e.target.value);
+                            if (donorFormError) setDonorFormError('');
+                          }}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                        />
+                      </div>
 
-                  <div className="relative">
-                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="tel"
-                      placeholder="WhatsApp (DDD + Número)"
-                      value={donorWhatsapp}
-                      onChange={(e) => {
-                        handleWhatsappChange(e.target.value);
-                        if (donorFormError) setDonorFormError('');
-                      }}
-                      maxLength={15}
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
-                    />
-                  </div>
+                      <div className="relative">
+                        <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          placeholder="WhatsApp (DDD + Número)"
+                          value={donorWhatsapp}
+                          onChange={(e) => {
+                            handleWhatsappChange(e.target.value);
+                            if (donorFormError) setDonorFormError('');
+                          }}
+                          maxLength={15}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {donorFormError && (
                     <p className="text-[10px] font-gotham-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 animate-fade-in">

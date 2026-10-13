@@ -185,14 +185,22 @@ export function MonthlyDonor() {
   }, [urlAmount]);
 
   // Formulário do Doador / Padrinho
-  const [donorName, setDonorName] = useState('');
-  const [donorEmail, setDonorEmail] = useState('');
-  const [donorPhone, setDonorPhone] = useState('');
+  const [donorName, setDonorName] = useState(user?.name || '');
+  const [donorEmail, setDonorEmail] = useState(user?.email || '');
+  const [donorPhone, setDonorPhone] = useState(user?.phone || '');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (user) {
+      if (user.name && !donorName) setDonorName(user.name);
+      if (user.email && !donorEmail) setDonorEmail(user.email);
+      if (user.phone && !donorPhone) setDonorPhone(user.phone);
+    }
+  }, [user]);
 
   // Cálculos de Valor
   const quotaCost = sponsorshipMetrics?.quotaCost || 90;
@@ -225,7 +233,11 @@ export function MonthlyDonor() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!donorName.trim() || !donorEmail.trim()) {
+    const finalName = donorName.trim() || user?.name || '';
+    const finalEmail = donorEmail.trim() || user?.email || '';
+    const finalPhone = donorPhone.trim() || user?.phone || '';
+
+    if (!user && (!finalName || !finalEmail)) {
       alert('Por favor, preencha seu nome e e-mail.');
       return;
     }
@@ -241,9 +253,9 @@ export function MonthlyDonor() {
       // 1. Caso seja Apadrinhamento de Criança
       if (donationType === 'sponsorship') {
         const result = await sponsorshipService.assignChildrenToSponsor({
-          donorName: donorName.trim(),
-          donorEmail: donorEmail.trim(),
-          donorPhone: donorPhone.trim(),
+          donorName: finalName,
+          donorEmail: finalEmail,
+          donorPhone: finalPhone,
           quotasCount,
           amountPerQuota: quotaCost,
           paymentMethod,
@@ -255,8 +267,8 @@ export function MonthlyDonor() {
           if (createDonation && currentCampaign) {
             createDonation({
               campaign_id: currentCampaign.id,
-              donor_name: donorName.trim(),
-              donor_email: donorEmail.trim(),
+              donor_name: finalName,
+              donor_email: finalEmail,
               amount: result.totalAmount,
               payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
             });
@@ -279,8 +291,8 @@ export function MonthlyDonor() {
           if (createDonation && currentCampaign) {
             createDonation({
               campaign_id: currentCampaign.id,
-              donor_name: donorName,
-              donor_email: donorEmail,
+              donor_name: finalName,
+              donor_email: finalEmail,
               amount: currentAmount,
               payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
             });
@@ -303,9 +315,9 @@ export function MonthlyDonor() {
           amount: currentAmount,
           isMonthly: true,
           paymentMethod,
-          donorName,
-          donorEmail,
-          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}`,
+          donorName: finalName,
+          donorEmail: finalEmail,
+          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}&name=${encodeURIComponent(finalName)}&email=${encodeURIComponent(finalEmail)}`,
           cancelUrl: `${window.location.origin}/mantenedor?status=cancel`
         })
       });
@@ -317,8 +329,8 @@ export function MonthlyDonor() {
         if (createDonation && currentCampaign) {
           createDonation({
             campaign_id: currentCampaign.id,
-            donor_name: donorName,
-            donor_email: donorEmail,
+            donor_name: finalName,
+            donor_email: finalEmail,
             amount: currentAmount,
             payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
           });
@@ -832,49 +844,74 @@ export function MonthlyDonor() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                      Nome Completo *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={donorName}
-                      onChange={(e) => setDonorName(e.target.value)}
-                      placeholder="Ex: Lucas Ferreira Silva"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
-                    />
-                  </div>
+                  {user ? (
+                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-black text-sm flex items-center justify-center shrink-0">
+                          {user.name ? user.name[0].toUpperCase() : 'U'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-gotham-bold text-slate-900 truncate">
+                              {user.name || 'Usuário Conectado'}
+                            </p>
+                            <span className="text-[10px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                              Conectado ✓
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 truncate font-medium mt-0.5">
+                            {user.email} {user.phone ? `• ${user.phone}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
+                          Nome Completo *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={donorName}
+                          onChange={(e) => setDonorName(e.target.value)}
+                          placeholder="Ex: Lucas Ferreira Silva"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                      E-mail *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={donorEmail}
-                      onChange={(e) => setDonorEmail(e.target.value)}
-                      placeholder="lucas@exemplo.com"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {donationType === 'sponsorship' ? 'O perfil da sua criança apadrinhada será enviado para este e-mail.' : 'Enviaremos os recibos mensais para este e-mail.'}
-                    </p>
-                  </div>
+                      <div>
+                        <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
+                          E-mail *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={donorEmail}
+                          onChange={(e) => setDonorEmail(e.target.value)}
+                          placeholder="lucas@exemplo.com"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {donationType === 'sponsorship' ? 'O perfil da sua criança apadrinhada será enviado para este e-mail.' : 'Enviaremos os recibos mensais para este e-mail.'}
+                        </p>
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                      WhatsApp com DDD (opcional)
-                    </label>
-                    <input
-                      type="tel"
-                      value={donorPhone}
-                      onChange={(e) => setDonorPhone(e.target.value)}
-                      placeholder="(11) 99999-9999"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
+                          WhatsApp com DDD (opcional)
+                        </label>
+                        <input
+                          type="tel"
+                          value={donorPhone}
+                          onChange={(e) => setDonorPhone(e.target.value)}
+                          placeholder="(11) 99999-9999"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className="block text-xs font-gotham-bold text-slate-700 mb-2">

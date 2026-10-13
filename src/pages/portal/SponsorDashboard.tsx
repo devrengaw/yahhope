@@ -67,7 +67,7 @@ export function SponsorDashboard() {
           <p className="text-slate-500 mt-2 font-medium">Sua proximidade transforma realidades todos os dias.</p>
         </div>
         <div className="flex items-center gap-4">
-          <Link to="/mantenedor?mode=sponsorship" className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all flex items-center gap-2">
+          <Link to="/portal/apadrinhar" className="bg-amber-500 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all flex items-center gap-2">
             <Plus size={20} /> Apadrinhar Mais Crianças
           </Link>
         </div>
@@ -116,7 +116,7 @@ export function SponsorDashboard() {
                   Com cotas solidárias a partir de R$ 90/mês, você garante nutrição clínica intensiva e recebe notícias e fotos exclusivas da sua criança.
                 </p>
                 <Link
-                  to="/mantenedor?mode=sponsorship"
+                  to="/portal/apadrinhar"
                   className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all"
                 >
                   <Plus size={16} />
