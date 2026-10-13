@@ -209,9 +209,17 @@ export function Patients() {
                 className="p-4 active:bg-emerald-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shadow-xs border border-emerald-200/50 shrink-0">
-                    {patient.name.charAt(0)}
-                  </div>
+                  {patient.photo_url ? (
+                    <img 
+                      src={patient.photo_url} 
+                      alt={patient.name} 
+                      className="w-12 h-12 rounded-2xl object-cover border border-emerald-200/50 shadow-xs shrink-0" 
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shadow-xs border border-emerald-200/50 shrink-0">
+                      {patient.name.charAt(0)}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-slate-900 text-sm truncate">{patient.name}</p>
@@ -268,9 +276,17 @@ export function Patients() {
                 >
                   <td className="p-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-sm border border-emerald-200/50 group-hover/row:scale-110 transition-transform">
-                        {patient.name.charAt(0)}
-                      </div>
+                      {patient.photo_url ? (
+                        <img 
+                          src={patient.photo_url} 
+                          alt={patient.name} 
+                          className="w-12 h-12 rounded-2xl object-cover border border-emerald-200/50 shadow-sm shrink-0 group-hover/row:scale-110 transition-transform" 
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-sm border border-emerald-200/50 shrink-0 group-hover/row:scale-110 transition-transform">
+                          {patient.name.charAt(0)}
+                        </div>
+                      )}
                       <div>
                         <p className="font-bold text-slate-900 group-hover/row:text-emerald-700 transition-colors">{patient.name}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{patient.registration_number}</p>

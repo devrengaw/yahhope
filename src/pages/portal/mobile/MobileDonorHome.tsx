@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useImpact } from '../../../contexts/ImpactContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
 import { useBlog } from '../../../contexts/BlogContext';
 import { usePatients } from '../../../contexts/PatientContext';
+import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
 import { 
   Heart, 
   Gift, 
@@ -31,6 +32,21 @@ export function MobileDonorHome() {
   const { patients } = usePatients();
   const navigate = useNavigate();
 
+  const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(true);
+
+  useEffect(() => {
+    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
+      .then(children => {
+        setMyChildren(children);
+        setIsLoadingChildren(false);
+      })
+      .catch(err => {
+        console.error('Erro ao carregar crianças apadrinhadas:', err);
+        setIsLoadingChildren(false);
+      });
+  }, [user?.id, user?.email]);
+
   const currentCampaign = activeCampaign || defaultCamp;
 
   // Doações reais do usuário logado
@@ -56,8 +72,31 @@ export function MobileDonorHome() {
     return `${months} ${months === 1 ? 'mês' : 'meses'}`;
   };
 
-  // Crianças reais do sistema
-  const displayedPatients = patients.slice(0, 4);
+  const isDonorOrSponsor = user?.role === 'SPONSOR' || (user?.role !== 'ADMIN' && user?.role !== 'USER');
+  const myChildIds = useMemo(() => new Set(myChildren.map(c => c.id)), [myChildren]);
+
+  // Crianças reais do sistema: Para mantenedores/padrinhos, EXCLUSIVAMENTE suas crianças apadrinhadas
+  const displayedPatients = useMemo(() => {
+    if (isDonorOrSponsor) {
+      const sponsoredFromPatients = patients.filter(c => myChildIds.has(c.id));
+      if (sponsoredFromPatients.length > 0) return sponsoredFromPatients;
+      return myChildren.map(c => ({
+        id: c.id,
+        name: c.name,
+        dob: c.dob || '',
+        status: (c.nutritional_status || 'Adequado') as any,
+        community: c.community || 'Casa Nutri',
+        photo_url: c.photo_url,
+        registration_number: '',
+        gender: (c.gender || 'M') as any,
+        created_at: '',
+        guardian_name: '',
+        housing_type: '',
+        sanitation: ''
+      }));
+    }
+    return patients.slice(0, 4);
+  }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
 
   const publishedImpact = getPublishedItems().slice(0, 3);
   const latestPost = posts.find(p => p.status === 'published') || posts[0];
@@ -136,17 +175,17 @@ export function MobileDonorHome() {
           </div>
         </div>
 
-        {/* Crianças em Atendimento Real */}
+        {/* Crianças Apadrinhadas ou na Casa Nutri */}
         <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
             <Users size={20} />
           </div>
           <div>
             <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight">
-              {patients.length > 0 ? patients.length : '18+'}
+              {isDonorOrSponsor ? myChildren.length : (patients.length > 0 ? patients.length : '18+')}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              Crianças na Casa Nutri
+              {isDonorOrSponsor ? 'Crianças Apadrinhadas' : 'Crianças na Casa Nutri'}
             </span>
           </div>
         </div>
@@ -182,10 +221,12 @@ export function MobileDonorHome() {
               <div>
                 <h3 className="text-xl font-heading font-black text-slate-900 flex items-center gap-2">
                   <Heart className="text-[#F49853]" size={22} fill="currentColor" /> 
-                  Crianças em Acompanhamento
+                  {isDonorOrSponsor ? 'Minhas Crianças Apadrinhadas' : 'Crianças em Acompanhamento'}
                 </h3>
                 <p className="text-xs text-slate-500 font-gotham-light">
-                  Vidas que recebem acolhimento e tratamento nutricional contínuo.
+                  {isDonorOrSponsor 
+                    ? 'Acompanhe a recuperação e o progresso da(s) criança(s) que você apadrinha.' 
+                    : 'Vidas que recebem acolhimento e tratamento nutricional contínuo.'}
                 </p>
               </div>
               <Link
@@ -197,12 +238,37 @@ export function MobileDonorHome() {
               </Link>
             </div>
 
-            {displayedPatients.length === 0 ? (
+            {isLoadingChildren ? (
               <div className="bg-white rounded-3xl p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
-                <Users size={32} className="mx-auto mb-2 opacity-40 text-slate-400" />
-                <p className="font-bold text-slate-600">Nenhuma criança registrada no momento.</p>
-                <p className="mt-1">Novos atendimentos da Casa Nutri serão sincronizados em breve.</p>
+                <p className="font-bold text-slate-600">Carregando suas crianças apadrinhadas...</p>
               </div>
+            ) : displayedPatients.length === 0 ? (
+              isDonorOrSponsor ? (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200/80 rounded-3xl p-8 text-center space-y-3">
+                  <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mx-auto text-[#F49853] shadow-xs">
+                    <Heart size={28} />
+                  </div>
+                  <h4 className="font-heading font-black text-slate-900 text-base">
+                    Você ainda não possui crianças apadrinhadas
+                  </h4>
+                  <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                    Com o apadrinhamento mensal, você garante tratamento nutricional intensivo e acompanha com exclusividade as fotos e a evolução da sua criança.
+                  </p>
+                  <Link
+                    to="/mantenedor"
+                    className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all"
+                  >
+                    <Heart size={14} fill="currentColor" />
+                    <span>Apadrinhar uma Criança</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
+                  <Users size={32} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                  <p className="font-bold text-slate-600">Nenhuma criança registrada no momento.</p>
+                  <p className="mt-1">Novos atendimentos da Casa Nutri serão sincronizados em breve.</p>
+                </div>
+              )
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {displayedPatients.map((child) => (
@@ -211,8 +277,14 @@ export function MobileDonorHome() {
                     onClick={() => navigate('/portal/sponsorship')}
                     className="bg-white p-5 rounded-3xl border border-slate-200/80 hover:border-orange-300 shadow-xs hover:shadow-md transition-all flex items-start gap-4 cursor-pointer group"
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-orange-100 border border-orange-200 text-[#F49853] font-heading font-black text-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      {child.name.charAt(0).toUpperCase()}
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-orange-100 border border-orange-200 shrink-0 group-hover:scale-105 transition-transform">
+                      {child.photo_url ? (
+                        <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[#F49853] font-heading font-black text-lg">
+                          {child.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">

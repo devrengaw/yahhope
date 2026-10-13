@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Heart, 
   Activity, 
@@ -29,11 +29,18 @@ export function MobileDonorChildren() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(true);
 
   useEffect(() => {
     sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
-      .then(children => setMyChildren(children))
-      .catch(e => console.error(e));
+      .then(children => {
+        setMyChildren(children);
+        setIsLoadingChildren(false);
+      })
+      .catch(e => {
+        console.error(e);
+        setIsLoadingChildren(false);
+      });
   }, [user?.id, user?.email]);
 
   // Calcula idade a partir do dob
@@ -66,18 +73,45 @@ export function MobileDonorChildren() {
     return { initial, current };
   };
 
-  const myChildIds = new Set(myChildren.map(c => c.id));
+  const isDonorOrSponsor = user?.role === 'SPONSOR' || (user?.role !== 'ADMIN' && user?.role !== 'USER');
+  const myChildIds = useMemo(() => new Set(myChildren.map(c => c.id)), [myChildren]);
 
-  const filteredPatients = patients.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.community && c.community.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.registration_number && c.registration_number.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    if (!matchesSearch) return false;
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'mine') return myChildIds.has(c.id);
-    return c.status === statusFilter;
-  });
+  // Fonte de dados de pacientes com segregação estrita:
+  // Se for mantenedor/padrinho, EXCLUSIVAMENTE as crianças que ele apadrinha!
+  const basePatients = useMemo(() => {
+    if (isDonorOrSponsor) {
+      const fromPatients = patients.filter(c => myChildIds.has(c.id));
+      if (fromPatients.length > 0) return fromPatients;
+      return myChildren.map(c => ({
+        id: c.id,
+        name: c.name,
+        dob: c.dob || '',
+        status: (c.nutritional_status || 'Adequado') as any,
+        community: c.community || 'Casa Nutri',
+        photo_url: c.photo_url,
+        registration_number: '',
+        gender: (c.gender || 'M') as any,
+        created_at: '',
+        guardian_name: '',
+        housing_type: '',
+        sanitation: ''
+      }));
+    }
+    return patients;
+  }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
+
+  const filteredPatients = useMemo(() => {
+    return basePatients.filter((c) => {
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.community && c.community.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (c.registration_number && c.registration_number.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      if (!matchesSearch) return false;
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'mine') return myChildIds.has(c.id);
+      return c.status === statusFilter;
+    });
+  }, [basePatients, searchQuery, statusFilter, myChildIds]);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -89,10 +123,12 @@ export function MobileDonorChildren() {
           </span>
           <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Heart className="text-[#F49853]" size={32} fill="currentColor" /> 
-            Crianças em Acompanhamento
+            {isDonorOrSponsor ? 'Minhas Crianças Apadrinhadas' : 'Crianças em Acompanhamento'}
           </h2>
           <p className="text-sm text-slate-500 font-gotham-light mt-1">
-            Conheça as vidas atendidas e acompanhe a evolução nutricional em tempo real.
+            {isDonorOrSponsor 
+              ? 'Acompanhe a recuperação nutricional, fotos e relatórios da(s) criança(s) sob seu apadrinhamento.' 
+              : 'Conheça as vidas atendidas e acompanhe a evolução nutricional em tempo real.'}
           </p>
         </div>
 
@@ -100,7 +136,9 @@ export function MobileDonorChildren() {
         <div className="bg-orange-50 border border-orange-200/80 px-4 py-2 rounded-2xl flex items-center gap-2 self-start md:self-auto">
           <Users size={16} className="text-[#F49853]" />
           <span className="text-xs font-gotham-bold text-slate-800">
-            {patients.length} {patients.length === 1 ? 'Criança Cadastrada' : 'Crianças Cadastradas'}
+            {basePatients.length} {isDonorOrSponsor 
+              ? (basePatients.length === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas') 
+              : (basePatients.length === 1 ? 'Criança Cadastrada' : 'Crianças Cadastradas')}
           </span>
         </div>
       </div>
@@ -127,9 +165,9 @@ export function MobileDonorChildren() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            Todos ({patients.length})
+            {isDonorOrSponsor ? `Todas (${basePatients.length})` : `Todos (${basePatients.length})`}
           </button>
-          {myChildren.length > 0 && (
+          {!isDonorOrSponsor && myChildren.length > 0 && (
             <button
               onClick={() => setStatusFilter('mine')}
               className={`px-4 py-2.5 rounded-xl text-xs font-gotham-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
@@ -166,14 +204,41 @@ export function MobileDonorChildren() {
       </div>
 
       {/* Grid de Crianças Responsivo (1 col mobile, 2 sm, 3 lg) */}
-      {filteredPatients.length === 0 ? (
+      {isLoadingChildren ? (
         <div className="bg-white rounded-3xl p-12 border border-slate-200/80 text-center text-slate-400">
-          <Users size={40} className="mx-auto mb-3 opacity-30 text-slate-400" />
-          <h4 className="font-heading font-black text-slate-700 text-base">Nenhum registro encontrado</h4>
-          <p className="text-xs text-slate-500 mt-1 font-gotham-light">
-            Tente buscar com outros termos ou limpe os filtros para visualizar todas as crianças.
-          </p>
+          <p className="font-bold text-slate-600">Carregando dados das crianças...</p>
         </div>
+      ) : filteredPatients.length === 0 ? (
+        isDonorOrSponsor && basePatients.length === 0 ? (
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200/80 rounded-3xl p-12 text-center space-y-4">
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-[#F49853] shadow-xs">
+              <Heart size={32} />
+            </div>
+            <h4 className="font-heading font-black text-slate-900 text-xl">
+              Você ainda não possui crianças apadrinhadas
+            </h4>
+            <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+              Com o apadrinhamento solidário, você garante acompanhamento clínico, alimentação especial e recebe fotos e relatórios de evolução exclusivos da sua criança.
+            </p>
+            <div>
+              <Link
+                to="/mantenedor"
+                className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all"
+              >
+                <Heart size={16} fill="currentColor" />
+                <span>Apadrinhar uma Criança Agora</span>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl p-12 border border-slate-200/80 text-center text-slate-400">
+            <Users size={40} className="mx-auto mb-3 opacity-30 text-slate-400" />
+            <h4 className="font-heading font-black text-slate-700 text-base">Nenhum registro encontrado</h4>
+            <p className="text-xs text-slate-500 mt-1 font-gotham-light">
+              Tente buscar com outros termos ou limpe os filtros para visualizar os dados.
+            </p>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPatients.map((child) => {
@@ -187,11 +252,15 @@ export function MobileDonorChildren() {
                 className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs hover:border-orange-300 hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
               >
                 <div>
-                  {/* Top Banner Card com Avatar Institucional */}
+                  {/* Top Banner Card com Avatar Institucional ou Foto Real */}
                   <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 text-white relative">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        {child.name.charAt(0).toUpperCase()}
+                      <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/10 border border-white/20 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        {child.photo_url ? (
+                          <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                        ) : (
+                          child.name.charAt(0).toUpperCase()
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         {myChildIds.has(child.id) && (
@@ -273,8 +342,12 @@ export function MobileDonorChildren() {
               {/* Header do Modal */}
               <div className="p-6 bg-gradient-to-r from-slate-950 to-slate-900 text-white flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-orange-100 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center">
-                    {child.name.charAt(0).toUpperCase()}
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-orange-100 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 border border-white/20">
+                    {child.photo_url ? (
+                      <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                    ) : (
+                      child.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div>
                     <h3 className="text-xl font-heading font-black text-white leading-tight">
@@ -295,6 +368,11 @@ export function MobileDonorChildren() {
 
               {/* Conteúdo do Modal */}
               <div className="p-6 space-y-5 overflow-y-auto">
+                {child.photo_url && (
+                  <div className="w-full h-52 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs">
+                    <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
                   <span className="text-xs font-gotham-bold text-slate-500 uppercase tracking-wider">
                     Status Nutricional Atual:

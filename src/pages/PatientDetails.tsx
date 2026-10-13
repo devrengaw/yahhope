@@ -976,6 +976,17 @@ export function PatientDetails() {
         <Link to="/nutrition/patients" className="p-2 rounded-xl hover:bg-slate-200 text-slate-500 transition-colors">
           <ArrowLeft size={20} />
         </Link>
+        {patient.photo_url ? (
+          <img 
+            src={patient.photo_url} 
+            alt={patient.name} 
+            className="w-14 h-14 md:w-16 md:h-16 rounded-2xl object-cover border-2 border-emerald-500/20 shadow-sm shrink-0"
+          />
+        ) : (
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-emerald-50 border border-emerald-200/60 flex items-center justify-center text-emerald-700 font-black text-xl shadow-xs shrink-0">
+            {patient.name.charAt(0)}
+          </div>
+        )}
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{patient.name}</h1>

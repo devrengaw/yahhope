@@ -6,6 +6,7 @@ import { calculateAge, cn, parseLocalDate, formatLocalDate } from '../lib/utils'
 import { usePatients } from '../contexts/PatientContext';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadChildPhoto } from '../lib/imageUpload';
 
 const STEPS = [
   { id: 1, title: 'Identificação', icon: User },
@@ -120,6 +121,7 @@ export function NewPatient() {
   const [educationalActions, setEducationalActions] = useState<string[]>([]);
   const [examsList, setExamsList] = useState([{ id: 1, name: '', result: '' }]);
   const [medicationsList, setMedicationsList] = useState([{ id: 1, name: '', dosage: '' }]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const location = useLocation();
   const waitingChild = location.state?.waitingChild;
@@ -408,7 +410,12 @@ export function NewPatient() {
                 <div className="flex items-center gap-6 mb-2">
                   <div className="relative group cursor-pointer w-24 h-24 shrink-0">
                     <div className="w-full h-full rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden hover:border-emerald-500 transition-colors">
-                      {formData.child_photo ? (
+                      {isUploadingPhoto ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-[9px] font-bold text-slate-500">Salvando...</span>
+                        </div>
+                      ) : formData.child_photo ? (
                         <img src={formData.child_photo} alt="Preview" className="w-full h-full object-cover" />
                       ) : (
                         <div className="flex flex-col items-center">
@@ -419,16 +426,38 @@ export function NewPatient() {
                     </div>
                     <input 
                       type="file" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                      onChange={(e) => {
+                      accept="image/*"
+                      disabled={isUploadingPhoto}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) setFormData(prev => ({ ...prev, child_photo: URL.createObjectURL(file) }));
+                        if (file) {
+                          try {
+                            setIsUploadingPhoto(true);
+                            const photoUrl = await uploadChildPhoto(file);
+                            setFormData(prev => ({ ...prev, child_photo: photoUrl }));
+                          } catch (err) {
+                            console.error('Erro ao processar foto:', err);
+                            alert('Erro ao carregar imagem. Tente novamente.');
+                          } finally {
+                            setIsUploadingPhoto(false);
+                          }
+                        }
                       }}
                     />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-800">Foto da Criança</h3>
                     <p className="text-sm text-slate-500">Adicione uma foto ao prontuário (opcional)</p>
+                    {formData.child_photo && !isUploadingPhoto && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, child_photo: '' }))}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold mt-1"
+                      >
+                        Remover foto
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

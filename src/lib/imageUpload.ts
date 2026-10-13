@@ -160,3 +160,50 @@ export async function uploadProfileAvatar(
   return optimizedDataUrl;
 }
 
+/**
+ * Compresses and prepares a child patient photo (max 800x800, quality 0.85).
+ * Attempts to upload to Supabase Storage ('avatars' bucket),
+ * falling back safely to the optimized WebP/JPEG data URL if bucket is not configured.
+ */
+export async function uploadChildPhoto(
+  file: File,
+  childId?: string
+): Promise<string> {
+  const optimizedDataUrl = await optimizeImageFile(file, {
+    maxWidth: 800,
+    maxHeight: 800,
+    quality: 0.85
+  });
+
+  try {
+    const fileExt = 'webp';
+    const fileName = `child-${childId || 'new'}-${Date.now()}.${fileExt}`;
+    const filePath = `children/${fileName}`;
+
+    const response = await fetch(optimizedDataUrl);
+    const blob = await response.blob();
+
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: blob.type || 'image/webp'
+      });
+
+    if (!error) {
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+  } catch {
+    // Graceful fallback to optimized data URL
+  }
+
+  return optimizedDataUrl;
+}
+

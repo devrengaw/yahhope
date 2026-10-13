@@ -73,7 +73,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
             created_at: c.created_at,
             guardian_name: guardian,
             housing_type: '',
-            sanitation: ''
+            sanitation: '',
+            photo_url: c.photo_url || ''
           };
         });
         setPatients(formattedPatients);
@@ -124,7 +125,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         dob: patient.dob,
         gender: patient.gender,
         address: patient.community,
-        color: ''
+        color: '',
+        photo_url: patient.photo_url || null
       }).select().single();
 
       if (newChild) {
@@ -157,7 +159,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       city: payload.city,
       dob: payload.dob,
       gender: payload.gender,
-      color: payload.color
+      color: payload.color,
+      photo_url: payload.child_photo || payload.photo_url || null
     }).select().single();
 
     if (childError) throw childError;
@@ -345,6 +348,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       if (updates.dob !== undefined) payload.dob = updates.dob;
       if (updates.gender !== undefined) payload.gender = updates.gender;
       if (updates.community !== undefined) payload.address = updates.community;
+      if (updates.photo_url !== undefined) payload.photo_url = updates.photo_url;
       
       if (Object.keys(payload).length > 0) {
         await supabase.from('children').update(payload).eq('id', id);

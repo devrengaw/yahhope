@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePatients } from '../contexts/PatientContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadChildPhoto } from '../lib/imageUpload';
 
 interface PatientProfileProps {
   patientId: string;
@@ -20,6 +21,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
   
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   const [childData, setChildData] = useState<any>(null);
   const [caregiverData, setCaregiverData] = useState<any>(null);
@@ -106,7 +108,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
         address: formData.address,
         city: formData.city,
         province: formData.province,
-        color: formData.color
+        color: formData.color,
+        photo_url: formData.photo_url || null
       }).eq('id', patientId);
 
       // Update Caregiver
@@ -206,6 +209,69 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
           <h3 className="text-sm font-black text-emerald-800 uppercase tracking-widest flex items-center gap-2 mb-6">
             <User size={18} className="text-emerald-500" /> Dados da Criança
           </h3>
+          
+          {/* Avatar and Photo Section */}
+          <div className="flex items-center gap-5 mb-6 pb-6 border-b border-slate-100">
+            <div className="relative group w-20 h-20 shrink-0">
+              {isUploadingPhoto ? (
+                <div className="w-full h-full rounded-2xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center gap-1">
+                  <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[9px] font-bold text-slate-500">Salvando</span>
+                </div>
+              ) : formData.photo_url ? (
+                <img 
+                  src={formData.photo_url} 
+                  alt={formData.name || 'Criança'} 
+                  className="w-full h-full rounded-2xl object-cover border-2 border-emerald-500/20 shadow-sm"
+                />
+              ) : (
+                <div className="w-full h-full rounded-2xl bg-emerald-50 border border-emerald-200/50 flex items-center justify-center text-emerald-600 font-black text-2xl shadow-xs">
+                  {formData.name ? formData.name.charAt(0).toUpperCase() : <User size={28} />}
+                </div>
+              )}
+              {isEditing && !isUploadingPhoto && (
+                <label className="absolute inset-0 bg-slate-900/60 hover:bg-slate-900/75 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-[10px] font-bold">
+                  <span>Alterar</span>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    className="hidden" 
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          setIsUploadingPhoto(true);
+                          const url = await uploadChildPhoto(file, patientId);
+                          setFormData((prev: any) => ({ ...prev, photo_url: url }));
+                        } catch (err) {
+                          console.error('Erro ao atualizar foto:', err);
+                          alert('Erro ao carregar a imagem.');
+                        } finally {
+                          setIsUploadingPhoto(false);
+                        }
+                      }
+                    }} 
+                  />
+                </label>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-800">Foto da Criança</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isEditing ? 'Passe o mouse na foto para alterar o arquivo' : 'Foto registrada no prontuário do paciente'}
+              </p>
+              {isEditing && formData.photo_url && !isUploadingPhoto && (
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev: any) => ({ ...prev, photo_url: '' }))}
+                  className="text-[11px] text-red-500 hover:text-red-700 hover:underline mt-1 font-semibold"
+                >
+                  Remover foto
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-4">
             <ProfileField 
               label="Nome Completo" name="name" value={formData.name} 

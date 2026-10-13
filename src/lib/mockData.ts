@@ -12,6 +12,7 @@ export interface Patient {
   guardian_name: string;
   housing_type: string;
   sanitation: string;
+  photo_url?: string;
 }
 
 export interface Prescription {
