@@ -356,12 +356,12 @@ export function MonthlyDonor() {
           <img 
             src="/mantenedor_hero.jpg" 
             alt="Criança sorrindo acolhida pela YAH Hope" 
-            className="w-full h-full object-cover object-[center_28%] filter brightness-[0.88] contrast-105 scale-100 transition-transform duration-1000"
+            className="w-full h-full object-cover object-[10%_25%] sm:object-[15%_25%] lg:object-[18%_22%] filter brightness-[0.92] contrast-105 scale-100 transition-transform duration-1000"
           />
-          {/* Gradientes equilibrados: foto nítida e iluminada com contraste perfeito para os textos */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/50 to-[#0F172A]/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/60 via-transparent to-[#0F172A]/60"></div>
-          <div className="absolute inset-0 bg-black/15"></div>
+          {/* Gradientes equilibrados: foto nítida e destacada à esquerda com contraste para o formulário à direita */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/45 to-[#0F172A]/20"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0F172A]/25 via-transparent to-[#0F172A]/85"></div>
+          <div className="absolute inset-0 bg-black/10"></div>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
