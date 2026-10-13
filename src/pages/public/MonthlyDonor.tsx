@@ -1050,17 +1050,17 @@ export function MonthlyDonor() {
       </section>
 
       {/* 3. AS TRÊS FRENTES DE DESTINAÇÃO DO RECURSO */}
-      <section className="py-20 md:py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-20 md:py-28 bg-[#0F172A] text-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
               Destinação Real e Auditada
             </span>
-            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight">
               Para onde vai a sua contribuição todo mês?
             </h2>
-            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
+            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-4">
               Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.
             </p>
           </div>
@@ -1068,57 +1068,57 @@ export function MonthlyDonor() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
             {/* Frente 1 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
               <div>
-                <div className="w-14 h-14 rounded-2xl bg-orange-100 text-[#F49853] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Activity size={28} />
                 </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                <h3 className="text-xl font-heading font-black text-white mb-3">
                   Casa Nutri (Nampula)
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
                   Compra de fórmulas terapêuticas (F-75, F-100 e Plumpy'Nut), insumos hospitalares, remuneração de nutricionistas locais e monitoramento pediátrico intensivo para erradicar a desnutrição infantil.
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1.5">
+              <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
                 <span>Salva vidas em risco iminente</span>
               </div>
             </div>
 
             {/* Frente 2 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
               <div>
-                <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <GraduationCap size={28} />
                 </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                <h3 className="text-xl font-heading font-black text-white mb-3">
                   Educação & Bolsas Universitárias
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
                   Financiamento de bolsas universitárias integrais para jovens órfãos ou em extrema vulnerabilidade se formarem médicos, enfermeiros, professores e engenheiros da sua própria nação.
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-blue-600 flex items-center gap-1.5">
+              <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-blue-400 flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
                 <span>Quebra o ciclo geracional da pobreza</span>
               </div>
             </div>
 
             {/* Frente 3 */}
-            <div className="bg-slate-50 hover:bg-slate-100/80 transition-colors p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between group">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-8 rounded-3xl border border-slate-700/80 flex flex-col justify-between group shadow-lg">
               <div>
-                <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-[#92BF78] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Droplets size={28} />
                 </div>
-                <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
+                <h3 className="text-xl font-heading font-black text-white mb-3">
                   Água Potável & Autonomia Comunitária
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed font-gotham-light mb-4">
+                <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
                   Perfuração de poços artesianos nas aldeias, saneamento, oficinas de agricultura sustentável para mães e hortas que alimentam centenas de famílias de forma autônoma.
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-200 text-xs font-gotham-bold text-emerald-600 flex items-center gap-1.5">
+              <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-[#92BF78] flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
                 <span>Saúde preventiva e dignidade básica</span>
               </div>
@@ -1181,59 +1181,59 @@ export function MonthlyDonor() {
       </section>
 
       {/* 5. TRANSPARÊNCIA RADICAL: O QUE VOCÊ GANHA COMO MANTENEDOR */}
-      <section className="py-20 md:py-28 bg-slate-50 border-y border-slate-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-20 md:py-28 bg-[#0F172A] text-white border-y border-slate-800 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
               Conexão e Integridade
             </span>
-            <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight">
               O Que Você Recebe Como Nosso Parceiro Mensal
             </h2>
-            <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
+            <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-4">
               Não tratamos doações como caixas-pretas. Criamos uma ponte direta entre a sua generosidade e a realidade das famílias assistidas.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-6 rounded-3xl border border-slate-700/80 shadow-lg space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-[#F49853] flex items-center justify-center font-bold">
                 <Users size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-slate-900">Portal do Mantenedor</h3>
-              <p className="text-xs text-slate-500 font-gotham-light leading-relaxed">
+              <h3 className="font-gotham-bold text-base text-white">Portal do Mantenedor</h3>
+              <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
                 Login exclusivo para acompanhar métricas de impacto em tempo real, evolução das crianças e histórico das suas doações.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-6 rounded-3xl border border-slate-700/80 shadow-lg space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-[#92BF78] flex items-center justify-center font-bold">
                 <FileText size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-slate-900">Relatórios Auditados</h3>
-              <p className="text-xs text-slate-500 font-gotham-light leading-relaxed">
+              <h3 className="font-gotham-bold text-base text-white">Relatórios Auditados</h3>
+              <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
                 Demonstrativos claros e públicos sobre onde cada real foi investido no terreno, com laudos médicos e notas fiscais.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-6 rounded-3xl border border-slate-700/80 shadow-lg space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
                 <Calendar size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-slate-900">Boletins Periódicos</h3>
-              <p className="text-xs text-slate-500 font-gotham-light leading-relaxed">
+              <h3 className="font-gotham-bold text-base text-white">Boletins Periódicos</h3>
+              <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
                 Atualizações periódicas no seu e-mail ou WhatsApp com histórias, vídeos e fotos diretamente da base de Moçambique.
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+            <div className="bg-slate-800/60 hover:bg-slate-800/90 transition-all p-6 rounded-3xl border border-slate-700/80 shadow-lg space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
                 <Award size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-slate-900">Certificado Oficial</h3>
-              <p className="text-xs text-slate-500 font-gotham-light leading-relaxed">
+              <h3 className="font-gotham-bold text-base text-white">Certificado Oficial</h3>
+              <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
                 Certificado digital de mantenedor solidário para atestar seu compromisso com a transformação social e humanitária.
               </p>
             </div>
