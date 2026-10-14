@@ -21,7 +21,7 @@ import {
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
-import { useFundraising, CampaignMilestone, Campaign } from '../../contexts/FundraisingContext';
+import { useFundraising, CampaignMilestone, Campaign, Donation } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
 import { Link } from 'react-router-dom';
 
@@ -45,6 +45,8 @@ export function FundraisingManager() {
     updateMilestone, 
     removeMilestone, 
     approveDonation,
+    deleteDonation,
+    clearTestDonationsAndResetRuler,
     currentMonthName,
     calculateCampaignProgress
   } = useFundraising();
@@ -209,6 +211,35 @@ export function FundraisingManager() {
       alert('Régua zerada com sucesso para o mês!');
     } else {
       alert('Erro ao zerar régua: ' + (res.error?.message || 'Tente novamente.'));
+    }
+  };
+
+  const handleDeleteDonation = async (d: Donation) => {
+    const confirm = window.confirm(
+      `Deseja realmente excluir a doação de R$ ${d.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} de "${d.donor_name}"?`
+    );
+    if (!confirm) return;
+
+    const res = await deleteDonation(d.id);
+    if (res.success) {
+      alert('Doação excluída com sucesso.');
+    } else {
+      alert('Erro ao excluir doação: ' + (res.error || 'Tente novamente.'));
+    }
+  };
+
+  const handleClearTestDonations = async () => {
+    const confirm = window.confirm(
+      '⚠️ ATENÇÃO: Esta ação irá zerar a arrecadação da régua para R$ 0,00 e remover todas as doações de teste cadastradas no banco de dados.\n\n' +
+      'Deseja realmente limpar as doações de teste e zerar a régua geral?'
+    );
+    if (!confirm) return;
+
+    const res = await clearTestDonationsAndResetRuler();
+    if (res.success) {
+      alert('Valores de teste limpos e régua zerada com sucesso para R$ 0,00!');
+    } else {
+      alert('Erro ao limpar testes: ' + (res.error?.message || 'Tente novamente.'));
     }
   };
 
@@ -384,7 +415,15 @@ export function FundraisingManager() {
           <p className="text-slate-500 font-medium">Cada campanha atua como um estágio na régua unificada. Mantenedores mensais sustentam o custo mensal contínuo do projeto.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleClearTestDonations}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-xs hover:bg-rose-100 transition-colors shadow-xs cursor-pointer"
+            title="Zera a régua geral e remove registros de doações de teste"
+          >
+            <RotateCcw size={14} /> Zerar Régua & Testes
+          </button>
           <Link
             to={`/campanha?id=${selectedCampaign.id}`}
             target="_blank"
@@ -1080,7 +1119,7 @@ export function FundraisingManager() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
                 <span className="text-slate-500 font-medium">
                   Total confirmado: <strong className="text-emerald-700 font-black">
                     R$ {displayedDonations
@@ -1093,6 +1132,15 @@ export function FundraisingManager() {
                       .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </strong>
                 </span>
+                <button
+                  type="button"
+                  onClick={handleClearTestDonations}
+                  className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Zerar valores de teste da régua e limpar doações de teste"
+                >
+                  <RotateCcw size={13} className="text-rose-600" />
+                  <span>Zerar Régua & Limpar Testes</span>
+                </button>
               </div>
             </div>
 
@@ -1180,15 +1228,24 @@ export function FundraisingManager() {
                                 )}
                               </td>
                               <td className="p-4 text-right">
-                                {d.status === 'pending' && (
-                                  <button 
-                                    onClick={() => approveDonation(d.id)}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold shadow-xs"
-                                    title="Aprovar Pagamento Manualmente"
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {d.status === 'pending' && (
+                                    <button 
+                                      onClick={() => approveDonation(d.id)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold shadow-xs cursor-pointer"
+                                      title="Aprovar Pagamento Manualmente"
+                                    >
+                                      <Check size={14} /> Aprovar
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteDonation(d)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Excluir Registro de Doação"
                                   >
-                                    <Check size={14} /> Aprovar
+                                    <Trash2 size={15} />
                                   </button>
-                                )}
+                                </div>
                               </td>
                             </tr>
                           ))}

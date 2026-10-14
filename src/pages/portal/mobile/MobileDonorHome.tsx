@@ -684,22 +684,6 @@ export function MobileDonorHome() {
                 </div>
               </div>
 
-              {/* Visão Consolidada da Régua Global */}
-              <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5 space-y-1.5">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-slate-400 font-gotham-medium">Total Geral da Régua:</span>
-                  <span className="text-white font-gotham-bold">
-                    R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / R$ {totalRulerGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({rulerOverallPercentage}%)
-                  </span>
-                </div>
-                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                    style={{ width: `${rulerOverallPercentage}%` }}
-                  />
-                </div>
-              </div>
-
               {/* Pilares do Impacto */}
               <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-gotham-medium text-slate-300">
                 <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">

@@ -647,38 +647,38 @@ export function Campaign() {
             <div className="flex items-center gap-3 bg-slate-50/90 py-2.5 px-3.5 rounded-xl border border-slate-200/70 self-start lg:self-auto shadow-inner">
               <div className="text-right">
                 <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">
-                  Total Geral Arrecadado
+                  Progresso da Fase Atual
                 </span>
                 <span className="text-lg md:text-xl font-black text-emerald-600">
-                  R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(currentActiveStage ? currentActiveStage.campStats.currentAmount : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
                 <span className="text-[11px] text-slate-400 block font-medium">
-                  de R$ {totalRulerGoal.toLocaleString('pt-BR')} ({rulerOverallPercentage}%)
+                  Alvo da Fase: R$ {(currentActiveStage?.campaign.target_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex flex-col items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-emerald-500/25">
-                <span>{rulerOverallPercentage}%</span>
-                <span className="text-[8px] font-bold uppercase text-white/80">concluído</span>
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 via-[#F49853] to-orange-500 text-white flex flex-col items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-orange-500/25">
+                <span>{currentActiveStage?.stageProgress || 0}%</span>
+                <span className="text-[8px] font-bold uppercase text-white/90">fase ativa</span>
               </div>
             </div>
           </div>
 
-          {/* Barra Contínua Global com Efeito Shimmer */}
+          {/* Barra de Progresso da Fase Atual com Efeito Shimmer */}
           <div className="relative pt-1 pb-2">
             <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 mb-1.5">
               <span className="flex items-center gap-1 text-slate-700">
-                <Layers size={12} className="text-emerald-600" />
-                Progresso Geral na Régua
+                <Layers size={12} className="text-[#F49853]" />
+                Progresso da Fase Atual: {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} • ${currentActiveStage.campaign.title}` : 'Fase Ativa'}
               </span>
-              <span className="text-emerald-700 font-semibold">
-                {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} em andamento` : 'Régua Concluída'}
+              <span className="text-[#F49853] font-bold">
+                {currentActiveStage?.stageProgress || 0}% atingido
               </span>
             </div>
 
             <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner ring-1 ring-slate-200/80 relative">
               <div 
-                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-[#F49853] rounded-full transition-all duration-1000 ease-out relative"
-                style={{ width: `${rulerOverallPercentage}%` }}
+                className="h-full bg-gradient-to-r from-amber-400 via-[#F49853] to-orange-500 rounded-full transition-all duration-1000 ease-out relative"
+                style={{ width: `${currentActiveStage?.stageProgress || 0}%` }}
               >
                 <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
               </div>

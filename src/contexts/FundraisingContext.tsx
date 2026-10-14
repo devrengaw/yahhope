@@ -82,6 +82,7 @@ interface FundraisingContextType {
   createDonation: (donation: Omit<Donation, 'id' | 'status' | 'date'> & { campaign_id?: string }) => Promise<void>;
   approveDonation: (id: string) => Promise<void>;
   deleteDonation: (id: string) => Promise<{ success: boolean; error?: any }>;
+  clearTestDonationsAndResetRuler: () => Promise<{ success: boolean; error?: any }>;
   calculateCampaignProgress: (camp: Campaign) => CampaignProgressStats;
 }
 
@@ -114,79 +115,53 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     return `${MONTH_NAMES[now.getMonth()]} de ${now.getFullYear()}`;
   }, []);
 
-  // Calcula o progresso dinâmico de qualquer campanha considerando se é Mensal ou Específica
+  // Calcula o progresso dinâmico de qualquer campanha considerando suas doações reais e cotas de apadrinhamento
   const calculateCampaignProgress = useCallback((camp: Campaign): CampaignProgressStats => {
     const isMonthly = camp.type !== 'specific'; // Padrão é mensal
 
-    // Filtra doações aprovadas desta campanha
+    // Identifica de forma precisa qual é o primeiro estágio ativo na régua (Fase 1)
+    const firstActiveCamp = campaigns.find(c => c && c.is_active !== false) || campaigns[0];
+    const isFirstActive = camp.id === firstActiveCamp?.id;
+
+    // Filtra doações confirmadas pertencentes a esta campanha
     const campDonations = donations.filter(d => {
       if (d.status !== 'paid') return false;
       if (d.campaign_id) {
         return d.campaign_id === camp.id;
       }
-      return camp.is_active && (camp.priority === 1 || camp.id === '1');
+      // Doações gerais e apadrinhamentos sem campanha explícita entram na primeira fase ativa (Casa Nutri)
+      return isFirstActive;
     });
 
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
 
-    // Filtra doações ocorridas estritamente dentro do mês e ano atuais
+    // Filtra doações ocorridas no mês e ano atuais
     const monthDonations = campDonations.filter(d => {
       const rawDate = d.date || d.paid_at;
-      if (!rawDate) return false;
+      if (!rawDate) return true;
 
-      // Extração robusta de ano e mês evitando deslocamento de fuso horário UTC
-      let dYear: number;
-      let dMonth: number;
       const match = rawDate.match(/^(\d{4})-(\d{2})/);
       if (match) {
-        dYear = parseInt(match[1], 10);
-        dMonth = parseInt(match[2], 10) - 1;
-      } else {
-        const dObj = new Date(rawDate);
-        if (isNaN(dObj.getTime())) return false;
-        dYear = dObj.getFullYear();
-        dMonth = dObj.getMonth();
+        const dYear = parseInt(match[1], 10);
+        const dMonth = parseInt(match[2], 10) - 1;
+        return dYear === currentYear && dMonth === currentMonth;
       }
 
-      // Deve pertencer estritamente ao mês e ano vigentes
-      const isCurrentMonth = dYear === currentYear && dMonth === currentMonth;
-
-      if (!isCurrentMonth) return false;
-
-      // Se houve reset manual no mês atual, só considera doações posteriores ao reset
-      if (camp.last_reset_at) {
-        const resetDate = new Date(camp.last_reset_at);
-        const donationDate = new Date(rawDate);
-        if (
-          !isNaN(resetDate.getTime()) &&
-          !isNaN(donationDate.getTime()) &&
-          resetDate.getFullYear() === currentYear &&
-          resetDate.getMonth() === currentMonth &&
-          donationDate < resetDate
-        ) {
-          return false;
-        }
-      }
-
-      return true;
+      const dObj = new Date(rawDate);
+      if (isNaN(dObj.getTime())) return true;
+      return dObj.getFullYear() === currentYear && dObj.getMonth() === currentMonth;
     });
 
     const currentMonthTotal = monthDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
     const totalHistorical = campDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
 
-    // REGRA DE OURO:
-    // 1. Campanha Mensal (recorrente):
-    //    - Zera automaticamente todo mês. APENAS doações do mês corrente (currentMonthTotal) entram na meta/régua do mês.
-    //    - Entradas de meses anteriores (ex: junho, julho) JAMAIS entram na arrecadação deste mês.
-    //
-    // 2. Campanha Específica (meta pontual/não mensal):
-    //    - NUNCA zera ao passar o mês.
-    //    - Acumula todo o histórico de arrecadação continuamente.
-    const currentAmount = isMonthly 
-      ? currentMonthTotal 
-      : Math.max(totalHistorical, Number(camp.current_amount || 0));
+    // REGRA DE OURO DE PRECISÃO:
+    // A soma das doações reais confirmadas (doação avulsa + apadrinhamentos) é a fonte primária da verdade.
+    // Se houver doações cadastradas no mês ou histórico, o valor real é calculado a partir delas (ex: 50 + 90 = 140).
+    const realDonationsTotal = currentMonthTotal > 0 ? currentMonthTotal : totalHistorical;
+    const currentAmount = realDonationsTotal > 0 ? realDonationsTotal : Number(camp.current_amount || 0);
 
     const targetAmount = Math.max(camp.target_amount || 1, 1);
     const percentage = Math.min(Math.round((currentAmount / targetAmount) * 100), 100);
@@ -196,10 +171,10 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       targetAmount,
       percentage,
       isMonthly,
-      currentMonthTotal,
-      totalHistorical: Math.max(totalHistorical, Number(camp.current_amount || 0))
+      currentMonthTotal: currentAmount,
+      totalHistorical: totalHistorical > 0 ? totalHistorical : currentAmount
     };
-  }, [donations]);
+  }, [donations, campaigns]);
 
   // Carrega todas as campanhas, milestones e doações do Supabase
   const fetchCampaignData = async () => {
@@ -229,30 +204,38 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       // 4. Buscar apadrinhamentos ativos (cotas de apadrinhamento financiam a nutrição e operação da Casa Nutri)
       const { data: sponsorshipsData } = await supabase
         .from('sponsorships')
-        .select('*')
-        .in('status', ['active', 'paid', 'ACTIVE']);
+        .select('*');
 
-      const formattedDonations: Donation[] = (donationsData || []).map(d => ({
-        id: d.id,
-        campaign_id: d.campaign_id,
-        donor_name: d.donor_name,
-        donor_email: d.donor_email || '',
-        amount: Number(d.amount || 0),
-        status: d.status,
-        payment_method: d.payment_method,
-        date: d.created_at,
-        paid_at: d.paid_at
-      }));
+      const formattedDonations: Donation[] = (donationsData || []).map(d => {
+        const rawStatus = (d.status || 'paid').toLowerCase().trim();
+        const isPaid = rawStatus === 'paid' || rawStatus === 'completed' || rawStatus === 'confirmed' || rawStatus === 'pago';
+        return {
+          id: d.id,
+          campaign_id: d.campaign_id,
+          donor_name: d.donor_name || 'Doador YAH Hope',
+          donor_email: d.donor_email || '',
+          amount: Number(d.amount || 0),
+          status: isPaid ? 'paid' : 'pending',
+          payment_method: d.payment_method || 'pix',
+          date: d.created_at || new Date().toISOString(),
+          paid_at: d.paid_at || d.created_at || new Date().toISOString()
+        };
+      });
 
       // Adiciona as cotas de apadrinhamento ativas na arrecadação contínua da Casa Nutri
       if (sponsorshipsData && sponsorshipsData.length > 0) {
         sponsorshipsData.forEach(sp => {
+          const st = (sp.status || 'active').toLowerCase().trim();
+          const isActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed' || st === 'active_recurring';
+          if (!isActive) return;
+
+          const spAmount = Number(sp.monthly_amount || sp.amount || 90);
           formattedDonations.push({
             id: `sp_${sp.id}`,
-            campaign_id: undefined, // Fundo Geral / Nutrição Casa Nutri
+            campaign_id: undefined, // Destinado à fase ativa da Casa Nutri
             donor_name: sp.donor_name || 'Padrinho YAH Hope',
             donor_email: sp.donor_email || '',
-            amount: Number(sp.monthly_amount || 90),
+            amount: spAmount,
             status: 'paid',
             payment_method: sp.payment_method || 'credit_card',
             date: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
@@ -724,14 +707,27 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   const deleteDonation = async (id: string) => {
     try {
       const donationToDelete = donations.find(d => d.id === id);
-      const { error } = await supabase.from('donations').delete().eq('id', id);
-      if (error) {
-        console.warn('Aviso ao deletar doação no Supabase:', error);
+
+      // Se for apadrinhamento sincronizado (id prefixado com sp_)
+      if (id.startsWith('sp_')) {
+        const rawSpId = id.replace('sp_', '');
+        const { error: spErr } = await supabase.from('sponsorships').delete().eq('id', rawSpId);
+        if (spErr) {
+          console.warn('Aviso ao deletar apadrinhamento:', spErr);
+        }
+      } else {
+        const { error } = await supabase.from('donations').delete().eq('id', id);
+        if (error) {
+          console.warn('Aviso ao deletar doação no Supabase:', error);
+        }
       }
 
       // Se a doação estava confirmada (status = paid), decrementa da campanha correspondente
-      if (donationToDelete && donationToDelete.status === 'paid' && donationToDelete.campaign_id) {
-        const targetCamp = campaigns.find(c => c.id === donationToDelete.campaign_id);
+      if (donationToDelete && donationToDelete.status === 'paid') {
+        const targetCamp = donationToDelete.campaign_id
+          ? campaigns.find(c => c.id === donationToDelete.campaign_id)
+          : (activeCampaign || campaigns[0]);
+
         if (targetCamp) {
           const newAmount = Math.max(0, Number(targetCamp.current_amount || 0) - Number(donationToDelete.amount || 0));
           await supabase.from('campaigns').update({
@@ -745,6 +741,51 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     } catch (err: any) {
       console.error('Erro ao deletar doação:', err);
       return { success: false, error: err.message };
+    }
+  };
+
+  // Limpa doações de teste e zera a arrecadação da régua para R$ 0,00
+  const clearTestDonationsAndResetRuler = async () => {
+    try {
+      const nowIso = new Date().toISOString();
+
+      // 1. Zera todas as campanhas no Supabase
+      const { error: campErr } = await supabase
+        .from('campaigns')
+        .update({
+          current_amount: 0,
+          last_reset_at: nowIso
+        })
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (campErr) {
+        console.warn('Tentativa com last_reset_at falhou, tentando apenas current_amount:', campErr);
+        await supabase.from('campaigns').update({ current_amount: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+
+      // 2. Deleta as doações de teste da tabela donations
+      const { error: donErr } = await supabase
+        .from('donations')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (donErr) {
+        console.warn('Aviso ao limpar donations:', donErr);
+      }
+
+      // 3. Atualiza estado em memória imediatamente
+      setDonations([]);
+      setCampaigns(prev => prev.map(c => ({
+        ...c,
+        current_amount: 0,
+        last_reset_at: nowIso
+      })));
+
+      await fetchCampaignData();
+      return { success: true };
+    } catch (err: any) {
+      console.error('Erro ao limpar doações de teste:', err);
+      return { success: false, error: err };
     }
   };
 
@@ -773,6 +814,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       createDonation,
       approveDonation,
       deleteDonation,
+      clearTestDonationsAndResetRuler,
       calculateCampaignProgress
     }}>
       {children}

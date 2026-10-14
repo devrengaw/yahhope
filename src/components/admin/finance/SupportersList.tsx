@@ -16,7 +16,9 @@ import {
   FileText,
   UserCheck,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -29,6 +31,8 @@ export function SupportersList() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'sponsor' | 'donor'>('all');
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterData | null>(null);
+  const [isSyncingStripe, setIsSyncingStripe] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchSupporters = async () => {
     setIsLoading(true);
@@ -49,10 +53,16 @@ export function SupportersList() {
         if (u.email) usersByEmail.set(u.email.toLowerCase().trim(), u);
       });
 
-      // Mapear apadrinhamentos por sponsor_id
+      // Mapear apadrinhamentos por sponsor_id e por donor_email
       const sponsorshipsBySponsor = new Map<string, any>();
+      const sponsorshipsByEmail = new Map<string, any[]>();
       dbSponsorships.forEach(sp => {
         if (sp.sponsor_id) sponsorshipsBySponsor.set(sp.sponsor_id, sp);
+        const spEmail = (sp.donor_email || '').toLowerCase().trim();
+        if (spEmail) {
+          if (!sponsorshipsByEmail.has(spEmail)) sponsorshipsByEmail.set(spEmail, []);
+          sponsorshipsByEmail.get(spEmail)!.push(sp);
+        }
       });
 
       // Agrupar doações por email do doador
@@ -65,17 +75,27 @@ export function SupportersList() {
         }
       });
 
-      // Lista consolidada de emails únicos
-      const allEmails = new Set([...donationsByEmail.keys(), ...usersByEmail.keys()]);
+      // Lista consolidada de emails únicos (doações, usuários e apadrinhamentos)
+      const allEmails = new Set([
+        ...donationsByEmail.keys(), 
+        ...usersByEmail.keys(),
+        ...sponsorshipsByEmail.keys()
+      ]);
       const mappedSupporters: SupporterData[] = [];
 
       for (const email of allEmails) {
         const user = usersByEmail.get(email);
-        const userDonations = donationsByEmail.get(email) || [];
-        const sponsorship = user ? sponsorshipsBySponsor.get(user.id) : null;
+        const userDonations = [...(donationsByEmail.get(email) || [])];
+        const userSponsorships = [
+          ...(user ? (sponsorshipsBySponsor.has(user.id) ? [sponsorshipsBySponsor.get(user.id)] : []) : []),
+          ...(sponsorshipsByEmail.get(email) || [])
+        ];
+        // Elimina eventuais duplicatas de apadrinhamentos
+        const uniqueSponsorships = Array.from(new Map(userSponsorships.map(sp => [sp.id, sp])).values());
+        const primarySponsorship = uniqueSponsorships[0] || null;
 
         const isSponsorRole = user?.role === 'SPONSOR' || user?.role === 'PADRINHO';
-        const hasSponsorship = !!sponsorship;
+        const hasSponsorship = uniqueSponsorships.length > 0;
         const hasDonations = userDonations.length > 0;
 
         // Se não tiver doações nem apadrinhamento nem papel de apoiador, ignora
@@ -83,22 +103,47 @@ export function SupportersList() {
           continue;
         }
 
+        // Integra as cotas de apadrinhamento ativas no extrato do apoiador
+        uniqueSponsorships.forEach(sp => {
+          const st = (sp.status || 'active').toLowerCase().trim();
+          const isSpPaid = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+          const spAmount = Number(sp.monthly_amount || sp.amount || 90);
+          
+          // Garante que não duplica caso já conste na tabela donations com o mesmo ID
+          const alreadyExists = userDonations.some(d => d.id === sp.id || d.id === `sp_${sp.id}`);
+          if (!alreadyExists) {
+            userDonations.push({
+              id: `sp_${sp.id}`,
+              amount: spAmount,
+              created_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
+              paid_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
+              status: isSpPaid ? 'paid' : 'pending',
+              payment_method: sp.payment_method || 'credit_card',
+              campaign_title: sp.children?.name 
+                ? `Apadrinhamento Mensal - ${sp.children.name}` 
+                : 'Apadrinhamento Mensal (Casa Nutri)',
+              donor_name: sp.donor_name || user?.name,
+              donor_phone: sp.donor_phone || user?.phone
+            });
+          }
+        });
+
         const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
-        const donorName = user?.name || lastDonation?.donor_name || email.split('@')[0];
+        const donorName = user?.name || primarySponsorship?.donor_name || lastDonation?.donor_name || email.split('@')[0];
 
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
           name: donorName,
           email: email,
-          phone: user?.phone || lastDonation?.donor_phone || undefined,
+          phone: user?.phone || primarySponsorship?.donor_phone || lastDonation?.donor_phone || undefined,
           avatar: user?.avatar || undefined,
           role: hasSponsorship ? 'Padrinho' : isSponsorRole ? 'Padrinho' : 'Doador Recorrente',
           status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
           joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
-          sponsoredChildName: sponsorship?.children?.name || undefined,
-          sponsoredChildVillage: sponsorship?.children?.address || undefined,
+          sponsoredChildName: primarySponsorship?.children?.name || undefined,
+          sponsoredChildVillage: primarySponsorship?.children?.address || undefined,
           totalDonated,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
@@ -209,6 +254,60 @@ export function SupportersList() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Sincronizar e buscar mantenedores reais diretamente no Stripe via Webhook / Edge Function
+  const handleSyncWithStripe = async () => {
+    setIsSyncingStripe(true);
+    setSyncFeedback(null);
+    try {
+      let syncResponse: any = null;
+
+      // 1. Tenta chamar a edge function via Supabase Client
+      try {
+        const { data, error } = await supabase.functions.invoke('stripe-webhook', {
+          body: { action: 'sync_stripe' }
+        });
+        if (!error && data) {
+          syncResponse = data;
+        }
+      } catch (invokeErr) {
+        console.warn('Tentando fallback direto na URL da função:', invokeErr);
+      }
+
+      // 2. Fallback direto HTTP caso supabase.functions.invoke não responda
+      if (!syncResponse) {
+        const baseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+        const res = await fetch(`${baseUrl}/functions/v1/stripe-webhook?action=sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ action: 'sync_stripe' })
+        });
+        const resJson = await res.json();
+        if (!res.ok) throw new Error(resJson.error || 'Falha ao conectar à API do Stripe');
+        syncResponse = resJson;
+      }
+
+      setSyncFeedback({
+        type: 'success',
+        message: syncResponse?.message || 'Busca no Stripe concluída! Perfis de mantenedores e doações atualizados com sucesso.'
+      });
+
+      // Recarrega imediatamente a lista consolidada
+      await fetchSupporters();
+    } catch (err: any) {
+      console.error('Erro ao sincronizar com Stripe:', err);
+      setSyncFeedback({
+        type: 'error',
+        message: err.message || 'Erro ao consultar o Stripe. Verifique a chave STRIPE_SECRET_KEY na sua Edge Function.'
+      });
+    } finally {
+      setIsSyncingStripe(false);
+      setTimeout(() => setSyncFeedback(null), 8000);
+    }
   };
 
   return (
@@ -362,9 +461,45 @@ export function SupportersList() {
               <Download size={14} className="text-slate-500" />
               Exportar CSV
             </button>
+
+            {/* Sincronizar com Stripe via Webhook / Edge Function */}
+            <button
+              onClick={handleSyncWithStripe}
+              disabled={isSyncingStripe}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50"
+              title="Buscar assinaturas e doações reais registradas no Stripe"
+            >
+              <RefreshCw size={14} className={cn("text-white", isSyncingStripe && "animate-spin")} />
+              {isSyncingStripe ? 'Consultando Stripe...' : 'Buscar no Stripe'}
+            </button>
           </div>
 
         </div>
+
+        {/* Banner de Feedback da Sincronização */}
+        {syncFeedback && (
+          <div className={cn(
+            "mt-3 p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2",
+            syncFeedback.type === 'success' 
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200" 
+              : "bg-rose-50 text-rose-800 border-rose-200"
+          )}>
+            <div className="flex items-center gap-2">
+              {syncFeedback.type === 'success' ? (
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle size={16} className="text-rose-600 shrink-0" />
+              )}
+              <span>{syncFeedback.message}</span>
+            </div>
+            <button 
+              onClick={() => setSyncFeedback(null)}
+              className="text-[10px] uppercase font-black underline opacity-70 hover:opacity-100"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabela de Apoiadores Cadastrados */}

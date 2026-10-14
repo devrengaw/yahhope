@@ -597,22 +597,6 @@ export function MobileDonorDonate() {
                     <span className="text-slate-300 font-gotham-bold">Alvo da Fase: R$ {currentStageTarget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
-
-                {/* Visão Consolidada da Régua Global */}
-                <div className="bg-white/[0.03] p-3 rounded-2xl border border-white/5 space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400 font-gotham-medium">Total Geral Arrecadado:</span>
-                    <span className="text-white font-gotham-bold">
-                      R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / R$ {totalRulerGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({rulerOverallPercentage}%)
-                    </span>
-                  </div>
-                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                      style={{ width: `${rulerOverallPercentage}%` }}
-                    />
-                  </div>
-                </div>
               </div>
             )}
 
