@@ -76,29 +76,76 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
   const saveSelection = () => {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
-      savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+      if (editorRef.current && editorRef.current.contains(sel.anchorNode)) {
+        savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+      }
     }
   };
 
   const restoreSelection = () => {
+    if (editorRef.current && document.activeElement !== editorRef.current) {
+      editorRef.current.focus();
+    }
     if (savedSelectionRef.current) {
       const sel = window.getSelection();
       if (sel) {
         sel.removeAllRanges();
         sel.addRange(savedSelectionRef.current);
       }
-    } else if (editorRef.current) {
-      editorRef.current.focus();
     }
   };
 
   const execCommand = (command: string, value?: string) => {
+    restoreSelection();
+    document.execCommand('styleWithCSS', false, 'true');
     document.execCommand(command, false, value);
     if (editorRef.current) {
       const newContent = editorRef.current.innerHTML;
       lastContent.current = newContent;
       onChange(newContent);
     }
+  };
+
+  const handleFormatBlock = (tag: string) => {
+    restoreSelection();
+    if (!tag) return;
+    const formattedTag = tag.startsWith('<') ? tag : `<${tag}>`;
+    document.execCommand('formatBlock', false, formattedTag);
+    if (editorRef.current) {
+      const newContent = editorRef.current.innerHTML;
+      lastContent.current = newContent;
+      onChange(newContent);
+      editorRef.current.focus();
+    }
+  };
+
+  const applyFont = (fontName: string) => {
+    restoreSelection();
+    document.execCommand('styleWithCSS', false, 'true');
+    document.execCommand('fontName', false, fontName);
+    setActiveFont(fontName);
+    if (editorRef.current) {
+      const newContent = editorRef.current.innerHTML;
+      lastContent.current = newContent;
+      onChange(newContent);
+    }
+  };
+
+  const applyFontSize = (size: string) => {
+    restoreSelection();
+    document.execCommand('styleWithCSS', false, 'true');
+    document.execCommand('fontSize', false, '7');
+    if (editorRef.current) {
+      const elements = editorRef.current.querySelectorAll('font[size="7"], span[style*="-webkit-xxx-large"], span[style*="xxx-large"]');
+      elements.forEach(el => {
+        (el as HTMLElement).removeAttribute('size');
+        (el as HTMLElement).style.fontSize = size;
+      });
+      const newContent = editorRef.current.innerHTML;
+      lastContent.current = newContent;
+      onChange(newContent);
+    }
+    setActiveSize(size);
   };
 
   const handleInput = () => {
@@ -388,24 +435,32 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
       <div className="bg-slate-50 p-2 border-b border-slate-100 flex flex-wrap items-center gap-1 rounded-t-2xl relative z-30">
         {/* Parágrafo / Título */}
         <select
-          onChange={(e) => execCommand('formatBlock', e.target.value)}
+          onMouseDown={saveSelection}
+          onChange={(e) => {
+            handleFormatBlock(e.target.value);
+            e.target.value = '';
+          }}
           className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer hover:border-slate-300 focus:outline-none"
           defaultValue=""
           title="Estilo de Parágrafo ou Título"
         >
           <option value="" disabled>Formatação</option>
-          <option value="H1">Título Grande</option>
-          <option value="H2">Título Médio</option>
-          <option value="H3">Título Pequeno</option>
-          <option value="P">Parágrafo Normal</option>
-          <option value="BLOCKQUOTE">Citação</option>
+          <option value="<h1>">Título Grande (H1)</option>
+          <option value="<h2>">Título Médio (H2)</option>
+          <option value="<h3>">Título Pequeno (H3)</option>
+          <option value="<p>">Parágrafo Normal</option>
+          <option value="<blockquote>">Citação</option>
         </select>
 
         <div className="w-[1px] h-6 bg-slate-200 mx-1" />
 
         {/* Font Select */}
         <div className="relative group">
-          <button type="button" className="flex items-center gap-2 px-3 py-1.5 hover:bg-white rounded-lg text-xs font-semibold text-slate-600 transition-all border border-transparent hover:border-slate-200">
+          <button 
+            type="button" 
+            onMouseDown={saveSelection}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-white rounded-lg text-xs font-semibold text-slate-600 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+          >
             {activeFont} <ChevronDown size={14} />
           </button>
           <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-40 p-1">
@@ -413,8 +468,9 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
               <button 
                 key={f}
                 type="button"
-                onClick={() => { execCommand('fontName', f); setActiveFont(f); }}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm"
+                onMouseDown={saveSelection}
+                onClick={() => applyFont(f)}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer"
                 style={{ fontFamily: f }}
               >
                 {f}
@@ -425,7 +481,11 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
 
         {/* Size Select */}
         <div className="relative group">
-          <button type="button" className="flex items-center gap-2 px-3 py-1.5 hover:bg-white rounded-lg text-xs font-semibold text-slate-600 transition-all border border-transparent hover:border-slate-200">
+          <button 
+            type="button" 
+            onMouseDown={saveSelection}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-white rounded-lg text-xs font-semibold text-slate-600 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+          >
             {activeSize} <ChevronDown size={14} />
           </button>
           <div className="absolute top-full left-0 mt-1 w-24 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-40 p-1">
@@ -433,8 +493,9 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
               <button 
                 key={s}
                 type="button"
-                onClick={() => { execCommand('fontSize', '3'); setActiveSize(s); }}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm"
+                onMouseDown={saveSelection}
+                onClick={() => applyFontSize(s)}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer"
               >
                 {s}
               </button>
@@ -540,7 +601,7 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
           </button>
 
           {showImageModal && (
-            <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 w-72 sm:w-80 animate-in fade-in zoom-in-95">
+            <div className="absolute top-full left-0 mt-2 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 w-72 sm:w-84 max-w-[calc(100vw-2rem)] animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                 <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <ImageIcon size={14} className="text-indigo-600" /> Inserir Imagem
@@ -620,7 +681,7 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
           </button>
 
           {showTableModal && (
-            <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 w-72 sm:w-84 animate-in fade-in zoom-in-95">
+            <div className="absolute top-full left-0 mt-2 p-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 w-72 sm:w-84 max-w-[calc(100vw-2rem)] animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                 <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <TableIcon size={14} className="text-indigo-600" /> 
@@ -881,10 +942,10 @@ export function RichTextEditor({ content, value, onChange, placeholder, classNam
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
         className={cn(
-          "p-4 sm:p-6 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100/90 [&_th]:p-2.5 [&_th]:font-bold [&_th]:text-slate-800 [&_td]:border [&_td]:border-slate-200 [&_td]:p-2.5 [&_td]:text-slate-700 [&_.table-container]:overflow-x-auto [&_.table-container]:my-4 [&_.table-container]:rounded-xl [&_.table-container]:border [&_.table-container]:border-slate-200",
+          "p-4 sm:p-6 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl [&_h1]:text-2xl [&_h1]:font-black [&_h1]:text-slate-900 [&_h1]:my-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-slate-800 [&_h2]:my-2 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100/90 [&_th]:p-2.5 [&_th]:font-bold [&_th]:text-slate-800 [&_td]:border [&_td]:border-slate-200 [&_td]:p-2.5 [&_td]:text-slate-700 [&_.table-container]:overflow-x-auto [&_.table-container]:my-4 [&_.table-container]:rounded-xl [&_.table-container]:border [&_.table-container]:border-slate-200",
           !minHeight && "min-h-[260px]"
         )}
-        style={{ fontFamily: activeFont, fontSize: activeSize, minHeight: minHeight || undefined }}
+        style={{ minHeight: minHeight || undefined }}
       />
     </div>
   );

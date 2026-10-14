@@ -69,6 +69,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   const [resolvedRecipients, setResolvedRecipients] = useState<Array<{ email: string; name: string; recipient_type: CampaignRecipient['recipient_type'] }>>([]);
   const [isResolvingAudience, setIsResolvingAudience] = useState(false);
   const [audienceSearch, setAudienceSearch] = useState('');
+  const [showRecipientsList, setShowRecipientsList] = useState(false);
 
   // Templates disponíveis para importação rápida
   const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
@@ -250,6 +251,10 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
     } finally {
       setIsResolvingAudience(false);
     }
+  };
+
+  const handleRemoveRecipient = (emailToRemove: string) => {
+    setResolvedRecipients(prev => prev.filter(r => r.email.toLowerCase() !== emailToRemove.toLowerCase()));
   };
 
   // Abre wizard para nova campanha
@@ -1433,25 +1438,105 @@ contato@parceiro.org"
                   </div>
 
                   {/* Resumo Consolidado de Destinatários */}
-                  <div className="bg-amber-50/50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold">
-                        <Users size={20} />
+                  <div className="space-y-3">
+                    <div className="bg-amber-50/50 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold shrink-0">
+                          <Users size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-amber-950">
+                            {isResolvingAudience ? 'Calculando lista...' : `${resolvedRecipients.length} Destinatários Únicos Selecionados`}
+                          </h4>
+                          <p className="text-xs text-amber-800/80">
+                            Prontos para receber o e-mail sem repetições.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-black text-amber-950">
-                          {isResolvingAudience ? 'Calculando lista...' : `${resolvedRecipients.length} Destinatários Únicos Selecionados`}
-                        </h4>
-                        <p className="text-xs text-amber-800/80">
-                          Prontos para receber o e-mail sem repetições.
-                        </p>
+
+                      <div className="flex items-center gap-2">
+                        {resolvedRecipients.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRecipientsList(!showRecipientsList)}
+                            className="px-3.5 py-1.5 text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Users size={14} />
+                            {showRecipientsList ? 'Ocultar E-mails' : `Ver Lista (${resolvedRecipients.length})`}
+                            {showRecipientsList ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                        )}
+                        {resolvedRecipients.length > 0 && (
+                          <span className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                            Audiência Pronta
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {resolvedRecipients.length > 0 && (
-                      <span className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
-                        Audiência Pronta
-                      </span>
+                    {/* Lista Interativa de Destinatários */}
+                    {showRecipientsList && resolvedRecipients.length > 0 && (
+                      <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden animate-in fade-in duration-150">
+                        <div className="p-3.5 bg-amber-50/70 border-b border-amber-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-amber-600" />
+                            <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                              Destinatários Confirmados ({resolvedRecipients.filter(r => !audienceSearch.trim() || r.email.toLowerCase().includes(audienceSearch.toLowerCase()) || (r.name && r.name.toLowerCase().includes(audienceSearch.toLowerCase()))).length} de {resolvedRecipients.length})
+                            </span>
+                          </div>
+                          <div className="relative flex-1 max-w-sm">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={audienceSearch}
+                              onChange={(e) => setAudienceSearch(e.target.value)}
+                              placeholder="Buscar por nome ou e-mail..."
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 text-xs">
+                          {resolvedRecipients
+                            .filter(r => !audienceSearch.trim() || r.email.toLowerCase().includes(audienceSearch.toLowerCase()) || (r.name && r.name.toLowerCase().includes(audienceSearch.toLowerCase())))
+                            .map((rec) => (
+                              <div key={rec.email} className="px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[10px] uppercase shrink-0">
+                                    {rec.name ? rec.name.charAt(0) : rec.email.charAt(0)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-800 truncate">{rec.name || 'Sem nome'}</p>
+                                    <p className="font-mono text-[11px] text-slate-500 truncate">{rec.email}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                    rec.recipient_type === 'apoiador' ? "bg-amber-100 text-amber-800" :
+                                    rec.recipient_type === 'donor' ? "bg-emerald-100 text-emerald-800" :
+                                    rec.recipient_type === 'volunteer' ? "bg-indigo-100 text-indigo-800" :
+                                    rec.recipient_type === 'caregiver' ? "bg-purple-100 text-purple-800" :
+                                    "bg-slate-100 text-slate-700"
+                                  )}>
+                                    {rec.recipient_type === 'apoiador' ? 'Apoiador' :
+                                     rec.recipient_type === 'donor' ? 'Doador' :
+                                     rec.recipient_type === 'volunteer' ? 'Voluntário' :
+                                     rec.recipient_type === 'caregiver' ? 'Família' : 'Avulso'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRecipient(rec.email)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Remover destinatário deste envio"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1739,17 +1824,97 @@ contato@parceiro.org"
                   </div>
 
                   {/* Resumo antes de Disparar */}
-                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <h4 className="font-black text-amber-950 text-sm">Pronto para o disparo oficial</h4>
-                      <p className="text-xs text-amber-800 mt-0.5">
-                        Esta campanha será disparada para <strong>{resolvedRecipients.length} destinatários</strong> com tracking de leitura individual ativado.
-                      </p>
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="font-black text-amber-950 text-sm">Pronto para o disparo oficial</h4>
+                        <p className="text-xs text-amber-800 mt-0.5">
+                          Esta campanha será disparada para <strong>{resolvedRecipients.length} destinatários</strong> com tracking de leitura individual ativado.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {resolvedRecipients.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRecipientsList(!showRecipientsList)}
+                            className="px-3.5 py-1.5 text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Users size={13} />
+                            {showRecipientsList ? 'Ocultar E-mails' : `Conferir Lista (${resolvedRecipients.length})`}
+                            {showRecipientsList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </button>
+                        )}
+                        <span className="text-xs font-bold text-amber-800 bg-amber-200/60 px-3 py-1 rounded-lg">
+                          Assunto: {campaignSubject || '(Sem assunto)'}
+                        </span>
+                      </div>
                     </div>
 
-                    <span className="text-xs font-bold text-amber-800 bg-amber-200/60 px-3 py-1 rounded-lg">
-                      Assunto: {campaignSubject || '(Sem assunto)'}
-                    </span>
+                    {/* Lista de Destinatários em Step 3 */}
+                    {showRecipientsList && resolvedRecipients.length > 0 && (
+                      <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden animate-in fade-in duration-150">
+                        <div className="p-3.5 bg-amber-50/70 border-b border-amber-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-amber-600" />
+                            <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                              Destinatários Confirmados ({resolvedRecipients.filter(r => !audienceSearch.trim() || r.email.toLowerCase().includes(audienceSearch.toLowerCase()) || (r.name && r.name.toLowerCase().includes(audienceSearch.toLowerCase()))).length} de {resolvedRecipients.length})
+                            </span>
+                          </div>
+                          <div className="relative flex-1 max-w-sm">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={audienceSearch}
+                              onChange={(e) => setAudienceSearch(e.target.value)}
+                              placeholder="Buscar por nome ou e-mail..."
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 text-xs">
+                          {resolvedRecipients
+                            .filter(r => !audienceSearch.trim() || r.email.toLowerCase().includes(audienceSearch.toLowerCase()) || (r.name && r.name.toLowerCase().includes(audienceSearch.toLowerCase())))
+                            .map((rec) => (
+                              <div key={rec.email} className="px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[10px] uppercase shrink-0">
+                                    {rec.name ? rec.name.charAt(0) : rec.email.charAt(0)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-800 truncate">{rec.name || 'Sem nome'}</p>
+                                    <p className="font-mono text-[11px] text-slate-500 truncate">{rec.email}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                    rec.recipient_type === 'apoiador' ? "bg-amber-100 text-amber-800" :
+                                    rec.recipient_type === 'donor' ? "bg-emerald-100 text-emerald-800" :
+                                    rec.recipient_type === 'volunteer' ? "bg-indigo-100 text-indigo-800" :
+                                    rec.recipient_type === 'caregiver' ? "bg-purple-100 text-purple-800" :
+                                    "bg-slate-100 text-slate-700"
+                                  )}>
+                                    {rec.recipient_type === 'apoiador' ? 'Apoiador' :
+                                     rec.recipient_type === 'donor' ? 'Doador' :
+                                     rec.recipient_type === 'volunteer' ? 'Voluntário' :
+                                     rec.recipient_type === 'caregiver' ? 'Família' : 'Avulso'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRecipient(rec.email)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Remover destinatário deste envio"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
