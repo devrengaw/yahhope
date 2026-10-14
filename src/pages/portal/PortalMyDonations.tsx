@@ -59,9 +59,15 @@ export function PortalMyDonations() {
 
   // Filter donations strictly for the logged-in supporter
   const myDonations = useMemo(() => {
-    if (!user?.email) return [];
-    const userEmail = user.email.toLowerCase().trim();
-    return allDonations.filter(d => d.donor_email?.toLowerCase().trim() === userEmail);
+    if (!user?.email && !user?.id) return [];
+    const userEmail = (user?.email || '').toLowerCase().trim();
+    const userId = user?.id;
+
+    return allDonations.filter(d => {
+      const emailMatches = Boolean(d.donor_email && d.donor_email.toLowerCase().trim() === userEmail);
+      const userMatches = Boolean(userId && (d.sponsor_id === userId || d.user_id === userId));
+      return emailMatches || userMatches;
+    });
   }, [allDonations, user]);
 
   // Statistics
@@ -84,22 +90,23 @@ export function PortalMyDonations() {
     };
   }, [myDonations]);
 
+  const getCampaignTitle = (donation: Donation) => {
+    if (donation.campaign_title) return donation.campaign_title;
+    if (donation.is_sponsorship || donation.id?.startsWith('sp_')) return 'Apadrinhamento Mensal (Casa Nutri)';
+    if (!donation.campaign_id) return 'Doação Geral - YAH Hope';
+    const camp = campaigns.find(c => c.id === donation.campaign_id);
+    return camp ? camp.title : 'Campanha Humanitária';
+  };
+
   // Filtered list
   const filteredDonations = useMemo(() => {
     return myDonations.filter(d => {
       const matchStatus = statusFilter === 'all' || d.status === statusFilter;
-      const camp = campaigns.find(c => c.id === d.campaign_id);
-      const campTitle = camp ? camp.title.toLowerCase() : 'doação geral';
-      const matchSearch = searchTerm === '' || campTitle.includes(searchTerm.toLowerCase());
+      const title = (d.campaign_title || getCampaignTitle(d)).toLowerCase();
+      const matchSearch = searchTerm === '' || title.includes(searchTerm.toLowerCase());
       return matchStatus && matchSearch;
     });
   }, [myDonations, statusFilter, searchTerm, campaigns]);
-
-  const getCampaignTitle = (campaignId?: string) => {
-    if (!campaignId) return 'Doação Geral - YAH Hope';
-    const camp = campaigns.find(c => c.id === campaignId);
-    return camp ? camp.title : 'Campanha Humanitária';
-  };
 
   const formatDate = (dateStr: string) => {
     try {
@@ -279,9 +286,16 @@ export function PortalMyDonations() {
                   </div>
 
                   <div>
-                    <h4 className="font-black text-slate-900 text-sm sm:text-base">
-                      {getCampaignTitle(donation.campaign_id)}
-                    </h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-black text-slate-900 text-sm sm:text-base">
+                        {getCampaignTitle(donation)}
+                      </h4>
+                      {donation.is_sponsorship && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-black uppercase tracking-wider border border-rose-200">
+                          Apadrinhamento
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 font-medium">
                       <span className="flex items-center gap-1">
                         <Calendar size={13} /> {formatDate(donation.date)}

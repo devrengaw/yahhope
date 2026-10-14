@@ -31,6 +31,7 @@ export interface Campaign {
 export interface Donation {
   id: string;
   campaign_id?: string;
+  campaign_title?: string;
   donor_name: string;
   donor_email: string;
   amount: number;
@@ -38,6 +39,9 @@ export interface Donation {
   payment_method: 'pix' | 'credit_card' | string;
   date: string;
   paid_at?: string;
+  sponsor_id?: string;
+  user_id?: string;
+  is_sponsorship?: boolean;
 }
 
 interface CampaignProgressStats {
@@ -158,10 +162,11 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     const totalHistorical = campDonations.reduce((acc, d) => acc + Number(d.amount || 0), 0);
 
     // REGRA DE OURO DE PRECISÃO:
-    // A soma das doações reais confirmadas (doação avulsa + apadrinhamentos) é a fonte primária da verdade.
-    // Se houver doações cadastradas no mês ou histórico, o valor real é calculado a partir delas (ex: 50 + 90 = 140).
-    const realDonationsTotal = currentMonthTotal > 0 ? currentMonthTotal : totalHistorical;
-    const currentAmount = realDonationsTotal > 0 ? realDonationsTotal : Number(camp.current_amount || 0);
+    // Para campanhas mensais (monthly): calcula estritamente as doações do mês vigente (ex: R$ 50 avulso + R$ 90 apadrinhamento = R$ 140).
+    // Para campanhas pontuais (specific): considera o histórico total arrecadado.
+    const currentAmount = isMonthly
+      ? (currentMonthTotal > 0 ? currentMonthTotal : Number(camp.current_amount || 0))
+      : (totalHistorical > 0 ? totalHistorical : Number(camp.current_amount || 0));
 
     const targetAmount = Math.max(camp.target_amount || 1, 1);
     const percentage = Math.min(Math.round((currentAmount / targetAmount) * 100), 100);
@@ -171,8 +176,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       targetAmount,
       percentage,
       isMonthly,
-      currentMonthTotal: currentAmount,
-      totalHistorical: totalHistorical > 0 ? totalHistorical : currentAmount
+      currentMonthTotal,
+      totalHistorical
     };
   }, [donations, campaigns]);
 
@@ -201,45 +206,89 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         .select('*')
         .order('created_at', { ascending: false });
 
-      // 4. Buscar apadrinhamentos ativos (cotas de apadrinhamento financiam a nutrição e operação da Casa Nutri)
-      const { data: sponsorshipsData } = await supabase
-        .from('sponsorships')
-        .select('*');
+      // 4. Buscar apadrinhamentos ativos e lista de crianças de forma segura
+      const [sponsorshipsRes, childrenRes] = await Promise.all([
+        supabase.from('sponsorships').select('*'),
+        supabase.from('children').select('id, name')
+      ]);
+
+      const sponsorshipsData = sponsorshipsRes.data || [];
+      const childrenMap = new Map((childrenRes.data || []).map(c => [c.id, c.name]));
 
       const formattedDonations: Donation[] = (donationsData || []).map(d => {
         const rawStatus = (d.status || 'paid').toLowerCase().trim();
         const isPaid = rawStatus === 'paid' || rawStatus === 'completed' || rawStatus === 'confirmed' || rawStatus === 'pago';
+        const isExplicitSponsorship = Boolean(
+          d.stripe_subscription_id || 
+          d.is_sponsorship || 
+          d.type === 'sponsorship' ||
+          (d.campaign_title && d.campaign_title.toLowerCase().includes('apadrinhamento'))
+        );
+
         return {
           id: d.id,
           campaign_id: d.campaign_id,
+          campaign_title: d.campaign_title,
           donor_name: d.donor_name || 'Doador YAH Hope',
-          donor_email: d.donor_email || '',
+          donor_email: (d.donor_email || '').toLowerCase().trim(),
           amount: Number(d.amount || 0),
           status: isPaid ? 'paid' : 'pending',
           payment_method: d.payment_method || 'pix',
           date: d.created_at || new Date().toISOString(),
-          paid_at: d.paid_at || d.created_at || new Date().toISOString()
+          paid_at: d.paid_at || d.created_at || new Date().toISOString(),
+          is_sponsorship: isExplicitSponsorship,
+          sponsor_id: d.sponsor_id || d.user_id,
+          user_id: d.user_id || d.sponsor_id
         };
       });
 
       // Adiciona as cotas de apadrinhamento ativas na arrecadação contínua da Casa Nutri
       if (sponsorshipsData && sponsorshipsData.length > 0) {
-        sponsorshipsData.forEach(sp => {
+        // Elimina eventuais duplicatas de sponsorships com mesmo ID
+        const uniqueSponsorships = Array.from(new Map(sponsorshipsData.map(sp => [sp.id, sp])).values());
+
+        uniqueSponsorships.forEach(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
           const isActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed' || st === 'active_recurring';
           if (!isActive) return;
 
           const spAmount = Number(sp.monthly_amount || sp.amount || 90);
+          const effectiveEmail = (sp.donor_email || '').toLowerCase().trim();
+          const effectiveName = sp.donor_name || 'Padrinho YAH Hope';
+          const childName = sp.child_id ? childrenMap.get(sp.child_id) : undefined;
+          const targetTitle = childName ? `Apadrinhamento Mensal - ${childName}` : 'Apadrinhamento Mensal (Casa Nutri)';
+
+          // Se a transação já constar na tabela donations:
+          // Só consideramos match se o registro em donations for EXPLICITAMENTE um apadrinhamento
+          // Uma doação avulsa comum (ex: R$ 50 Pix) NUNCA é sobrescrita!
+          const existingMatch = formattedDonations.find(d => 
+            (sp.stripe_subscription_id && (d as any).stripe_payment_id === sp.stripe_subscription_id) ||
+            (d.id === sp.id || d.id === `sp_${sp.id}`) ||
+            (d.is_sponsorship && d.donor_email === effectiveEmail && Math.abs(d.amount - spAmount) < 0.01)
+          );
+
+          if (existingMatch) {
+            existingMatch.campaign_title = targetTitle;
+            existingMatch.is_sponsorship = true;
+            existingMatch.sponsor_id = sp.sponsor_id;
+            existingMatch.user_id = sp.sponsor_id;
+            return;
+          }
+
           formattedDonations.push({
             id: `sp_${sp.id}`,
             campaign_id: undefined, // Destinado à fase ativa da Casa Nutri
-            donor_name: sp.donor_name || 'Padrinho YAH Hope',
-            donor_email: sp.donor_email || '',
+            campaign_title: targetTitle,
+            donor_name: effectiveName,
+            donor_email: effectiveEmail,
             amount: spAmount,
             status: 'paid',
             payment_method: sp.payment_method || 'credit_card',
             date: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
-            paid_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString()
+            paid_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
+            sponsor_id: sp.sponsor_id,
+            user_id: sp.sponsor_id,
+            is_sponsorship: true
           });
         });
       }

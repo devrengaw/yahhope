@@ -154,11 +154,11 @@ export const sponsorshipService = {
         console.warn('Aviso ao consultar children no Supabase, usando catálogo local:', childError.message);
       }
 
-      // 2. Busca apadrinhamentos ativos
+      // 2. Busca apadrinhamentos ativos (consulta direta resiliente)
       const { data: sponsorshipsData, error: spError } = await supabase
         .from('sponsorships')
-        .select('*, users(id, name, email)')
-        .eq('status', 'active');
+        .select('*')
+        .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
 
       if (spError) {
         console.warn('Aviso ao consultar sponsorships:', spError.message);
@@ -578,13 +578,11 @@ export const sponsorshipService = {
   },
 
   /**
-   * Reconciliação e Auto-Atribuição de Criança para Mantenedores/Padrinhos que já pagaram:
+   * Reconciliação e Auto-Atribuição de Criança para Padrinhos com Cota Pendente de Vínculo:
    * 1. Verifica se há apadrinhamentos na tabela 'sponsorships' sem child_id atribuída.
-   * 2. Verifica se o usuário tem doação com status 'paid' na tabela 'donations'.
-   * 3. Verifica se o usuário possui cargo 'SPONSOR' na tabela 'users'.
-   * Se algum desses critérios for atendido e o usuário ainda não tiver uma criança vinculada,
-   * atribui automaticamente a criança em maior prioridade da Casa Nutri (Least-Sponsored)
-   * e persiste tanto no banco quanto no cache local.
+   * 2. Se houver, localiza a criança em maior prioridade da Casa Nutri (Least-Sponsored)
+   *    e ATUALIZA a linha existente no banco (sem duplicar registros nem criar falsas doações).
+   * 3. NUNCA utiliza doações avulsas da tabela 'donations' para inferir apadrinhamento.
    */
   async autoReconcilePaidSponsor(
     userId?: string, 
@@ -596,12 +594,7 @@ export const sponsorshipService = {
     if (!cleanEmail && !userId) return [];
 
     try {
-      let donorName = userName || 'Padrinho YAH Hope';
-      let hasPaidProof = forceAssign;
-      let existingUnassignedId: string | null = null;
-      let quotaAmount = 90;
-
-      // A. Checa tabela 'sponsorships'
+      // Busca apadrinhamentos ativos do usuário
       let queryBySponsorId: any = null;
       let queryByEmail: any = null;
 
@@ -630,80 +623,42 @@ export const sponsorshipService = {
         }
       });
 
-      if (combinedSp.length > 0) {
-        hasPaidProof = true;
-        const unassignedRow = combinedSp.find(r => !r.child_id);
-        if (unassignedRow) {
-          existingUnassignedId = unassignedRow.id;
-          quotaAmount = Number(unassignedRow.monthly_amount) || 90;
-          if (unassignedRow.donor_name) donorName = unassignedRow.donor_name;
-        }
-      }
+      // Identifica apadrinhamento pendente de vínculo com criança
+      const unassignedRow = combinedSp.find(r => !r.child_id);
 
-      // B. Checa tabela 'donations' caso ainda não tenha encontrado
-      if (!hasPaidProof && cleanEmail) {
-        const { data: donRows } = await supabase
-          .from('donations')
-          .select('*')
-          .ilike('donor_email', cleanEmail)
-          .eq('status', 'paid')
-          .limit(5);
+      // Só executa a atribuição se houver cota de apadrinhamento pendente ou se for explicitamente forçado
+      if (unassignedRow || (forceAssign && combinedSp.length > 0)) {
+        const targetRow = unassignedRow || combinedSp[0];
+        console.log(`[AutoReconcile] Vinculando criança à cota existente do padrinho: ${cleanEmail}`);
 
-        if (donRows && donRows.length > 0) {
-          hasPaidProof = true;
-          if (donRows[0].donor_name) donorName = donRows[0].donor_name;
-          quotaAmount = Number(donRows[0].amount) || 90;
-        }
-      }
+        const metrics = await this.getMetrics();
+        const availableChildren = metrics.children.filter(c => !c.isFull);
+        const targetChild = availableChildren.length > 0 ? availableChildren[0] : metrics.children[0];
 
-      // C. Checa tabela 'users' se tem cargo de SPONSOR
-      if (!hasPaidProof && userId) {
-        const { data: uRow } = await supabase
-          .from('users')
-          .select('role, name')
-          .eq('id', userId)
-          .maybeSingle();
+        if (targetChild) {
+          // Atualiza a linha existente no Supabase - NUNCA insere duplicatas
+          await supabase
+            .from('sponsorships')
+            .update({ 
+              child_id: targetChild.id,
+              last_sponsored_at: new Date().toISOString()
+            })
+            .eq('id', targetRow.id);
 
-        if (uRow && (uRow.role === 'SPONSOR' || uRow.role === 'USER')) {
-          if (uRow.role === 'SPONSOR') {
-            hasPaidProof = true;
-          }
-          if (uRow.name) donorName = uRow.name;
-        }
-      }
-
-      // Se comprovado que pagou ou foi forçado:
-      if (hasPaidProof) {
-        console.log(`[AutoReconcile] Atribuindo criança automaticamente para o padrinho: ${cleanEmail}`);
-
-        const assignRes = await this.assignChildrenToSponsor({
-          donorName,
-          donorEmail: cleanEmail,
-          quotasCount: 1,
-          amountPerQuota: quotaAmount,
-          paymentMethod: 'cartao_mensal',
-          sponsorUserId: userId
-        });
-
-        if (assignRes.success && assignRes.assignedChildren.length > 0) {
-          const assigned = assignRes.assignedChildren;
-
-          if (existingUnassignedId && assigned[0]) {
-            await supabase
-              .from('sponsorships')
-              .update({ child_id: assigned[0].id })
-              .eq('id', existingUnassignedId);
-          }
+          const assignedDetail: ChildSponsorshipDetail = {
+            ...targetChild,
+            sponsorshipId: targetRow.id
+          };
 
           if (cleanEmail) {
-            localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify(assigned));
+            localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify([assignedDetail]));
           }
 
-          return assigned;
+          return [assignedDetail];
         }
       }
     } catch (e) {
-      console.error('[AutoReconcile] Erro ao auto-reconciliar padrinho:', e);
+      console.error('[AutoReconcile] Erro ao reconciliar cota do padrinho:', e);
     }
 
     return [];
@@ -712,7 +667,7 @@ export const sponsorshipService = {
   /**
    * Retorna as crianças apadrinhadas pelo usuário autenticado (por ID ou E-mail),
    * sincronizando banco de dados Supabase e cache local resiliente.
-   * Auto-recupera e vincula a criança imediatamente caso o usuário já tenha pago.
+   * Auto-vincula a criança caso o registro de apadrinhamento ainda esteja sem child_id.
    */
   async getSponsoredChildrenForUser(
     userId?: string, 
@@ -724,8 +679,6 @@ export const sponsorshipService = {
 
     let dbChildren: ChildSponsorshipDetail[] = [];
     let hasUnassignedRow = false;
-    let unassignedRowId: string | null = null;
-    let unassignedAmount = 90;
 
     try {
       // Fazemos busca por sponsor_id e por donor_email de forma segura
@@ -784,15 +737,13 @@ export const sponsorshipService = {
         const unassigned = combinedData.filter(item => !item.child_id);
         if (unassigned.length > 0) {
           hasUnassignedRow = true;
-          unassignedRowId = unassigned[0].id;
-          unassignedAmount = Number(unassigned[0].monthly_amount) || 90;
         }
       }
     } catch (err) {
       console.warn('Aviso ao consultar apadrinhamentos no Supabase:', err);
     }
 
-    // Leitura do cache local resiliente (garante que a criança nunca desapareça)
+    // Leitura do cache local resiliente (garante que a criança nunca desapareça temporariamente da UI)
     let cachedChildren: ChildSponsorshipDetail[] = [];
     if (cleanEmail) {
       try {
@@ -817,8 +768,8 @@ export const sponsorshipService = {
 
     let result = Array.from(mergedMap.values());
 
-    // Se o usuário pagou mas continua sem nenhuma criança vinculada, ou tinha apadrinhamento sem criança:
-    if (result.length === 0 || hasUnassignedRow) {
+    // Somente auto-atribui se o usuário tiver uma cota de apadrinhamento confirmada sem criança vinculada:
+    if (hasUnassignedRow) {
       try {
         const reconciled = await this.autoReconcilePaidSponsor(userId, cleanEmail, userName, false);
         if (reconciled && reconciled.length > 0) {

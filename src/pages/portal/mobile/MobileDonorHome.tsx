@@ -137,9 +137,11 @@ export function MobileDonorHome() {
   const currentStageTarget = currentCampaign?.target_amount || 0;
 
   // Doações reais do usuário logado
-  const userDonations = allDonations.filter(
-    d => d.donor_email?.toLowerCase().trim() === user?.email?.toLowerCase().trim() && d.status === 'paid'
-  );
+  const userDonations = allDonations.filter(d => {
+    const emailMatches = Boolean(d.donor_email && d.donor_email.toLowerCase().trim() === user?.email?.toLowerCase().trim());
+    const userMatches = Boolean(user?.id && (d.sponsor_id === user.id || d.user_id === user.id));
+    return (emailMatches || userMatches) && d.status === 'paid';
+  });
   const totalUserDonated = userDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const donationsCount = userDonations.length;
 
