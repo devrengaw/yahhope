@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
+import { sponsorshipService, SupporterCommitmentSummary } from '../../../services/sponsorshipService';
+import { ManageMonthlyPlanModal } from '../../../components/portal/ManageMonthlyPlanModal';
 import { PortalMyDonations } from '../PortalMyDonations';
 
 export function MobileDonorDonate() {
@@ -27,6 +29,20 @@ export function MobileDonorDonate() {
   const [activeTab, setActiveTab] = useState<'donate' | 'history'>('donate');
 
   const currentCampaign = activeCampaign || defaultCamp;
+
+  // Gerenciamento de Apoio Mensal Recorrente
+  const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+
+  const fetchCommitments = () => {
+    sponsorshipService.getSupporterCommitments(user?.id, user?.email)
+      .then(res => setMonthlyCommitments(res))
+      .catch(e => console.warn('Erro ao carregar compromissos do mantenedor:', e));
+  };
+
+  React.useEffect(() => {
+    fetchCommitments();
+  }, [user?.id, user?.email]);
 
   // Donation form state
   const [frequency, setFrequency] = useState<'monthly' | 'single'>('monthly');
@@ -96,6 +112,18 @@ export function MobileDonorDonate() {
         }
       }
 
+      // Se for doação mensal, atualiza e substitui o valor do apoio geral ativo
+      if (frequency === 'monthly') {
+        await sponsorshipService.updateGeneralMonthlySupport(
+          user?.id,
+          user?.email || 'mantenedor@yahhope.org',
+          currentAmount,
+          paymentMethod,
+          user?.name || 'Mantenedor YAH Hope'
+        );
+        fetchCommitments();
+      }
+
       // Registro da doação Pix
       await createDonation({
         donor_name: user?.name || 'Mantenedor YAH Hope',
@@ -126,7 +154,7 @@ export function MobileDonorDonate() {
             Central de Doações
           </h2>
           <p className="text-sm text-slate-500 font-gotham-light mt-1">
-            Abençoe vidas na Casa Nutri com Pix instantâneo, cartão ou acompanhe seus comprovantes.
+            Abençoe vidas na Casa Nutri com Pix instantâneo, cartão ou acompanhe seu histórico de contribuições.
           </p>
         </div>
 
@@ -165,6 +193,51 @@ export function MobileDonorDonate() {
           {/* COLUNA ESQUERDA (7 cols): Formulário Principal de Doação */}
           <div className="lg:col-span-7 space-y-6">
             
+            {/* Card de Apoio Mensal Ativo com Ações de Alteração e Cancelamento */}
+            {monthlyCommitments?.generalMonthlySupport?.active && (
+              <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200/90 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-orange-200 flex items-center justify-center text-[#F49853] shadow-xs shrink-0">
+                    <RefreshCw size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Apoio Mensal Ativo
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-gotham-medium">
+                        Regra de Substituição
+                      </span>
+                    </div>
+                    <h4 className="text-xl font-heading font-black text-slate-900 mt-0.5">
+                      R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    </h4>
+                    <p className="text-xs text-slate-500 font-gotham-light">
+                      Fundo Geral Casa Nutri • Ao alterar, o novo valor substitui o anterior.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsManageModalOpen(true)}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-all cursor-pointer"
+                  >
+                    Alterar / Aumentar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsManageModalOpen(true)}
+                    className="px-3.5 py-2.5 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 rounded-xl text-xs font-gotham-medium transition-all cursor-pointer"
+                    title="Cancelar apoio mensal"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Seletor Recorrência vs Pontual */}
             <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex">
               <button
@@ -464,11 +537,20 @@ export function MobileDonorDonate() {
                 </div>
                 <div className="flex items-start gap-3">
                   <FileText size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <p><strong>Recibos e Transparência:</strong> Baixe comprovantes instantâneos no portal para sua contabilidade e declarações.</p>
+                  <p><strong>Transparência & Prestação de Contas:</strong> Acompanhe no portal relatórios periódicos de prestação de contas e a evolução dos atendimentos da Casa Nutri.</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <Lock size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <p><strong>Sem Burocracia:</strong> Pause, altere ou cancele sua aliança mensal a qualquer momento pelo portal.</p>
+                  <div className="flex-1">
+                    <p><strong>Sem Burocracia:</strong> Pause, altere ou cancele seu apoio mensal a qualquer momento pelo portal.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsManageModalOpen(true)}
+                      className="text-[#F49853] hover:text-[#e0853d] font-gotham-bold text-[11px] underline mt-1 block cursor-pointer"
+                    >
+                      Gerenciar meu apoio mensal →
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -477,6 +559,15 @@ export function MobileDonorDonate() {
 
         </div>
       )}
+
+      {/* Modal de Gestão do Apoio Mensal */}
+      <ManageMonthlyPlanModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        currentAmount={monthlyCommitments?.generalMonthlySupport?.monthlyAmount || 100}
+        isActive={Boolean(monthlyCommitments?.generalMonthlySupport?.active)}
+        onSuccess={() => fetchCommitments()}
+      />
     </div>
   );
 }

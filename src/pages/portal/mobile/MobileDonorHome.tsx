@@ -4,7 +4,8 @@ import { useImpact } from '../../../contexts/ImpactContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
 import { useBlog } from '../../../contexts/BlogContext';
 import { usePatients } from '../../../contexts/PatientContext';
-import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
+import { sponsorshipService, ChildSponsorshipDetail, SupporterCommitmentSummary } from '../../../services/sponsorshipService';
+import { ManageMonthlyPlanModal } from '../../../components/portal/ManageMonthlyPlanModal';
 import { 
   Heart, 
   Gift, 
@@ -22,7 +23,8 @@ import {
   Users,
   Target,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -36,6 +38,14 @@ export function MobileDonorHome() {
 
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
+  const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+
+  const fetchCommitments = () => {
+    sponsorshipService.getSupporterCommitments(user?.id, user?.email)
+      .then(res => setMonthlyCommitments(res))
+      .catch(err => console.warn('Erro ao carregar compromissos:', err));
+  };
 
   useEffect(() => {
     sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
@@ -47,6 +57,8 @@ export function MobileDonorHome() {
         console.error('Erro ao carregar crianças apadrinhadas:', err);
         setIsLoadingChildren(false);
       });
+
+    fetchCommitments();
   }, [user?.id, user?.email]);
 
   const currentCampaign = activeCampaign || defaultCamp;
@@ -57,6 +69,20 @@ export function MobileDonorHome() {
   );
   const totalUserDonated = userDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const donationsCount = userDonations.length;
+
+  // Ordenação das doações por data mais recente
+  const sortedUserDonations = useMemo(() => {
+    return [...userDonations].sort((a, b) => {
+      const dateA = new Date(a.paid_at || a.date || 0).getTime();
+      const dateB = new Date(b.paid_at || b.date || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [userDonations]);
+
+  const latestDonation = sortedUserDonations[0];
+
+  // Cálculo real do impacto social baseado nas doações efetivas (R$ 5 = 1 refeição fortificada)
+  const mealsProvided = Math.floor(totalUserDonated / 5);
 
   // Cálculo de idade da criança a partir de dob
   const calculateAge = (dobString?: string) => {
@@ -146,12 +172,12 @@ export function MobileDonorHome() {
                 className="bg-white/10 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white font-gotham-medium text-xs px-5 py-3.5 rounded-xl transition-all flex items-center gap-2 backdrop-blur-sm shadow-xs active:scale-98"
               >
                 <Receipt size={16} className="text-orange-300" />
-                <span>Meus Comprovantes & Recibos</span>
+                <span>Histórico de Contribuições</span>
               </Link>
             </div>
           </div>
 
-          {/* Lado Direito (5 cols): Card de Impacto Social / Selo de Fidelidade */}
+          {/* Lado Direito (5 cols): Card de Impacto Social Real do Usuário */}
           <div className="lg:col-span-5">
             <div className="relative overflow-hidden bg-gradient-to-br from-white/[0.08] to-white/[0.03] backdrop-blur-md rounded-2xl p-6 border border-white/15 shadow-xl space-y-4">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -163,33 +189,79 @@ export function MobileDonorHome() {
                     Seu Impacto na Missão
                   </span>
                 </div>
-                <span className="text-[10px] font-gotham-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Ativo
+                <span className={`text-[10px] font-gotham-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border ${
+                  donationsCount > 0
+                    ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
+                    : 'text-amber-300 bg-amber-500/15 border-amber-500/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${donationsCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-amber-300'}`}></span>
+                  {donationsCount > 0 ? 'Mantenedor Ativo' : 'Cadastro Recente'}
                 </span>
               </div>
 
+              {/* Descrição real do impacto das contribuições */}
               <p className="text-xs text-slate-200 font-gotham-light leading-relaxed">
-                Você faz parte da família que mantém a <strong className="font-gotham-bold text-white">Casa Nutri em Boane</strong> funcionando diariamente com alimentação e suporte clínico especializado.
+                {myChildren.length > 0 ? (
+                  <>
+                    Você apadrinha diretamente <strong className="font-gotham-bold text-white">{myChildren.length === 1 ? myChildren[0].name : `${myChildren.length} crianças`}</strong> na Casa Nutri, garantindo acompanhamento clínico e nutricional.
+                  </>
+                ) : totalUserDonated > 0 ? (
+                  <>
+                    Seu total de <strong className="font-gotham-bold text-white">R$ {totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> foi direcionado para o tratamento de crianças desnutridas e manutenção da Casa Nutri.
+                  </>
+                ) : (
+                  <>
+                    Suas futuras contribuições e apadrinhamentos serão convertidos diretamente em tratamento e refeições nutritivas com acompanhamento aqui.
+                  </>
+                )}
               </p>
 
+              {/* Métricas Reais do Usuário */}
               <div className="grid grid-cols-2 gap-2.5 pt-1">
-                <div className="bg-black/20 rounded-xl p-2.5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">Local de Atuação</span>
-                  <span className="text-xs font-gotham-bold text-white flex items-center gap-1 mt-0.5">
-                    📍 Boane & Nampula
+                <div className="bg-black/25 rounded-xl p-3 border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">
+                    Refeições Viabilizadas
+                  </span>
+                  <span className="text-sm font-heading font-black text-amber-300 block">
+                    {mealsProvided > 0 ? `~${mealsProvided} refeições` : '0 refeições'}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-gotham-light block">
+                    {totalUserDonated > 0 ? 'Nutrição terapêutica' : 'Aguardando 1ª doação'}
                   </span>
                 </div>
-                <div className="bg-black/20 rounded-xl p-2.5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">Transparência</span>
-                  <span className="text-xs font-gotham-bold text-emerald-300 flex items-center gap-1 mt-0.5">
-                    ✓ 100% Auditado
+
+                <div className="bg-black/25 rounded-xl p-3 border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">
+                    Última Contribuição
+                  </span>
+                  <span className="text-sm font-heading font-black text-white block">
+                    {latestDonation 
+                      ? `R$ ${latestDonation.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                      : 'R$ 0,00'}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-gotham-light block truncate">
+                    {latestDonation?.date 
+                      ? `${new Date(latestDonation.paid_at || latestDonation.date).toLocaleDateString('pt-BR')} • ${latestDonation.payment_method?.toUpperCase() || 'PIX'}`
+                      : 'Nenhuma ainda'}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-1 text-[11px] text-slate-400 font-gotham-light italic flex items-center gap-1.5">
-                <span>"Cada vida recuperada é fruto da sua fidelidade."</span>
+              {/* Linha de status do doador */}
+              <div className="pt-1 text-[11px] text-slate-300 font-gotham-medium flex items-center justify-between border-t border-white/10">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                  <span>
+                    {donationsCount > 0 
+                      ? `${donationsCount} ${donationsCount === 1 ? 'doação confirmada' : 'doações confirmadas'} no sistema` 
+                      : 'Nenhuma doação registrada'}
+                  </span>
+                </span>
+                {myChildren.length > 0 && (
+                  <span className="text-xs text-rose-300 flex items-center gap-1 font-gotham-bold">
+                    <Heart size={12} fill="currentColor" /> {myChildren.length} {myChildren.length === 1 ? 'afilhada' : 'afilhadas'}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -200,6 +272,50 @@ export function MobileDonorHome() {
         <div className="absolute -right-16 -bottom-16 w-96 h-96 bg-gradient-to-br from-[#F49853]/20 to-orange-600/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute top-0 right-1/3 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
       </div>
+
+      {/* Banner de Apoio Mensal Geral Ativo com Ações de Alteração e Cancelamento */}
+      {monthlyCommitments?.generalMonthlySupport?.active && (
+        <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200/90 rounded-[1.75rem] p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-orange-200 flex items-center justify-center text-[#F49853] shadow-xs shrink-0">
+              <RefreshCw size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  Apoio Mensal Ativo
+                </span>
+                <span className="text-xs text-slate-500 font-gotham-medium">
+                  R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                </span>
+              </div>
+              <h4 className="text-sm sm:text-base font-heading font-black text-slate-900 mt-1">
+                Apoio Mensal Geral • Casa Nutri
+              </h4>
+              <p className="text-xs text-slate-500 font-gotham-light">
+                Ao alterar o valor, o novo valor substitui o anterior. Você pode cancelar ou alterar quando quiser.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setIsManageModalOpen(true)}
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-all cursor-pointer"
+            >
+              Alterar / Aumentar Apoio
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManageModalOpen(true)}
+              className="px-3.5 py-2.5 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 rounded-xl text-xs font-gotham-medium transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Grid de Métricas Reais do Mantenedor */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -620,6 +736,14 @@ export function MobileDonorHome() {
 
       </div>
 
+      {/* Modal de Gestão do Apoio Mensal */}
+      <ManageMonthlyPlanModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        currentAmount={monthlyCommitments?.generalMonthlySupport?.monthlyAmount || 100}
+        isActive={Boolean(monthlyCommitments?.generalMonthlySupport?.active)}
+        onSuccess={() => fetchCommitments()}
+      />
     </div>
   );
 }

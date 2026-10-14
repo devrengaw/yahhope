@@ -3,6 +3,7 @@ import { fetchAndSyncOrgSettings } from './organizationSettingsService';
 
 export interface ChildSponsorshipDetail {
   id: string;
+  sponsorshipId?: string;
   name: string;
   dob?: string;
   ageText?: string;
@@ -21,6 +22,24 @@ export interface ChildSponsorshipDetail {
     monthly_amount: number;
     created_at: string;
   }>;
+}
+
+export interface SupporterGeneralSupport {
+  active: boolean;
+  monthlyAmount: number;
+  paymentMethod: string;
+  updatedAt?: string;
+}
+
+export interface SupporterCommitmentSummary {
+  generalMonthlySupport: SupporterGeneralSupport;
+  childSponsorships: {
+    count: number;
+    quotaCost: number;
+    totalMonthly: number;
+    children: ChildSponsorshipDetail[];
+  };
+  totalMonthlyCommitment: number;
 }
 
 export interface SponsorshipMetrics {
@@ -132,7 +151,7 @@ export const sponsorshipService = {
           ageText: calculateChildAge(c.dob),
           gender: c.gender,
           community: c.address || c.province || 'Casa Nutri - Nampula',
-          photo_url: c.photo_url || (c.gender === 'F' ? 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?q=80&w=800' : 'https://images.unsplash.com/photo-1489710437720-ebb67ec84dd2?q=80&w=800'),
+          photo_url: c.photo_url || '',
           story: c.story || `Acompanhado com amor pela equipe clínica da Casa Nutri em Moçambique, recebendo suplementação e alimentação balanceada.`,
           sponsorsCount,
           maxSponsors: maxSponsorsPerChild,
@@ -444,12 +463,13 @@ export const sponsorshipService = {
           const c = item.children;
           return {
             id: c.id,
+            sponsorshipId: item.id,
             name: c.name,
             dob: c.dob,
             ageText: calculateChildAge(c.dob),
             gender: c.gender,
             community: c.address || c.province || 'Casa Nutri',
-            photo_url: c.photo_url || (c.gender === 'F' ? 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?q=80&w=800' : 'https://images.unsplash.com/photo-1489710437720-ebb67ec84dd2?q=80&w=800'),
+            photo_url: c.photo_url || '',
             story: c.story || 'Acompanhada com amor na Casa Nutri.',
             sponsorsCount: 1,
             maxSponsors: 2,
@@ -460,6 +480,240 @@ export const sponsorshipService = {
     } catch (err) {
       console.error('Erro ao buscar crianças apadrinhadas do usuário:', err);
       return [];
+    }
+  },
+
+  /**
+   * Obtém o resumo consolidado dos compromissos mensais do apoiador:
+   * 1. Apoio Mensal Geral (Casa Nutri)
+   * 2. Apadrinhamento de Crianças (R$ 90/cota)
+   */
+  async getSupporterCommitments(userId?: string, userEmail?: string): Promise<SupporterCommitmentSummary> {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    const settings = await fetchAndSyncOrgSettings();
+    const quotaCost = Number(settings.sponsorship_quota_cost) || 90;
+
+    // 1. Busca crianças apadrinhadas ativas
+    const children = await this.getSponsoredChildrenForUser(userId, cleanEmail);
+    const childCount = children.length;
+    const childTotalMonthly = childCount * quotaCost;
+
+    // 2. Busca apoio mensal geral no banco ou cache local
+    let generalSupport: SupporterGeneralSupport = {
+      active: false,
+      monthlyAmount: 0,
+      paymentMethod: 'pix'
+    };
+
+    if (cleanEmail) {
+      try {
+        // Tenta ler do localStorage primeiro
+        const localKey = `yah_hope_general_monthly_${cleanEmail}`;
+        const cached = localStorage.getItem(localKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (typeof parsed === 'object' && parsed !== null) {
+              generalSupport = {
+                active: Boolean(parsed.active),
+                monthlyAmount: Number(parsed.monthlyAmount) || 0,
+                paymentMethod: parsed.paymentMethod || 'pix',
+                updatedAt: parsed.updatedAt
+              };
+            }
+          } catch (e) {
+            console.warn('Erro ao ler cache local de apoio mensal:', e);
+          }
+        }
+
+        // Tenta sincronizar com tabela sponsorships (apoio geral onde child_id é nulo)
+        let query = supabase
+          .from('sponsorships')
+          .select('*')
+          .is('child_id', null)
+          .eq('status', 'active');
+
+        if (userId) {
+          query = query.or(`sponsor_id.eq.${userId},donor_email.ilike.${cleanEmail}`);
+        } else {
+          query = query.ilike('donor_email', cleanEmail);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false }).limit(1);
+        if (!error && data && data.length > 0) {
+          const rec = data[0];
+          generalSupport = {
+            active: true,
+            monthlyAmount: Number(rec.monthly_amount) || 100,
+            paymentMethod: rec.payment_method || 'pix',
+            updatedAt: rec.created_at
+          };
+          localStorage.setItem(localKey, JSON.stringify(generalSupport));
+        }
+      } catch (err) {
+        console.warn('Aviso ao consultar apoio mensal geral:', err);
+      }
+    }
+
+    const totalMonthlyCommitment = (generalSupport.active ? generalSupport.monthlyAmount : 0) + childTotalMonthly;
+
+    return {
+      generalMonthlySupport: generalSupport,
+      childSponsorships: {
+        count: childCount,
+        quotaCost,
+        totalMonthly: childTotalMonthly,
+        children
+      },
+      totalMonthlyCommitment
+    };
+  },
+
+  /**
+   * Atualiza ou aumenta o Apoio Mensal Geral do mantenedor.
+   * REGRA DE NEGÓCIO: O novo valor SUBSTITUI o valor anterior (NÃO SOMA).
+   */
+  async updateGeneralMonthlySupport(
+    userId: string | undefined,
+    userEmail: string,
+    newAmount: number,
+    paymentMethod: string = 'pix',
+    donorName: string = 'Mantenedor YAH Hope'
+  ): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = userEmail.toLowerCase().trim();
+    if (!cleanEmail) {
+      return { success: false, message: 'E-mail do mantenedor não identificado.' };
+    }
+
+    const payload: SupporterGeneralSupport = {
+      active: true,
+      monthlyAmount: newAmount,
+      paymentMethod,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Salva imediatamente no cache do mantenedor (garante responsividade imediata)
+    const localKey = `yah_hope_general_monthly_${cleanEmail}`;
+    localStorage.setItem(localKey, JSON.stringify(payload));
+
+    try {
+      // Desativa qualquer registro anterior de apoio geral
+      await supabase
+        .from('sponsorships')
+        .update({ status: 'replaced' })
+        .is('child_id', null)
+        .or(`donor_email.ilike.${cleanEmail}${userId ? `,sponsor_id.eq.${userId}` : ''}`)
+        .eq('status', 'active');
+
+      // Insere o novo compromisso com o valor substituto atualizado
+      await supabase.from('sponsorships').insert([{
+        sponsor_id: userId || null,
+        child_id: null,
+        donor_name: donorName,
+        donor_email: cleanEmail,
+        monthly_amount: newAmount,
+        quotas_count: 1,
+        status: 'active',
+        payment_method: paymentMethod,
+        last_sponsored_at: new Date().toISOString()
+      }]);
+
+      return {
+        success: true,
+        message: `Seu apoio mensal foi atualizado com sucesso para R$ ${newAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês.`
+      };
+    } catch (err: any) {
+      console.warn('Erro ao registrar no banco, mantendo persistência local:', err);
+      return {
+        success: true,
+        message: `Seu apoio mensal foi atualizado para R$ ${newAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês.`
+      };
+    }
+  },
+
+  /**
+   * Cancela o Apoio Mensal Geral do mantenedor.
+   */
+  async cancelGeneralMonthlySupport(
+    userId?: string,
+    userEmail?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    if (cleanEmail) {
+      const localKey = `yah_hope_general_monthly_${cleanEmail}`;
+      localStorage.setItem(localKey, JSON.stringify({
+        active: false,
+        monthlyAmount: 0,
+        paymentMethod: '',
+        updatedAt: new Date().toISOString()
+      }));
+
+      try {
+        await supabase
+          .from('sponsorships')
+          .update({ status: 'canceled' })
+          .is('child_id', null)
+          .or(`donor_email.ilike.${cleanEmail}${userId ? `,sponsor_id.eq.${userId}` : ''}`)
+          .eq('status', 'active');
+      } catch (err) {
+        console.warn('Aviso ao cancelar apoio no banco:', err);
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Seu apoio mensal geral foi cancelado. Você pode reativá-lo a qualquer momento pelo portal.'
+    };
+  },
+
+  /**
+   * Cancela o apadrinhamento de uma criança específica.
+   * Libera a vaga no sistema para outro padrinho e reduz o total mensal.
+   */
+  async cancelChildSponsorship(
+    sponsorshipId?: string,
+    childId?: string,
+    userId?: string,
+    userEmail?: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (sponsorshipId) {
+        const { error } = await supabase
+          .from('sponsorships')
+          .update({ status: 'canceled' })
+          .eq('id', sponsorshipId);
+
+        if (error) throw error;
+      } else if (childId) {
+        let query = supabase
+          .from('sponsorships')
+          .update({ status: 'canceled' })
+          .eq('child_id', childId)
+          .eq('status', 'active');
+
+        const cleanEmail = (userEmail || '').toLowerCase().trim();
+        if (userId && cleanEmail) {
+          query = query.or(`sponsor_id.eq.${userId},donor_email.ilike.${cleanEmail}`);
+        } else if (userId) {
+          query = query.eq('sponsor_id', userId);
+        } else if (cleanEmail) {
+          query = query.ilike('donor_email', cleanEmail);
+        }
+
+        const { error } = await query;
+        if (error) throw error;
+      }
+
+      return {
+        success: true,
+        message: 'O apadrinhamento desta criança foi cancelado com sucesso. A vaga foi liberada para acolhimento por outro padrinho.'
+      };
+    } catch (err: any) {
+      console.error('Erro ao cancelar apadrinhamento de criança:', err);
+      return {
+        success: false,
+        message: err.message || 'Erro ao processar cancelamento do apadrinhamento.'
+      };
     }
   },
 

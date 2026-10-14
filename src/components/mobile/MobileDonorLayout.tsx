@@ -68,16 +68,15 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
           <div className="flex items-center gap-8">
             <Link 
               to="/portal/dashboard" 
-              className="flex items-center gap-3.5 group outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 rounded-2xl p-1 -m-1"
+              className="flex items-center gap-3 group outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 rounded-2xl p-1 -m-1"
             >
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#F49853] to-amber-400 flex items-center justify-center shadow-md shadow-orange-500/25 group-hover:scale-105 group-hover:shadow-orange-500/35 transition-all">
-                <Heart className="text-white" size={22} fill="currentColor" />
-              </div>
-              <div>
-                <span className="font-heading font-black text-slate-900 tracking-tight text-xl block leading-tight group-hover:text-amber-600 transition-colors">
-                  YAH Hope
-                </span>
-                <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none flex items-center gap-1.5 mt-0.5">
+              <img 
+                src="/logo-black.png" 
+                alt="YAH Hope" 
+                className="h-10 md:h-12 w-auto object-contain group-hover:opacity-90 transition-opacity"
+              />
+              <div className="border-l border-slate-200/80 pl-3">
+                <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#F49853] animate-pulse"></span>
                   Portal do Mantenedor
                 </span>

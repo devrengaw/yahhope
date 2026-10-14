@@ -1,26 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
-  DollarSign, 
   Copy, 
   Check, 
   Sparkles, 
   ShieldCheck, 
   QrCode, 
-  Receipt, 
   ArrowRight,
-  RefreshCw,
   CreditCard,
   Building2,
   Lock,
   CheckCircle2,
   TrendingUp,
   FileText,
-  Users,
-  MapPin,
-  Calendar,
-  Activity,
-  Smile
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
@@ -32,9 +25,8 @@ export function MobileDonorSponsor() {
   const navigate = useNavigate();
   const { currentCampaign, createDonation } = useFundraising();
 
-  // Metrics and Priority Child
+  // Metrics
   const [metrics, setMetrics] = useState<SponsorshipMetrics | null>(null);
-  const [priorityChild, setPriorityChild] = useState<ChildSponsorshipDetail | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
 
   // Form State
@@ -51,25 +43,11 @@ export function MobileDonorSponsor() {
   const quotaCost = metrics?.quotaCost || 90;
   const totalAmount = quotasCount * quotaCost;
 
-  // Carrega métricas e identifica a criança mais prioritária (Least-Sponsored)
+  // Carrega métricas
   useEffect(() => {
     setIsLoadingMetrics(true);
     sponsorshipService.getMetrics()
-      .then(m => {
-        setMetrics(m);
-        // Filtra crianças que ainda possuem vagas abertas
-        const available = m.children.filter(c => c.sponsorsCount < m.maxSponsorsPerChild);
-        if (available.length > 0) {
-          // Ordena pelo menor número de padrinhos (Least-Sponsored)
-          available.sort((a, b) => {
-            if (a.sponsorsCount !== b.sponsorsCount) {
-              return a.sponsorsCount - b.sponsorsCount;
-            }
-            return a.name.localeCompare(b.name);
-          });
-          setPriorityChild(available[0]);
-        }
-      })
+      .then(m => setMetrics(m))
       .catch(err => console.error('Erro ao carregar dados de apadrinhamento:', err))
       .finally(() => setIsLoadingMetrics(false));
   }, []);
@@ -302,64 +280,38 @@ export function MobileDonorSponsor() {
                 </div>
               </div>
 
-              {/* 2. Card da Criança Prioritária (Algoritmo Least-Sponsored) */}
-              {priorityChild && (
-                <div className="bg-gradient-to-br from-amber-50/70 to-orange-50/50 rounded-2xl p-4 sm:p-5 border border-amber-200/80">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                      Criança Prioritária para este Apadrinhamento
-                    </span>
-                    <span className="text-[11px] font-gotham-bold text-[#F49853] flex items-center gap-1">
-                      <Sparkles size={13} /> Algoritmo Solidário
-                    </span>
-                  </div>
+              {/* 2. Informações sobre a Vinculação e Revelação da Criança */}
+              <div className="bg-gradient-to-br from-amber-50/70 to-orange-50/50 rounded-2xl p-5 border border-amber-200/80 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Sparkles size={12} className="text-[#F49853]" />
+                    Distribuição Solidária com Amor
+                  </span>
+                  <span className="text-xs text-amber-700 font-gotham-bold">
+                    Casa Nutri • Moçambique
+                  </span>
+                </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-amber-200/60 overflow-hidden shrink-0 border border-amber-300/60 shadow-xs">
-                      {priorityChild.photo_url ? (
-                        <img 
-                          src={priorityChild.photo_url} 
-                          alt={priorityChild.name} 
-                          className="w-full h-full object-cover" 
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-amber-700 font-black text-2xl">
-                          {priorityChild.name[0]}
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-base sm:text-lg font-heading font-black text-slate-900 truncate">
-                        {priorityChild.name}
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 mt-1">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} className="text-slate-400" />
-                          {priorityChild.ageText || calculateChildAge(priorityChild.dob)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin size={12} className="text-slate-400" />
-                          {priorityChild.community || 'Casa Nutri'}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Activity size={12} className="text-amber-600" />
-                          {priorityChild.nutritional_status || 'Em Recuperação'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-gotham-light mt-1.5 line-clamp-1">
-                        Aguardando padrinho para continuidade do tratamento clínico nutricional.
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#F49853] to-amber-400 text-white flex items-center justify-center shrink-0 shadow-md shadow-orange-500/20">
+                    <Heart size={24} fill="currentColor" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-heading font-black text-slate-900 text-sm">
+                      Acolhimento da Criança em Maior Vulnerabilidade
+                    </h4>
+                    <p className="text-xs text-slate-600 font-gotham-light mt-1 leading-relaxed">
+                      Sua contribuição mensal apoia diretamente o resgate nutricional, acompanhamento clínico e refeições diárias. Nosso algoritmo inteligente distribui seu apoio à criança em estado prioritário na Casa Nutri.
+                    </p>
                   </div>
                 </div>
-              )}
 
-              {/* Banner Explicativo do Algoritmo */}
-              <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 font-gotham-light">
-                <ShieldCheck size={18} className="text-[#F49853] shrink-0 mt-0.5" />
-                <p>
-                  <strong className="text-slate-800">Distribuição Solidária Inteligente (Least-Sponsored):</strong> Suas cotas são direcionadas automaticamente às crianças que mais precisam e com menor número de padrinhos, garantindo assistência digna e uniforme a todas.
-                </p>
+                <div className="p-3.5 bg-white/90 rounded-xl border border-amber-200/70 text-xs text-amber-950 font-gotham-medium flex items-center gap-2.5 shadow-2xs">
+                  <span className="text-lg shrink-0">💌</span>
+                  <span>
+                    <strong>Identificação da sua Criança:</strong> Você conhecerá a foto, o nome, a história e os relatórios de evolução médica da sua criança apadrinhada <strong>logo após a confirmação</strong>!
+                  </span>
+                </div>
               </div>
 
               {/* 3. Forma de Pagamento */}
@@ -629,11 +581,11 @@ export function MobileDonorSponsor() {
               </div>
               <div className="flex items-start gap-3">
                 <FileText size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Recibos e Transparência:</strong> Baixe comprovantes fiscais e prestação de contas periódica no portal.</p>
+                <p><strong>Transparência & Prestação de Contas:</strong> Acompanhe no portal o histórico de contribuições e a prestação de contas periódica da Casa Nutri.</p>
               </div>
               <div className="flex items-start gap-3">
                 <Lock size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Sem Burocracia:</strong> Pause, altere ou cancele seu apadrinhamento a qualquer momento pelo portal.</p>
+                <p><strong>Sem Burocracia:</strong> Pause, gerencie ou cancele seu apadrinhamento a qualquer momento pelo portal.</p>
               </div>
             </div>
           </div>

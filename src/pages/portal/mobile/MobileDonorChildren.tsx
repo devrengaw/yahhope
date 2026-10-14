@@ -30,8 +30,11 @@ export function MobileDonorChildren() {
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
+  const [childToCancel, setChildToCancel] = useState<{ id: string; name: string; sponsorshipId?: string } | null>(null);
+  const [isCancelingChild, setIsCancelingChild] = useState(false);
 
-  useEffect(() => {
+  const refreshChildren = () => {
+    setIsLoadingChildren(true);
     sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
       .then(children => {
         setMyChildren(children);
@@ -41,7 +44,46 @@ export function MobileDonorChildren() {
         console.error(e);
         setIsLoadingChildren(false);
       });
+  };
+
+  useEffect(() => {
+    refreshChildren();
   }, [user?.id, user?.email]);
+
+  const childIdToSponsorshipId = useMemo(() => {
+    const map = new Map<string, string>();
+    myChildren.forEach(c => {
+      if (c.sponsorshipId) map.set(c.id, c.sponsorshipId);
+    });
+    return map;
+  }, [myChildren]);
+
+  const handleConfirmCancelChild = async () => {
+    if (!childToCancel) return;
+    setIsCancelingChild(true);
+
+    try {
+      const res = await sponsorshipService.cancelChildSponsorship(
+        childToCancel.sponsorshipId,
+        childToCancel.id,
+        user?.id,
+        user?.email
+      );
+
+      if (res.success) {
+        alert(res.message);
+        setChildToCancel(null);
+        setSelectedChild(null);
+        refreshChildren();
+      } else {
+        alert(res.message);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Erro ao cancelar apadrinhamento.');
+    } finally {
+      setIsCancelingChild(false);
+    }
+  };
 
   // Calcula idade a partir do dob
   const calculateAge = (dobString?: string) => {
@@ -421,29 +463,126 @@ export function MobileDonorChildren() {
                   <p><strong>Número de Registro Clínico:</strong> {child.registration_number || 'YAH-2026'}</p>
                 </div>
 
-                {/* Botões de Ação */}
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                  <Link
-                    to="/portal/donations"
-                    onClick={() => setSelectedChild(null)}
-                    className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2"
-                  >
-                    <Heart size={16} fill="currentColor" />
-                    <span>Apoiar Tratamento Mensal</span>
-                  </Link>
-                  <button
-                    onClick={() => setSelectedChild(null)}
-                    className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
-                  >
-                    Fechar
-                  </button>
-                </div>
+                {/* Bloco de Apadrinhamento Ativo */}
+                {myChildIds.has(child.id) ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-orange-50/70 border border-orange-200/80 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-[#F49853] block">
+                          Apadrinhamento Ativo
+                        </span>
+                        <p className="text-xs text-slate-800 font-gotham-bold mt-0.5">
+                          Cota Mensal: R$ 90,00/mês
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setChildToCancel({ 
+                          id: child.id, 
+                          name: child.name, 
+                          sponsorshipId: childIdToSponsorshipId.get(child.id) 
+                        })}
+                        className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-gotham-bold transition-all cursor-pointer shadow-2xs"
+                      >
+                        Cancelar Apadrinhamento
+                      </button>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                      <Link
+                        to="/portal/apadrinhar"
+                        onClick={() => setSelectedChild(null)}
+                        className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Heart size={16} fill="currentColor" />
+                        <span>Apadrinhar Mais Crianças (+R$ 90/mês)</span>
+                      </Link>
+                      <button
+                        onClick={() => setSelectedChild(null)}
+                        className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Botões de Ação para quem não é padrinho desta criança */
+                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                    <Link
+                      to="/portal/apadrinhar"
+                      onClick={() => setSelectedChild(null)}
+                      className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2"
+                    >
+                      <Heart size={16} fill="currentColor" />
+                      <span>Apadrinhar Esta Criança</span>
+                    </Link>
+                    <button
+                      onClick={() => setSelectedChild(null)}
+                      className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                )}
               </div>
 
             </div>
           </div>
         );
       })()}
+
+      {/* Modal de Confirmação para Cancelar Apadrinhamento de Criança */}
+      {childToCancel && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-fade-in relative flex flex-col">
+            <div className="p-6 bg-gradient-to-r from-slate-950 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                  <X size={20} />
+                </div>
+                <h3 className="text-lg font-heading font-black text-white">
+                  Cancelar Apadrinhamento
+                </h3>
+              </div>
+              <button
+                onClick={() => setChildToCancel(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 space-y-2">
+                <p className="font-gotham-bold text-sm">
+                  Deseja realmente cancelar o apadrinhamento de {childToCancel.name}?
+                </p>
+                <p className="font-gotham-light leading-relaxed">
+                  Ao confirmar, a cota mensal de R$ 90,00 deixará de ser cobrada no seu plano e a vaga da criança será liberada na Casa Nutri para acolhimento por outro padrinho.
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleConfirmCancelChild}
+                  disabled={isCancelingChild}
+                  className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  <span>{isCancelingChild ? 'Cancelando...' : 'Confirmar Cancelamento'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChildToCancel(null)}
+                  className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Voltar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
