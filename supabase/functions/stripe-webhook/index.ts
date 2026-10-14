@@ -107,7 +107,7 @@ serve(async (req) => {
         
       const campaignId = campaigns && campaigns.length > 0 ? campaigns[0].id : null
 
-      if (campaignId) {
+      if (campaignId && !isSponsorship) {
         const isPixPayment = session.metadata?.paymentMethod === 'pix' || session.payment_method_types?.includes('pix');
         const paymentMethodRecord = isPixPayment ? 'pix' : (session.payment_method_types?.[0] || 'credit_card');
 

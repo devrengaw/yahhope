@@ -317,36 +317,7 @@ export const sponsorshipService = {
         }
       }
 
-      // 5. Integra com a Régua Geral de Doações (campanhas e donations)
-      const { data: activeCampaigns } = await supabase
-        .from('campaigns')
-        .select('id, current_amount')
-        .eq('is_active', true)
-        .limit(1);
-
-      const activeCampaign = activeCampaigns?.[0];
-      const campaignId = activeCampaign?.id || null;
-
-      if (campaignId) {
-        // Insere na tabela de doações
-        await supabase.from('donations').insert({
-          campaign_id: campaignId,
-          donor_name: donorName,
-          donor_email: cleanEmail,
-          donor_phone: donorPhone || null,
-          amount: totalAmount,
-          status: 'paid',
-          payment_method: paymentMethod,
-          paid_at: new Date().toISOString()
-        });
-
-        // Incrementa o montante da régua de arrecadação da campanha
-        await supabase.from('campaigns').update({
-          current_amount: Number(activeCampaign.current_amount || 0) + totalAmount
-        }).eq('id', campaignId);
-      }
-
-      // 6. Registra no Módulo Financeiro Global
+      // 5. Registra no Módulo Financeiro Global
       await supabase.from('finance_transactions').insert({
         description: `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`,
         amount: totalAmount,

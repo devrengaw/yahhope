@@ -14,7 +14,8 @@ import {
   Award,
   ArrowRight,
   CreditCard,
-  Flame
+  Flame,
+  Users
 } from 'lucide-react';
 import { useFundraising, Campaign as CampaignType } from '../../contexts/FundraisingContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -513,47 +514,73 @@ export function Campaign() {
             </div>
           )}
 
-          {/* Botão de Doação Única para a Régua */}
+          {/* 1. Botão Principal: Seja um Mantenedor Mensal */}
+          <button
+            type="button"
+            onClick={handleBecomeMonthlyDonor}
+            className="w-full bg-gradient-to-r from-[#F49853] to-orange-500 hover:from-[#e0853d] hover:to-orange-600 text-white p-4 rounded-2xl shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 transition-all flex items-center justify-between group cursor-pointer text-left mt-5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <Heart size={20} fill="currentColor" />
+              </div>
+              <div>
+                <span className="text-sm font-black uppercase tracking-wider block">
+                  Seja um Mantenedor Mensal
+                </span>
+                <span className="text-xs text-white/95 font-medium">
+                  Apoiar com R$ {isCustom ? (customAmount || '50') : selectedAmount}/mês
+                </span>
+              </div>
+            </div>
+            <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform shrink-0" />
+          </button>
+          <p className="text-[10px] text-slate-400 -mt-2 text-center font-medium">
+            * Mantenedores mensais cobrem os custos fixos dos projetos que zeram todo mês.
+          </p>
+
+          {/* 2. Botão de Doação com "Doação sem recorrência" menor embaixo dentro do botão */}
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-[#0F172A] hover:bg-emerald-600 disabled:opacity-70 text-white font-black text-base py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all mt-4 shadow-lg shadow-slate-900/10 cursor-pointer"
+            className="w-full bg-[#0F172A] hover:bg-slate-800 disabled:opacity-70 text-white py-3.5 px-4 rounded-2xl flex flex-col items-center justify-center transition-all shadow-md shadow-slate-900/10 cursor-pointer group mt-1"
           >
             {isLoading ? (
-              <span className="animate-pulse">Processando...</span>
+              <span className="animate-pulse text-sm font-bold">Processando...</span>
             ) : (
               <>
-                Doar R$ {isCustom ? (customAmount || '0') : selectedAmount} para a Régua
-                <ChevronRight size={18} />
+                <div className="flex items-center justify-center gap-2 text-sm md:text-base font-black">
+                  <span>Doar R$ {isCustom ? (customAmount || '0') : selectedAmount} para a Régua</span>
+                  <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[11px] font-medium text-slate-300 mt-0.5">
+                  Doação sem recorrência
+                </span>
               </>
             )}
           </button>
 
-          {/* Botão Seja um Mantenedor Mensal (Custo Mensal do Projeto) */}
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={handleBecomeMonthlyDonor}
-              className="w-full bg-gradient-to-r from-[#F49853] to-orange-500 hover:from-[#e0853d] hover:to-orange-600 text-white p-3.5 rounded-2xl shadow-md transition-all flex items-center justify-between group cursor-pointer text-left"
+          {/* 3. Botão de Apadrinhamento */}
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <Link
+              to="/apadrinhar"
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white p-3.5 rounded-2xl shadow-md shadow-emerald-600/15 transition-all flex items-center justify-between group cursor-pointer text-left block"
             >
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                  <Heart size={18} fill="currentColor" />
+                  <Users size={18} />
                 </div>
                 <div>
                   <span className="text-xs font-black uppercase tracking-wider block">
-                    Seja um Mantenedor Mensal
+                    Apadrinhar uma Criança
                   </span>
                   <span className="text-[11px] text-white/95 font-medium">
-                    Apoiar com R$ {isCustom ? (customAmount || '50') : selectedAmount}/mês
+                    R$ 90/mês para nutrição na Casa Nutri
                   </span>
                 </div>
               </div>
-              <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-            <p className="text-[10px] text-slate-400 mt-2 text-center font-medium">
-              * Mantenedores mensais cobrem os custos fixos dos projetos que zeram todo mês.
-            </p>
+              <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform shrink-0" />
+            </Link>
           </div>
         </form>
       </div>
@@ -904,13 +931,40 @@ export function Campaign() {
                 </div>
               );
             })()}
+
+            {/* Banner Especial de Apadrinhamento de Crianças */}
+            <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-800 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-5 border border-emerald-500/30">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner mt-0.5">
+                  <Users size={24} className="text-white" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-200 block mb-1">
+                    Apadrinhamento Casa Nutri
+                  </span>
+                  <h4 className="text-lg font-black leading-tight text-white">
+                    Deseja Apadrinhar uma Criança?
+                  </h4>
+                  <p className="text-xs text-emerald-100/90 mt-1 max-w-md font-medium leading-relaxed">
+                    Com R$ 90/mês você garante nutrição plena diária, exames clínicos e recebe atualizações do desenvolvimento do seu afilhado.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/apadrinhar"
+                className="bg-white hover:bg-emerald-50 text-emerald-800 font-black text-xs uppercase tracking-wider px-5 py-3.5 rounded-2xl transition-all shadow-md shrink-0 whitespace-nowrap flex items-center gap-2 group cursor-pointer"
+              >
+                <span>Conhecer e Apadrinhar</span>
+                <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
           </div>
 
           {/* Coluna Direita (lg:col-span-5): Caixa Fixa de Doação para a Régua */}
           <div className="lg:col-span-5 lg:sticky lg:top-24">
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
               <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Faça sua contribuição</h2>
-              <p className="text-xs text-slate-500 mb-5">Sua doação única entra diretamente na régua de arrecadação.</p>
+              <p className="text-xs text-slate-500 mb-5">Escolha abaixo a melhor forma de apoiar nossa missão humanitária.</p>
               
               {/* Identificação da Fase que está sendo impulsionada agora */}
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 mb-6">

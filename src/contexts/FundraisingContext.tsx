@@ -81,6 +81,7 @@ interface FundraisingContextType {
   removeMilestone: (id: string) => Promise<void>;
   createDonation: (donation: Omit<Donation, 'id' | 'status' | 'date'> & { campaign_id?: string }) => Promise<void>;
   approveDonation: (id: string) => Promise<void>;
+  deleteDonation: (id: string) => Promise<{ success: boolean; error?: any }>;
   calculateCampaignProgress: (camp: Campaign) => CampaignProgressStats;
 }
 
@@ -225,6 +226,12 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         .select('*')
         .order('created_at', { ascending: false });
 
+      // 4. Buscar apadrinhamentos ativos (cotas de apadrinhamento financiam a nutrição e operação da Casa Nutri)
+      const { data: sponsorshipsData } = await supabase
+        .from('sponsorships')
+        .select('*')
+        .in('status', ['active', 'paid', 'ACTIVE']);
+
       const formattedDonations: Donation[] = (donationsData || []).map(d => ({
         id: d.id,
         campaign_id: d.campaign_id,
@@ -236,6 +243,23 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         date: d.created_at,
         paid_at: d.paid_at
       }));
+
+      // Adiciona as cotas de apadrinhamento ativas na arrecadação contínua da Casa Nutri
+      if (sponsorshipsData && sponsorshipsData.length > 0) {
+        sponsorshipsData.forEach(sp => {
+          formattedDonations.push({
+            id: `sp_${sp.id}`,
+            campaign_id: undefined, // Fundo Geral / Nutrição Casa Nutri
+            donor_name: sp.donor_name || 'Padrinho YAH Hope',
+            donor_email: sp.donor_email || '',
+            amount: Number(sp.monthly_amount || 90),
+            status: 'paid',
+            payment_method: sp.payment_method || 'credit_card',
+            date: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
+            paid_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString()
+          });
+        });
+      }
 
       setDonations(formattedDonations);
 
@@ -318,6 +342,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         fetchCampaignData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_milestones' }, () => {
+        fetchCampaignData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsorships' }, () => {
         fetchCampaignData();
       })
       .subscribe();
@@ -648,7 +675,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
   };
 
   const createDonation = async (donation: Omit<Donation, 'id' | 'status' | 'date'> & { campaign_id?: string }) => {
-    const cId = donation.campaign_id || selectedCampaign.id;
+    const cId = donation.campaign_id || null;
     const { data } = await supabase.from('donations').insert({
       campaign_id: cId,
       donor_name: donation.donor_name,
@@ -694,6 +721,33 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const deleteDonation = async (id: string) => {
+    try {
+      const donationToDelete = donations.find(d => d.id === id);
+      const { error } = await supabase.from('donations').delete().eq('id', id);
+      if (error) {
+        console.warn('Aviso ao deletar doação no Supabase:', error);
+      }
+
+      // Se a doação estava confirmada (status = paid), decrementa da campanha correspondente
+      if (donationToDelete && donationToDelete.status === 'paid' && donationToDelete.campaign_id) {
+        const targetCamp = campaigns.find(c => c.id === donationToDelete.campaign_id);
+        if (targetCamp) {
+          const newAmount = Math.max(0, Number(targetCamp.current_amount || 0) - Number(donationToDelete.amount || 0));
+          await supabase.from('campaigns').update({
+            current_amount: newAmount
+          }).eq('id', targetCamp.id);
+        }
+      }
+
+      setDonations(prev => prev.filter(d => d.id !== id));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Erro ao deletar doação:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <FundraisingContext.Provider value={{
       campaign: selectedCampaign,
@@ -718,6 +772,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       removeMilestone,
       createDonation,
       approveDonation,
+      deleteDonation,
       calculateCampaignProgress
     }}>
       {children}

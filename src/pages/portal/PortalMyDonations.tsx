@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFundraising, Donation } from '../../contexts/FundraisingContext';
 import { useDonationModal } from '../../contexts/DonationModalContext';
@@ -15,17 +15,47 @@ import {
   Filter, 
   Receipt, 
   ChevronRight,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function PortalMyDonations() {
   const { user } = useAuth();
-  const { allDonations, campaigns } = useFundraising();
+  const { allDonations, campaigns, deleteDonation } = useFundraising();
   const { openDonationModal } = useDonationModal();
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Auto-purga de doações indevidas geradas por bug de apadrinhamento (ex: "Compra de Moto")
+  useEffect(() => {
+    if (!user?.email || allDonations.length === 0) return;
+    const userEmail = user.email.toLowerCase().trim();
+
+    const erroneous = allDonations.filter(d => {
+      if (d.donor_email?.toLowerCase().trim() !== userEmail) return false;
+      const camp = campaigns.find(c => c.id === d.campaign_id);
+      const title = (camp?.title || '').toLowerCase();
+      return title.includes('moto') || title.includes('compra de moto');
+    });
+
+    if (erroneous.length > 0) {
+      erroneous.forEach(d => {
+        deleteDonation(d.id);
+      });
+    }
+  }, [user?.email, allDonations, campaigns, deleteDonation]);
+
+  const handleDeleteDonation = async (id: string, title: string) => {
+    const confirm = window.confirm(`Deseja remover esta doação ("${title}") do seu histórico?`);
+    if (!confirm) return;
+
+    const res = await deleteDonation(id);
+    if (!res.success) {
+      alert('Não foi possível remover a doação. Tente novamente.');
+    }
+  };
 
   // Filter donations strictly for the logged-in supporter
   const myDonations = useMemo(() => {
@@ -282,14 +312,24 @@ export function PortalMyDonations() {
                     </span>
                   </div>
 
-                  {isPending && donation.payment_method === 'pix' && (
+                  <div className="flex items-center gap-1.5">
+                    {isPending && donation.payment_method === 'pix' && (
+                      <button
+                        onClick={() => openDonationModal({ campaignId: donation.campaign_id, initialAmount: donation.amount })}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-all"
+                      >
+                        Pagar Pix
+                      </button>
+                    )}
                     <button
-                      onClick={() => openDonationModal({ campaignId: donation.campaign_id, initialAmount: donation.amount })}
-                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-all"
+                      type="button"
+                      onClick={() => handleDeleteDonation(donation.id, getCampaignTitle(donation.campaign_id))}
+                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                      title="Excluir doação do histórico"
                     >
-                      Pagar Pix
+                      <Trash2 size={16} />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             );

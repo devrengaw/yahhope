@@ -31,7 +31,13 @@ import { Link, useNavigate } from 'react-router-dom';
 export function MobileDonorHome() {
   const { user } = useAuth();
   const { getPublishedItems } = useImpact();
-  const { allDonations, activeCampaign, campaign: defaultCamp } = useFundraising();
+  const { 
+    allDonations, 
+    activeCampaign, 
+    campaign: defaultCamp,
+    campaigns,
+    calculateCampaignProgress
+  } = useFundraising();
   const { posts } = useBlog();
   const { patients } = usePatients();
   const navigate = useNavigate();
@@ -61,7 +67,74 @@ export function MobileDonorHome() {
     fetchCommitments();
   }, [user?.id, user?.email, user?.name]);
 
-  const currentCampaign = activeCampaign || defaultCamp;
+  // Sincronização idêntica com a Régua da Campanha pública (Home.tsx / Campaign.tsx)
+  const availableCampaigns = useMemo(() => {
+    const list = campaigns || [];
+    const active = list.filter(c => c && c.is_active !== false);
+    if (active.length > 0) return active;
+    if (list.length > 0) return list;
+    if (defaultCamp) return [defaultCamp];
+    return [];
+  }, [campaigns, defaultCamp]);
+
+  const totalRulerGoal = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => sum + (c.target_amount || 0), 0);
+  }, [availableCampaigns]);
+
+  const totalRulerRaised = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => {
+      const p = calculateCampaignProgress(c);
+      return sum + p.currentAmount;
+    }, 0);
+  }, [availableCampaigns, calculateCampaignProgress]);
+
+  const rulerOverallPercentage = totalRulerGoal > 0 
+    ? Math.min(Math.round((totalRulerRaised / totalRulerGoal) * 100), 100) 
+    : 0;
+
+  const stagesData = useMemo(() => {
+    let runningTarget = 0;
+    return availableCampaigns.map((camp, idx) => {
+      const prevTarget = runningTarget;
+      runningTarget += (camp.target_amount || 0);
+      const threshold = runningTarget;
+      const isReached = totalRulerRaised >= threshold;
+      const isCurrent = !isReached && totalRulerRaised >= prevTarget;
+      const isUpcoming = totalRulerRaised < prevTarget;
+      
+      const campStats = calculateCampaignProgress(camp);
+      const stageNumber = idx + 1;
+
+      let stageProgress = 0;
+      if (isReached) {
+        stageProgress = 100;
+      } else if (isCurrent && camp.target_amount > 0) {
+        const raisedInThisStage = Math.max(0, totalRulerRaised - prevTarget);
+        stageProgress = Math.min(100, Math.round((raisedInThisStage / camp.target_amount) * 100));
+      }
+
+      return {
+        campaign: camp,
+        stageNumber,
+        prevTarget,
+        threshold,
+        isReached,
+        isCurrent,
+        isUpcoming,
+        campStats,
+        stageProgress
+      };
+    });
+  }, [availableCampaigns, totalRulerRaised, calculateCampaignProgress]);
+
+  const currentActiveStage = useMemo(() => {
+    return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
+  }, [stagesData]);
+
+  const currentCampaign = currentActiveStage?.campaign || activeCampaign || defaultCamp;
+  const currentStageProgress = currentActiveStage ? currentActiveStage.stageProgress : (currentCampaign?.target_amount ? Math.min(100, Math.round((totalRulerRaised / currentCampaign.target_amount) * 100)) : 0);
+  const currentStageRaised = currentActiveStage ? (currentActiveStage.isReached ? currentActiveStage.campaign.target_amount : Math.max(0, totalRulerRaised - currentActiveStage.prevTarget)) : totalRulerRaised;
+  const currentStageTarget = currentCampaign?.target_amount || 0;
 
   // Doações reais do usuário logado
   const userDonations = allDonations.filter(
@@ -384,13 +457,13 @@ export function MobileDonorHome() {
               <Target size={20} />
             </div>
             <span className="text-[10px] font-gotham-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60">
-              Casa Nutri
+              {currentActiveStage ? `Fase ${currentActiveStage.stageNumber}` : 'Casa Nutri'}
             </span>
           </div>
           <div>
             <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
               {currentCampaign 
-                ? `${Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%`
+                ? `${currentStageProgress}%`
                 : '100%'}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
@@ -578,7 +651,7 @@ export function MobileDonorHome() {
                 </span>
                 <span className="text-xs font-gotham-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Fase Ativa
+                  {currentActiveStage ? `Fase ${currentActiveStage.stageNumber} Ativa` : 'Fase Ativa'}
                 </span>
               </div>
 
@@ -591,23 +664,39 @@ export function MobileDonorHome() {
                 </p>
               </div>
 
-              {/* Barra de Progresso Real com Glow */}
+              {/* Barra de Progresso Real da Fase com Glow */}
               <div className="space-y-2 pt-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-gotham-medium text-slate-400">Progresso Arrecadado</span>
+                  <span className="font-gotham-medium text-slate-400">Progresso da Fase Atual</span>
                   <span className="font-gotham-bold text-[#F49853] text-sm">
-                    {Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%
+                    {currentStageProgress}%
                   </span>
                 </div>
                 <div className="h-3 bg-white/10 rounded-full overflow-hidden p-0.5">
                   <div 
                     className="h-full bg-gradient-to-r from-amber-400 via-[#F49853] to-orange-500 rounded-full shadow-[0_0_12px_rgba(244,152,83,0.5)] transition-all duration-700"
-                    style={{ width: `${Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%` }}
+                    style={{ width: `${currentStageProgress}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 font-gotham-medium pt-0.5">
-                  <span>R$ {currentCampaign.current_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  <span className="text-slate-300 font-gotham-bold">Alvo: R$ {currentCampaign.target_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span>R$ {currentStageRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-slate-300 font-gotham-bold">Alvo da Fase: R$ {currentStageTarget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+
+              {/* Visão Consolidada da Régua Global */}
+              <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5 space-y-1.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-400 font-gotham-medium">Total Geral da Régua:</span>
+                  <span className="text-white font-gotham-bold">
+                    R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / R$ {totalRulerGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({rulerOverallPercentage}%)
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                    style={{ width: `${rulerOverallPercentage}%` }}
+                  />
                 </div>
               </div>
 

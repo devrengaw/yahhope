@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Heart, 
   DollarSign, 
@@ -25,10 +25,77 @@ import { PortalMyDonations } from '../PortalMyDonations';
 
 export function MobileDonorDonate() {
   const { user } = useAuth();
-  const { campaigns, activeCampaign, campaign: defaultCamp, createDonation } = useFundraising();
+  const { campaigns, activeCampaign, campaign: defaultCamp, createDonation, calculateCampaignProgress } = useFundraising();
   const [activeTab, setActiveTab] = useState<'donate' | 'history'>('donate');
 
-  const currentCampaign = activeCampaign || defaultCamp;
+  // Sincronização idêntica com a Régua da Campanha pública
+  const availableCampaigns = useMemo(() => {
+    const list = campaigns || [];
+    const active = list.filter(c => c && c.is_active !== false);
+    if (active.length > 0) return active;
+    if (list.length > 0) return list;
+    if (defaultCamp) return [defaultCamp];
+    return [];
+  }, [campaigns, defaultCamp]);
+
+  const totalRulerGoal = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => sum + (c.target_amount || 0), 0);
+  }, [availableCampaigns]);
+
+  const totalRulerRaised = useMemo(() => {
+    return availableCampaigns.reduce((sum, c) => {
+      const p = calculateCampaignProgress(c);
+      return sum + p.currentAmount;
+    }, 0);
+  }, [availableCampaigns, calculateCampaignProgress]);
+
+  const rulerOverallPercentage = totalRulerGoal > 0 
+    ? Math.min(Math.round((totalRulerRaised / totalRulerGoal) * 100), 100) 
+    : 0;
+
+  const stagesData = useMemo(() => {
+    let runningTarget = 0;
+    return availableCampaigns.map((camp, idx) => {
+      const prevTarget = runningTarget;
+      runningTarget += (camp.target_amount || 0);
+      const threshold = runningTarget;
+      const isReached = totalRulerRaised >= threshold;
+      const isCurrent = !isReached && totalRulerRaised >= prevTarget;
+      const isUpcoming = totalRulerRaised < prevTarget;
+      
+      const campStats = calculateCampaignProgress(camp);
+      const stageNumber = idx + 1;
+
+      let stageProgress = 0;
+      if (isReached) {
+        stageProgress = 100;
+      } else if (isCurrent && camp.target_amount > 0) {
+        const raisedInThisStage = Math.max(0, totalRulerRaised - prevTarget);
+        stageProgress = Math.min(100, Math.round((raisedInThisStage / camp.target_amount) * 100));
+      }
+
+      return {
+        campaign: camp,
+        stageNumber,
+        prevTarget,
+        threshold,
+        isReached,
+        isCurrent,
+        isUpcoming,
+        campStats,
+        stageProgress
+      };
+    });
+  }, [availableCampaigns, totalRulerRaised, calculateCampaignProgress]);
+
+  const currentActiveStage = useMemo(() => {
+    return stagesData.find(s => s.isCurrent) || stagesData[0] || null;
+  }, [stagesData]);
+
+  const currentCampaign = currentActiveStage?.campaign || activeCampaign || defaultCamp;
+  const currentStageProgress = currentActiveStage ? currentActiveStage.stageProgress : (currentCampaign?.target_amount ? Math.min(100, Math.round((totalRulerRaised / currentCampaign.target_amount) * 100)) : 0);
+  const currentStageRaised = currentActiveStage ? (currentActiveStage.isReached ? currentActiveStage.campaign.target_amount : Math.max(0, totalRulerRaised - currentActiveStage.prevTarget)) : totalRulerRaised;
+  const currentStageTarget = currentCampaign?.target_amount || 0;
 
   // Gerenciamento de Apoio Mensal Recorrente
   const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
@@ -93,7 +160,7 @@ export function MobileDonorDonate() {
               'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
             },
             body: JSON.stringify({
-              campaignId: selectedCampaignId || currentCampaign?.id || '1',
+              campaignId: selectedCampaignId || null,
               amount: currentAmount,
               isMonthly: frequency === 'monthly',
               paymentMethod: 'card',
@@ -497,10 +564,10 @@ export function MobileDonorDonate() {
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
-                    Régua de Arrecadação Ativa
+                    Régua de Arrecadação
                   </span>
                   <span className="text-xs font-gotham-bold text-emerald-400 flex items-center gap-1">
-                    <TrendingUp size={14} /> Em Andamento
+                    <TrendingUp size={14} /> {currentActiveStage ? `Fase ${currentActiveStage.stageNumber}` : 'Em Andamento'}
                   </span>
                 </div>
 
@@ -511,18 +578,38 @@ export function MobileDonorDonate() {
                   {currentCampaign.description}
                 </p>
 
-                {/* Barra de Progresso Real */}
+                {/* Barra de Progresso Real da Fase */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-xs font-gotham-bold">
-                    <span className="text-slate-400">Arrecadado</span>
-                    <span className="text-emerald-400">
-                      R$ {currentCampaign.current_amount.toLocaleString('pt-BR')} de R$ {currentCampaign.target_amount.toLocaleString('pt-BR')}
+                    <span className="text-slate-400">Progresso da Fase</span>
+                    <span className="text-[#F49853]">
+                      {currentStageProgress}%
                     </span>
                   </div>
                   <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-amber-400 to-[#F49853] rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, Math.round((currentCampaign.current_amount / currentCampaign.target_amount) * 100))}%` }}
+                      className="h-full bg-gradient-to-r from-amber-400 via-[#F49853] to-orange-500 rounded-full transition-all duration-500"
+                      style={{ width: `${currentStageProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-400 font-gotham-medium pt-0.5">
+                    <span>R$ {currentStageRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-slate-300 font-gotham-bold">Alvo da Fase: R$ {currentStageTarget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                {/* Visão Consolidada da Régua Global */}
+                <div className="bg-white/[0.03] p-3 rounded-2xl border border-white/5 space-y-1.5">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-400 font-gotham-medium">Total Geral Arrecadado:</span>
+                    <span className="text-white font-gotham-bold">
+                      R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / R$ {totalRulerGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({rulerOverallPercentage}%)
+                    </span>
+                  </div>
+                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                      style={{ width: `${rulerOverallPercentage}%` }}
                     />
                   </div>
                 </div>
