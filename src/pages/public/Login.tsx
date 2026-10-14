@@ -128,7 +128,7 @@ export function Login() {
 
         // Registration is strictly for Sponsors on the public page
         const res = await registerWithEmail(name, email, password, {
-          communication: allowContact,
+          communication: acceptCommunications,
           privacy: acceptPrivacy
         });
         
@@ -274,33 +274,15 @@ export function Login() {
               </p>
             </div>
 
-            {/* Abas Alternadoras (Apenas no Login do Mantenedor) */}
-            {!isAdminMode && activeTab !== 'recovery' && (
-              <div className="relative z-10 grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl text-xs font-bold border border-slate-200/60">
-                <button
-                  type="button"
-                  onClick={() => switchTab('login')}
-                  className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeTab === 'login'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <LogIn size={14} />
-                  <span>Já sou Mantenedor</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchTab('register')}
-                  className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeTab === 'register'
-                      ? 'bg-[#F49853] text-white shadow-md'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Heart size={14} fill={activeTab === 'register' ? 'currentColor' : 'none'} />
-                  <span>Quero me Cadastrar</span>
-                </button>
+            {/* Banner de Ativação (Exibido apenas quando vindo de convite pós-apadrinhamento/doação) */}
+            {!isAdminMode && activeTab === 'register' && (
+              <div className="relative z-10 p-3.5 bg-orange-50 border border-orange-200/80 rounded-2xl text-left space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#F49853] block">
+                  Ativação de Conta de Mantenedor
+                </span>
+                <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                  Crie sua senha para acessar sua área de apadrinhamento e acompanhar o impacto do seu apoio.
+                </p>
               </div>
             )}
 
@@ -513,18 +495,7 @@ export function Login() {
                 </div>
               ) : (
                 <>
-                  {activeTab === 'login' ? (
-                    <p className="text-xs text-slate-500">
-                      Ainda não tem conta?{' '}
-                      <button
-                        type="button"
-                        onClick={() => switchTab('register')}
-                        className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
-                      >
-                        Cadastre-se como Mantenedor
-                      </button>
-                    </p>
-                  ) : activeTab === 'register' ? (
+                  {activeTab === 'register' ? (
                     <p className="text-xs text-slate-500">
                       Já possui conta cadastrada?{' '}
                       <button
@@ -535,7 +506,7 @@ export function Login() {
                         Fazer Login
                       </button>
                     </p>
-                  ) : (
+                  ) : activeTab === 'recovery' ? (
                     <button
                       type="button"
                       onClick={() => switchTab('login')}
@@ -543,17 +514,7 @@ export function Login() {
                     >
                       Voltar para o login
                     </button>
-                  )}
-
-                  <div className="pt-2 border-t border-slate-200/60">
-                    <Link
-                      to="/login?mode=admin"
-                      className="text-[11px] font-bold text-slate-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1.5"
-                    >
-                      <Lock size={12} className="text-orange-500" />
-                      <span>Colaborador da YAH Hope? Acessar Área Administrativa</span>
-                    </Link>
-                  </div>
+                  ) : null}
                 </>
               )}
             </div>

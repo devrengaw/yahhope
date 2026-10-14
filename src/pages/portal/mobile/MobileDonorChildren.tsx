@@ -19,12 +19,13 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
 import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 export function MobileDonorChildren() {
   const { user } = useAuth();
   const { patients, events } = usePatients();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
@@ -32,6 +33,8 @@ export function MobileDonorChildren() {
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
   const [childToCancel, setChildToCancel] = useState<{ id: string; name: string; sponsorshipId?: string } | null>(null);
   const [isCancelingChild, setIsCancelingChild] = useState(false);
+  const [celebrationChildren, setCelebrationChildren] = useState<ChildSponsorshipDetail[]>([]);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const refreshChildren = () => {
     setIsLoadingChildren(true);
@@ -49,6 +52,61 @@ export function MobileDonorChildren() {
   useEffect(() => {
     refreshChildren();
   }, [user?.id, user?.email]);
+
+  // Reconciliação imediata pós-retorno de pagamento (Stripe / Checkout)
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (status === 'success') {
+      const reconcile = async () => {
+        setIsLoadingChildren(true);
+
+        const pendingRaw = localStorage.getItem('yah_pending_sponsorship');
+        let quotas = Number(searchParams.get('quotas')) || 1;
+        let donorEmail = searchParams.get('email') || user?.email || '';
+        let donorName = searchParams.get('name') || user?.name || 'Padrinho YAH Hope';
+        let sponsorUserId = user?.id;
+
+        if (pendingRaw) {
+          try {
+            const pending = JSON.parse(pendingRaw);
+            if (pending.quotasCount) quotas = Number(pending.quotasCount);
+            if (pending.donorEmail) donorEmail = pending.donorEmail;
+            if (pending.donorName) donorName = pending.donorName;
+            if (pending.sponsorUserId) sponsorUserId = pending.sponsorUserId;
+          } catch (e) {
+            console.warn('Aviso ao ler pending sponsorship:', e);
+          }
+          localStorage.removeItem('yah_pending_sponsorship');
+        }
+
+        if (donorEmail) {
+          try {
+            const result = await sponsorshipService.assignChildrenToSponsor({
+              donorName,
+              donorEmail,
+              donorPhone: user?.phone || '',
+              quotasCount: quotas,
+              paymentMethod: 'cartao_mensal',
+              sponsorUserId
+            });
+
+            if (result.success && result.assignedChildren.length > 0) {
+              setCelebrationChildren(result.assignedChildren);
+              setShowCelebration(true);
+            }
+          } catch (err) {
+            console.error('Erro ao reconciliar apadrinhamento pós-pagamento:', err);
+          }
+        }
+
+        // Limpa a URL para evitar re-execução em F5
+        window.history.replaceState({}, '', window.location.pathname);
+        refreshChildren();
+      };
+
+      reconcile();
+    }
+  }, [searchParams, user]);
 
   const childIdToSponsorshipId = useMemo(() => {
     const map = new Map<string, string>();
@@ -579,6 +637,67 @@ export function MobileDonorChildren() {
                   Voltar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Celebração e Apresentação da Criança Designada */}
+      {showCelebration && celebrationChildren.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-[2rem] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-orange-200 relative overflow-hidden animate-scale-up">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-orange-100/60 rounded-full blur-2xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
+            
+            <div className="text-center space-y-2.5 mb-6 relative z-10">
+              <div className="w-14 h-14 bg-orange-100 text-[#F49853] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                <Heart size={28} fill="currentColor" />
+              </div>
+              <span className="text-[11px] font-gotham-bold uppercase tracking-widest text-[#F49853] block">
+                Apadrinhamento Confirmado! 🧡
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 font-heading">
+                {celebrationChildren.length === 1 
+                  ? 'Conheça o seu afilhado(a)!' 
+                  : 'Conheça suas crianças apadrinhadas!'}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 font-gotham-medium leading-relaxed">
+                Pelo nosso modelo solidário de distribuição justa, vinculamos o seu carinho para a(s) criança(s) em maior prioridade na Casa Nutri. Enviamos os detalhes completos também para seu e-mail!
+              </p>
+            </div>
+
+            <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1">
+              {celebrationChildren.map((c) => (
+                <div key={c.id} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex gap-4 items-center">
+                  <img
+                    src={c.photo_url || 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png'}
+                    alt={c.name}
+                    className="w-16 h-16 rounded-xl object-cover border-2 border-[#F49853] shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+                        {c.gender === 'F' ? 'Menina' : 'Menino'} • {c.ageText}
+                      </span>
+                    </div>
+                    <h4 className="font-heading font-black text-slate-900 text-base truncate">
+                      {c.name}
+                    </h4>
+                    <p className="text-xs text-slate-500 font-gotham-medium truncate">
+                      📍 {c.community || 'Casa Nutri - Nampula'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowCelebration(false)}
+                className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Acessar Minhas Crianças
+              </button>
             </div>
           </div>
         </div>

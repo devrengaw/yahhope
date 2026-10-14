@@ -310,8 +310,29 @@ export const sponsorshipService = {
         date: new Date().toISOString().split('T')[0]
       });
 
-      // 7. Dispara o E-mail de Boas-Vindas com o perfil detalhado da(s) criança(s)
-      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, selectedChildren, totalAmount);
+      // 7. Persiste imediatamente no cache local do padrinho para exibição instantânea
+      try {
+        const cacheKey = `yah_sponsored_children_${cleanEmail}`;
+        const existingRaw = localStorage.getItem(cacheKey);
+        let updatedList = [...selectedChildren];
+        if (existingRaw) {
+          const parsed = JSON.parse(existingRaw);
+          if (Array.isArray(parsed)) {
+            const currentIds = new Set(selectedChildren.map(c => c.id));
+            const oldFiltered = parsed.filter(c => !currentIds.has(c.id));
+            updatedList = [...oldFiltered, ...selectedChildren];
+          }
+        }
+        localStorage.setItem(cacheKey, JSON.stringify(updatedList));
+      } catch (cacheErr) {
+        console.warn('Erro ao salvar apadrinhamento no cache:', cacheErr);
+      }
+
+      // 8. Verifica se o padrinho já possui cadastro ativo na plataforma
+      const isRegistered = await this.isUserRegistered(cleanEmail);
+
+      // 9. Dispara o E-mail de Apresentação da(s) Criança(s) Apadrinhada(s)
+      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, selectedChildren, totalAmount, isRegistered);
 
       return {
         success: true,
@@ -331,85 +352,191 @@ export const sponsorshipService = {
   },
 
   /**
-   * Dispara o e-mail de boas-vindas com o perfil da criança atribuída
+   * Verifica se um e-mail já possui conta cadastrada no Supabase
+   */
+  async isUserRegistered(email: string): Promise<boolean> {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    if (!cleanEmail) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email')
+        .ilike('email', cleanEmail)
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return false;
+      return Boolean(data.id);
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * Dispara o e-mail oficial de agradecimento e apresentação da(s) criança(s) apadrinhada(s).
+   * Se já cadastrado: inclui botão direto para o Portal do Mantenedor.
+   * Se não cadastrado: inclui link de ativação/cadastro de senha no site.
    */
   async sendSponsorshipWelcomeEmail(
     email: string,
     name: string,
     children: ChildSponsorshipDetail[],
-    monthlyAmount: number
+    monthlyAmount: number,
+    isRegistered?: boolean
   ): Promise<void> {
-    const childrenHtml = children.map(c => `
-      <div style="background-color: #ffffff; border: 1px solid #f1f5f9; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="width: 120px; vertical-align: top;">
-              <img src="${c.photo_url}" alt="${c.name}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 14px; border: 2px solid #F49853;" />
-            </td>
-            <td style="vertical-align: top; padding-left: 15px;">
-              <h3 style="margin: 0 0 6px 0; color: #0f172a; font-size: 20px; font-weight: 800;">${c.name}</h3>
-              <p style="margin: 0 0 4px 0; color: #F49853; font-size: 13px; font-weight: 700; text-transform: uppercase;">
-                ${c.ageText} • ${c.community}
-              </p>
-              <p style="margin: 8px 0 0 0; color: #475569; font-size: 14px; line-height: 1.5;">
-                ${c.story}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </div>
-    `).join('');
+    const cleanEmail = email.toLowerCase().trim();
+    if (isRegistered === undefined) {
+      isRegistered = await this.isUserRegistered(cleanEmail);
+    }
+
+    const appOrigin = typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://yahhope.org';
+
+    const count = children.length;
+    const isMultiple = count > 1;
+
+    // Constrói cards de apresentação de cada criança
+    const childrenCardsHtml = children.map((c, index) => {
+      const photoSrc = c.photo_url && c.photo_url.trim().length > 0 
+        ? c.photo_url 
+        : 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png';
+
+      const genderBadge = c.gender === 'F' ? 'Menina' : 'Menino';
+
+      return `
+        <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <div style="background-color: #0f172a; padding: 12px 20px; color: #ffffff; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #F49853;">
+              ${isMultiple ? `Criança Apadrinhada #${index + 1}` : 'Seu Novo Afilhado(a)'}
+            </span>
+            <span style="font-size: 11px; background-color: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 12px; font-weight: 600;">
+              Casa Nutri • Moçambique
+            </span>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; padding: 20px;">
+            <tr>
+              <td style="width: 130px; vertical-align: top; padding: 20px 0 20px 20px;">
+                <img 
+                  src="${photoSrc}" 
+                  alt="${c.name}" 
+                  style="width: 115px; height: 115px; object-fit: cover; border-radius: 16px; border: 3px solid #F49853; display: block;" 
+                />
+              </td>
+              <td style="vertical-align: top; padding: 20px 20px 20px 16px;">
+                <div style="display: inline-block; background-color: #fff7ed; color: #ea580c; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 10px; border-radius: 20px; margin-bottom: 6px;">
+                  ${genderBadge} • ${c.ageText}
+                </div>
+                <h3 style="margin: 0 0 4px 0; color: #0f172a; font-size: 22px; font-weight: 900; letter-spacing: -0.5px;">
+                  ${c.name}
+                </h3>
+                <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px; font-weight: 600;">
+                  📍 ${c.community || 'Casa Nutri - Nampula'}
+                </p>
+                <p style="margin: 0; color: #334155; font-size: 13px; line-height: 1.55;">
+                  ${c.story || 'Acompanhada com muito amor e carinho pela equipe clínica da Casa Nutri em Moçambique, recebendo fórmula terapêutica, alimentação balanceada e exames regulares.'}
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <div style="background-color: #f8fafc; border-top: 1px solid #f1f5f9; padding: 12px 20px; font-size: 12px; color: #475569;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="color: #475569;">🍲 <strong>Nutrição Terapêutica:</strong> Alimentação balanceada diária</td>
+                <td style="text-align: right; color: #10b981; font-weight: 700;">✓ Acompanhamento Ativo</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Seção de Ação (CTA) condicionada se o usuário já é cadastrado ou não
+    let actionCtaHtml = '';
+    if (isRegistered) {
+      actionCtaHtml = `
+        <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 16px; padding: 22px; margin: 28px 0; text-align: center;">
+          <p style="margin: 0 0 6px 0; color: #065f46; font-size: 16px; font-weight: 900;">
+            ✨ Seu Acesso de Padrinho Já Está Ativo!
+          </p>
+          <p style="margin: 0 0 18px 0; color: #047857; font-size: 13px; line-height: 1.5;">
+            Identificamos que você já possui cadastro na nossa plataforma. Sua(s) criança(s) apadrinhada(s) já foram vinculadas automaticamente ao seu perfil de mantenedor!
+          </p>
+          <a href="${appOrigin}/portal/sponsorship" style="background-color: #F49853; color: #ffffff; text-decoration: none; padding: 15px 36px; border-radius: 14px; font-weight: 800; font-size: 15px; display: inline-block; box-shadow: 0 4px 14px rgba(244,152,83,0.35);">
+            Acessar Minhas Crianças no Portal →
+          </a>
+        </div>
+      `;
+    } else {
+      actionCtaHtml = `
+        <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 16px; padding: 22px; margin: 28px 0; text-align: center;">
+          <p style="margin: 0 0 6px 0; color: #9a3412; font-size: 16px; font-weight: 900;">
+            🔐 Crie sua Senha de Acesso ao Portal
+          </p>
+          <p style="margin: 0 0 18px 0; color: #c2410c; font-size: 13px; line-height: 1.5;">
+            Como este é o seu primeiro apoio, clique no botão abaixo para criar sua senha de acesso e liberar o Portal do Mantenedor. Seu e-mail (<strong>${cleanEmail}</strong>) já foi pré-aprovado!
+          </p>
+          <a href="${appOrigin}/login?tab=register&email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(name)}" style="background-color: #F49853; color: #ffffff; text-decoration: none; padding: 15px 36px; border-radius: 14px; font-weight: 800; font-size: 15px; display: inline-block; box-shadow: 0 4px 14px rgba(244,152,83,0.35);">
+            Ativar Minha Conta de Padrinho →
+          </a>
+          <p style="margin: 12px 0 0 0; color: #9a3412; font-size: 11px;">
+            Acesso exclusivo para mantenedores e padrinhos da YAH Hope.
+          </p>
+        </div>
+      `;
+    }
 
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 24px;">
-        <div style="text-align: center; padding: 24px 0;">
-          <img src="https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif" alt="YAH Hope" style="max-height: 55px; border-radius: 8px;" />
+        <div style="text-align: center; padding: 20px 0;">
+          <img src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" alt="YAH Hope" style="max-height: 48px;" />
         </div>
 
-        <div style="background-color: #ffffff; border-radius: 24px; padding: 32px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+        <div style="background-color: #ffffff; border-radius: 24px; padding: 32px 28px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
           <div style="display: inline-block; background-color: #fef3c7; color: #d97706; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 9999px; margin-bottom: 16px;">
-            Novo Vínculo de Amor
+            Aliança de Amor e Esperança 🧡
           </div>
 
-          <h1 style="color: #0f172a; font-size: 26px; font-weight: 900; margin: 0 0 12px 0; line-height: 1.2;">
+          <h1 style="color: #0f172a; font-size: 26px; font-weight: 900; margin: 0 0 12px 0; line-height: 1.25;">
             Olá, ${name}! Seja bem-vindo(a) à família YAH Hope.
           </h1>
 
-          <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
-            Seu coração generoso acaba de acender uma luz de esperança viva. Pelo nosso modelo de <strong>distribuição solidária e justa</strong>, alocamos o seu carinho para a(s) criança(s) em maior prioridade de cuidado na nossa Casa Nutri em Moçambique:
+          <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+            Agradecemos de todo coração pelo seu compromisso mensal. Pelo nosso modelo de <strong>distribuição solidária e equitativa</strong>, destinamos o seu apadrinhamento para ${isMultiple ? `as <strong>${count} crianças</strong>` : 'a criança'} com maior prioridade de suporte na nossa Casa Nutri em Moçambique:
           </p>
 
-          <div style="margin: 24px 0;">
-            ${childrenHtml}
-          </div>
+          ${childrenCardsHtml}
 
-          <div style="background-color: #fff7ed; border-left: 4px solid #F49853; padding: 16px; border-radius: 8px; margin: 24px 0;">
-            <p style="margin: 0; font-size: 13px; color: #9a3412; font-weight: 600;">
-              O que o seu apadrinhamento garante mensalmente:
+          <div style="background-color: #fff7ed; border-left: 4px solid #F49853; padding: 16px; border-radius: 12px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 13px; color: #9a3412; font-weight: 700;">
+              O que o seu apadrinhamento garante todos os meses:
             </p>
-            <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px; color: #c2410c;">
-              <li>Fórmulas terapêuticas especiais e alimentação rica em nutrientes</li>
-              <li>Consultas pediátricas, pesagens e acompanhamento de saúde contínuo</li>
-              <li>Apoio sociofamiliar na comunidade</li>
-              <li>Acesso exclusivo a relatórios e cartas no Portal do Mantenedor</li>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 12px; color: #c2410c; line-height: 1.6;">
+              <li>Fórmulas nutricionais terapêuticas e refeições enriquecidas diárias</li>
+              <li>Acompanhamento pediátrico, pesagens e exames clínicos periódicos</li>
+              <li>Apoio sociofamiliar na comunidade em Moçambique</li>
+              <li>Acesso exclusivo a fotos atualizadas, evolução de peso e relatórios no Portal</li>
             </ul>
           </div>
 
-          <div style="text-align: center; padding-top: 16px;">
-            <a href="https://yahhope.org/portal/dashboard" style="background-color: #F49853; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 14px; font-weight: 800; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(244,152,83,0.3);">
-              Acessar Portal do Padrinho →
-            </a>
-          </div>
+          ${actionCtaHtml}
         </div>
 
-        <div style="text-align: center; padding: 24px; font-size: 12px; color: #94a3b8;">
-          <p style="margin: 0 0 4px 0;">YAH Hope International • Nampula, Moçambique</p>
-          <p style="margin: 0;">Você recebeu esta mensagem porque é um padrinho ativo do nosso projeto.</p>
+        <div style="text-align: center; padding: 24px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          <p style="margin: 0 0 4px 0; font-weight: 600; color: #64748b;">YAH Hope International • Moçambique & Brasil</p>
+          <p style="margin: 0;">Você recebeu esta mensagem porque realizou um apadrinhamento solidário de amor na YAH Hope.</p>
         </div>
       </div>
     `;
 
-    // Tenta enviar via Supabase Edge Function ou Resend
+    const emailSubject = isMultiple 
+      ? `🧡 Parabéns, ${name}! Conheça as crianças que você está apadrinhando na YAH Hope`
+      : `🧡 Parabéns, ${name}! Conheça ${children[0]?.name || 'a criança'} que você está apadrinhando na YAH Hope`;
+
+    // Tenta enviar via Supabase Edge Function ou serviço de e-mail
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -421,8 +548,8 @@ export const sponsorshipService = {
             'Authorization': `Bearer ${anonKey}`
           },
           body: JSON.stringify({
-            to: email,
-            subject: `🧡 Parabéns, ${name}! Conheça a criança que você está apadrinhando na YAH Hope`,
+            to: cleanEmail,
+            subject: emailSubject,
             html: htmlBody
           })
         }).catch(e => console.warn('Aviso ao enviar via edge function:', e));
@@ -433,10 +560,14 @@ export const sponsorshipService = {
   },
 
   /**
-   * Retorna as crianças apadrinhadas pelo usuário autenticado (por ID ou E-mail)
+   * Retorna as crianças apadrinhadas pelo usuário autenticado (por ID ou E-mail),
+   * sincronizando banco de dados Supabase e cache local resiliente.
    */
   async getSponsoredChildrenForUser(userId?: string, userEmail?: string): Promise<ChildSponsorshipDetail[]> {
-    if (!userId && !userEmail) return [];
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    if (!userId && !cleanEmail) return [];
+
+    let dbChildren: ChildSponsorshipDetail[] = [];
 
     try {
       let query = supabase
@@ -444,43 +575,73 @@ export const sponsorshipService = {
         .select('*, children(*)')
         .eq('status', 'active');
 
-      if (userId && userEmail) {
-        query = query.or(`sponsor_id.eq.${userId},donor_email.ilike.${userEmail.trim()}`);
+      if (userId && cleanEmail) {
+        query = query.or(`sponsor_id.eq.${userId},donor_email.ilike.${cleanEmail}`);
       } else if (userId) {
         query = query.eq('sponsor_id', userId);
-      } else if (userEmail) {
-        query = query.ilike('donor_email', userEmail.trim());
+      } else if (cleanEmail) {
+        query = query.ilike('donor_email', cleanEmail);
       }
 
       const { data, error } = await query;
-      if (error) throw error;
-
-      if (!data || data.length === 0) return [];
-
-      return data
-        .filter(item => item.children)
-        .map(item => {
-          const c = item.children;
-          return {
-            id: c.id,
-            sponsorshipId: item.id,
-            name: c.name,
-            dob: c.dob,
-            ageText: calculateChildAge(c.dob),
-            gender: c.gender,
-            community: c.address || c.province || 'Casa Nutri',
-            photo_url: c.photo_url || '',
-            story: c.story || 'Acompanhada com amor na Casa Nutri.',
-            sponsorsCount: 1,
-            maxSponsors: 2,
-            isFull: false,
-            sponsors: []
-          };
-        });
+      if (!error && data) {
+        dbChildren = data
+          .filter(item => item.children)
+          .map(item => {
+            const c = item.children;
+            return {
+              id: c.id,
+              sponsorshipId: item.id,
+              name: c.name,
+              dob: c.dob,
+              ageText: calculateChildAge(c.dob),
+              gender: c.gender,
+              community: c.address || c.province || 'Casa Nutri',
+              photo_url: c.photo_url || '',
+              story: c.story || 'Acompanhada com amor na Casa Nutri.',
+              nutritional_status: c.status || 'Adequado',
+              sponsorsCount: 1,
+              maxSponsors: 2,
+              isFull: false,
+              sponsors: []
+            };
+          });
+      }
     } catch (err) {
-      console.error('Erro ao buscar crianças apadrinhadas do usuário:', err);
-      return [];
+      console.warn('Aviso ao consultar apadrinhamentos no Supabase:', err);
     }
+
+    // Leitura do cache local resiliente (garante que a criança nunca desapareça)
+    let cachedChildren: ChildSponsorshipDetail[] = [];
+    if (cleanEmail) {
+      try {
+        const raw = localStorage.getItem(`yah_sponsored_children_${cleanEmail}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) cachedChildren = parsed;
+        }
+      } catch (e) {
+        console.warn('Aviso ao ler cache local de crianças:', e);
+      }
+    }
+
+    // Mescla sem duplicidade priorizando o id da criança
+    const mergedMap = new Map<string, ChildSponsorshipDetail>();
+    dbChildren.forEach(c => mergedMap.set(c.id, c));
+    cachedChildren.forEach(c => {
+      if (!mergedMap.has(c.id)) {
+        mergedMap.set(c.id, c);
+      }
+    });
+
+    const result = Array.from(mergedMap.values());
+    if (cleanEmail && result.length > 0) {
+      try {
+        localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify(result));
+      } catch (e) {}
+    }
+
+    return result;
   },
 
   /**
@@ -702,6 +863,27 @@ export const sponsorshipService = {
 
         const { error } = await query;
         if (error) throw error;
+      }
+
+      // Atualiza também o cache local resiliente
+      const cleanEmail = (userEmail || '').toLowerCase().trim();
+      if (cleanEmail) {
+        try {
+          const cacheKey = `yah_sponsored_children_${cleanEmail}`;
+          const raw = localStorage.getItem(cacheKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const filtered = parsed.filter(c => 
+                (childId ? c.id !== childId : true) && 
+                (sponsorshipId ? c.sponsorshipId !== sponsorshipId : true)
+              );
+              localStorage.setItem(cacheKey, JSON.stringify(filtered));
+            }
+          }
+        } catch (cacheErr) {
+          console.warn('Aviso ao atualizar cache local após cancelamento:', cacheErr);
+        }
       }
 
       return {

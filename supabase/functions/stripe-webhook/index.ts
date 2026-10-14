@@ -53,7 +53,51 @@ serve(async (req) => {
       const donorName = session.metadata?.donorName || session.customer_details?.name || 'Anônimo'
       const donorEmail = session.customer_details?.email || ''
       const amount = session.amount_total ? session.amount_total / 100 : 0
-      
+      const isSponsorship = session.metadata?.type === 'sponsorship'
+      const quotasCount = Number(session.metadata?.quotasCount) || 1
+      const cleanEmail = (donorEmail || '').toLowerCase().trim()
+
+      if (isSponsorship && cleanEmail) {
+        try {
+          const { data: existingSp } = await supabase
+            .from('sponsorships')
+            .select('id')
+            .ilike('donor_email', cleanEmail)
+            .eq('status', 'active');
+
+          if (!existingSp || existingSp.length === 0) {
+            const { data: allChildren } = await supabase.from('children').select('id, name').order('name');
+            const { data: activeSp } = await supabase.from('sponsorships').select('child_id').eq('status', 'active');
+            
+            const spCountByChild = new Map<string, number>();
+            (activeSp || []).forEach((s: any) => {
+              if (s.child_id) {
+                spCountByChild.set(s.child_id, (spCountByChild.get(s.child_id) || 0) + 1);
+              }
+            });
+
+            const available = (allChildren || []).filter((c: any) => (spCountByChild.get(c.id) || 0) < 2);
+            available.sort((a: any, b: any) => ((spCountByChild.get(a.id) || 0) - (spCountByChild.get(b.id) || 0)));
+
+            const countToTake = Math.min(quotasCount, available.length);
+            for (let i = 0; i < countToTake; i++) {
+              await supabase.from('sponsorships').insert({
+                child_id: available[i].id,
+                donor_name: donorName,
+                donor_email: cleanEmail,
+                monthly_amount: amount / (quotasCount || 1),
+                quotas_count: 1,
+                status: 'active',
+                payment_method: 'credit_card',
+                last_sponsored_at: new Date().toISOString()
+              });
+            }
+          }
+        } catch (spErr) {
+          console.error('Error auto-assigning sponsorship in stripe webhook:', spErr);
+        }
+      }
+
       // Get the active campaign
       const { data: campaigns } = await supabase
         .from('campaigns')

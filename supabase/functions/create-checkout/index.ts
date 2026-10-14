@@ -26,7 +26,9 @@ serve(async (req) => {
       donorWhatsapp,
       successUrl, 
       cancelUrl,
-      paymentMethod 
+      paymentMethod,
+      quotasCount,
+      type
     } = await req.json()
 
     if (!amount) {
@@ -37,14 +39,15 @@ serve(async (req) => {
     }
 
     const isPix = paymentMethod === 'pix';
-    // Assinaturas automáticas recorrentes no Stripe exigem métodos de cobrança automática (cartão).
-    // Quando o doador escolhe Pix, o checkout opera em mode: 'payment' gerando o QR Code dinâmico Pix oficial do Stripe.
     const isSubscription = isMonthly && !isPix;
     const mode = isSubscription ? 'subscription' : 'payment';
+    const isSponsorship = type === 'sponsorship';
 
-    const productName = isMonthly 
-      ? (isPix ? 'Mantenedor Mensal (via Pix) - YAH Hope' : 'Doação Mensal - YAH Hope')
-      : (isPix ? 'Doação via Pix - YAH Hope' : 'Doação - YAH Hope');
+    const productName = isSponsorship
+      ? `Apadrinhamento de Criança (${quotasCount || 1} ${(quotasCount || 1) === 1 ? 'cota' : 'cotas'}) - YAH Hope`
+      : isMonthly 
+        ? (isPix ? 'Mantenedor Mensal (via Pix) - YAH Hope' : 'Doação Mensal - YAH Hope')
+        : (isPix ? 'Doação via Pix - YAH Hope' : 'Doação - YAH Hope');
 
     const priceData: any = {
       currency: 'brl',
@@ -89,7 +92,9 @@ serve(async (req) => {
         donorPhone: donorPhone || donorWhatsapp || '',
         isMonthly: isMonthly ? 'true' : 'false',
         paymentMethod: isPix ? 'pix' : (isSubscription ? 'card_subscription' : 'card'),
-        amount: amount.toString()
+        amount: amount.toString(),
+        type: type || 'donation',
+        quotasCount: (quotasCount || 1).toString()
       }
     };
 

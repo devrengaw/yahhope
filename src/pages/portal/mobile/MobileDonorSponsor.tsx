@@ -79,6 +79,28 @@ export function MobileDonorSponsor() {
   const handleConfirmSponsorship = async () => {
     setIsSubmitting(true);
 
+    const donorName = user?.name || 'Padrinho YAH Hope';
+    const donorEmail = user?.email || 'padrinho@yahhope.org';
+    const donorPhone = user?.phone || '';
+
+    // Salva intenção de apadrinhamento para reconciliação imediata no retorno do Stripe
+    try {
+      localStorage.setItem('yah_pending_sponsorship', JSON.stringify({
+        donorName,
+        donorEmail,
+        donorPhone,
+        quotasCount,
+        amountPerQuota: quotaCost,
+        totalAmount,
+        sponsorUserId: user?.id,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Erro ao gravar yah_pending_sponsorship:', e);
+    }
+
+    const successReturnUrl = `${window.location.origin}/portal/sponsorship?status=success&quotas=${quotasCount}&amount=${totalAmount}&email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`;
+
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (supabaseUrl) {
@@ -94,11 +116,12 @@ export function MobileDonorSponsor() {
             amount: totalAmount,
             isMonthly: true,
             paymentMethod: 'card',
-            donorName: user?.name || 'Padrinho YAH Hope',
-            donorEmail: user?.email || 'padrinho@yahhope.org',
-            donorPhone: user?.phone || '',
+            donorName,
+            donorEmail,
+            donorPhone,
             quotasCount,
-            successUrl: `${window.location.origin}/portal/sponsorship?status=success&amount=${totalAmount}`,
+            type: 'sponsorship',
+            successUrl: successReturnUrl,
             cancelUrl: `${window.location.origin}/portal/apadrinhar?status=cancel`
           })
         });
@@ -110,11 +133,11 @@ export function MobileDonorSponsor() {
         }
       }
 
-      // Executa a atribuição Least-Sponsored com 1-clique (usuário logado)
+      // Executa a atribuição Least-Sponsored com 1-clique (fallback ou ambiente local)
       const result = await sponsorshipService.assignChildrenToSponsor({
-        donorName: user?.name || 'Padrinho YAH Hope',
-        donorEmail: user?.email || 'padrinho@yahhope.org',
-        donorPhone: user?.phone || '',
+        donorName,
+        donorEmail,
+        donorPhone,
         quotasCount,
         amountPerQuota: quotaCost,
         paymentMethod: 'cartao_mensal',
