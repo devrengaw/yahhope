@@ -14,7 +14,7 @@ export function SponsorDashboard() {
   const [feedFilter, setFeedFilter] = useState<'all' | 'news' | 'my_children'>('all');
 
   useEffect(() => {
-    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
+    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name)
       .then(children => {
         setMyChildren(children);
         setIsLoadingChildren(false);
@@ -23,7 +23,7 @@ export function SponsorDashboard() {
         console.error('Erro ao carregar crianças apadrinhadas:', err);
         setIsLoadingChildren(false);
       });
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, user?.name]);
 
   const impactStats = [
     { label: 'Refeições Providas', value: '1,240', icon: Gift, color: 'text-amber-600', bg: 'bg-amber-100' },

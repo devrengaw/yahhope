@@ -42,13 +42,13 @@ export function MobileDonorHome() {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
   const fetchCommitments = () => {
-    sponsorshipService.getSupporterCommitments(user?.id, user?.email)
+    sponsorshipService.getSupporterCommitments(user?.id, user?.email, user?.name)
       .then(res => setMonthlyCommitments(res))
       .catch(err => console.warn('Erro ao carregar compromissos:', err));
   };
 
   useEffect(() => {
-    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
+    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name)
       .then(children => {
         setMyChildren(children);
         setIsLoadingChildren(false);
@@ -59,7 +59,7 @@ export function MobileDonorHome() {
       });
 
     fetchCommitments();
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, user?.name]);
 
   const currentCampaign = activeCampaign || defaultCamp;
 

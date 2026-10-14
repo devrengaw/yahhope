@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   TrendingUp,
   FileText,
-  Star
+  Star,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
@@ -35,23 +36,23 @@ export function MobileDonorChildren() {
   const [isCancelingChild, setIsCancelingChild] = useState(false);
   const [celebrationChildren, setCelebrationChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [isSyncingPayer, setIsSyncingPayer] = useState(false);
 
-  const refreshChildren = () => {
+  const refreshChildren = async () => {
     setIsLoadingChildren(true);
-    sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email)
-      .then(children => {
-        setMyChildren(children);
-        setIsLoadingChildren(false);
-      })
-      .catch(e => {
-        console.error(e);
-        setIsLoadingChildren(false);
-      });
+    try {
+      const children = await sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name);
+      setMyChildren(children);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingChildren(false);
+    }
   };
 
   useEffect(() => {
     refreshChildren();
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, user?.name]);
 
   // Reconciliação imediata pós-retorno de pagamento (Stripe / Checkout)
   useEffect(() => {
@@ -140,6 +141,31 @@ export function MobileDonorChildren() {
       alert(e.message || 'Erro ao cancelar apadrinhamento.');
     } finally {
       setIsCancelingChild(false);
+    }
+  };
+
+  const handleManualSyncPayer = async () => {
+    setIsSyncingPayer(true);
+    try {
+      const reconciled = await sponsorshipService.autoReconcilePaidSponsor(
+        user?.id, 
+        user?.email, 
+        user?.name, 
+        true
+      );
+
+      if (reconciled && reconciled.length > 0) {
+        setMyChildren(reconciled);
+        setCelebrationChildren(reconciled);
+        setShowCelebration(true);
+      } else {
+        alert('Identificamos seus dados de mantenedor e atualizamos a sincronização. Por favor, recarregue a página.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao sincronizar apadrinhamento.');
+    } finally {
+      setIsSyncingPayer(false);
+      refreshChildren();
     }
   };
 
@@ -340,13 +366,22 @@ export function MobileDonorChildren() {
             <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
               Com o apadrinhamento solidário, você garante acompanhamento clínico, alimentação especial e recebe fotos e relatórios de evolução exclusivos da sua criança.
             </p>
-            <div>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleManualSyncPayer}
+                disabled={isSyncingPayer}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-60"
+              >
+                <RefreshCw size={15} className={isSyncingPayer ? 'animate-spin' : ''} />
+                <span>{isSyncingPayer ? 'Localizando pagamento...' : 'Já paguei, vincular minha criança'}</span>
+              </button>
               <Link
                 to="/portal/apadrinhar"
-                className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
               >
-                <Heart size={16} fill="currentColor" />
-                <span>Apadrinhar uma Criança Agora</span>
+                <Heart size={15} fill="currentColor" />
+                <span>Novo Apadrinhamento</span>
               </Link>
             </div>
           </div>
