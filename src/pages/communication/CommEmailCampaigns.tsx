@@ -1574,6 +1574,7 @@ contato@parceiro.org"
                     <RichTextEditor
                       value={campaignBody}
                       onChange={(newVal) => setCampaignBody(newVal)}
+                      minHeight="240px"
                     />
                   </div>
 

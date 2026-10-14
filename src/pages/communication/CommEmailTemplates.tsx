@@ -441,6 +441,7 @@ export function CommEmailTemplates() {
                     <RichTextEditor 
                       value={currentTemplate.body}
                       onChange={(val) => updateTemplate(activeTab, 'body', val)}
+                      minHeight="260px"
                     />
                     
                     <div className="mt-3">

@@ -22,15 +22,19 @@ import {
   Columns,
   Rows
 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { uploadBlogImage } from '../../lib/imageUpload';
 
-interface RichTextEditorProps {
-  content: string;
+export interface RichTextEditorProps {
+  content?: string;
+  value?: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  className?: string;
+  minHeight?: string;
 }
 
-export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ content, value, onChange, placeholder, className, minHeight }: RichTextEditorProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -55,17 +59,19 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
-  const lastContent = useRef(content);
+  const resolvedContent = value !== undefined ? value : (content || '');
+  const lastContent = useRef(resolvedContent);
 
   // Sync initial content or external changes only when not focused
   useEffect(() => {
-    if (editorRef.current && content !== editorRef.current.innerHTML) {
+    const currentVal = value !== undefined ? value : (content || '');
+    if (editorRef.current && currentVal !== editorRef.current.innerHTML) {
       if (document.activeElement !== editorRef.current) {
-        editorRef.current.innerHTML = content;
-        lastContent.current = content;
+        editorRef.current.innerHTML = currentVal;
+        lastContent.current = currentVal;
       }
     }
-  }, [content]);
+  }, [content, value]);
 
   const saveSelection = () => {
     const sel = window.getSelection();
@@ -364,7 +370,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   ];
 
   return (
-    <div className="border border-slate-200 rounded-2xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500 transition-all relative">
+    <div className={cn("border border-slate-200 rounded-2xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/10 focus-within:border-indigo-500 transition-all relative", className)}>
       {/* Hidden file input for direct file choosing */}
       <input 
         type="file"
@@ -380,6 +386,23 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
       {/* Toolbar */}
       <div className="bg-slate-50 p-2 border-b border-slate-100 flex flex-wrap items-center gap-1 rounded-t-2xl relative z-30">
+        {/* Parágrafo / Título */}
+        <select
+          onChange={(e) => execCommand('formatBlock', e.target.value)}
+          className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer hover:border-slate-300 focus:outline-none"
+          defaultValue=""
+          title="Estilo de Parágrafo ou Título"
+        >
+          <option value="" disabled>Formatação</option>
+          <option value="H1">Título Grande</option>
+          <option value="H2">Título Médio</option>
+          <option value="H3">Título Pequeno</option>
+          <option value="P">Parágrafo Normal</option>
+          <option value="BLOCKQUOTE">Citação</option>
+        </select>
+
+        <div className="w-[1px] h-6 bg-slate-200 mx-1" />
+
         {/* Font Select */}
         <div className="relative group">
           <button type="button" className="flex items-center gap-2 px-3 py-1.5 hover:bg-white rounded-lg text-xs font-semibold text-slate-600 transition-all border border-transparent hover:border-slate-200">
@@ -480,6 +503,25 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-2 hover:bg-white hover:text-indigo-600 rounded-lg text-slate-500 transition-all border border-transparent hover:border-slate-200" title="Lista Numerada">
           <ListOrdered size={17} />
         </button>
+
+        {/* Link Button */}
+        <button 
+          type="button" 
+          onClick={() => {
+            saveSelection();
+            const url = prompt('Digite o endereço do link (URL):', 'https://');
+            if (url && url.trim()) {
+              restoreSelection();
+              execCommand('createLink', url.trim());
+            }
+          }} 
+          className="p-2 hover:bg-white hover:text-indigo-600 rounded-lg text-slate-500 transition-all border border-transparent hover:border-slate-200" 
+          title="Inserir Link no Texto"
+        >
+          <Link2 size={17} />
+        </button>
+
+        <div className="w-[1px] h-6 bg-slate-200 mx-1" />
 
         {/* Upload Image Button */}
         <div className="relative">
@@ -838,8 +880,11 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         onBlur={saveSelection}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
-        className="min-h-[420px] p-8 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100/90 [&_th]:p-2.5 [&_th]:font-bold [&_th]:text-slate-800 [&_td]:border [&_td]:border-slate-200 [&_td]:p-2.5 [&_td]:text-slate-700 [&_.table-container]:overflow-x-auto [&_.table-container]:my-4 [&_.table-container]:rounded-xl [&_.table-container]:border [&_.table-container]:border-slate-200"
-        style={{ fontFamily: activeFont, fontSize: activeSize }}
+        className={cn(
+          "p-4 sm:p-6 focus:outline-none prose prose-slate max-w-none prose-p:my-2 prose-img:rounded-2xl [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100/90 [&_th]:p-2.5 [&_th]:font-bold [&_th]:text-slate-800 [&_td]:border [&_td]:border-slate-200 [&_td]:p-2.5 [&_td]:text-slate-700 [&_.table-container]:overflow-x-auto [&_.table-container]:my-4 [&_.table-container]:rounded-xl [&_.table-container]:border [&_.table-container]:border-slate-200",
+          !minHeight && "min-h-[260px]"
+        )}
+        style={{ fontFamily: activeFont, fontSize: activeSize, minHeight: minHeight || undefined }}
       />
     </div>
   );
