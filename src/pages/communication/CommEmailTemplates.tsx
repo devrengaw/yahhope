@@ -19,7 +19,7 @@ interface EmailTemplate {
 }
 
 export function CommEmailTemplates() {
-  const [viewMode, setViewMode] = useState<'campaigns' | 'templates'>('campaigns');
+  const [viewMode, setViewMode] = useState<'campaigns' | 'templates'>('templates');
   const [activeTab, setActiveTab] = useState<'settings' | TemplateType>('settings');
   const [isSaved, setIsSaved] = useState(false);
 

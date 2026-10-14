@@ -47,6 +47,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
   // Modal de Criação / Edição de Campanha (Wizard Mailchimp)
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
 
   // Estados do Formulário da Campanha
@@ -253,6 +254,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
   // Abre wizard para nova campanha
   const handleOpenNewCampaign = () => {
+    setEditingCampaignId(null);
     setCampaignTitle('');
     setCampaignSubject('');
     setCampaignPreheader('');
@@ -266,6 +268,48 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
     setCtaUrl('https://yahhope.com');
     setSelectedSegments(['apoiadores']);
     setRawExternalEmails('');
+    setWizardStep(1);
+    setTestSendSuccess(false);
+    setIsWizardOpen(true);
+  };
+
+  // Editar um rascunho existente
+  const handleEditDraft = async (camp: EmailCampaign) => {
+    setEditingCampaignId(camp.id);
+    setCampaignTitle(camp.title || '');
+    setCampaignSubject(camp.subject || '');
+    setCampaignPreheader(camp.preheader || '');
+    setCampaignHeading(camp.heading || '');
+    setCampaignBody(camp.body_html || '');
+    setSenderName(camp.sender_name || 'YAH Hope');
+    setSenderEmail(camp.sender_email || 'contato@yahhope.com');
+    setReplyTo(camp.reply_to || '');
+    setHasCta(camp.has_cta ?? false);
+    setCtaText(camp.cta_text || 'Acessar');
+    setCtaUrl(camp.cta_url || 'https://yahhope.com');
+
+    if (camp.audience_type && camp.audience_type !== 'custom' && camp.audience_type !== 'mixed') {
+      setSelectedSegments([camp.audience_type]);
+    } else {
+      setSelectedSegments(['apoiadores']);
+    }
+    setRawExternalEmails('');
+
+    try {
+      const recs = await emailCampaignService.getCampaignRecipients(camp.id);
+      if (recs && recs.length > 0) {
+        setResolvedRecipients(recs.map(r => ({
+          email: r.email,
+          name: r.name || r.email,
+          recipient_type: r.recipient_type
+        })));
+      } else {
+        await resolveAudience();
+      }
+    } catch {
+      await resolveAudience();
+    }
+
     setWizardStep(1);
     setTestSendSuccess(false);
     setIsWizardOpen(true);
@@ -312,7 +356,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
     try {
       const summary = `${selectedSegments.length > 0 ? selectedSegments.join(', ') : 'Avulsos'} (${resolvedRecipients.length} destinatários)`;
-      await emailCampaignService.createCampaign({
+      const campaignPayload = {
         title: campaignTitle,
         subject: campaignSubject || 'Sem assunto',
         preheader: campaignPreheader,
@@ -326,11 +370,18 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
         has_cta: hasCta,
         cta_text: ctaText,
         cta_url: ctaUrl,
-        status: 'draft'
-      }, resolvedRecipients);
+        status: 'draft' as const
+      };
+
+      if (editingCampaignId) {
+        await emailCampaignService.updateCampaign(editingCampaignId, campaignPayload, resolvedRecipients);
+      } else {
+        await emailCampaignService.createCampaign(campaignPayload, resolvedRecipients);
+      }
 
       await loadData();
       setIsWizardOpen(false);
+      setEditingCampaignId(null);
     } catch (e: any) {
       alert('Erro ao salvar rascunho: ' + e.message);
     }
@@ -393,7 +444,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
     try {
       const summary = `${selectedSegments.length > 0 ? selectedSegments.join(', ') : 'Avulsos'} (${resolvedRecipients.length} destinatários)`;
-      const created = await emailCampaignService.createCampaign({
+      const campaignPayload = {
         title: campaignTitle || campaignSubject,
         subject: campaignSubject,
         preheader: campaignPreheader,
@@ -407,14 +458,24 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
         has_cta: hasCta,
         cta_text: ctaText,
         cta_url: ctaUrl,
-        status: 'sending'
-      }, resolvedRecipients);
+        status: 'sending' as const
+      };
+
+      let targetCampaignId = editingCampaignId;
+
+      if (targetCampaignId) {
+        await emailCampaignService.updateCampaign(targetCampaignId, campaignPayload, resolvedRecipients);
+      } else {
+        const created = await emailCampaignService.createCampaign(campaignPayload, resolvedRecipients);
+        targetCampaignId = created.id;
+      }
 
       // Dispara os envios
-      await emailCampaignService.dispatchCampaign(created.id);
+      await emailCampaignService.dispatchCampaign(targetCampaignId);
 
       await loadData();
       setIsWizardOpen(false);
+      setEditingCampaignId(null);
       alert(`Campanha disparada com sucesso para ${resolvedRecipients.length} destinatários! O rastreamento de leituras já está ativo.`);
     } catch (e: any) {
       alert('Erro durante o envio: ' + e.message);
@@ -764,9 +825,24 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-black text-slate-900">
-                      {camp.title}
-                    </h3>
+                    {camp.status === 'draft' ? (
+                      <button
+                        onClick={() => handleEditDraft(camp)}
+                        className="text-left group cursor-pointer block"
+                        title="Clique para editar este rascunho"
+                      >
+                        <h3 className="text-lg font-black text-slate-900 group-hover:text-amber-600 transition-colors flex items-center gap-2">
+                          {camp.title}
+                          <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+                            Editar
+                          </span>
+                        </h3>
+                      </button>
+                    ) : (
+                      <h3 className="text-lg font-black text-slate-900">
+                        {camp.title}
+                      </h3>
+                    )}
                     <p className="text-sm text-slate-600 flex items-center gap-1.5">
                       <span className="font-semibold text-slate-400">Assunto:</span>
                       {camp.subject}
@@ -866,18 +942,28 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                         Relatório
                       </button>
                     ) : (
-                      <button
-                        onClick={async () => {
-                          const confirmSend = window.confirm(`Deseja disparar este rascunho para ${camp.total_recipients} destinatários agora?`);
-                          if (!confirmSend) return;
-                          await emailCampaignService.dispatchCampaign(camp.id);
-                          await loadData();
-                        }}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm shadow-amber-500/20 cursor-pointer"
-                      >
-                        <Send size={14} />
-                        Disparar Agora
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditDraft(camp)}
+                          className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer hover:border-amber-300 hover:text-amber-600"
+                          title="Editar rascunho de e-mail e destinatários"
+                        >
+                          <FileText size={14} className="text-amber-500" />
+                          Editar Rascunho
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const confirmSend = window.confirm(`Deseja disparar este rascunho para ${camp.total_recipients} destinatários agora?`);
+                            if (!confirmSend) return;
+                            await emailCampaignService.dispatchCampaign(camp.id);
+                            await loadData();
+                          }}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm shadow-amber-500/20 cursor-pointer"
+                        >
+                          <Send size={14} />
+                          Disparar Agora
+                        </button>
+                      </div>
                     )}
 
                     <button
@@ -1141,10 +1227,12 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                   <Sparkles size={20} className="text-amber-500" />
-                  Criador de Campanha de E-mail
+                  {editingCampaignId ? 'Editar Rascunho da Campanha' : 'Criador de Campanha de E-mail'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Configure o público-alvo, elabore a mensagem e visualize antes de disparar.
+                  {editingCampaignId
+                    ? 'Modifique o público-alvo, assunto, conteúdo e visualize antes de salvar ou disparar.'
+                    : 'Configure o público-alvo, elabore a mensagem e visualize antes de disparar.'}
                 </p>
               </div>
 
@@ -1158,8 +1246,11 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
               </div>
 
               <button
-                onClick={() => setIsWizardOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                onClick={() => {
+                  setIsWizardOpen(false);
+                  setEditingCampaignId(null);
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -1645,9 +1736,10 @@ contato@parceiro.org"
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                Salvar como Rascunho
+                <FileText size={14} />
+                {editingCampaignId ? 'Salvar Alterações no Rascunho' : 'Salvar como Rascunho'}
               </button>
 
               <div className="flex items-center gap-3">

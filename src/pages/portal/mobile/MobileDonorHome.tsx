@@ -126,13 +126,6 @@ export function MobileDonorHome() {
     return patients.slice(0, 4);
   }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
 
-  // Crianças para sugestão de apadrinhamento (quando o mantenedor ainda não apadrinha)
-  const suggestedChildren = useMemo(() => {
-    return patients
-      .filter(p => !myChildIds.has(p.id))
-      .slice(0, 2);
-  }, [patients, myChildIds]);
-
   const publishedImpact = getPublishedItems().slice(0, 3);
   const latestPost = posts.find(p => p.status === 'published') || posts[0];
 
@@ -461,52 +454,10 @@ export function MobileDonorHome() {
                       </div>
                     </div>
 
-                    {/* Sugestões de Crianças Aguardando Apadrinhamento */}
-                    {suggestedChildren.length > 0 && (
-                      <div className="pt-2 border-t border-amber-200/60">
-                        <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 block mb-3">
-                          Crianças que aguardam por um padrinho:
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {suggestedChildren.map((child) => (
-                            <div 
-                              key={child.id}
-                              className="bg-white/95 rounded-2xl p-3.5 border border-amber-200/80 flex items-center gap-3.5 shadow-xs hover:border-orange-300 hover:shadow-md transition-all"
-                            >
-                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-100 shrink-0 border border-orange-200">
-                                {child.photo_url ? (
-                                  <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-[#F49853] font-heading font-black text-sm">
-                                    {child.name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h5 className="font-heading font-black text-slate-900 text-xs truncate">
-                                  {child.name}
-                                </h5>
-                                <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5">
-                                  {calculateAge(child.dob)} • {child.community || 'Boane'}
-                                </p>
-                                 <Link
-                                  to="/portal/apadrinhar"
-                                  className="text-[10px] font-gotham-bold text-[#F49853] hover:text-[#e0853d] mt-1.5 inline-flex items-center gap-1 group"
-                                >
-                                  <span>Apadrinhar esta criança</span>
-                                  <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
-                                </Link>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-1 flex items-center justify-end">
+                    <div className="pt-2 flex items-center justify-end">
                       <Link
                         to="/portal/apadrinhar"
-                        className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 transition-all active:scale-98"
+                        className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 transition-all active:scale-98 cursor-pointer"
                       >
                         <Heart size={14} fill="currentColor" />
                         <span>Apadrinhar uma Criança Agora</span>

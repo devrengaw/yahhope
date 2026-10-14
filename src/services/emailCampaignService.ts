@@ -314,6 +314,81 @@ export const emailCampaignService = {
     return campaign as EmailCampaign;
   },
 
+  // Atualiza uma campanha existente (especialmente rascunhos)
+  async updateCampaign(
+    campaignId: string,
+    campaignData: Partial<EmailCampaign>,
+    recipients?: Array<{ email: string; name: string; recipient_type: CampaignRecipient['recipient_type'] }>
+  ): Promise<EmailCampaign> {
+    const updatePayload: any = {
+      title: campaignData.title,
+      subject: campaignData.subject,
+      preheader: campaignData.preheader,
+      heading: campaignData.heading,
+      body_html: campaignData.body_html,
+      sender_name: campaignData.sender_name,
+      sender_email: campaignData.sender_email,
+      reply_to: campaignData.reply_to,
+      audience_type: campaignData.audience_type,
+      audience_summary: campaignData.audience_summary,
+      has_cta: campaignData.has_cta,
+      cta_text: campaignData.cta_text,
+      cta_url: campaignData.cta_url,
+      updated_at: new Date().toISOString()
+    };
+
+    if (campaignData.status) {
+      updatePayload.status = campaignData.status;
+    }
+
+    if (recipients) {
+      updatePayload.total_recipients = recipients.length;
+    }
+
+    const { data: campaign, error: campErr } = await supabase
+      .from('email_campaigns')
+      .update(updatePayload)
+      .eq('id', campaignId)
+      .select('*')
+      .single();
+
+    if (campErr || !campaign) {
+      throw new Error('Falha ao atualizar campanha: ' + (campErr?.message || 'Erro desconhecido'));
+    }
+
+    // Se novos destinatários foram informados para este rascunho, substitui os pendentes
+    if (recipients && recipients.length > 0) {
+      await supabase
+        .from('email_campaign_recipients')
+        .delete()
+        .eq('campaign_id', campaignId)
+        .eq('status', 'pending');
+
+      const recipientBatches: any[] = [];
+      const batchSize = 100;
+
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const batch = recipients.slice(i, i + batchSize).map(r => ({
+          campaign_id: campaignId,
+          email: r.email,
+          name: r.name,
+          recipient_type: r.recipient_type,
+          status: 'pending'
+        }));
+        recipientBatches.push(batch);
+      }
+
+      for (const b of recipientBatches) {
+        const { error: batchErr } = await supabase.from('email_campaign_recipients').insert(b);
+        if (batchErr) {
+          console.error('Erro ao atualizar lote de destinatários:', batchErr);
+        }
+      }
+    }
+
+    return campaign as EmailCampaign;
+  },
+
   // Enviar e-mail de teste
   async sendTestEmail(campaignId: string, testEmail: string): Promise<any> {
     try {

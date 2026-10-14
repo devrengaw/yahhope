@@ -514,7 +514,7 @@ export function MobileDonorChildren() {
                       className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2"
                     >
                       <Heart size={16} fill="currentColor" />
-                      <span>Apadrinhar Esta Criança</span>
+                      <span>Fazer Apadrinhamento Solidário</span>
                     </Link>
                     <button
                       onClick={() => setSelectedChild(null)}
