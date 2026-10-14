@@ -74,7 +74,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
             guardian_name: guardian,
             housing_type: '',
             sanitation: '',
-            photo_url: c.photo_url || ''
+            photo_url: c.photo_url || '',
+            story: c.story || ''
           };
         });
         setPatients(formattedPatients);
@@ -84,6 +85,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         const formattedEvents: ClinicalEvent[] = eventsData.map(e => ({
           id: e.id,
           patient_id: e.child_id,
+          child_id: e.child_id,
           event_type: e.event_type as any,
           date: e.date,
           notes: e.notes || '',

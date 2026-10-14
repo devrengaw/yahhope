@@ -13,6 +13,7 @@ export interface Patient {
   housing_type: string;
   sanitation: string;
   photo_url?: string;
+  story?: string;
 }
 
 export interface Prescription {
@@ -84,6 +85,7 @@ export interface InventoryTransaction {
 export interface ClinicalEvent {
   id: string;
   patient_id: string;
+  child_id?: string;
   event_type: 'initial' | 'return' | 'acs_visit' | 'referral' | 'acompanhamento' | 'observation';
   date: string;
   notes: string;
