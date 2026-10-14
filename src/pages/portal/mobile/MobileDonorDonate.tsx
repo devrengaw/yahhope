@@ -386,6 +386,12 @@ export function MobileDonorDonate() {
                       <span>Cartão de Crédito</span>
                     </button>
                   </div>
+                  {paymentMethod === 'card' && frequency === 'monthly' && (
+                    <div className="mt-2.5 p-3 bg-blue-50/70 border border-blue-200/70 rounded-xl text-[11px] text-blue-900 font-gotham-light flex items-center gap-2">
+                      <ShieldCheck size={15} className="text-blue-600 shrink-0" />
+                      <span><strong>Cobrança mensal avulsa:</strong> O valor é cobrado a cada 30 dias sem comprometer ou bloquear o limite total do seu cartão de crédito.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Botão de Ação */}

@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
-  Copy, 
-  Check, 
   Sparkles, 
   ShieldCheck, 
-  QrCode, 
   ArrowRight,
   CreditCard,
   Building2,
@@ -29,10 +26,9 @@ export function MobileDonorSponsor() {
   const [metrics, setMetrics] = useState<SponsorshipMetrics | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
 
-  // Form State
+  // Form State - Apadrinhamento é exclusivo no cartão de crédito recorrente para garantir regularidade
   const [quotasCount, setQuotasCount] = useState<number>(1);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
-  const [isCopied, setIsCopied] = useState(false);
+  const paymentMethod = 'card' as const;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assignedResult, setAssignedResult] = useState<{
     success: boolean;
@@ -80,49 +76,37 @@ export function MobileDonorSponsor() {
     },
   ];
 
-  // Pix oficial da YAH Hope
-  const pixKey = 'contato@yahhope.org';
-  const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${totalAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
-
-  const handleCopyPix = () => {
-    navigator.clipboard.writeText(pixKey);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2500);
-  };
-
   const handleConfirmSponsorship = async () => {
     setIsSubmitting(true);
 
     try {
-      if (paymentMethod === 'card') {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-        if (supabaseUrl) {
-          const baseUrl = supabaseUrl.replace(/\/$/, '');
-          const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              campaignId: currentCampaign?.id || '1',
-              amount: totalAmount,
-              isMonthly: true,
-              paymentMethod: 'card',
-              donorName: user?.name || 'Padrinho YAH Hope',
-              donorEmail: user?.email || 'padrinho@yahhope.org',
-              donorPhone: user?.phone || '',
-              quotasCount,
-              successUrl: `${window.location.origin}/portal/sponsorship?status=success&amount=${totalAmount}`,
-              cancelUrl: `${window.location.origin}/portal/apadrinhar?status=cancel`
-            })
-          });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      if (supabaseUrl) {
+        const baseUrl = supabaseUrl.replace(/\/$/, '');
+        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            campaignId: currentCampaign?.id || '1',
+            amount: totalAmount,
+            isMonthly: true,
+            paymentMethod: 'card',
+            donorName: user?.name || 'Padrinho YAH Hope',
+            donorEmail: user?.email || 'padrinho@yahhope.org',
+            donorPhone: user?.phone || '',
+            quotasCount,
+            successUrl: `${window.location.origin}/portal/sponsorship?status=success&amount=${totalAmount}`,
+            cancelUrl: `${window.location.origin}/portal/apadrinhar?status=cancel`
+          })
+        });
 
-          const data = await response.json();
-          if (data.url) {
-            window.location.href = data.url;
-            return;
-          }
+        const data = await response.json();
+        if (data.url) {
+          window.location.href = data.url;
+          return;
         }
       }
 
@@ -133,7 +117,7 @@ export function MobileDonorSponsor() {
         donorPhone: user?.phone || '',
         quotasCount,
         amountPerQuota: quotaCost,
-        paymentMethod: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal',
+        paymentMethod: 'cartao_mensal',
         sponsorUserId: user?.id
       });
 
@@ -150,7 +134,7 @@ export function MobileDonorSponsor() {
             donor_name: user?.name || 'Padrinho YAH Hope',
             donor_email: user?.email || 'padrinho@yahhope.org',
             amount: result.totalAmount,
-            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
+            payment_method: 'cartao_mensal'
           });
         }
       } else {
@@ -158,7 +142,7 @@ export function MobileDonorSponsor() {
       }
     } catch (e: any) {
       console.error(e);
-      alert('Ocorreu um erro ao registrar o apadrinhamento. Tente novamente.');
+      alert('Ocorreu um erro ao processar o apadrinhamento.');
     } finally {
       setIsSubmitting(false);
     }
@@ -315,35 +299,53 @@ export function MobileDonorSponsor() {
               </div>
 
               {/* 3. Forma de Pagamento */}
-              <div>
-                <label className="block text-xs font-gotham-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Forma de Pagamento Mensal
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('pix')}
-                    className={`p-3.5 rounded-2xl border flex items-center justify-center gap-2 font-gotham-bold text-xs transition-all cursor-pointer ${
-                      paymentMethod === 'pix'
-                        ? 'border-[#F49853] bg-orange-50 text-[#F49853] ring-2 ring-[#F49853]/20'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <QrCode size={18} />
-                    <span>PIX Instantâneo</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-3.5 rounded-2xl border flex items-center justify-center gap-2 font-gotham-bold text-xs transition-all cursor-pointer ${
-                      paymentMethod === 'card'
-                        ? 'border-[#F49853] bg-orange-50 text-[#F49853] ring-2 ring-[#F49853]/20'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <CreditCard size={18} />
-                    <span>Cartão de Crédito</span>
-                  </button>
+              {/* 3. Forma de Pagamento Exclusiva: Cartão de Crédito Mensal */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500">
+                    Forma de Cobrança Mensal
+                  </label>
+                  <span className="text-[11px] font-gotham-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                    <CreditCard size={12} /> Assinatura Recorrente Automática
+                  </span>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#F49853] flex items-center justify-center shrink-0">
+                      <CreditCard size={20} />
+                    </div>
+                    <div>
+                      <h5 className="font-heading font-black text-slate-900 text-sm">
+                        Cartão de Crédito (Cobrança Mensal Recorrente)
+                      </h5>
+                      <p className="text-[11px] text-slate-500 font-gotham-light">
+                        Cobrança automática a cada 30 dias de R$ {totalAmount.toFixed(2)}/mês
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-gotham-bold text-[#F49853] bg-white px-3 py-1 rounded-lg border border-orange-200">
+                    Ativo
+                  </span>
+                </div>
+
+                {/* Card Explicativo: Ocupa o Limite ou é Mensal? */}
+                <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-blue-900 font-gotham-bold text-xs">
+                    <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                    <span>Como funciona a cobrança? Não compromete o seu limite total!</span>
+                  </div>
+                  <ul className="text-xs text-blue-950/80 font-gotham-light space-y-2 pl-5 list-disc leading-relaxed">
+                    <li>
+                      <strong>Sem bloqueio de limite futuro:</strong> O apadrinhamento funciona como uma assinatura mensal (como Netflix ou Spotify). A cada mês é cobrado <strong>apenas o valor da cota do mês (R$ {totalAmount.toFixed(2)})</strong>, sem comprometer o limite total do seu cartão com parcelas de meses futuros.
+                    </li>
+                    <li>
+                      <strong>Regularidade que salva vidas:</strong> O tratamento de desnutrição na Casa Nutri não pode sofrer interrupções. A recorrência automática no cartão garante que a criança nunca fique sem as fórmulas especiais e acompanhamento clínico, sem que você precise se preocupar em lembrar de pagar todo mês.
+                    </li>
+                    <li>
+                      <strong>Sem fidelidade forçada:</strong> Você tem total autonomia para pausar, alterar cotas ou cancelar o apadrinhamento a qualquer momento diretamente no seu Portal do Mantenedor.
+                    </li>
+                  </ul>
                 </div>
               </div>
 
@@ -370,7 +372,7 @@ export function MobileDonorSponsor() {
 
             </div>
           ) : (
-            /* Tela de Confirmação / PIX Gerado */
+            /* Tela de Confirmação de Apadrinhamento */
             <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-xl text-center space-y-6 animate-fade-in">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
                 <CheckCircle2 size={36} />
@@ -378,7 +380,7 @@ export function MobileDonorSponsor() {
 
               <div>
                 <span className="text-xs font-gotham-bold uppercase tracking-wider text-emerald-600 block mb-1">
-                  {paymentMethod === 'pix' ? 'Apadrinhamento Confirmado • Chave PIX Gerada' : 'Apadrinhamento Concluído com Sucesso!'}
+                  Apadrinhamento Concluído com Sucesso!
                 </span>
                 <h3 className="text-3xl font-heading font-black text-slate-900">
                   R$ {assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-sm font-normal text-slate-500">/ mês</span>
@@ -386,6 +388,11 @@ export function MobileDonorSponsor() {
                 <p className="text-xs text-slate-500 mt-1 font-gotham-light">
                   {assignedResult.assignedChildren.length} {assignedResult.assignedChildren.length === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} com Amor
                 </p>
+              </div>
+
+              {/* Informação de Cobrança Recorrente */}
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl max-w-md mx-auto text-xs text-emerald-900 font-gotham-light text-left leading-relaxed">
+                <strong>Assinatura mensal ativa:</strong> A cobrança de R$ {assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ocorrerá mensalmente no seu cartão de crédito, debitando apenas a mensalidade vigente (sem comprometer o limite total do cartão).
               </div>
 
               {/* Crianças Vinculadas */}
@@ -413,44 +420,6 @@ export function MobileDonorSponsor() {
                   </div>
                 ))}
               </div>
-
-              {/* QR Code Pix */}
-              {paymentMethod === 'pix' && (
-                <>
-                  <div className="p-5 bg-slate-50 rounded-3xl border border-slate-200 inline-block mx-auto shadow-inner">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCopyPaste)}`}
-                      alt="QR Code Pix"
-                      className="w-48 h-48 mx-auto rounded-xl"
-                    />
-                  </div>
-
-                  <div className="space-y-2 text-left max-w-md mx-auto">
-                    <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block">
-                      Chave PIX Oficial da YAH Hope:
-                    </label>
-                    <div className="flex items-center gap-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-xs font-mono font-bold text-slate-800 flex-1 truncate">
-                        {pixKey}
-                      </span>
-                      <button
-                        onClick={handleCopyPix}
-                        className="px-4 py-2 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                      >
-                        {isCopied ? (
-                          <>
-                            <Check size={14} /> Copiado!
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={14} /> Copiar Chave
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
 
               {/* Botões de Ação Pós-Apadrinhamento */}
               <div className="pt-2 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">

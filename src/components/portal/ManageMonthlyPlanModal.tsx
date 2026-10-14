@@ -283,6 +283,12 @@ export function ManageMonthlyPlanModal({
                     <span>Cartão de Crédito</span>
                   </button>
                 </div>
+                {paymentMethod === 'card' && (
+                  <div className="mt-2 p-2.5 bg-blue-50/70 border border-blue-200/70 rounded-xl text-[11px] text-blue-900 font-gotham-light flex items-center gap-2">
+                    <ShieldCheck size={14} className="text-blue-600 shrink-0" />
+                    <span><strong>Não compromete seu limite:</strong> cobrança mensal avulsa, sem parcelamento e sem bloquear o limite total do cartão.</span>
+                  </div>
+                )}
               </div>
 
               {/* Botão de Ação */}
