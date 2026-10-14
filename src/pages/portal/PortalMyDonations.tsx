@@ -27,6 +27,7 @@ export function PortalMyDonations() {
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   // Auto-purga de doações indevidas geradas por bug de apadrinhamento (ex: "Compra de Moto")
   useEffect(() => {
@@ -70,25 +71,88 @@ export function PortalMyDonations() {
     });
   }, [allDonations, user]);
 
+  const getDonationMonthYear = (d: Donation) => {
+    const rawDate = d.paid_at || d.date;
+    if (!rawDate) return null;
+    const match = String(rawDate).match(/^(\d{4})-(\d{2})/);
+    if (match) {
+      return {
+        year: parseInt(match[1], 10),
+        month: parseInt(match[2], 10) - 1,
+        key: `${match[1]}-${match[2]}`
+      };
+    }
+    const dObj = new Date(rawDate);
+    if (!isNaN(dObj.getTime())) {
+      const y = dObj.getFullYear();
+      const m = dObj.getMonth();
+      return {
+        year: y,
+        month: m,
+        key: `${y}-${String(m + 1).padStart(2, '0')}`
+      };
+    }
+    return null;
+  };
+
+  // Lista dinâmica de meses disponíveis baseada no histórico do doador
+  const availableMonths = useMemo(() => {
+    const monthMap = new Map<string, { label: string; count: number; total: number }>();
+
+    myDonations.forEach(d => {
+      const info = getDonationMonthYear(d);
+      if (!info) return;
+      const dateObj = new Date(info.year, info.month, 1);
+      const rawMonthName = dateObj.toLocaleDateString('pt-BR', { month: 'long' });
+      const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
+      const label = `${monthName} / ${info.year}`;
+
+      const existing = monthMap.get(info.key) || { label, count: 0, total: 0 };
+      existing.count += 1;
+      if (d.status === 'paid') {
+        existing.total += (d.amount || 0);
+      }
+      monthMap.set(info.key, existing);
+    });
+
+    return Array.from(monthMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, data]) => ({
+        key,
+        label: data.label,
+        count: data.count,
+        total: data.total
+      }));
+  }, [myDonations]);
+
   // Statistics
   const stats = useMemo(() => {
     const paidDonations = myDonations.filter(d => d.status === 'paid');
     const totalPaid = paidDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const countAllTime = paidDonations.length;
     const pendingCount = myDonations.filter(d => d.status === 'pending').length;
 
+    // Doações pagas no mês filtrado (se houver filtro selecionado)
+    const monthDonations = selectedMonth === 'all'
+      ? paidDonations
+      : paidDonations.filter(d => getDonationMonthYear(d)?.key === selectedMonth);
+    const totalPaidMonth = monthDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const countMonth = monthDonations.length;
+
     // Social impact equivalence metrics
-    // R$ 15 provides roughly 3 fortified meals or supplements for a child in Boane/Nampula
     const mealsProvided = Math.floor(totalPaid / 5);
     const medicalKits = Math.floor(totalPaid / 60);
 
     return {
-      totalPaid,
-      count: paidDonations.length,
+      totalPaid, // Total Geral permanente
+      countAllTime,
+      totalPaidMonth,
+      countMonth,
       pendingCount,
       mealsProvided,
       medicalKits
     };
-  }, [myDonations]);
+  }, [myDonations, selectedMonth]);
 
   const getCampaignTitle = (donation: Donation) => {
     if (donation.campaign_title) return donation.campaign_title;
@@ -104,9 +168,13 @@ export function PortalMyDonations() {
       const matchStatus = statusFilter === 'all' || d.status === statusFilter;
       const title = (d.campaign_title || getCampaignTitle(d)).toLowerCase();
       const matchSearch = searchTerm === '' || title.includes(searchTerm.toLowerCase());
-      return matchStatus && matchSearch;
+      
+      const myInfo = getDonationMonthYear(d);
+      const matchMonth = selectedMonth === 'all' || (myInfo && myInfo.key === selectedMonth);
+
+      return matchStatus && matchSearch && matchMonth;
     });
-  }, [myDonations, statusFilter, searchTerm, campaigns]);
+  }, [myDonations, statusFilter, searchTerm, selectedMonth, campaigns]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -142,18 +210,30 @@ export function PortalMyDonations() {
 
       {/* Impact & Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Total Contributed */}
-        <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg shadow-amber-500/20 relative overflow-hidden">
+        {/* Total Geral Doado */}
+        <div className="bg-gradient-to-br from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg shadow-amber-500/20 relative overflow-hidden flex flex-col justify-between">
           <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-          <span className="text-[11px] font-black uppercase tracking-wider text-amber-100 flex items-center gap-1.5">
-            <DollarSign size={14} /> Total Doado
-          </span>
-          <h2 className="text-3xl font-black mt-2 tracking-tight">
-            R$ {stats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h2>
-          <p className="text-xs text-amber-100/90 mt-2 font-medium">
-            {stats.count} {stats.count === 1 ? 'doação confirmada' : 'doações confirmadas'}
-          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase tracking-wider text-amber-100 flex items-center gap-1.5">
+              <DollarSign size={14} /> Total Geral Doado
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 text-white px-2.5 py-0.5 rounded-full backdrop-blur-xs">
+              Geral
+            </span>
+          </div>
+          <div>
+            <h2 className="text-3xl font-black mt-2 tracking-tight">
+              R$ {stats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            <div className="mt-2 text-xs text-amber-100/90 font-medium flex items-center justify-between flex-wrap gap-1">
+              <span>{stats.countAllTime} {stats.countAllTime === 1 ? 'doação confirmada' : 'doações confirmadas'}</span>
+              {selectedMonth !== 'all' && (
+                <span className="bg-amber-600/70 border border-amber-400/40 px-2 py-0.5 rounded-md font-bold text-white text-[11px]">
+                  Neste mês: R$ {stats.totalPaidMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Meals Provided Impact */}
@@ -188,41 +268,62 @@ export function PortalMyDonations() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl w-full sm:w-auto">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              statusFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Todas ({myDonations.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('paid')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              statusFilter === 'paid'
-                ? 'bg-white text-emerald-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Pagas ({myDonations.filter(d => d.status === 'paid').length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('pending')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              statusFilter === 'pending'
-                ? 'bg-white text-amber-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Pendentes ({myDonations.filter(d => d.status === 'pending').length})
-          </button>
+      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status buttons */}
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Todas ({myDonations.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('paid')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'paid'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Pagas ({myDonations.filter(d => d.status === 'paid').length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'pending'
+                  ? 'bg-white text-amber-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Pendentes ({myDonations.filter(d => d.status === 'pending').length})
+            </button>
+          </div>
+
+          {/* Month Filter Selector */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-xs">
+            <Calendar size={14} className="text-amber-500 shrink-0" />
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Mês:</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent text-xs font-black text-slate-800 focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="all">Todos os Meses</option>
+              {availableMonths.map(m => (
+                <option key={m.key} value={m.key}>
+                  {m.label} ({m.count})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full md:w-64">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -233,6 +334,24 @@ export function PortalMyDonations() {
           />
         </div>
       </div>
+
+      {/* Active Month Filter Chip */}
+      {selectedMonth !== 'all' && (
+        <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/70 px-4 py-2.5 rounded-2xl text-xs text-amber-950">
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-amber-600" />
+            <span>
+              Filtrando pelo mês: <strong className="font-bold text-amber-900">{availableMonths.find(m => m.key === selectedMonth)?.label}</strong> • {filteredDonations.length} {filteredDonations.length === 1 ? 'doação encontrada' : 'doações encontradas'}
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedMonth('all')}
+            className="text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer text-xs"
+          >
+            Limpar filtro de mês
+          </button>
+        </div>
+      )}
 
       {/* Donations List */}
       <div className="space-y-3">
@@ -246,15 +365,26 @@ export function PortalMyDonations() {
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-medium">
                 {myDonations.length === 0
                   ? 'Você ainda não possui doações registradas com este e-mail. Faça sua primeira doação para apoiar os projetos da YAH Hope!'
+                  : selectedMonth !== 'all'
+                  ? `Nenhuma doação corresponde ao mês de ${availableMonths.find(m => m.key === selectedMonth)?.label || selectedMonth}.`
                   : 'Nenhuma doação corresponde aos filtros selecionados.'}
               </p>
             </div>
-            <button
-              onClick={() => openDonationModal()}
-              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-amber-500/20 transition-all"
-            >
-              <Heart size={16} /> Fazer uma Doação Agora
-            </button>
+            {selectedMonth !== 'all' ? (
+              <button
+                onClick={() => setSelectedMonth('all')}
+                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer mx-auto"
+              >
+                <Calendar size={16} /> Ver Todos os Meses
+              </button>
+            ) : (
+              <button
+                onClick={() => openDonationModal()}
+                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer mx-auto"
+              >
+                <Heart size={16} /> Fazer uma Doação Agora
+              </button>
+            )}
           </div>
         ) : (
           filteredDonations.map((donation) => {

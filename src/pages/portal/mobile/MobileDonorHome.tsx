@@ -145,6 +145,46 @@ export function MobileDonorHome() {
   const totalUserDonated = userDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const donationsCount = userDonations.length;
 
+  // Informações do mês corrente para visão geral mensal
+  const currentMonthInfo = useMemo(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    const rawMonthName = now.toLocaleDateString('pt-BR', { month: 'long' });
+    const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
+    return {
+      year: curYear,
+      month: curMonth,
+      name: monthName
+    };
+  }, []);
+
+  // Doações do usuário estritamente no mês atual
+  const userMonthlyDonations = useMemo(() => {
+    return userDonations.filter(d => {
+      const rawDate = d.paid_at || d.date;
+      if (!rawDate) return false;
+      const match = String(rawDate).match(/^(\d{4})-(\d{2})/);
+      let dYear: number;
+      let dMonth: number;
+      if (match) {
+        dYear = parseInt(match[1], 10);
+        dMonth = parseInt(match[2], 10) - 1;
+      } else {
+        const dObj = new Date(rawDate);
+        if (isNaN(dObj.getTime())) return false;
+        dYear = dObj.getFullYear();
+        dMonth = dObj.getMonth();
+      }
+      return dYear === currentMonthInfo.year && dMonth === currentMonthInfo.month;
+    });
+  }, [userDonations, currentMonthInfo]);
+
+  const totalUserMonthlyDonated = useMemo(() => {
+    return userMonthlyDonations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  }, [userMonthlyDonations]);
+  const monthlyDonationsCount = userMonthlyDonations.length;
+
   // Ordenação das doações por data mais recente
   const sortedUserDonations = useMemo(() => {
     return [...userDonations].sort((a, b) => {
@@ -388,22 +428,25 @@ export function MobileDonorHome() {
       {/* 2. Grid de Métricas Reais do Mantenedor */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
-        {/* Total Contribuído */}
+        {/* Total Contribuído no Mês */}
         <div className="group bg-white p-5 sm:p-6 rounded-[1.75rem] border border-slate-200/80 shadow-xs hover:shadow-lg hover:shadow-orange-500/5 hover:border-orange-200 transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-400 to-[#F49853] text-white flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
               <Sparkles size={20} />
             </div>
-            <span className="text-[10px] font-gotham-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100/60">
-              Impacto Direto
+            <span className="text-[10px] font-gotham-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100/60 capitalize">
+              {currentMonthInfo.name}
             </span>
           </div>
           <div>
             <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
-              {totalUserDonated > 0 ? `R$ ${totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+              {totalUserMonthlyDonated > 0 ? `R$ ${totalUserMonthlyDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              Seu Total Doado
+              Total Doado no Mês
+            </span>
+            <span className="text-[10px] text-slate-400 font-gotham-book mt-1 block">
+              Geral acumulado: R$ {totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
           </div>
         </div>
