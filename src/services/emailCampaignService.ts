@@ -247,6 +247,11 @@ export const emailCampaignService = {
     return (data || []) as CampaignRecipient[];
   },
 
+  // Alias para compatibilidade
+  async getCampaignRecipients(campaignId: string): Promise<CampaignRecipient[]> {
+    return this.fetchCampaignRecipients(campaignId);
+  },
+
   // Salva uma nova campanha e insere seus destinatários
   async createCampaign(
     campaignData: Partial<EmailCampaign>,

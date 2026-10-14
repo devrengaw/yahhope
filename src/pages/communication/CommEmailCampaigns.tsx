@@ -295,8 +295,13 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
     }
     setRawExternalEmails('');
 
+    // Abre o wizard imediatamente para resposta instantânea na interface
+    setWizardStep(1);
+    setTestSendSuccess(false);
+    setIsWizardOpen(true);
+
     try {
-      const recs = await emailCampaignService.getCampaignRecipients(camp.id);
+      const recs = await emailCampaignService.fetchCampaignRecipients(camp.id);
       if (recs && recs.length > 0) {
         setResolvedRecipients(recs.map(r => ({
           email: r.email,
@@ -304,15 +309,16 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
           recipient_type: r.recipient_type
         })));
       } else {
-        await resolveAudience();
+        await resolveAudienceList();
       }
-    } catch {
-      await resolveAudience();
+    } catch (err) {
+      console.warn('Erro ao carregar destinatários do rascunho:', err);
+      try {
+        await resolveAudienceList();
+      } catch (e) {
+        console.error('Erro ao resolver audiência padrão:', e);
+      }
     }
-
-    setWizardStep(1);
-    setTestSendSuccess(false);
-    setIsWizardOpen(true);
   };
 
   // Importar conteúdo de um template existente
@@ -1237,12 +1243,30 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
               </div>
 
               {/* Stepper */}
-              <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold">
-                <span className={cn("px-2 py-0.5 rounded-md", wizardStep === 1 ? "bg-amber-500 text-white" : "text-slate-400")}>1. Audiência</span>
+              <div className="hidden sm:flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(1)}
+                  className={cn("px-2.5 py-1 rounded-lg transition-colors cursor-pointer", wizardStep === 1 ? "bg-amber-500 text-white shadow-xs" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50")}
+                >
+                  1. Audiência
+                </button>
                 <ChevronRight size={14} className="text-slate-300" />
-                <span className={cn("px-2 py-0.5 rounded-md", wizardStep === 2 ? "bg-amber-500 text-white" : "text-slate-400")}>2. Conteúdo</span>
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(2)}
+                  className={cn("px-2.5 py-1 rounded-lg transition-colors cursor-pointer", wizardStep === 2 ? "bg-amber-500 text-white shadow-xs" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50")}
+                >
+                  2. Conteúdo
+                </button>
                 <ChevronRight size={14} className="text-slate-300" />
-                <span className={cn("px-2 py-0.5 rounded-md", wizardStep === 3 ? "bg-amber-500 text-white" : "text-slate-400")}>3. Disparo</span>
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(3)}
+                  className={cn("px-2.5 py-1 rounded-lg transition-colors cursor-pointer", wizardStep === 3 ? "bg-amber-500 text-white shadow-xs" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50")}
+                >
+                  3. Disparo
+                </button>
               </div>
 
               <button
