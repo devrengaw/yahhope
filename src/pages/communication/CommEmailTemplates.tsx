@@ -35,8 +35,8 @@ export function CommEmailTemplates() {
   const [isManualDispatching, setIsManualDispatching] = useState(false);
 
   // Global Settings State
-  const [logoUrl, setLogoUrl] = useState('https://yahhope.com/Logo+icone.png');
-  const [logoLinkUrl, setLogoLinkUrl] = useState('https://yahhope.com');
+  const [logoUrl, setLogoUrl] = useState('https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png');
+  const [logoLinkUrl, setLogoLinkUrl] = useState('https://hope.yahchurch.com');
   const [primaryColor, setPrimaryColor] = useState('#F49853');
 
   // Templates State
@@ -112,7 +112,9 @@ export function CommEmailTemplates() {
       const { data: settingsData } = await supabase.from('email_settings').select('*');
       if (settingsData && settingsData.length > 0) {
         const set = settingsData[0];
-        if (set.logo_url) setLogoUrl(set.logo_url);
+        if (set.logo_url) {
+          setLogoUrl(!set.logo_url.includes('Logo+icone.png') ? set.logo_url : 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png');
+        }
         if (set.logo_link_url) setLogoLinkUrl(set.logo_link_url);
         if (set.primary_color) setPrimaryColor(set.primary_color);
       }

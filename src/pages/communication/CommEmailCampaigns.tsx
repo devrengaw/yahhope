@@ -41,7 +41,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
   // Configurações globais de e-mail (logo e cor primária)
   const [brandSettings, setBrandSettings] = useState({
-    logoUrl: 'https://yahhope.com/Logo+icone.png',
+    logoUrl: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png',
     primaryColor: '#F49853'
   });
 
@@ -228,8 +228,11 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
       setAudienceStats(counts);
 
       if (settingsRes.data) {
+        const validLogo = (settingsRes.data.logo_url && !settingsRes.data.logo_url.includes('Logo+icone.png'))
+          ? settingsRes.data.logo_url
+          : 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png';
         setBrandSettings({
-          logoUrl: settingsRes.data.logo_url || 'https://yahhope.com/Logo+icone.png',
+          logoUrl: validLogo,
           primaryColor: settingsRes.data.primary_color || '#F49853'
         });
       }
@@ -1810,14 +1813,15 @@ contato@parceiro.org"
                       previewDevice === 'mobile' ? "w-[340px]" : "w-full max-w-[560px]"
                     )}>
                       {/* Cabeçalho */}
-                      <div 
-                        className="p-6 text-center border-b-2"
-                        style={{ borderBottomColor: brandSettings.primaryColor }}
-                      >
+                      <div className="pt-8 pb-4 px-6 text-center">
                         <img
                           src={brandSettings.logoUrl}
                           alt="YAH Hope"
                           className="h-10 mx-auto object-contain"
+                        />
+                        <div 
+                          className="h-1 w-11 mx-auto mt-4 rounded-full" 
+                          style={{ backgroundColor: brandSettings.primaryColor }} 
                         />
                       </div>
 

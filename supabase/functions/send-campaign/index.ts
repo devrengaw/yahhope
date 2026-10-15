@@ -75,13 +75,15 @@ serve(async (req) => {
     const activeCtaUrl = directCtaUrl || campaign?.cta_url || ''
 
     // 2. Carregar Configurações Globais de Marca (email_settings)
-    let logoUrl = 'https://yahhope.com/Logo+icone.png'
-    let logoLinkUrl = 'https://yahhope.com'
+    let logoUrl = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png'
+    let logoLinkUrl = 'https://hope.yahchurch.com'
     let primaryColor = '#F49853'
 
-    const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single()
+    const { data: settings } = await supabase.from('email_settings').select('*').limit(1).maybeSingle()
     if (settings) {
-      if (settings.logo_url) logoUrl = settings.logo_url
+      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png')) {
+        logoUrl = settings.logo_url
+      }
       if (settings.logo_link_url) logoLinkUrl = settings.logo_link_url
       if (settings.primary_color) primaryColor = settings.primary_color
     }
@@ -91,6 +93,62 @@ serve(async (req) => {
     const fromEmail = (activeSenderEmail && activeSenderEmail.endsWith('@yahhope.com')) ? activeSenderEmail : verifiedSenderDomain
     const fromAddress = `${activeSenderName} <${fromEmail}>`
 
+    // Normalizador de conteúdo para garantir fontes sem serifa e diagramação limpa em todos os clientes
+    const SANS_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+
+    const normalizeBodyContent = (rawHtml: string) => {
+      if (!rawHtml) return ''
+
+      let content = rawHtml
+
+      // Se o conteúdo for texto puro sem tags estruturais, converte quebras em parágrafos
+      if (!content.includes('<p>') && !content.includes('<p ') && !content.includes('<div>') && !content.includes('<table')) {
+        content = content
+          .split(/\n\s*\n/)
+          .map(para => `<p>${para.replace(/\n/g, '<br />')}</p>`)
+          .join('')
+      }
+
+      // Aplica inline font-family e estilos consistentes nas tags principais
+      content = content
+        .replace(/<p(\s+[^>]*)?>/gi, (match) => {
+          if (/style="/i.test(match)) {
+            return match.replace(/style="([^"]*)"/i, `style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155; margin: 0 0 16px 0; $1"`)
+          }
+          return `<p style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155; margin: 0 0 16px 0;">`
+        })
+        .replace(/<h1(\s+[^>]*)?>/gi, (match) => {
+          if (/style="/i.test(match)) {
+            return match.replace(/style="([^"]*)"/i, `style="font-family: ${SANS_STACK}; font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.3; margin: 24px 0 12px 0; $1"`)
+          }
+          return `<h1 style="font-family: ${SANS_STACK}; font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.3; margin: 24px 0 12px 0;">`
+        })
+        .replace(/<h2(\s+[^>]*)?>/gi, (match) => {
+          if (/style="/i.test(match)) {
+            return match.replace(/style="([^"]*)"/i, `style="font-family: ${SANS_STACK}; font-size: 18px; font-weight: 700; color: #0f172a; line-height: 1.35; margin: 20px 0 10px 0; $1"`)
+          }
+          return `<h2 style="font-family: ${SANS_STACK}; font-size: 18px; font-weight: 700; color: #0f172a; line-height: 1.35; margin: 20px 0 10px 0;">`
+        })
+        .replace(/<h3(\s+[^>]*)?>/gi, (match) => {
+          if (/style="/i.test(match)) {
+            return match.replace(/style="([^"]*)"/i, `style="font-family: ${SANS_STACK}; font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.4; margin: 16px 0 8px 0; $1"`)
+          }
+          return `<h3 style="font-family: ${SANS_STACK}; font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.4; margin: 16px 0 8px 0;">`
+        })
+        .replace(/<ul(\s+[^>]*)?>/gi, `<ul style="margin: 0 0 16px 0; padding-left: 24px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+        .replace(/<ol(\s+[^>]*)?>/gi, `<ol style="margin: 0 0 16px 0; padding-left: 24px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+        .replace(/<li(\s+[^>]*)?>/gi, `<li style="margin-bottom: 6px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+        .replace(/<blockquote(\s+[^>]*)?>/gi, `<blockquote style="margin: 18px 0; padding: 12px 18px; border-left: 4px solid ${primaryColor}; background-color: #f8fafc; font-style: italic; color: #475569; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7;">`)
+        .replace(/<a(\s+href="[^"]*")(\s+[^>]*)?>/gi, (match, href) => {
+          if (/style="/i.test(match)) {
+            return match.replace(/style="([^"]*)"/i, `style="color: ${primaryColor}; text-decoration: underline; font-weight: 600; $1"`)
+          }
+          return `<a ${href} target="_blank" style="color: ${primaryColor}; text-decoration: underline; font-weight: 600;">`
+        })
+
+      return content
+    }
+
     // Helper para gerar o HTML do e-mail com identidade visual e tracking
     const buildEmailHtml = (bodyContent: string, recipientId: string, recipientName: string, recipientEmail: string) => {
       // Personalização de tags
@@ -99,17 +157,23 @@ serve(async (req) => {
         .replace(/{{nome_doador}}/gi, recipientName || 'Amigo(a)')
         .replace(/{{email}}/gi, recipientEmail)
 
-      // CTA Tracking
+      const formattedBody = normalizeBodyContent(personalizedBody)
+
+      // CTA Tracking com botão bulletproof compatível com todos os clientes
       let ctaHtml = ''
       if (activeHasCta && activeCtaText && activeCtaUrl) {
         const campaignIdForTracking = campaign?.id || 'preview-test'
         const trackedCtaUrl = `${supabaseUrl}/functions/v1/track-campaign?t=c&cid=${campaignIdForTracking}&rid=${recipientId}&url=${encodeURIComponent(activeCtaUrl)}`
         ctaHtml = `
-          <div style="margin: 32px 0; text-align: center;">
-            <a href="${trackedCtaUrl}" target="_blank" style="display: inline-block; background-color: ${primaryColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              ${activeCtaText}
-            </a>
-          </div>
+          <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 32px auto 12px auto; text-align: center;">
+            <tr>
+              <td align="center" style="border-radius: 12px; background-color: ${primaryColor}; box-shadow: 0 4px 14px rgba(244, 152, 83, 0.35);">
+                <a href="${trackedCtaUrl}" target="_blank" style="display: inline-block; padding: 15px 34px; font-family: ${SANS_STACK}; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px; letter-spacing: 0.01em; -webkit-text-size-adjust: none;">
+                  ${activeCtaText}
+                </a>
+              </td>
+            </tr>
+          </table>
         `
       }
 
@@ -123,28 +187,98 @@ serve(async (req) => {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="X-UA-Compatible" content="IE=edge">
+          <meta name="x-apple-disable-message-reformatting">
           <title>${activeSubject}</title>
+          <!--[if mso]>
+          <style type="text/css">
+            table, td, div, p, a, h1, h2, h3, span { font-family: Arial, sans-serif !important; }
+          </style>
+          <![endif]-->
+          <style type="text/css">
+            body, table, td, p, a, li, blockquote {
+              -webkit-text-size-adjust: 100%;
+              -ms-text-size-adjust: 100%;
+              font-family: ${SANS_STACK} !important;
+            }
+            img {
+              -ms-interpolation-mode: bicubic;
+              border: 0;
+              height: auto;
+              line-height: 100%;
+              outline: none;
+              text-decoration: none;
+            }
+            table {
+              border-collapse: collapse !important;
+            }
+            body {
+              height: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              background-color: #f1f5f9;
+            }
+            a[x-apple-data-detectors] {
+              color: inherit !important;
+              text-decoration: none !important;
+              font-size: inherit !important;
+              font-family: inherit !important;
+              font-weight: inherit !important;
+              line-height: inherit !important;
+            }
+            @media only screen and (max-width: 620px) {
+              .email-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                border-left: none !important;
+                border-right: none !important;
+              }
+              .content-cell {
+                padding: 20px 20px 28px 20px !important;
+              }
+              .header-cell {
+                padding: 28px 20px 18px 20px !important;
+              }
+              .footer-cell {
+                padding: 24px 20px !important;
+              }
+            }
+          </style>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
-          ${activePreheader ? `<div style="display: none; max-height: 0px; overflow: hidden; opacity: 0;">${activePreheader}</div>` : ''}
-          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 30px 10px;">
+        <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: ${SANS_STACK}; color: #334155; -webkit-font-smoothing: antialiased;">
+          ${activePreheader ? `<div style="display: none; max-height: 0px; overflow: hidden; opacity: 0; font-size: 1px; line-height: 1px; color: #ffffff;">${activePreheader}</div>` : ''}
+          <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 36px 12px; width: 100%;">
             <tr>
               <td align="center">
-                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
-                  <!-- Header com Logo -->
+                <!--[if (gte mso 9)|(IE)]>
+                <table align="center" border="0" cellspacing="0" cellpadding="0" width="600">
+                <tr>
+                <td align="center" valign="top" width="600">
+                <![endif]-->
+                <table class="email-container" role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; margin: 0 auto;">
+                  <!-- Header com Logo Branded -->
                   <tr>
-                    <td style="padding: 28px 24px; text-align: center; border-bottom: 2px solid ${primaryColor};">
-                      <a href="${logoLinkUrl}" target="_blank">
-                        <img src="${logoUrl}" alt="YAH Hope" style="max-height: 54px; max-width: 220px; object-fit: contain;" />
+                    <td class="header-cell" align="center" style="padding: 36px 32px 20px 32px; text-align: center;">
+                      <a href="${logoLinkUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
+                        <img 
+                          src="${logoUrl}" 
+                          alt="YAH Hope" 
+                          width="160" 
+                          border="0"
+                          style="display: block; margin: 0 auto; width: 160px; max-width: 160px; height: auto; border: 0; outline: none; text-decoration: none;" 
+                        />
                       </a>
+                      <div style="height: 3px; width: 44px; background-color: ${primaryColor}; margin: 20px auto 0 auto; border-radius: 999px;"></div>
                     </td>
                   </tr>
 
-                  <!-- Título se houver -->
+                  <!-- Título de Destaque se houver -->
                   ${activeHeading ? `
                   <tr>
-                    <td style="padding: 32px 32px 10px 32px; text-align: center;">
-                      <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: ${primaryColor}; line-height: 1.3;">
+                    <td align="center" style="padding: 8px 36px 4px 36px; text-align: center;">
+                      <h1 style="margin: 0; font-family: ${SANS_STACK}; font-size: 22px; font-weight: 800; color: ${primaryColor}; line-height: 1.35; letter-spacing: -0.01em;">
                         ${activeHeading}
                       </h1>
                     </td>
@@ -152,21 +286,34 @@ serve(async (req) => {
 
                   <!-- Conteúdo Principal -->
                   <tr>
-                    <td style="padding: ${activeHeading ? '16px' : '32px'} 32px; font-size: 15px; line-height: 1.65; color: #334155;">
-                      ${personalizedBody}
+                    <td class="content-cell" style="padding: 20px 36px 36px 36px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">
+                      <div style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">
+                        ${formattedBody}
+                      </div>
                       ${ctaHtml}
                     </td>
                   </tr>
 
-                  <!-- Rodapé -->
+                  <!-- Rodapé Branded -->
                   <tr>
-                    <td style="background-color: #f1f5f9; padding: 24px 32px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-                      <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">YAH Hope - Transformando Vidas</p>
-                      <p style="margin: 0 0 8px 0;">Você está recebendo este e-mail através das comunicações oficiais da YAH Hope.</p>
-                      <p style="margin: 0;">© ${new Date().getFullYear()} YAH Hope. Todos os direitos reservados.</p>
+                    <td class="footer-cell" style="background-color: #f8fafc; padding: 28px 36px; text-align: center; border-top: 1px solid #f1f5f9; font-family: ${SANS_STACK}; font-size: 12px; line-height: 1.6; color: #64748b;">
+                      <p style="margin: 0 0 6px 0; font-family: ${SANS_STACK}; font-size: 13px; font-weight: 700; color: #334155;">
+                        YAH Hope
+                      </p>
+                      <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 12px; color: #64748b;">
+                        Você está recebendo este e-mail através das comunicações oficiais da YAH Hope.
+                      </p>
+                      <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
+                        © ${new Date().getFullYear()} Associação YAH Hope. Todos os direitos reservados.
+                      </p>
                     </td>
                   </tr>
                 </table>
+                <!--[if (gte mso 9)|(IE)]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
               </td>
             </tr>
           </table>
