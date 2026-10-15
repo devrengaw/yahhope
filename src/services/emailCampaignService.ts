@@ -423,7 +423,14 @@ export const emailCampaignService = {
         return data;
       }
       if (error) {
-        lastError = error;
+        let detail = error.message;
+        if ((error as any).context && typeof (error as any).context.json === 'function') {
+          try {
+            const errJson = await (error as any).context.json();
+            if (errJson?.error) detail = errJson.error;
+          } catch (_) {}
+        }
+        lastError = new Error(detail);
       }
     } catch (invokeErr: any) {
       lastError = invokeErr;
@@ -439,6 +446,7 @@ export const emailCampaignService = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': anonKey,
             'Authorization': `Bearer ${anonKey}`
           },
           body: JSON.stringify(payload)
