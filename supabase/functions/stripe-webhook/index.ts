@@ -381,7 +381,8 @@ serve(async (req) => {
       }
 
       const donorName = customer?.name || session.metadata?.donorName || session.customer_details?.name || 'Apoiador YAH Hope'
-      const donorEmail = customer?.email || session.customer_details?.email || session.metadata?.donorEmail || ''
+      const rawDonorEmail = customer?.email || session.customer_details?.email || session.metadata?.donorEmail || ''
+      const donorEmail = rawDonorEmail.toLowerCase().trim()
       const donorPhone = customer?.phone || session.customer_details?.phone || session.metadata?.donorPhone || null
       const amount = session.amount_total ? session.amount_total / 100 : 0
       const isSponsorship = session.metadata?.type === 'sponsorship' || session.mode === 'subscription'
@@ -391,7 +392,7 @@ serve(async (req) => {
       const paymentMethod = isPix ? 'pix' : 'credit_card'
 
       // Atualiza o perfil do mantenedor e apadrinhamento
-      await syncMaintainerProfile({
+      const syncResult = await syncMaintainerProfile({
         email: donorEmail,
         name: donorName,
         phone: donorPhone,
@@ -403,29 +404,35 @@ serve(async (req) => {
         subscriptionId: session.subscription as string,
         customerId: session.customer as string
       })
+      const resolvedUserId = syncResult?.userId || null
 
-      // Se for doação avulsa, grava em 'donations' e 'campaigns'
-      if (!isSponsorship && !isMonthly && amount > 0) {
-        const { data: campaigns } = await supabase
-          .from('campaigns')
-          .select('id, current_amount')
-          .order('priority', { ascending: true })
-          .limit(1)
+      // Busca a campanha para associar à doação
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id, current_amount')
+        .order('priority', { ascending: true })
+        .limit(1)
 
-        const campaignId = campaigns?.[0]?.id
+      const campaignId = campaigns?.[0]?.id
 
-        if (campaignId) {
-          await supabase.from('donations').insert({
-            campaign_id: campaignId,
-            donor_name: donorName,
-            donor_email: donorEmail,
-            donor_phone: donorPhone,
-            amount: amount,
-            status: 'paid',
-            payment_method: paymentMethod,
-            paid_at: new Date().toISOString()
-          })
+      // Registra a doação na tabela 'donations' para somatória completa do apoiador
+      if (amount > 0) {
+        await supabase.from('donations').insert({
+          campaign_id: campaignId || null,
+          donor_name: donorName,
+          donor_email: donorEmail,
+          donor_phone: donorPhone,
+          amount: amount,
+          status: 'paid',
+          payment_method: paymentMethod,
+          paid_at: new Date().toISOString(),
+          user_id: resolvedUserId,
+          is_sponsorship: isSponsorship || isMonthly,
+          stripe_payment_id: session.payment_intent || session.id,
+          stripe_subscription_id: session.subscription || null
+        })
 
+        if (!isSponsorship && !isMonthly && campaignId) {
           const newTotal = Number(campaigns[0].current_amount || 0) + amount
           await supabase.from('campaigns').update({
             current_amount: newTotal,
@@ -464,12 +471,13 @@ serve(async (req) => {
         } catch {}
       }
 
-      const email = customer?.email || invoice.customer_email || ''
+      const rawEmail = customer?.email || invoice.customer_email || ''
+      const email = rawEmail.toLowerCase().trim()
       const name = customer?.name || invoice.customer_name || 'Mantenedor YAH Hope'
       const phone = customer?.phone || null
 
       if (email && amount > 0) {
-        await syncMaintainerProfile({
+        const syncResult = await syncMaintainerProfile({
           email,
           name,
           phone,
@@ -480,6 +488,31 @@ serve(async (req) => {
           customerId: invoice.customer as string,
           lastSponsoredAt: new Date().toISOString()
         })
+        const resolvedUserId = syncResult?.userId || null
+
+        // Evita duplicar se for o primeiro pagamento do checkout que acabou de criar o invoice
+        const paymentIdentifier = invoice.payment_intent || invoice.id
+        const { data: existingDonation } = await supabase
+          .from('donations')
+          .select('id')
+          .eq('stripe_payment_id', paymentIdentifier)
+          .maybeSingle()
+
+        if (!existingDonation) {
+          await supabase.from('donations').insert({
+            donor_name: name,
+            donor_email: email,
+            donor_phone: phone,
+            amount: amount,
+            status: 'paid',
+            payment_method: 'credit_card',
+            paid_at: new Date().toISOString(),
+            user_id: resolvedUserId,
+            is_sponsorship: true,
+            stripe_payment_id: paymentIdentifier,
+            stripe_subscription_id: invoice.subscription as string
+          })
+        }
 
         await supabase.from('finance_transactions').insert({
           description: `Recorrência Mensal Stripe - ${name}`,

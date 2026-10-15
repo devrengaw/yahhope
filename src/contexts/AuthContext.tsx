@@ -127,6 +127,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // 2.1 Vincula retroativamente doações e apadrinhamentos feitos deslogado com o mesmo e-mail
+      if (finalUser?.email && finalUser?.id) {
+        const cleanUserEmail = finalUser.email.toLowerCase().trim();
+        Promise.all([
+          supabase
+            .from('donations')
+            .update({ user_id: finalUser.id })
+            .ilike('donor_email', cleanUserEmail)
+            .is('user_id', null),
+          supabase
+            .from('sponsorships')
+            .update({ sponsor_id: finalUser.id })
+            .ilike('donor_email', cleanUserEmail)
+            .is('sponsor_id', null)
+        ]).catch(linkErr => console.warn('Aviso ao sincronizar doações do apoiador:', linkErr));
+      }
+
       // 3. Build the User object for context (with fallback to auth metadata if table columns aren't populated yet)
       const roleStr = (finalUser.role || 'SPONSOR').toUpperCase() as Role;
       const avatarImg = finalUser.avatar_url || finalUser.avatar || authUser.user_metadata?.avatar_url;

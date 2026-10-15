@@ -43,7 +43,20 @@ serve(async (req) => {
     }
 
     const donorName = payload.customer?.name || payload.metadata?.donor_name || payload.transaction?.customer_name || 'Doador InfinitePay'
-    const donorEmail = payload.customer?.email || payload.metadata?.donor_email || payload.transaction?.customer_email || ''
+    const rawDonorEmail = payload.customer?.email || payload.metadata?.donor_email || payload.transaction?.customer_email || ''
+    const donorEmail = rawDonorEmail.toLowerCase().trim()
+    const donorPhone = payload.customer?.phone || payload.metadata?.donor_phone || null
+
+    // Busca usuário existente pelo e-mail para vincular a doação automaticamente
+    let resolvedUserId: string | null = null
+    if (donorEmail) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .ilike('email', donorEmail)
+        .maybeSingle()
+      resolvedUserId = existingUser?.id || null
+    }
 
     // Pega a campanha ativa para onde o dinheiro deve ir
     const { data: campaigns } = await supabase
@@ -60,15 +73,17 @@ serve(async (req) => {
         current_amount: Number(activeCampaign.current_amount) + amount
       }).eq('id', activeCampaign.id)
 
-      // 2. Registra na tabela de doações
+      // 2. Registra na tabela de doações vinculando ao usuário identificado por e-mail
       await supabase.from('donations').insert({
         campaign_id: activeCampaign.id,
         donor_name: donorName,
         donor_email: donorEmail,
+        donor_phone: donorPhone,
         amount: amount,
         status: 'paid',
         payment_method: 'infinitepay',
-        paid_at: new Date().toISOString()
+        paid_at: new Date().toISOString(),
+        user_id: resolvedUserId
       })
 
       // 3. Registra no Painel Financeiro Geral
