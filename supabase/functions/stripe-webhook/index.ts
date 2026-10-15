@@ -444,8 +444,12 @@ serve(async (req) => {
         }
       }
 
-      // Envia e-mail de agradecimento se configurado
-      await sendThankYouEmail(donorEmail, donorName)
+      // Envia e-mail de agradecimento da primeira doação com botão de finalização de cadastro
+      await sendThankYouEmail(donorEmail, donorName, {
+        isSponsorship,
+        isMonthly,
+        amount
+      })
     }
 
     // 2. EVENTO: INVOICE PAYMENT SUCCEEDED (Recorrência Mensal Confirmada)
@@ -530,52 +534,170 @@ serve(async (req) => {
   }
 })
 
-async function sendThankYouEmail(donorEmail: string, donorName: string) {
+async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: { isSponsorship?: boolean; isMonthly?: boolean; amount?: number }) {
   if (!donorEmail) return
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   if (!resendApiKey) return
 
   try {
-    let subject = 'Obrigado pelo seu apoio! 🧡'
-    let body = `Olá {{nome_doador}},\n\nNós da YAH Hope queremos agradecer de todo o coração pelo seu apoio.\nSua contribuição transforma vidas e garante nutrição e dignidade para as nossas crianças.\n\nCom gratidão,\nEquipe YAH Hope`
-
-    let logoUrl = 'https://yahhope.com/Logo+icone.png'
-    let logoLinkUrl = 'https://yahhope.com'
+    let logoUrl = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png'
+    let logoLinkUrl = 'https://hope.yahchurch.com'
     let primaryColor = '#F49853'
     
-    const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single()
+    const { data: settings } = await supabase.from('email_settings').select('*').limit(1).maybeSingle()
     if (settings) {
-      if (settings.logo_url) logoUrl = settings.logo_url
+      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png')) logoUrl = settings.logo_url
       if (settings.logo_link_url) logoLinkUrl = settings.logo_link_url
       if (settings.primary_color) primaryColor = settings.primary_color
     }
 
+    // Busca template donation_thank_you
     const { data: templateData } = await supabase
       .from('email_templates')
-      .select('subject, body')
+      .select('*')
       .eq('name', 'donation_thank_you')
-      .single()
+      .maybeSingle()
 
-    if (templateData) {
-      subject = templateData.subject
-      body = templateData.body
+    // Trava de segurança: Se o template estiver explicitamente desativado, não envia
+    if (templateData && templateData.is_active === false) {
+      console.log('Disparo de agradecimento ignorado: template donation_thank_you está desativado.')
+      return
     }
 
-    const finalBody = body.replace(/{{nome_doador}}/g, donorName)
+    let subject = templateData?.subject || 'Obrigado pelo seu apoio! 🧡 Finalize seu cadastro'
+    let preheader = templateData?.preheader || 'Crie sua senha de acesso para acompanhar o impacto da sua doação no portal.'
+    let heading = templateData?.heading || 'Obrigado por transformar vidas!'
+    let body = templateData?.body || `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua contribuição! Seja através de uma doação pontual, apoio mensal recorrente ou apadrinhamento, o seu gesto garante nutrição, educação e dignidade para as nossas crianças.</p><p><br></p><p>Para acompanhar os relatórios de impacto, ver fotos das nossas crianças e acessar sua área exclusiva, finalize o seu cadastro no portal criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+    let hasCta = templateData?.has_cta ?? true
+    let ctaText = templateData?.cta_text || 'Finalizar Meu Cadastro'
+    let ctaUrl = templateData?.cta_url || 'https://yahhope.com/finalizar-cadastro'
+
+    // Personaliza corpo do texto
+    let personalizedBody = body
+      .replace(/{{nome_doador}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{nome}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{email}}/gi, donorEmail)
+
+    const SANS_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+
+    // Normaliza tags HTML
+    if (!personalizedBody.includes('<p>') && !personalizedBody.includes('<p ') && !personalizedBody.includes('<div>')) {
+      personalizedBody = personalizedBody
+        .split(/\n\s*\n/)
+        .map(para => `<p style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155; margin: 0 0 16px 0;">${para.replace(/\n/g, '<br />')}</p>`)
+        .join('')
+    } else {
+      personalizedBody = personalizedBody
+        .replace(/<p(\s+[^>]*)?>/gi, `<p style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155; margin: 0 0 16px 0;">`)
+        .replace(/<h1(\s+[^>]*)?>/gi, `<h1 style="font-family: ${SANS_STACK}; font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.3; margin: 24px 0 12px 0;">`)
+        .replace(/<h2(\s+[^>]*)?>/gi, `<h2 style="font-family: ${SANS_STACK}; font-size: 18px; font-weight: 700; color: #0f172a; line-height: 1.35; margin: 20px 0 10px 0;">`)
+        .replace(/<h3(\s+[^>]*)?>/gi, `<h3 style="font-family: ${SANS_STACK}; font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.4; margin: 16px 0 8px 0;">`)
+        .replace(/<ul(\s+[^>]*)?>/gi, `<ul style="margin: 0 0 16px 0; padding-left: 24px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+        .replace(/<ol(\s+[^>]*)?>/gi, `<ol style="margin: 0 0 16px 0; padding-left: 24px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+        .replace(/<li(\s+[^>]*)?>/gi, `<li style="margin-bottom: 6px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
+    }
+
+    // Botão de Finalização de Cadastro (CTA)
+    let ctaHtml = ''
+    if (hasCta && ctaText && ctaUrl) {
+      // Concatena parâmetros de e-mail e nome para preencher automaticamente na tela de finalização
+      const sep = ctaUrl.includes('?') ? '&' : '?'
+      const targetCtaUrl = (ctaUrl.includes('cadastro') || ctaUrl.includes('finalizar') || ctaUrl.includes('portal') || ctaUrl.includes('set-password'))
+        ? `${ctaUrl}${sep}email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`
+        : ctaUrl
+
+      ctaHtml = `
+        <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 32px auto 12px auto; text-align: center;">
+          <tr>
+            <td align="center" style="border-radius: 12px; background-color: ${primaryColor}; box-shadow: 0 4px 14px rgba(244, 152, 83, 0.35);">
+              <a href="${targetCtaUrl}" target="_blank" style="display: inline-block; padding: 15px 34px; font-family: ${SANS_STACK}; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px; letter-spacing: 0.01em; -webkit-text-size-adjust: none;">
+                ${ctaText}
+              </a>
+            </td>
+          </tr>
+        </table>
+      `
+    }
+
     const htmlBody = `
-      <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; color: #333;">
-        <div style="text-align: center; padding: 20px; border-bottom: 2px solid ${primaryColor};">
-          <a href="${logoLinkUrl}" target="_blank" style="text-decoration: none;">
-            <img src="${logoUrl}" alt="YAH Hope Logo" style="max-height: 60px; border: none;" />
-          </a>
-        </div>
-        <div style="padding: 30px 20px; line-height: 1.6; white-space: pre-wrap;">
-          ${finalBody}
-        </div>
-        <div style="text-align: center; padding: 20px; font-size: 12px; color: #888; background-color: #f9f9f9;">
-          Obrigado por apoiar a YAH Hope!
-        </div>
-      </div>
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>${subject}</title>
+        <style type="text/css">
+          body, table, td, p, a, li {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            font-family: ${SANS_STACK} !important;
+          }
+          body { margin: 0; padding: 0; background-color: #f1f5f9; }
+        </style>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: ${SANS_STACK}; color: #334155; -webkit-font-smoothing: antialiased;">
+        ${preheader ? `<div style="display: none; max-height: 0px; overflow: hidden; opacity: 0; font-size: 1px; line-height: 1px; color: #ffffff;">${preheader}</div>` : ''}
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 36px 12px; width: 100%;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; margin: 0 auto;">
+                <!-- Header com Logo Branded -->
+                <tr>
+                  <td align="center" style="padding: 36px 32px 20px 32px; text-align: center;">
+                    <a href="${logoLinkUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
+                      <img 
+                        src="${logoUrl}" 
+                        alt="YAH Hope" 
+                        width="160" 
+                        border="0"
+                        style="display: block; margin: 0 auto; width: 160px; max-width: 160px; height: auto; border: 0; outline: none; text-decoration: none;" 
+                      />
+                    </a>
+                    <div style="height: 3px; width: 44px; background-color: ${primaryColor}; margin: 20px auto 0 auto; border-radius: 999px;"></div>
+                  </td>
+                </tr>
+
+                <!-- Título se houver -->
+                ${heading ? `
+                <tr>
+                  <td align="center" style="padding: 8px 36px 4px 36px; text-align: center;">
+                    <h1 style="margin: 0; font-family: ${SANS_STACK}; font-size: 22px; font-weight: 800; color: ${primaryColor}; line-height: 1.35;">
+                      ${heading}
+                    </h1>
+                  </td>
+                </tr>` : ''}
+
+                <!-- Conteúdo Principal -->
+                <tr>
+                  <td style="padding: 20px 36px 36px 36px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">
+                    <div style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">
+                      ${personalizedBody}
+                    </div>
+                    ${ctaHtml}
+                  </td>
+                </tr>
+
+                <!-- Rodapé Branded -->
+                <tr>
+                  <td style="background-color: #f8fafc; padding: 28px 36px; text-align: center; border-top: 1px solid #f1f5f9; font-family: ${SANS_STACK}; font-size: 12px; line-height: 1.6; color: #64748b;">
+                    <p style="margin: 0 0 6px 0; font-family: ${SANS_STACK}; font-size: 13px; font-weight: 700; color: #334155;">
+                      YAH Hope
+                    </p>
+                    <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 12px; color: #64748b;">
+                      Você está recebendo este e-mail por apoiar os projetos oficiais da Associação YAH Hope.
+                    </p>
+                    <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
+                      © ${new Date().getFullYear()} Associação YAH Hope. Todos os direitos reservados.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `
 
     await fetch('https://api.resend.com/emails', {
@@ -589,9 +711,11 @@ async function sendThankYouEmail(donorEmail: string, donorName: string) {
         to: donorEmail,
         subject: subject,
         html: htmlBody,
-        text: finalBody
+        reply_to: 'contato@yahhope.com'
       })
     })
+
+    console.log(`E-mail de agradecimento e finalização de cadastro enviado com sucesso para ${donorEmail}`)
   } catch (emailErr) {
     console.warn('Erro ao disparar e-mail de agradecimento:', emailErr)
   }

@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { KeyRound, Lock, ArrowRight, User, Mail, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function SponsorSetup() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const [name, setName] = useState(searchParams.get('nome') || searchParams.get('name') || '');
+  const [email, setEmail] = useState(searchParams.get('email') || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  
+
+  useEffect(() => {
+    const urlEmail = searchParams.get('email');
+    const urlName = searchParams.get('nome') || searchParams.get('name');
+    if (urlEmail && !email) setEmail(urlEmail);
+    if (urlName && !name) setName(urlName);
+  }, [searchParams]);
+
   // Custom theme colors for this page to look modern and elegant (using orange for sponsors)
   const themeColor = 'orange';
 
@@ -91,7 +99,7 @@ export function SponsorSetup() {
             Finalize seu Cadastro
           </h2>
           <p className="mt-3 text-sm text-slate-500 font-medium px-2 leading-relaxed">
-            Obrigado por apoiar nosso projeto! Crie sua senha de acesso ao Portal do Apadrinhamento.
+            Obrigado por apoiar a YAH Hope! Crie sua senha para acompanhar o impacto da sua doação e acessar o portal.
           </p>
 
           <form className="mt-8 space-y-5 w-full text-left" onSubmit={handleSubmit}>
@@ -173,11 +181,20 @@ export function SponsorSetup() {
               <button
                 type="submit"
                 disabled={isLoading || !password || !confirmPassword || !name || !email}
-                className={`group relative w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-600 hover:bg-${themeColor}-700 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70`}
+                className={`group relative w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-600 hover:bg-${themeColor}-700 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70 cursor-pointer`}
               >
                 {isLoading ? 'Aguarde...' : 'Criar meu Acesso'}
                 {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
               </button>
+            </div>
+
+            <div className="pt-4 text-center">
+              <p className="text-xs text-slate-500 font-medium">
+                Já possui uma conta ou senha cadastrada?{' '}
+                <Link to="/login" className="text-orange-600 hover:text-orange-700 font-bold hover:underline">
+                  Fazer Login
+                </Link>
+              </p>
             </div>
           </form>
         </div>

@@ -239,6 +239,7 @@ export default function App() {
                                           <Route path="/login" element={<Login />} />
                                           <Route path="/admin/login" element={<Navigate to="/login?mode=admin" replace />} />
                                           <Route path="/set-password" element={<SetPassword />} />
+                                          <Route path="/finalizar-cadastro" element={<SponsorSetup />} />
                                           <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
                                           <Route path="/apoiador" element={<SupporterLanding />} />
                                           <Route path="/mantenedor" element={<MonthlyDonor />} />
