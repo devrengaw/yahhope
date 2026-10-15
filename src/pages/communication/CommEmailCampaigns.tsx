@@ -78,6 +78,7 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   const [testEmailAddress, setTestEmailAddress] = useState(user?.email || '');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testSendSuccess, setTestSendSuccess] = useState(false);
+  const [testSendError, setTestSendError] = useState<string | null>(null);
   const [isDispatching, setIsDispatching] = useState(false);
   const [dispatchProgress, setDispatchProgress] = useState<{ current: number; total: number } | null>(null);
 
@@ -407,28 +408,49 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
     setIsSendingTest(true);
     setTestSendSuccess(false);
+    setTestSendError(null);
 
     try {
-      // Cria temporariamente ou pega o template
-      const tempCamp = await emailCampaignService.createCampaign({
-        title: `[TESTE] ${campaignTitle || 'Campanha de Teste'}`,
-        subject: campaignSubject || 'E-mail de Teste YAH Hope',
+      const draftPayload = {
+        title: campaignTitle || 'Campanha de E-mail',
+        subject: campaignSubject || 'E-mail YAH Hope',
         preheader: campaignPreheader,
         heading: campaignHeading,
         body_html: campaignBody,
         sender_name: senderName,
         sender_email: senderEmail,
+        reply_to: replyTo,
         has_cta: hasCta,
         cta_text: ctaText,
         cta_url: ctaUrl,
-        status: 'draft'
-      }, [{ email: testEmailAddress, name: 'Usuário Teste', recipient_type: 'external' }]);
+        status: 'draft' as const
+      };
 
-      await emailCampaignService.sendTestEmail(tempCamp.id, testEmailAddress);
+      let targetCampId = editingCampaignId;
+
+      // Se já estivermos editando um rascunho existente, salvamos as alterações nele para o teste refletir exatamente o que está na tela
+      if (editingCampaignId) {
+        await emailCampaignService.updateCampaign(editingCampaignId, draftPayload);
+      } else {
+        // Se for um novo rascunho criado no assistente, cria o registro inicial
+        const newCamp = await emailCampaignService.createCampaign(
+          draftPayload,
+          resolvedRecipients.length > 0 
+            ? resolvedRecipients 
+            : [{ email: testEmailAddress, name: 'Usuário Teste', recipient_type: 'external' }]
+        );
+        targetCampId = newCamp.id;
+        setEditingCampaignId(newCamp.id);
+      }
+
+      await emailCampaignService.sendTestEmail(targetCampId!, testEmailAddress, draftPayload);
       setTestSendSuccess(true);
-      setTimeout(() => setTestSendSuccess(false), 5000);
+      setTimeout(() => setTestSendSuccess(false), 8000);
     } catch (e: any) {
-      alert('Erro ao disparar teste: ' + e.message);
+      console.error('Erro ao disparar teste:', e);
+      const msg = e.message || 'Falha ao disparar e-mail de teste.';
+      setTestSendError(msg);
+      alert('Aviso no envio de teste:\n\n' + msg);
     } finally {
       setIsSendingTest(false);
     }
@@ -1759,9 +1781,25 @@ contato@parceiro.org"
                   </div>
 
                   {testSendSuccess && (
-                    <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs flex items-center gap-2 font-medium">
-                      <CheckCircle2 size={16} className="text-emerald-600" />
-                      E-mail de teste enviado para <strong>{testEmailAddress}</strong>! Verifique sua caixa de entrada.
+                    <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs flex items-center gap-2 font-medium animate-in fade-in">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>E-mail de teste enviado com sucesso para <strong>{testEmailAddress}</strong>! Verifique sua caixa de entrada.</span>
+                    </div>
+                  )}
+
+                  {testSendError && (
+                    <div className="p-3.5 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs flex items-center justify-between gap-2 font-medium animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                        <span><strong>Falha ao enviar e-mail de teste:</strong> {testSendError}</span>
+                      </div>
+                      <button 
+                        onClick={() => setTestSendError(null)} 
+                        className="text-rose-500 hover:text-rose-800 text-xs font-bold px-2 py-0.5 rounded cursor-pointer"
+                        title="Fechar aviso"
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
 

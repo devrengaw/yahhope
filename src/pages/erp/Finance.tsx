@@ -37,7 +37,8 @@ export function Finance() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        }
+        },
+        body: JSON.stringify({ manual_force: true })
       });
       
       if (!response.ok) throw new Error('Falha ao enviar os e-mails');

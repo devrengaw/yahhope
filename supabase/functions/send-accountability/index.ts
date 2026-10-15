@@ -30,14 +30,34 @@ serve(async (req) => {
       if (settings.primary_color) primaryColor = settings.primary_color;
     }
 
+    // Parse request body for possible manual trigger flags or single dispatch
+    let reqBody: any = {};
+    try {
+      reqBody = await req.json();
+    } catch (_) {
+      // Empty body is ok
+    }
+
     // Fetch Accountability Template
     let subject = 'Prestação de Contas: Veja o impacto da sua doação!';
     let body = `Olá {{nome_doador}},\n\nÉ com muita alegria que compartilhamos os resultados alcançados neste mês graças ao seu apoio contínuo.\n\nAcesse o portal do apoiador para conferir o relatório completo de impacto.\n\nObrigado por fazer a diferença!\nEquipe YAH Hope`;
 
     const { data: template } = await supabase.from('email_templates').select('*').eq('name', 'accountability').single();
     if (template) {
-      subject = template.subject;
-      body = template.body;
+      // TRAVA DE SEGURANÇA: Se o template estiver desligado e não for um disparo manual explícito, aborta imediatamente
+      if (template.is_active === false && !reqBody.manual_force) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          skipped: true, 
+          message: "O envio automático de prestação de contas está desativado nas configurações do template." 
+        }), { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 200 
+        });
+      }
+
+      subject = template.subject || subject;
+      body = template.body || body;
     }
 
     // Fetch distinct donor emails
@@ -94,6 +114,11 @@ serve(async (req) => {
     // We can use Promise.all to send them in parallel, 
     // or batch API if Resend batch is preferred, but loop fetch works for < 100 requests easily.
     await Promise.all(emailPromises);
+
+    // Registra a data do envio realizado no template
+    await supabase.from('email_templates').update({
+      last_sent_at: new Date().toISOString()
+    }).eq('name', 'accountability');
 
     return new Response(JSON.stringify({ success: true, count: uniqueDonors.size }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

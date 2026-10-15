@@ -395,18 +395,73 @@ export const emailCampaignService = {
   },
 
   // Enviar e-mail de teste
-  async sendTestEmail(campaignId: string, testEmail: string): Promise<any> {
+  async sendTestEmail(campaignId: string, testEmail: string, directPayload?: Partial<EmailCampaign>): Promise<any> {
+    const payload = {
+      campaignId,
+      isTest: true,
+      testEmail,
+      subject: directPayload?.subject,
+      body_html: directPayload?.body_html,
+      heading: directPayload?.heading,
+      preheader: directPayload?.preheader,
+      sender_name: directPayload?.sender_name,
+      sender_email: directPayload?.sender_email,
+      has_cta: directPayload?.has_cta,
+      cta_text: directPayload?.cta_text,
+      cta_url: directPayload?.cta_url
+    };
+
+    let lastError: any = null;
+
+    // 1. Tentar via supabase.functions.invoke
     try {
       const { data, error } = await supabase.functions.invoke('send-campaign', {
-        body: { campaignId, isTest: true, testEmail }
+        body: payload
       });
 
-      if (error) throw error;
-      return data;
-    } catch (e: any) {
-      console.warn('Edge function send-campaign falhou ou não configurada, simulando teste:', e.message);
-      return { success: true, isSimulation: true, target: testEmail };
+      if (!error && data?.success) {
+        return data;
+      }
+      if (error) {
+        lastError = error;
+      }
+    } catch (invokeErr: any) {
+      lastError = invokeErr;
     }
+
+    // 2. Fallback direto HTTP via fetch (padrão resiliente com token anon)
+    try {
+      const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+      if (supabaseUrl && anonKey) {
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-campaign`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${anonKey}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const resJson = await response.json().catch(() => ({}));
+
+        if (response.ok && resJson.success) {
+          return resJson;
+        }
+
+        if (resJson.error) {
+          throw new Error(resJson.error);
+        }
+      }
+    } catch (fetchErr: any) {
+      lastError = fetchErr;
+    }
+
+    // Se ambos falharem, NUNCA finge sucesso silencioso. Lança o erro real para visualização do usuário.
+    const errorMsg = lastError?.message || 'Falha ao conectar com o serviço de envio de e-mails.';
+    console.error('Falha ao disparar e-mail de teste:', errorMsg);
+    throw new Error(errorMsg);
   },
 
   // Disparar campanha oficial em massa
@@ -493,7 +548,7 @@ export const emailCampaignService = {
   async simulateInteraction(recipientId: string, type: 'open' | 'click' | 'reply' | 'delivered' | 'bounced') {
     const { data: rec } = await supabase
       .from('email_campaign_recipients')
-      .select('campaign_id, open_count, click_count, reply_count, status')
+      .select('campaign_id, open_count, click_count, reply_count, status, opened_at, clicked_at')
       .eq('id', recipientId)
       .single();
 

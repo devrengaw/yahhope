@@ -17,10 +17,24 @@ serve(async (req) => {
   }
 
   try {
-    const { campaignId, isTest, testEmail } = await req.json()
+    const bodyJson = await req.json()
+    const { 
+      campaignId, 
+      isTest, 
+      testEmail,
+      subject: directSubject,
+      body_html: directBodyHtml,
+      heading: directHeading,
+      preheader: directPreheader,
+      sender_name: directSenderName,
+      sender_email: directSenderEmail,
+      has_cta: directHasCta,
+      cta_text: directCtaText,
+      cta_url: directCtaUrl
+    } = bodyJson
 
-    if (!campaignId) {
-      throw new Error("campaignId é obrigatório")
+    if (!campaignId && !isTest) {
+      throw new Error("campaignId é obrigatório para disparo em massa")
     }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -28,16 +42,35 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY não configurada no ambiente Supabase.");
     }
 
-    // 1. Carregar Campanha
-    const { data: campaign, error: campErr } = await supabase
-      .from('email_campaigns')
-      .select('*')
-      .eq('id', campaignId)
-      .single()
+    // 1. Carregar Campanha se campaignId fornecido
+    let campaign: any = null
+    if (campaignId) {
+      const { data: camp, error: campErr } = await supabase
+        .from('email_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .maybeSingle()
 
-    if (campErr || !campaign) {
-      throw new Error("Campanha não encontrada: " + (campErr?.message || ''))
+      if (campErr) {
+        console.warn("Erro ao buscar campanha:", campErr.message)
+      }
+      campaign = camp
     }
+
+    if (!campaign && !isTest) {
+      throw new Error("Campanha não encontrada no banco de dados.")
+    }
+
+    // Mescla dados da campanha com sobrescritas diretas (útil em testes ao vivo)
+    const activeSubject = directSubject || campaign?.subject || 'E-mail YAH Hope'
+    const activeBodyHtml = directBodyHtml ?? campaign?.body_html ?? ''
+    const activeHeading = directHeading ?? campaign?.heading ?? ''
+    const activePreheader = directPreheader ?? campaign?.preheader ?? ''
+    const activeSenderName = directSenderName || campaign?.sender_name || 'YAH Hope'
+    const activeSenderEmail = directSenderEmail || campaign?.sender_email || 'contato@yahhope.com'
+    const activeHasCta = directHasCta ?? campaign?.has_cta ?? false
+    const activeCtaText = directCtaText || campaign?.cta_text || ''
+    const activeCtaUrl = directCtaUrl || campaign?.cta_url || ''
 
     // 2. Carregar Configurações Globais de Marca (email_settings)
     let logoUrl = 'https://yahhope.com/Logo+icone.png'
@@ -51,9 +84,10 @@ serve(async (req) => {
       if (settings.primary_color) primaryColor = settings.primary_color
     }
 
-    const senderEmail = campaign.sender_email || 'contato@yahhope.com'
-    const senderName = campaign.sender_name || 'YAH Hope'
-    const fromAddress = `${senderName} <${senderEmail}>`
+    // No Resend, garantir envio por domínio verificado (contato@yahhope.com) mantendo o Reply-To personalizado
+    const verifiedSenderDomain = 'contato@yahhope.com'
+    const fromEmail = (activeSenderEmail && activeSenderEmail.endsWith('@yahhope.com')) ? activeSenderEmail : verifiedSenderDomain
+    const fromAddress = `${activeSenderName} <${fromEmail}>`
 
     // Helper para gerar o HTML do e-mail com identidade visual e tracking
     const buildEmailHtml = (bodyContent: string, recipientId: string, recipientName: string, recipientEmail: string) => {
@@ -65,19 +99,21 @@ serve(async (req) => {
 
       // CTA Tracking
       let ctaHtml = ''
-      if (campaign.has_cta && campaign.cta_text && campaign.cta_url) {
-        const trackedCtaUrl = `${supabaseUrl}/functions/v1/track-campaign?t=c&cid=${campaign.id}&rid=${recipientId}&url=${encodeURIComponent(campaign.cta_url)}`
+      if (activeHasCta && activeCtaText && activeCtaUrl) {
+        const campaignIdForTracking = campaign?.id || 'preview-test'
+        const trackedCtaUrl = `${supabaseUrl}/functions/v1/track-campaign?t=c&cid=${campaignIdForTracking}&rid=${recipientId}&url=${encodeURIComponent(activeCtaUrl)}`
         ctaHtml = `
           <div style="margin: 32px 0; text-align: center;">
             <a href="${trackedCtaUrl}" target="_blank" style="display: inline-block; background-color: ${primaryColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              ${campaign.cta_text}
+              ${activeCtaText}
             </a>
           </div>
         `
       }
 
       // Tracking Pixel 1x1
-      const trackingPixel = `<img src="${supabaseUrl}/functions/v1/track-campaign?t=o&cid=${campaign.id}&rid=${recipientId}" width="1" height="1" alt="" style="display:none !important; width:1px !important; height:1px !important; border:0 !important; outline:none !important;" />`
+      const campaignIdForPixel = campaign?.id || 'preview-test'
+      const trackingPixel = `<img src="${supabaseUrl}/functions/v1/track-campaign?t=o&cid=${campaignIdForPixel}&rid=${recipientId}" width="1" height="1" alt="" style="display:none !important; width:1px !important; height:1px !important; border:0 !important; outline:none !important;" />`
 
       return `
         <!DOCTYPE html>
@@ -85,10 +121,10 @@ serve(async (req) => {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${campaign.subject}</title>
+          <title>${activeSubject}</title>
         </head>
         <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
-          ${campaign.preheader ? `<div style="display: none; max-height: 0px; overflow: hidden; opacity: 0;">${campaign.preheader}</div>` : ''}
+          ${activePreheader ? `<div style="display: none; max-height: 0px; overflow: hidden; opacity: 0;">${activePreheader}</div>` : ''}
           <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 30px 10px;">
             <tr>
               <td align="center">
@@ -103,18 +139,18 @@ serve(async (req) => {
                   </tr>
 
                   <!-- Título se houver -->
-                  ${campaign.heading ? `
+                  ${activeHeading ? `
                   <tr>
                     <td style="padding: 32px 32px 10px 32px; text-align: center;">
                       <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: ${primaryColor}; line-height: 1.3;">
-                        ${campaign.heading}
+                        ${activeHeading}
                       </h1>
                     </td>
                   </tr>` : ''}
 
                   <!-- Conteúdo Principal -->
                   <tr>
-                    <td style="padding: ${campaign.heading ? '16px' : '32px'} 32px; font-size: 15px; line-height: 1.65; color: #334155;">
+                    <td style="padding: ${activeHeading ? '16px' : '32px'} 32px; font-size: 15px; line-height: 1.65; color: #334155;">
                       ${personalizedBody}
                       ${ctaHtml}
                     </td>
@@ -141,7 +177,7 @@ serve(async (req) => {
     // 3. SE FOR DISPARO DE TESTE
     if (isTest) {
       const recipientTarget = testEmail || 'contato@yahhope.com'
-      const testHtml = buildEmailHtml(campaign.body_html, 'test-preview', 'Destinatário Teste', recipientTarget)
+      const testHtml = buildEmailHtml(activeBodyHtml, 'test-preview', 'Destinatário Teste', recipientTarget)
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -152,18 +188,24 @@ serve(async (req) => {
         body: JSON.stringify({
           from: fromAddress,
           to: recipientTarget,
-          subject: `[TESTE] ${campaign.subject}`,
+          subject: activeSubject.startsWith('[TESTE]') ? activeSubject : `[TESTE] ${activeSubject}`,
           html: testHtml,
-          reply_to: campaign.reply_to || undefined
+          reply_to: campaign?.reply_to || activeSenderEmail || undefined
         })
       })
 
       const resData = await res.json()
       if (!res.ok) {
-        throw new Error(resData?.message || 'Falha ao enviar e-mail de teste no Resend')
+        const errorDetail = resData?.message || resData?.error || JSON.stringify(resData)
+        throw new Error(`Falha no Resend (${res.status}): ${errorDetail}`)
       }
 
-      return new Response(JSON.stringify({ success: true, isTest: true, target: recipientTarget, resendId: resData.id }), {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        isTest: true, 
+        target: recipientTarget, 
+        resendId: resData.id 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })

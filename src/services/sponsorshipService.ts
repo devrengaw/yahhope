@@ -554,26 +554,29 @@ export const sponsorshipService = {
       ? `🧡 Parabéns, ${name}! Conheça as crianças que você está apadrinhando na YAH Hope`
       : `🧡 Parabéns, ${name}! Conheça ${children[0]?.name || 'a criança'} que você está apadrinhando na YAH Hope`;
 
-    // Tenta enviar via Supabase Edge Function ou serviço de e-mail
+    // Envia o e-mail transacional de apadrinhamento diretamente para o padrinho (NUNCA aciona send-accountability)
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       if (supabaseUrl && anonKey) {
-        await fetch(`${supabaseUrl}/functions/v1/send-accountability`, {
+        await fetch(`${supabaseUrl}/functions/v1/send-campaign`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${anonKey}`
           },
           body: JSON.stringify({
-            to: cleanEmail,
+            isTest: true,
+            testEmail: cleanEmail,
             subject: emailSubject,
-            html: htmlBody
+            body_html: htmlBody,
+            sender_name: 'YAH Hope',
+            sender_email: 'contato@yahhope.com'
           })
-        }).catch(e => console.warn('Aviso ao enviar via edge function:', e));
+        }).catch(e => console.warn('Aviso ao enviar e-mail de apadrinhamento via edge function:', e));
       }
     } catch (e) {
-      console.warn('Fallback de e-mail:', e);
+      console.warn('Fallback de e-mail de apadrinhamento:', e);
     }
   },
 
