@@ -62,30 +62,55 @@ export interface AudienceStats {
 }
 
 export const emailCampaignService = {
-  // Carrega contagens de cada segmento cadastrado no sistema
+  // Carrega contagens de cada segmento cadastrado no sistema (destinatários únicos)
   async fetchAudienceCounts(): Promise<AudienceStats> {
     try {
-      // 1. Apoiadores Cadastrados
-      let supportersCount = 0;
-      const { count: apCount, error: apErr } = await supabase.from('apoiadores').select('id', { count: 'exact', head: true });
-      if (!apErr && apCount !== null) {
-        supportersCount = apCount;
-      } else {
-        const { count: uCount } = await supabase.from('users').select('id', { count: 'exact', head: true });
-        supportersCount = uCount || 0;
+      // 1. Apoiadores Cadastrados (usuários do sistema e/ou tabela apoiadores)
+      const uniqueSupporters = new Set<string>();
+      const { data: uData } = await supabase.from('users').select('email').not('email', 'is', null);
+      (uData || []).forEach(u => {
+        if (u.email && u.email.includes('@')) uniqueSupporters.add(u.email.toLowerCase().trim());
+      });
+
+      const { data: apData, error: apErr } = await supabase.from('apoiadores').select('email, contato_email, mail');
+      if (!apErr && apData) {
+        apData.forEach((a: any) => {
+          const email = (a.email || a.contato_email || a.mail || '').toLowerCase().trim();
+          if (email && email.includes('@')) uniqueSupporters.add(email);
+        });
       }
 
-      const [donorsRes, volRes, careRes] = await Promise.all([
-        supabase.from('donations').select('donor_email', { count: 'exact', head: true }).not('donor_email', 'is', null),
-        supabase.from('users').select('id', { count: 'exact', head: true }).in('role', ['VOLUNTEER', 'VOLUNTARIO', 'STAFF']),
-        supabase.from('caregivers').select('id', { count: 'exact', head: true }).not('email', 'is', null),
+      // 2. Doadores & Apoiadores (donations + sponsorships)
+      const uniqueDonors = new Set<string>();
+      const [donationsRes, sponsorshipsRes, volRes, careRes] = await Promise.all([
+        supabase.from('donations').select('donor_email').not('donor_email', 'is', null),
+        supabase.from('sponsorships').select('donor_email').not('donor_email', 'is', null),
+        supabase.from('users').select('email').in('role', ['VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'COORDINATOR']).not('email', 'is', null),
+        supabase.from('caregivers').select('email').not('email', 'is', null),
       ]);
 
+      (donationsRes.data || []).forEach(d => {
+        if (d.donor_email && d.donor_email.includes('@')) uniqueDonors.add(d.donor_email.toLowerCase().trim());
+      });
+      (sponsorshipsRes.data || []).forEach(s => {
+        if (s.donor_email && s.donor_email.includes('@')) uniqueDonors.add(s.donor_email.toLowerCase().trim());
+      });
+
+      const uniqueVolunteers = new Set<string>();
+      (volRes.data || []).forEach(v => {
+        if (v.email && v.email.includes('@')) uniqueVolunteers.add(v.email.toLowerCase().trim());
+      });
+
+      const uniqueCaregivers = new Set<string>();
+      (careRes.data || []).forEach(c => {
+        if (c.email && c.email.includes('@')) uniqueCaregivers.add(c.email.toLowerCase().trim());
+      });
+
       return {
-        supporters: supportersCount,
-        donors: donorsRes.count || 0,
-        volunteers: volRes.count || 0,
-        caregivers: careRes.count || 0,
+        supporters: uniqueSupporters.size,
+        donors: uniqueDonors.size,
+        volunteers: uniqueVolunteers.size,
+        caregivers: uniqueCaregivers.size,
       };
     } catch (e) {
       console.error('Erro ao buscar contagens de audiência:', e);
@@ -102,38 +127,44 @@ export const emailCampaignService = {
 
     // 1. Segmentos de Apoiadores / Usuários cadastrados no banco
     if (selectedSegments.includes('apoiadores') || selectedSegments.includes('all_users')) {
-      // Tenta tabela apoiadores primeiro
+      const { data: uData } = await supabase.from('users').select('name, email').not('email', 'is', null);
+      (uData || []).forEach(u => {
+        if (u.email && u.email.includes('@')) {
+          recipientMap.set(u.email.toLowerCase().trim(), {
+            email: u.email.toLowerCase().trim(),
+            name: u.name || '',
+            recipient_type: 'user'
+          });
+        }
+      });
+
       const { data: apData, error: apErr } = await supabase.from('apoiadores').select('*');
       if (!apErr && apData && apData.length > 0) {
         apData.forEach((a: any) => {
           const email = (a.email || a.contato_email || a.mail || '').toLowerCase().trim();
           const name = a.nome || a.name || a.razao_social || '';
           if (email && email.includes('@')) {
-            recipientMap.set(email, {
-              email,
-              name,
-              recipient_type: 'apoiador' as any
-            });
-          }
-        });
-      } else {
-        // Fallback para users se existir
-        const { data: uData } = await supabase.from('users').select('name, email').not('email', 'is', null);
-        (uData || []).forEach(u => {
-          if (u.email && u.email.includes('@')) {
-            recipientMap.set(u.email.toLowerCase().trim(), {
-              email: u.email.toLowerCase().trim(),
-              name: u.name || '',
-              recipient_type: 'user'
-            });
+            if (!recipientMap.has(email)) {
+              recipientMap.set(email, {
+                email,
+                name,
+                recipient_type: 'apoiador' as any
+              });
+            } else if (name && !recipientMap.get(email)!.name) {
+              recipientMap.get(email)!.name = name;
+            }
           }
         });
       }
     }
 
     if (selectedSegments.includes('donors')) {
-      const { data } = await supabase.from('donations').select('donor_name, donor_email').not('donor_email', 'is', null);
-      (data || []).forEach(d => {
+      const [donationsRes, sponsorshipsRes] = await Promise.all([
+        supabase.from('donations').select('donor_name, donor_email').not('donor_email', 'is', null),
+        supabase.from('sponsorships').select('donor_name, donor_email').not('donor_email', 'is', null)
+      ]);
+
+      (donationsRes.data || []).forEach(d => {
         if (d.donor_email && d.donor_email.includes('@')) {
           const email = d.donor_email.toLowerCase().trim();
           if (!recipientMap.has(email)) {
@@ -142,6 +173,23 @@ export const emailCampaignService = {
               name: d.donor_name || '',
               recipient_type: 'donor'
             });
+          } else if (d.donor_name && !recipientMap.get(email)!.name) {
+            recipientMap.get(email)!.name = d.donor_name;
+          }
+        }
+      });
+
+      (sponsorshipsRes.data || []).forEach(s => {
+        if (s.donor_email && s.donor_email.includes('@')) {
+          const email = s.donor_email.toLowerCase().trim();
+          if (!recipientMap.has(email)) {
+            recipientMap.set(email, {
+              email,
+              name: s.donor_name || '',
+              recipient_type: 'donor'
+            });
+          } else if (s.donor_name && !recipientMap.get(email)!.name) {
+            recipientMap.get(email)!.name = s.donor_name;
           }
         }
       });

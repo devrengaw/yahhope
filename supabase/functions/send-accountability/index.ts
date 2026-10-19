@@ -62,18 +62,34 @@ serve(async (req) => {
       body = template.body || body;
     }
 
-    // Fetch distinct donor emails
-    // A more advanced query would group by email. We will fetch all and filter duplicates in memory.
-    const { data: donations } = await supabase.from('donations').select('donor_name, donor_email').not('donor_email', 'is', null);
+    // Fetch distinct donor and sponsor emails
+    const [donationsRes, sponsorshipsRes] = await Promise.all([
+      supabase.from('donations').select('donor_name, donor_email').not('donor_email', 'is', null),
+      supabase.from('sponsorships').select('donor_name, donor_email').not('donor_email', 'is', null)
+    ]);
     
-    if (!donations || donations.length === 0) {
+    const uniqueDonors = new Map<string, string>(); // email -> name
+    (donationsRes.data || []).forEach((d: any) => {
+      const email = (d.donor_email || '').toLowerCase().trim();
+      if (email && email.includes('@')) {
+        if (!uniqueDonors.has(email) || !uniqueDonors.get(email)) {
+          uniqueDonors.set(email, d.donor_name || '');
+        }
+      }
+    });
+
+    (sponsorshipsRes.data || []).forEach((s: any) => {
+      const email = (s.donor_email || '').toLowerCase().trim();
+      if (email && email.includes('@')) {
+        if (!uniqueDonors.has(email) || !uniqueDonors.get(email)) {
+          uniqueDonors.set(email, s.donor_name || '');
+        }
+      }
+    });
+
+    if (uniqueDonors.size === 0) {
       return new Response(JSON.stringify({ message: "No donors found" }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
-
-    const uniqueDonors = new Map<string, string>(); // email -> name
-    donations.forEach(d => {
-      if (d.donor_email) uniqueDonors.set(d.donor_email, d.donor_name);
-    });
 
     const SANS_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
