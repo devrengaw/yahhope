@@ -215,7 +215,7 @@ export function MobileDonorHome() {
     return `${months} ${months === 1 ? 'mês' : 'meses'}`;
   };
 
-  const isDonorOrSponsor = user?.role === 'SPONSOR' || (user?.role !== 'ADMIN' && user?.role !== 'USER');
+  const isDonorOrSponsor = user?.role === 'SPONSOR' || myChildren.length > 0 || (user?.role !== 'ADMIN' && user?.role !== 'USER');
   const myChildIds = useMemo(() => new Set(myChildren.map(c => c.id)), [myChildren]);
 
   // Crianças reais do sistema: Para mantenedores/padrinhos, EXCLUSIVAMENTE suas crianças apadrinhadas

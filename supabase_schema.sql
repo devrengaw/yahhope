@@ -380,6 +380,8 @@ CREATE TABLE email_templates (
   body TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Staff_Full_Access_Email_Templates" ON email_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- 30. email_settings (Configurações Globais de E-mail)
 CREATE TABLE email_settings (
@@ -388,6 +390,9 @@ CREATE TABLE email_settings (
   primary_color TEXT DEFAULT '#F49853',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE email_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Staff_Full_Access_Email_Settings" ON email_settings FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 
 -- 31. store_products (Catálogo do Marketplace)
 CREATE TABLE store_products (

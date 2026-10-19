@@ -418,7 +418,7 @@ serve(async (req) => {
       // Registra a doação na tabela 'donations' para somatória completa do apoiador
       if (amount > 0) {
         await supabase.from('donations').insert({
-          campaign_id: campaignId || null,
+          campaign_id: (isSponsorship || isMonthly) ? null : (campaignId || null),
           donor_name: donorName,
           donor_email: donorEmail,
           donor_phone: donorPhone,

@@ -536,49 +536,45 @@ export function MobileDonorChildren() {
     return `${childName} foi acolhida com amor na Casa Nutri após triagem realizada pela equipe de saúde comunitária em Nampula. Com o apadrinhamento regular, recebe suplementação vitamínica, papas terapêuticas e acompanhamento pediátrico contínuo. Graças ao suporte dos padrinhos, sua recuperação nutricional tem sido notável, garantindo um desenvolvimento saudável e cheio de esperança.`;
   };
 
-  const isDonorOrSponsor = user?.role === 'SPONSOR' || (user?.role !== 'ADMIN' && user?.role !== 'USER');
+  const isDonorOrSponsor = user?.role === 'SPONSOR' || myChildren.length > 0 || (user?.role !== 'ADMIN' && user?.role !== 'USER');
   const myChildIds = useMemo(() => new Set(myChildren.map(c => c.id)), [myChildren]);
 
   // Fonte de dados de pacientes com segregação estrita:
   // Se for mantenedor/padrinho, EXCLUSIVAMENTE as crianças que ele apadrinha!
   const basePatients = useMemo(() => {
     if (isDonorOrSponsor) {
-      const fromPatients = patients.filter(c => myChildIds.has(c.id));
-      if (fromPatients.length > 0) {
-        return fromPatients.map(p => {
-          const matched = myChildren.find(m => m.id === p.id);
+      if (myChildren.length > 0) {
+        return myChildren.map(c => {
+          const fromPt = patients.find(p => p.id === c.id);
           return {
-            ...p,
-            story: p.story || matched?.story || '',
-            dob: p.dob || matched?.dob || '',
-            photo_url: p.photo_url || matched?.photo_url || ''
+            id: c.id,
+            name: c.name || fromPt?.name || 'Criança Apadrinhada',
+            dob: c.dob || fromPt?.dob || '',
+            status: (fromPt?.status || c.nutritional_status || 'Adequado') as any,
+            community: c.community || fromPt?.community || 'Casa Nutri',
+            photo_url: c.photo_url || fromPt?.photo_url || '',
+            registration_number: fromPt?.registration_number || '',
+            gender: (c.gender || fromPt?.gender || 'F') as any,
+            created_at: fromPt?.created_at || '',
+            guardian_name: fromPt?.guardian_name || '',
+            housing_type: fromPt?.housing_type || '',
+            sanitation: fromPt?.sanitation || '',
+            story: c.story || fromPt?.story || 'Acompanhada com amor na Casa Nutri.'
           };
         });
       }
-      return myChildren.map(c => ({
-        id: c.id,
-        name: c.name,
-        dob: c.dob || '',
-        status: (c.nutritional_status || 'Adequado') as any,
-        community: c.community || 'Casa Nutri',
-        photo_url: c.photo_url,
-        registration_number: '',
-        gender: (c.gender || 'M') as any,
-        created_at: '',
-        guardian_name: '',
-        housing_type: '',
-        sanitation: '',
-        story: c.story || ''
-      }));
+      return [];
     }
     return patients;
-  }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
+  }, [isDonorOrSponsor, patients, myChildren]);
 
   const filteredPatients = useMemo(() => {
     return basePatients.filter((c) => {
-      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.community && c.community.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.registration_number && c.registration_number.toLowerCase().includes(searchQuery.toLowerCase()));
+      const q = (searchQuery || '').toLowerCase().trim();
+      const name = (c.name || '').toLowerCase();
+      const comm = (c.community || '').toLowerCase();
+      const reg = (c.registration_number || '').toLowerCase();
+      const matchesSearch = !q || name.includes(q) || comm.includes(q) || reg.includes(q);
       
       if (!matchesSearch) return false;
       if (statusFilter === 'all') return true;

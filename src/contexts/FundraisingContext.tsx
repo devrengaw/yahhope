@@ -42,6 +42,8 @@ export interface Donation {
   sponsor_id?: string;
   user_id?: string;
   is_sponsorship?: boolean;
+  stripe_payment_id?: string;
+  stripe_subscription_id?: string;
 }
 
 interface CampaignProgressStats {
@@ -238,7 +240,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           paid_at: d.paid_at || d.created_at || new Date().toISOString(),
           is_sponsorship: isExplicitSponsorship,
           sponsor_id: d.sponsor_id || d.user_id,
-          user_id: d.user_id || d.sponsor_id
+          user_id: d.user_id || d.sponsor_id,
+          stripe_payment_id: d.stripe_payment_id || null,
+          stripe_subscription_id: d.stripe_subscription_id || null
         };
       });
 
@@ -257,21 +261,33 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           const effectiveName = sp.donor_name || 'Padrinho YAH Hope';
           const childName = sp.child_id ? childrenMap.get(sp.child_id) : undefined;
           const targetTitle = childName ? `Apadrinhamento Mensal - ${childName}` : 'Apadrinhamento Mensal (Casa Nutri)';
+          const spDateStr = (sp.last_sponsored_at || sp.created_at || '').slice(0, 10);
 
-          // Se a transação já constar na tabela donations:
-          // Só consideramos match se o registro em donations for EXPLICITAMENTE um apadrinhamento
-          // Uma doação avulsa comum (ex: R$ 50 Pix) NUNCA é sobrescrita!
-          const existingMatch = formattedDonations.find(d => 
-            (sp.stripe_subscription_id && (d as any).stripe_payment_id === sp.stripe_subscription_id) ||
-            (d.id === sp.id || d.id === `sp_${sp.id}`) ||
-            (d.is_sponsorship && d.donor_email === effectiveEmail && Math.abs(d.amount - spAmount) < 0.01)
-          );
+          // Procura match inteligente na tabela donations para NUNCA duplicar o valor da contribuição:
+          const existingMatch = formattedDonations.find(d => {
+            if (d.id === sp.id || d.id === `sp_${sp.id}`) return true;
+            if (sp.stripe_subscription_id && (d.stripe_subscription_id === sp.stripe_subscription_id || d.stripe_payment_id === sp.stripe_subscription_id)) return true;
+            if (sp.stripe_payment_id && d.stripe_payment_id === sp.stripe_payment_id) return true;
+            
+            // Match por mesmo email, mesmo valor e mesma data (ou stripe payment intent)
+            const dDateStr = (d.paid_at || d.date || '').slice(0, 10);
+            const isSameEmail = d.donor_email === effectiveEmail;
+            const isSameAmount = Math.abs(d.amount - spAmount) < 0.01;
+            
+            if (isSameEmail && isSameAmount) {
+              if (d.is_sponsorship) return true;
+              if (dDateStr && spDateStr && dDateStr === spDateStr) return true;
+              if (d.stripe_payment_id && (sp.stripe_subscription_id || sp.stripe_customer_id)) return true;
+            }
+            return false;
+          });
 
           if (existingMatch) {
             existingMatch.campaign_title = targetTitle;
             existingMatch.is_sponsorship = true;
-            existingMatch.sponsor_id = sp.sponsor_id;
-            existingMatch.user_id = sp.sponsor_id;
+            existingMatch.campaign_id = undefined; // Libera da campanha genérica de Custos Operacionais
+            existingMatch.sponsor_id = sp.sponsor_id || existingMatch.sponsor_id;
+            existingMatch.user_id = sp.sponsor_id || existingMatch.user_id;
             return;
           }
 

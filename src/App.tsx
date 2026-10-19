@@ -15,6 +15,8 @@ import { PrivacyPolicy } from './pages/public/PrivacyPolicy';
 import { TermsOfService } from './pages/public/TermsOfService';
 import { AboutUs } from './pages/public/AboutUs';
 import { MissionVisionValues } from './pages/public/MissionVisionValues';
+import { CampaignHotsite } from './pages/public/CampaignHotsite';
+import { CampaignHotsiteAdmin } from './pages/admin/CampaignHotsiteAdmin';
 
 import { Settings } from './pages/admin/Settings';
 import { Profile } from './pages/admin/Profile';
@@ -225,10 +227,20 @@ export default function App() {
                                         {/* Dedicated full-screen Display Route */}
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
 
+                                        {/* Rotas Dedicadas do Hotsite da Campanha (Design focado, de alta conversão) */}
+                                        <Route path="/campanha-yahhope" element={<CampaignHotsite />} />
+                                        <Route path="/hotsite" element={<CampaignHotsite />} />
+                                        <Route path="/participe" element={<CampaignHotsite />} />
+                                        <Route path="/fazer-parte" element={<CampaignHotsite />} />
+
                                         <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
                                           <Route path="/portal/login" element={<Navigate to="/login" replace />} />
                                           <Route path="/app/login" element={<Navigate to="/login" replace />} />
-                                          <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
+                                          <Route path="/" element={
+                                            (typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com'))
+                                              ? <CampaignHotsite />
+                                              : (isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />)
+                                          } />
                                           <Route path="/sobre-nos" element={<AboutUs />} />
                                           <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />
                                           <Route path="/missao-visao-valores" element={<MissionVisionValues />} />
@@ -260,6 +272,7 @@ export default function App() {
                                               <Routes>
                                                 <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
                                                 <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
+                                                <Route path="/hotsite" element={<CampaignHotsiteAdmin />} />
                                                 <Route path="/home-highlights" element={<Navigate to="/communication/home-highlights" replace />} />
                                                 <Route path="/impact-metrics" element={<Navigate to="/communication/impact-metrics" replace />} />
                                                 <Route path="/top-banner" element={<Navigate to="/communication/top-banner" replace />} />

@@ -276,6 +276,11 @@ export function PublicHeader() {
                 <div className="absolute top-full right-0 w-72 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
                     <li>
+                      <Link to="/hotsite" className="block font-gotham-bold text-amber-600 hover:translate-x-1 transition-all py-1">
+                        Faça Parte do Projeto (Hotsite)
+                      </Link>
+                    </li>
+                    <li>
                       <Link to="/mantenedor" className="block font-gotham-bold text-[#F49853] hover:translate-x-1 transition-all py-1">
                         Seja um Mantenedor Mensal/Apadrinhamento
                       </Link>
@@ -456,6 +461,13 @@ export function PublicHeader() {
               </div>
 
               <div className="space-y-1 py-1">
+                <Link 
+                  to="/hotsite" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="block py-2 text-amber-600 font-gotham-bold hover:translate-x-1 transition-all"
+                >
+                  Faça Parte do Projeto (Hotsite)
+                </Link>
                 <Link 
                   to="/mantenedor" 
                   onClick={() => setMobileMenuOpen(false)} 

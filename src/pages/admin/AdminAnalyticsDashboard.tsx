@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Users, 
   Eye, 
@@ -20,7 +21,8 @@ import {
   Calendar,
   Sparkles,
   BarChart2,
-  ExternalLink
+  ExternalLink,
+  Flame
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -183,6 +185,33 @@ export function AdminAnalyticsDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Banner de Acesso Rápido ao Controle do Hotsite da Campanha */}
+      <Link 
+        to="/admin/hotsite"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-emerald-500/10 border border-amber-200/80 hover:border-amber-300 hover:shadow-md transition-all group"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#F49853] to-amber-500 text-white flex items-center justify-center shadow-md shadow-[#F49853]/25 group-hover:scale-105 transition-transform shrink-0">
+            <Flame size={24} />
+          </div>
+          <div>
+            <div className="text-base font-black text-slate-900 group-hover:text-[#F49853] transition-colors flex items-center gap-2 flex-wrap">
+              <span>Controle Especial do Hotsite da Campanha</span>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold border border-amber-200/80">
+                campanha.yahhope.com
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Acompanhe quantas pessoas clicaram, de onde vieram (cidades), faixas de idade e contatos de quem quer fazer parte.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#F49853] group-hover:translate-x-1 transition-transform shrink-0 self-end sm:self-auto">
+          <span>Abrir Painel do Hotsite</span>
+          <ArrowUpRight size={16} />
+        </div>
+      </Link>
 
       {/* Cards de Métricas Principais (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox, Flame } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatWidget } from './ChatWidget';
@@ -30,6 +30,7 @@ const workspaceNavItems = [
 
 const adminNavItems = [
   { name: 'Dashboard de Acessos', path: '/admin/analytics', icon: BarChart3 },
+  { name: 'Hotsite da Campanha', path: '/admin/hotsite', icon: Flame },
   { name: 'Feed de Impacto', path: '/admin/impact-feed', icon: TrendingUp },
   { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
   { name: 'Captação', path: '/admin/fundraising', icon: Target },
@@ -120,7 +121,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     Boolean(user?.permissions && user.permissions.some(p => communicationPermissions.includes(p)));
 
   // Administração: Admin ou usuário com permissões administrativas explícitas
-  const adminPermissions = ['settings', 'impact-feed', 'fundraising', 'store', 'local-projects', 'users', 'finance', 'analytics', 'top-banner', 'home-highlights', 'impact-metrics', 'gifts', 'admin'];
+  const adminPermissions = ['settings', 'hotsite', 'impact-feed', 'fundraising', 'store', 'local-projects', 'users', 'finance', 'analytics', 'top-banner', 'home-highlights', 'impact-metrics', 'gifts', 'admin'];
   const hasAdmin = 
     isAdmin || 
     Boolean(user?.permissions && user.permissions.some(p => adminPermissions.includes(p)));
