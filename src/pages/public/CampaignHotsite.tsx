@@ -46,8 +46,8 @@ export function CampaignHotsite() {
       {/* Conteúdo da Página */}
       <div className="relative z-10 flex flex-col min-h-screen">
         
-        {/* Topo Limpo: Apenas o Logo Centralizado (Clica e abre www.yahhope.com) */}
-        <header className="py-7 px-4 border-b border-white/10 bg-black/25 backdrop-blur-md flex items-center justify-center">
+        {/* Topo Limpo e Compacto: Apenas o Logo Centralizado (Clica e abre www.yahhope.com) */}
+        <header className="py-2.5 sm:py-3 px-4 border-b border-white/10 bg-black/25 backdrop-blur-md flex items-center justify-center">
           <a 
             href="https://www.yahhope.com" 
             title="Ir para o site principal da YAH Hope"
