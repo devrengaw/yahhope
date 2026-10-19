@@ -12,6 +12,7 @@ import {
 } from '../../services/campaignTrackingService';
 import { trackPageView } from '../../services/analyticsService';
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
+import { PublicFooter } from '../../components/PublicFooter';
 
 export function CampaignHotsite() {
   useEffect(() => {
@@ -248,13 +249,8 @@ export function CampaignHotsite() {
           </div>
         </section>
 
-        {/* Rodapé Limpo e Discreto */}
-        <footer className="py-10 bg-black/50 border-t border-white/10 text-center text-xs text-slate-400">
-          <div className="max-w-3xl mx-auto px-4 space-y-1.5">
-            <p className="font-bold text-slate-300">YAH Hope • Dignidade & Transformação Humana</p>
-            <p>© {new Date().getFullYear()} YAH Hope. Todos os direitos reservados.</p>
-          </div>
-        </footer>
+        {/* Footer Oficial do Site Principal */}
+        <PublicFooter />
 
       </div>
     </div>
