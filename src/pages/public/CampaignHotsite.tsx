@@ -71,7 +71,7 @@ export function CampaignHotsite() {
                 Um convite para levar esperança.
               </h1>
 
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
                 <p>
                   Há muitas formas de fazer parte da vida de alguém. Hoje, queremos convidar você a fazer parte da YAH Hope.
                 </p>
@@ -90,7 +90,7 @@ export function CampaignHotsite() {
                 Cuidar hoje. Construir possibilidades para o amanhã.
               </h2>
               
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
                 <p>
                   Cada criança tem uma história, vínculos e um futuro a descobrir. Nosso compromisso começa com suas necessidades de hoje e se estende às oportunidades que ela e sua família podem encontrar ao longo do caminho.
                 </p>
@@ -112,7 +112,7 @@ export function CampaignHotsite() {
                 A esperança precisa de continuidade. Seu apoio ajuda a construí-la.
               </h2>
 
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
                 Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Ela ajuda a dar continuidade ao trabalho e cria condições para que a YAH Hope alcance mais pessoas.
               </p>
 
@@ -127,7 +127,7 @@ export function CampaignHotsite() {
                     1
                   </div>
                   <h3 className="text-base font-bold text-white">Como mantenedor do projeto</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-300 leading-relaxed text-justify">
                     Contribuindo mensalmente para o trabalho da YAH Hope como um todo, apoiando suas ações e seu crescimento.
                   </p>
                 </div>
@@ -138,13 +138,13 @@ export function CampaignHotsite() {
                     2
                   </div>
                   <h3 className="text-base font-bold text-white">Como padrinho ou madrinha de uma criança</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-300 leading-relaxed text-justify">
                     Assumindo uma contribuição mensal por meio do apadrinhamento e participando mais de perto dessa caminhada de cuidado.
                   </p>
                 </div>
               </div>
 
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal pt-1">
+              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal pt-1 text-justify">
                 Em qualquer uma dessas escolhas, você se une a uma rede de pessoas que ajudam a tornar esse trabalho possível.
               </p>
             </div>
@@ -155,13 +155,13 @@ export function CampaignHotsite() {
                 Você faz parte e acompanha essa história.
               </h2>
 
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
                 <p>
                   Queremos que você saiba como o projeto está caminhando e o que seu apoio ajuda a construir.
                 </p>
 
                 <div className="p-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-md space-y-2 text-slate-100">
-                  <p className="text-sm sm:text-base leading-relaxed">
+                  <p className="text-sm sm:text-base leading-relaxed text-justify">
                     Mantenedores, padrinhos e madrinhas têm acesso a um portal exclusivo, onde podem receber notícias das crianças, acompanhar as atualizações do projeto e consultar suas doações. Também recebem em primeira mão as novidades da YAH Hope.
                   </p>
                 </div>
@@ -178,7 +178,7 @@ export function CampaignHotsite() {
                 Vamos levar esperança juntos?
               </h2>
 
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
                 <p>
                   Nosso convite é para que você escolha uma forma de participar e caminhe com a YAH Hope.
                 </p>
