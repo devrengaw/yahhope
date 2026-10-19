@@ -16,7 +16,9 @@ import {
   FileText,
   Star,
   RefreshCw,
-  BookOpen
+  BookOpen,
+  ZoomIn,
+  Maximize2
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
@@ -248,6 +250,7 @@ export function MobileDonorChildren() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
+  const [zoomedPhoto, setZoomedPhoto] = useState<{ url: string; name: string } | null>(null);
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
   const [childToCancel, setChildToCancel] = useState<{ id: string; name: string; sponsorshipId?: string } | null>(null);
@@ -255,6 +258,21 @@ export function MobileDonorChildren() {
   const [celebrationChildren, setCelebrationChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [isSyncingPayer, setIsSyncingPayer] = useState(false);
+
+  // Fecha foto ampliada ou modal ao pressionar ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (zoomedPhoto) {
+          setZoomedPhoto(null);
+        } else if (selectedChild) {
+          setSelectedChild(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedPhoto, selectedChild]);
 
   const refreshChildren = async () => {
     setIsLoadingChildren(true);
@@ -845,9 +863,18 @@ export function MobileDonorChildren() {
               {/* Header do Modal */}
               <div className="p-6 bg-gradient-to-r from-slate-950 to-slate-900 text-white flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-orange-100 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 border border-white/20">
+                  <div 
+                    onClick={() => child.photo_url && setZoomedPhoto({ url: child.photo_url, name: child.name })}
+                    className={`w-16 h-16 rounded-2xl overflow-hidden bg-orange-100 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 border border-white/20 relative group ${child.photo_url ? 'cursor-pointer hover:border-orange-400/80 transition-all' : ''}`}
+                    title={child.photo_url ? "Clique para ampliar a foto" : undefined}
+                  >
                     {child.photo_url ? (
-                      <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                      <>
+                        <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Maximize2 size={16} className="text-white drop-shadow" />
+                        </div>
+                      </>
                     ) : (
                       child.name.charAt(0).toUpperCase()
                     )}
@@ -872,8 +899,24 @@ export function MobileDonorChildren() {
               {/* Conteúdo do Modal */}
               <div className="p-6 space-y-5 overflow-y-auto">
                 {child.photo_url && (
-                  <div className="w-full h-52 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs">
-                    <img src={child.photo_url} alt={child.name} className="w-full h-full object-cover" />
+                  <div 
+                    onClick={() => setZoomedPhoto({ url: child.photo_url, name: child.name })}
+                    className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs relative group cursor-pointer"
+                    title="Clique para ver a foto ampliada"
+                  >
+                    <img 
+                      src={child.photo_url} 
+                      alt={child.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
+                      <span className="text-white text-xs font-gotham-bold flex items-center gap-1.5 drop-shadow">
+                        <ZoomIn size={16} className="text-[#F49853]" /> Clique para ampliar
+                      </span>
+                    </div>
+                    <div className="absolute top-3 right-3 bg-slate-900/60 hover:bg-slate-900/90 text-white p-2 rounded-xl backdrop-blur-xs transition-colors shadow-sm">
+                      <Maximize2 size={16} />
+                    </div>
                   </div>
                 )}
 
@@ -1114,6 +1157,46 @@ export function MobileDonorChildren() {
               >
                 Acessar Minhas Crianças
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Foto Ampliada da Criança */}
+      {zoomedPhoto && (
+        <div 
+          className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in"
+          onClick={() => setZoomedPhoto(null)}
+        >
+          <div 
+            className="relative max-w-2xl max-h-[92vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Barra Superior com Nome e Botão Fechar */}
+            <div className="w-full flex items-center justify-between pb-3 text-white">
+              <div className="flex items-center gap-2">
+                <Heart size={18} className="text-[#F49853] fill-[#F49853]" />
+                <h3 className="text-base sm:text-lg font-heading font-black tracking-tight truncate">
+                  {zoomedPhoto.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomedPhoto(null)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer"
+                title="Fechar (Esc)"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Imagem Ampliada */}
+            <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-slate-900 max-h-[82vh] flex items-center justify-center">
+              <img 
+                src={zoomedPhoto.url} 
+                alt={zoomedPhoto.name} 
+                className="max-h-[80vh] w-auto max-w-full object-contain rounded-xl select-none"
+              />
             </div>
           </div>
         </div>

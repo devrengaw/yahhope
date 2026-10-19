@@ -227,20 +227,21 @@ export default function App() {
                                         {/* Dedicated full-screen Display Route */}
                                         <Route path="/campanha-display" element={<CampaignDisplay />} />
 
-                                        {/* Rotas Dedicadas do Hotsite da Campanha (Design focado, de alta conversão) */}
+                                        {/* Rotas Dedicadas do Hotsite da Campanha (Completamente isolado: Sem barra urgente, sem menus do site) */}
                                         <Route path="/campanha-yahhope" element={<CampaignHotsite />} />
                                         <Route path="/hotsite" element={<CampaignHotsite />} />
                                         <Route path="/participe" element={<CampaignHotsite />} />
                                         <Route path="/fazer-parte" element={<CampaignHotsite />} />
 
+                                        {/* Se for o subdomínio campanha.yahhope.com, a rota raiz carrega o Hotsite isolado */}
+                                        {typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com') && (
+                                          <Route path="/" element={<CampaignHotsite />} />
+                                        )}
+
                                         <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
                                           <Route path="/portal/login" element={<Navigate to="/login" replace />} />
                                           <Route path="/app/login" element={<Navigate to="/login" replace />} />
-                                          <Route path="/" element={
-                                            (typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com'))
-                                              ? <CampaignHotsite />
-                                              : (isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />)
-                                          } />
+                                          <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
                                           <Route path="/sobre-nos" element={<AboutUs />} />
                                           <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />
                                           <Route path="/missao-visao-valores" element={<MissionVisionValues />} />
