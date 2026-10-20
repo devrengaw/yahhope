@@ -254,22 +254,47 @@ export function SupportersList() {
           }
         });
 
+        // Identificação estrita de quem é Padrinho de criança vs Doador Mensal vs Doador Geral
+        const monthlySponsorships = uniqueSponsorships.filter(sp => {
+          const st = (sp.status || 'active').toLowerCase().trim();
+          return st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+        });
+
+        // 1. Padrinho de Criança: Tem assinatura ativa com valor >= R$ 90 e criança vinculada
+        const validChildSponsorships = monthlySponsorships.filter(sp => {
+          const spAmt = Number(sp.monthly_amount || sp.amount || 0);
+          return sp.child_id && sp.children?.name && spAmt >= 90;
+        });
+
+        const isRealPadrinho = validChildSponsorships.length > 0;
+        const primaryValidSp = validChildSponsorships[0] || null;
+
+        // 2. Doador Mensal / Mantenedor: Tem recorrência ativa (seja de R$ 50 ou qualquer valor) sem criança ou < R$ 90
+        const isDoadorMensal = !isRealPadrinho && (monthlySponsorships.length > 0 || user?.role === 'MANTENEDOR');
+
+        // 3. Doador Geral: Fez doações pontuais/avulsas
+        const roleDisplay = isRealPadrinho 
+          ? 'Padrinho' 
+          : isDoadorMensal 
+            ? 'Doador Mensal' 
+            : 'Doador Geral';
+
         const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
-        const donorName = user?.name || primarySponsorship?.donor_name || lastDonation?.donor_name || email.split('@')[0];
+        const donorName = user?.name || primaryValidSp?.donor_name || primarySponsorship?.donor_name || lastDonation?.donor_name || email.split('@')[0];
 
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
           name: donorName,
           email: email,
-          phone: user?.phone || primarySponsorship?.donor_phone || lastDonation?.donor_phone || undefined,
+          phone: user?.phone || primaryValidSp?.donor_phone || primarySponsorship?.donor_phone || lastDonation?.donor_phone || undefined,
           avatar: user?.avatar || undefined,
-          role: hasSponsorship ? 'Padrinho' : isSponsorRole ? 'Padrinho' : 'Doador Recorrente',
+          role: roleDisplay,
           status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
           joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
-          sponsoredChildName: primarySponsorship?.children?.name || undefined,
-          sponsoredChildVillage: primarySponsorship?.children?.address || undefined,
+          sponsoredChildName: isRealPadrinho ? primaryValidSp?.children?.name : undefined,
+          sponsoredChildVillage: isRealPadrinho ? primaryValidSp?.children?.address : undefined,
           totalDonated,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
@@ -312,7 +337,10 @@ export function SupportersList() {
   const stats = useMemo(() => {
     const total = supporters.length;
     const active = supporters.filter(s => s.status === 'active').length;
-    const withSponsorship = supporters.filter(s => !!s.sponsoredChildName).length;
+    // Padrinhos Ativos: APENAS quem realmente tem criança apadrinhada com cota >= R$ 90!
+    const withSponsorship = supporters.filter(s => s.role === 'Padrinho' && !!s.sponsoredChildName).length;
+    // Doadores Mensais (Mantenedores do Fundo Geral, incluindo os de R$ 50):
+    const monthlyDonors = supporters.filter(s => s.role === 'Doador Mensal').length;
     const totalRaised = supporters.reduce((acc, s) => acc + s.totalDonated, 0);
     const avgTicket = total > 0 ? totalRaised / total : 0;
 
@@ -320,6 +348,7 @@ export function SupportersList() {
       total,
       active,
       withSponsorship,
+      monthlyDonors,
       totalRaised,
       avgTicket
     };
@@ -508,7 +537,7 @@ export function SupportersList() {
             {stats.withSponsorship}
           </p>
           <p className="text-[11px] text-slate-400 font-bold mt-2">
-            Crianças diretamente apoiadas
+            {stats.withSponsorship} crianças com cota de R$ 90+ {stats.monthlyDonors > 0 ? `(${stats.monthlyDonors} mantenedores gerais)` : ''}
           </p>
         </div>
 
@@ -704,19 +733,26 @@ export function SupportersList() {
                 <td className="px-6 py-5">
                   <span className={cn(
                     "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm",
-                    s.role === 'Padrinho' || !!s.sponsoredChildName
+                    s.role === 'Padrinho'
                       ? "bg-rose-50 text-rose-700 border-rose-100"
-                      : "bg-blue-50 text-blue-700 border-blue-100"
+                      : s.role === 'Doador Mensal'
+                        ? "bg-blue-50 text-blue-700 border-blue-100"
+                        : "bg-slate-100 text-slate-700 border-slate-200"
                   )}>
-                    {s.role === 'Padrinho' || !!s.sponsoredChildName ? (
+                    {s.role === 'Padrinho' ? (
                       <>
                         <Heart size={11} className="fill-rose-500 text-rose-500" />
                         Padrinho
                       </>
+                    ) : s.role === 'Doador Mensal' ? (
+                      <>
+                        <RefreshCw size={11} className="text-blue-600" />
+                        Doador Mensal
+                      </>
                     ) : (
                       <>
-                        <Users size={11} />
-                        Doador Mensal
+                        <Users size={11} className="text-slate-500" />
+                        Doador Geral
                       </>
                     )}
                   </span>
@@ -724,7 +760,7 @@ export function SupportersList() {
 
                 {/* Criança Apadrinhada */}
                 <td className="px-6 py-5">
-                  {s.sponsoredChildName ? (
+                  {s.role === 'Padrinho' && s.sponsoredChildName ? (
                     <div>
                       <p className="text-xs font-black text-slate-900 flex items-center gap-1">
                         <Heart size={12} className="text-rose-500" />
@@ -734,9 +770,13 @@ export function SupportersList() {
                         <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>
                       )}
                     </div>
-                  ) : (
-                    <span className="text-xs text-slate-400 font-bold italic">
+                  ) : s.role === 'Doador Mensal' ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-blue-700 font-bold bg-blue-50/70 px-2.5 py-1 rounded-lg">
                       Apoio Geral / Fundo
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400 font-medium italic">
+                      Doação Pontual / Avulsa
                     </span>
                   )}
                 </td>
