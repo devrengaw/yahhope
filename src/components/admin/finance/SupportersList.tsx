@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   RefreshCw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Repeat
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -30,7 +31,7 @@ export function SupportersList() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'sponsor' | 'donor'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'sponsor' | 'maintainer' | 'donor'>('all');
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterData | null>(null);
   const [isSyncingStripe, setIsSyncingStripe] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -415,8 +416,9 @@ export function SupportersList() {
       const matchStatus = statusFilter === 'all' || s.status === statusFilter;
       const matchRole = 
         roleFilter === 'all' || 
-        (roleFilter === 'sponsor' && (s.role === 'Padrinho' || !!s.sponsoredChildName)) ||
-        (roleFilter === 'donor' && s.role !== 'Padrinho' && !s.sponsoredChildName);
+        (roleFilter === 'sponsor' && s.role === 'Padrinho') ||
+        (roleFilter === 'maintainer' && s.role === 'Doador Mensal') ||
+        (roleFilter === 'donor' && s.role === 'Doador Geral');
 
       return matchSearch && matchStatus && matchRole;
     });
@@ -552,8 +554,9 @@ export function SupportersList() {
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Cards de Métricas dos Apoiadores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-8 pb-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 p-8 pb-0">
         
+        {/* Card 1: Total de Apoiadores */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform">
@@ -572,6 +575,7 @@ export function SupportersList() {
           </p>
         </div>
 
+        {/* Card 2: Padrinhos Ativos */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform">
@@ -586,10 +590,30 @@ export function SupportersList() {
             {stats.withSponsorship}
           </p>
           <p className="text-[11px] text-slate-400 font-bold mt-2">
-            {stats.withSponsorship} crianças com cota de R$ 90+ {stats.monthlyDonors > 0 ? `(${stats.monthlyDonors} mantenedores gerais)` : ''}
+            {stats.withSponsorship} crianças com cota de R$ 90/mês
           </p>
         </div>
 
+        {/* Card 3: Mantenedores Mensais */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
+          <div className="flex justify-between items-start mb-3">
+            <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform">
+              <Repeat size={22} />
+            </div>
+            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+              Apoio Geral
+            </span>
+          </div>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Mantenedores Mensais</p>
+          <p className="text-3xl font-black text-slate-900 mt-1">
+            {stats.monthlyDonors}
+          </p>
+          <p className="text-[11px] text-slate-400 font-bold mt-2">
+            {stats.monthlyDonors} doadores mensais (R$ 50/mês)
+          </p>
+        </div>
+
+        {/* Card 4: Arrecadação Apoiadores */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform">
@@ -609,6 +633,7 @@ export function SupportersList() {
           </p>
         </div>
 
+        {/* Card 5: Contribuição Média */}
         <div className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 transition-all text-white relative overflow-hidden group">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
@@ -686,8 +711,9 @@ export function SupportersList() {
               className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
             >
               <option value="all">Todas as Modalidades</option>
-              <option value="sponsor">Apenas Padrinhos de Criança</option>
-              <option value="donor">Apenas Doadores Recorrentes</option>
+              <option value="sponsor">Apenas Padrinhos (Crianças)</option>
+              <option value="maintainer">Apenas Mantenedores Mensais</option>
+              <option value="donor">Apenas Doadores Gerais</option>
             </select>
 
             {/* Exportar CSV */}
