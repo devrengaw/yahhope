@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { evaluateNutritionalStatus } from '../lib/whoStandards';
+import { differenceInMonths } from 'date-fns';
+import { parseLocalDate } from '../lib/utils';
 
 interface PatientContextType {
   patients: Patient[];
@@ -310,8 +313,28 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // 8. Clinical Event (CRITICAL for Dashboard)
-    const status = (payload.nutritionalEval?.length > 0 ? (payload.nutritionalEval.includes('Desnutrição aguda grave com complicações') || payload.nutritionalEval.includes('Desnutrição aguda grave sem complicações') ? 'DAG' : (payload.nutritionalEval.includes('Desnutrição aguda moderada (DAM)') ? 'DAM' : 'Adequado')) : 'Adequado');
+    // 8. Clinical Event (CRITICAL for Dashboard & Status)
+    let status = 'Adequado';
+    const evalList = payload.nutritionalEval || [];
+    if (evalList.includes('Desnutrição aguda grave com complicações') || evalList.includes('Desnutrição aguda grave sem complicações')) {
+      status = 'DAG';
+    } else if (evalList.includes('Desnutrição aguda moderada (DAM)')) {
+      status = 'DAM';
+    } else {
+      // Avaliação estrita pelos padrões oficiais de crescimento infantil da OMS
+      const ageM = payload.dob ? differenceInMonths(new Date(), parseLocalDate(payload.dob)) : undefined;
+      const whoEval = evaluateNutritionalStatus({
+        weight: payload.weight ? parseFloat(payload.weight) : null,
+        height: payload.height ? parseFloat(payload.height) : null,
+        gender: payload.gender === 'F' ? 'F' : 'M',
+        ageInMonths: ageM,
+        muac: payload.muac ? parseFloat(payload.muac) : null,
+        hasBilateralEdema: payload.bilateral_edema
+      });
+      if (whoEval.status !== 'N/A') {
+        status = whoEval.status;
+      }
+    }
 
     const { error: eventError } = await supabase.from('clinical_events').insert({
       child_id: childId,

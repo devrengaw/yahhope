@@ -15,74 +15,36 @@ import { useVisits } from '../contexts/VisitContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { matchDefaultKitByIdOrName, matchInventoryItem } from '../lib/defaultNutritionKits';
+import { evaluateNutritionalStatus, calculateWeightForHeightZScore } from '../lib/whoStandards';
 
-// Helper to calculate Z-score approximation based on WHO simplified math
-const calculateZScoreAndStatus = (weight: number, height: number, gender: 'M' | 'F', ageInMonths?: number) => {
-  if (!weight || !height || height < 45 || height > 120) return { zScore: null, status: 'N/A' };
-  
-  // 1. Weight-for-Height (WFH) Calculation (Original logic)
-  const base = gender === 'M' ? 2.5 : 2.4;
-  const wfhMedian = base + 0.15 * (height - 45) + 0.0015 * Math.pow(height - 45, 2);
-  const wfhZ2Offset = 0.5 + (height - 45) * 0.03;
-  const wfhZ3Offset = 0.8 + (height - 45) * 0.04;
+// Helper to calculate Z-score and nutritional status strictly based on WHO Child Growth Standards
+const calculateZScoreAndStatus = (
+  weight: number, 
+  height: number, 
+  gender: 'M' | 'F', 
+  ageInMonths?: number,
+  muac?: number,
+  hasEdema?: boolean | string
+) => {
+  const result = evaluateNutritionalStatus({
+    weight,
+    height,
+    gender,
+    ageInMonths,
+    muac,
+    hasBilateralEdema: hasEdema
+  });
 
-  const wfh_z_2 = wfhMedian - wfhZ2Offset;
-  const wfh_z_3 = wfhMedian - wfhZ3Offset;
-
-  let zScore = 0;
-  if (weight < wfhMedian) {
-    zScore = -((wfhMedian - weight) / (wfhZ2Offset / 2)); // Approximate SD
-  } else {
-    zScore = ((weight - wfhMedian) / (wfhZ2Offset / 2));
-  }
-
-  let status = 'Adequado';
-  if (weight <= wfh_z_3) status = 'DAG';
-  else if (weight <= wfh_z_2) status = 'DAM';
-  else if (zScore < -1) status = 'Risco';
-
-  // 2. Age-based checks for Stunting (Height-for-Age) and Underweight (Weight-for-Age)
-  if (ageInMonths !== undefined && ageInMonths >= 0) {
-    // Piecewise approximation for Median Height
-    let hfaMedian = 50;
-    if (ageInMonths <= 3) hfaMedian = 50 + ageInMonths * 3.5;
-    else if (ageInMonths <= 12) hfaMedian = 60.5 + (ageInMonths - 3) * 1.5;
-    else if (ageInMonths <= 24) hfaMedian = 74 + (ageInMonths - 12) * 1.0;
-    else if (ageInMonths <= 36) hfaMedian = 86 + (ageInMonths - 24) * 0.8;
-    else if (ageInMonths <= 48) hfaMedian = 95.6 + (ageInMonths - 36) * 0.7;
-    else hfaMedian = 104 + (ageInMonths - 48) * 0.5;
-
-    // Roughly -3 SD for height is 10-12% below median
-    const sd_h = hfaMedian * 0.04;
-    
-    // Piecewise approximation for Median Weight
-    let wfaMedian = 3.3;
-    if (ageInMonths <= 3) wfaMedian = 3.3 + ageInMonths * 0.9;
-    else if (ageInMonths <= 12) wfaMedian = 6.0 + (ageInMonths - 3) * 0.3;
-    else if (ageInMonths <= 24) wfaMedian = 8.7 + (ageInMonths - 12) * 0.23;
-    else if (ageInMonths <= 36) wfaMedian = 11.5 + (ageInMonths - 24) * 0.16;
-    else if (ageInMonths <= 48) wfaMedian = 13.4 + (ageInMonths - 36) * 0.15;
-    else wfaMedian = 15.2 + (ageInMonths - 48) * 0.15;
-
-    // Roughly -3 SD for weight is 25-30% below median
-    const sd_w = wfaMedian * 0.10;
-
-    // Check Stunting (Height-for-Age)
-    if (height <= hfaMedian - 3 * sd_h && status !== 'DAG') {
-      status = 'DAG'; // Severe stunting -> DAG
-    } else if (height <= hfaMedian - 2 * sd_h && (status === 'Adequado' || status === 'Risco')) {
-      status = 'DAM'; // Moderate stunting -> DAM
-    }
-
-    // Check Underweight (Weight-for-Age)
-    if (weight <= wfaMedian - 3 * sd_w && status !== 'DAG') {
-      status = 'DAG'; // Severe underweight -> DAG
-    } else if (weight <= wfaMedian - 2 * sd_w && (status === 'Adequado' || status === 'Risco')) {
-      status = 'DAM'; // Moderate underweight -> DAM
-    }
-  }
-
-  return { zScore: parseFloat(zScore.toFixed(2)), status };
+  return {
+    zScore: result.zScore,
+    status: result.status,
+    stuntingStatus: result.stuntingStatus,
+    underweightStatus: result.underweightStatus,
+    hfaZScore: result.hfaZScore,
+    wfaZScore: result.wfaZScore,
+    criteriaExplanation: result.criteriaExplanation
+  };
 };
 
 export function PatientDetails() {
@@ -119,7 +81,7 @@ export function PatientDetails() {
   // Hospital Discharge State
   const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
   const [hospDischargeDate, setHospDischargeDate] = useState(formatLocalDate(new Date()));
-  const [hospDischargeStatus, setHospDischargeStatus] = useState<string>('DAG');
+  const [hospDischargeStatus, setHospDischargeStatus] = useState<string>('Adequado');
   const [hospDischargeReturnDate, setHospDischargeReturnDate] = useState<string>(formatLocalDate(addDays(new Date(), 7)));
   const [hospDischargeWeight, setHospDischargeWeight] = useState<string>('');
   const [hospDischargeHeight, setHospDischargeHeight] = useState<string>('');
@@ -441,19 +403,54 @@ export function PatientDetails() {
     }
   };
 
+  // Produtos nutricionais e complementares entregues nos kits para esta criança
+  const activeKitProducts = useMemo(() => {
+    if (!latestClinicalEvent?.kit_delivered || latestClinicalEvent.kit_delivered.length === 0) return [];
+    const products: {
+      kitId: string;
+      kitName: string;
+      itemId: string;
+      itemName: string;
+      category: string;
+      quantity: number;
+      unit: string;
+      dosage?: string;
+    }[] = [];
+
+    latestClinicalEvent.kit_delivered.forEach(kitId => {
+      const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
+      if (kit) {
+        kit.items.forEach(kitItem => {
+          const invItem = items.find(i => i.id === kitItem.item_id) || matchInventoryItem({ itemId: kitItem.item_id, itemName: (kitItem as any).item_name }, items);
+          products.push({
+            kitId: kit.id,
+            kitName: kit.name,
+            itemId: invItem?.id || kitItem.item_id,
+            itemName: invItem?.name || (kitItem as any).item_name || 'Insumo Nutricional',
+            category: invItem?.category || 'Nutrição',
+            quantity: kitItem.quantity,
+            unit: invItem?.unit || 'un',
+            dosage: kitItem.dosage
+          });
+        });
+      }
+    });
+    return products;
+  }, [latestClinicalEvent, kits, items]);
+
   const activeMedications = [...(latestClinicalEvent?.prescriptions || [])];
   if (latestClinicalEvent?.kit_delivered) {
     latestClinicalEvent.kit_delivered.forEach(kitId => {
-      const kit = kits.find(k => k.id === kitId);
+      const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
       if (kit) {
         kit.items.forEach(kitItem => {
-          const invItem = items.find(i => i.id === kitItem.item_id);
+          const invItem = items.find(i => i.id === kitItem.item_id) || matchInventoryItem({ itemId: kitItem.item_id, itemName: (kitItem as any).item_name }, items);
           if (invItem) {
             const cat = invItem.category?.toLowerCase() || '';
             const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
             
             if (isMedication) {
-              const alreadyHas = activeMedications.some(p => p.item_id === invItem.id || p.medication === invItem.name);
+              const alreadyHas = activeMedications.some(p => p.item_id === invItem.id || p.medication.toLowerCase() === invItem.name.toLowerCase());
               if (!alreadyHas) {
                 activeMedications.push({
                   item_id: invItem.id,
@@ -512,7 +509,13 @@ export function PatientDetails() {
   const isCurrentEventRetroactive = Boolean(eventDate && eventDate < formatLocalDate(new Date()));
   const ageInMonths = differenceInMonths(new Date(), new Date(patient.dob));
   const bmi = (newWeight && newHeight) ? (parseFloat(newWeight) / Math.pow(parseFloat(newHeight) / 100, 2)).toFixed(2) : '--';
-  const { zScore, status: calcStatus } = calculateZScoreAndStatus(parseFloat(newWeight), parseFloat(newHeight), patient.gender, ageInMonths);
+  const { zScore, status: calcStatus, criteriaExplanation, stuntingStatus } = calculateZScoreAndStatus(
+    parseFloat(newWeight), 
+    parseFloat(newHeight), 
+    patient.gender, 
+    ageInMonths,
+    parseFloat(newMuac) || undefined
+  );
   const queueAppointment = patient ? atendimentos.find(
     a => a.patient_id === patient.id && a.status !== 'completed' && a.date <= formatLocalDate(new Date())
   ) : undefined;
@@ -646,18 +649,17 @@ export function PatientDetails() {
       newSelectedKits = selectedKits.filter(id => id !== kitId);
       
       // Auto-remove medications from this kit
-      const kit = kits.find(k => k.id === kitId);
+      const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
       if (kit) {
         kit.items.forEach(kitItem => {
-          const invItem = items.find(i => i.id === kitItem.item_id);
+          const invItem = items.find(i => i.id === kitItem.item_id) || matchInventoryItem({ itemId: kitItem.item_id, itemName: (kitItem as any).item_name }, items);
           if (invItem) {
             const cat = invItem.category?.toLowerCase() || '';
             const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
             
             if (isMedication) {
               setPrescriptions(prev => {
-                // If it's the last one, leave an empty template
-                const filtered = prev.filter(p => p.medication !== invItem.name);
+                const filtered = prev.filter(p => p.medication.toLowerCase() !== invItem.name.toLowerCase() && p.item_id !== invItem.id);
                 if (filtered.length === 0) {
                   return [{ id: '1', item_id: '', medication: '', treatment: '', duration_days: '', quantity: '' }];
                 }
@@ -671,20 +673,19 @@ export function PatientDetails() {
       newSelectedKits = [...selectedKits, kitId];
       
       // Auto-add medications from this kit
-      const kit = kits.find(k => k.id === kitId);
+      const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
       if (kit) {
         kit.items.forEach(kitItem => {
-          const invItem = items.find(i => i.id === kitItem.item_id);
+          const invItem = items.find(i => i.id === kitItem.item_id) || matchInventoryItem({ itemId: kitItem.item_id, itemName: (kitItem as any).item_name }, items);
           if (invItem) {
             const cat = invItem.category?.toLowerCase() || '';
             const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
             
             if (isMedication) {
               setPrescriptions(prev => {
-                const alreadyHas = prev.some(p => p.medication === invItem.name);
+                const alreadyHas = prev.some(p => p.medication.toLowerCase() === invItem.name.toLowerCase() || (p.item_id && p.item_id === invItem.id));
                 if (alreadyHas) return prev;
                 
-                // Remove first empty prescription if it exists
                 const cleaned = prev.filter(p => p.medication !== '' || p.treatment !== '');
                 return [...cleaned, { 
                   id: Date.now().toString() + Math.random().toString(), 
@@ -755,13 +756,13 @@ export function PatientDetails() {
     const w = fromEvent?.weight ?? patientEvents[0]?.weight;
     const h = fromEvent?.height ?? patientEvents[0]?.height;
     const pe = fromEvent?.zScore ?? patientEvents[0]?.z_score_weight_height;
-    const st = fromEvent?.status || (patient ? patient.status : 'DAG');
+    const st = fromEvent?.status || (patient ? patient.status : 'Adequado');
 
     setRefProfessional(fromEvent?.professional || user?.name || '');
     setRefWeight(w ? (w * 1000).toString() : '');
     setRefHeight(h ? h.toString() : '');
     setRefPE(pe !== undefined && pe !== null ? pe.toString() : '');
-    setRefStatus(st || 'DAG');
+    setRefStatus(st || 'Adequado');
     setIsHospitalized(st === 'Internada' ? 'Sim' : 'Não');
     setHospitalName('');
     setEdema('Não');
@@ -775,7 +776,7 @@ export function PatientDetails() {
     const w = newWeight ? parseFloat(newWeight) : undefined;
     const h = newHeight ? parseFloat(newHeight) : undefined;
     const pe = zScore !== null ? zScore : undefined;
-    const st = calcStatus !== 'N/A' ? calcStatus : (patient?.status || 'DAG');
+    const st = calcStatus !== 'N/A' ? calcStatus : (patient?.status || 'Adequado');
 
     setIsModalOpen(false);
     openReferralModal({
@@ -1022,7 +1023,19 @@ export function PatientDetails() {
           <button
             onClick={() => {
               setHospDischargeDate(formatLocalDate(new Date()));
-              setHospDischargeStatus('DAG');
+              const w = latestWeightEvent?.weight;
+              const h = latestHeightEvent?.height;
+              let suggestedStatus = 'Adequado';
+              if (w && h) {
+                const evalRes = evaluateNutritionalStatus({
+                  weight: Number(w),
+                  height: Number(h),
+                  gender: patient.gender,
+                  ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
+                });
+                if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
+              }
+              setHospDischargeStatus(suggestedStatus);
               setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
               setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
               setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
@@ -1081,7 +1094,19 @@ export function PatientDetails() {
                 <button 
                   onClick={() => {
                     setHospDischargeDate(formatLocalDate(new Date()));
-                    setHospDischargeStatus('DAG');
+                    const w = latestWeightEvent?.weight;
+                    const h = latestHeightEvent?.height;
+                    let suggestedStatus = 'Adequado';
+                    if (w && h) {
+                      const evalRes = evaluateNutritionalStatus({
+                        weight: Number(w),
+                        height: Number(h),
+                        gender: patient.gender,
+                        ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
+                      });
+                      if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
+                    }
+                    setHospDischargeStatus(suggestedStatus);
                     setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
                     setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
                     setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
@@ -1217,6 +1242,68 @@ export function PatientDetails() {
                     </p>
                   )}
                 </div>
+              </div>
+
+              {/* Active Nutrition Kits & Products Section */}
+              <div className="bg-amber-50/40 rounded-[2.5rem] p-8 border border-amber-200/60 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div>
+                    <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
+                      <Package size={18} className="text-amber-600" />
+                      Kits & Produtos Nutricionais Ativos (Alimentação da Criança)
+                    </h3>
+                    <p className="text-xs text-amber-800/80 mt-1">
+                      Insumos, alimentos terapêuticos e kits de entrega vinculados aos atendimentos da criança.
+                    </p>
+                  </div>
+                  {activeKitProducts.length > 0 && (
+                    <span className="text-xs font-black text-amber-900 bg-amber-100/80 px-3 py-1 rounded-xl border border-amber-200 w-fit">
+                      {activeKitProducts.length} {activeKitProducts.length === 1 ? 'produto ativo' : 'produtos ativos'}
+                    </span>
+                  )}
+                </div>
+
+                {activeKitProducts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {activeKitProducts.map((prod, idx) => (
+                      <div key={idx} className="bg-white p-5 rounded-2xl border border-amber-100/90 flex flex-col hover:shadow-md transition-all group">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md truncate max-w-[180px]">
+                            {prod.kitName}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {prod.category}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-black text-slate-900 line-clamp-2 mt-1">
+                          {prod.itemName}
+                        </h4>
+
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs text-slate-500 font-medium">Quantidade no Kit:</span>
+                          <span className="text-xs font-black text-amber-900 bg-amber-100/70 px-2.5 py-1 rounded-lg">
+                            {prod.quantity} {prod.unit}
+                          </span>
+                        </div>
+
+                        {prod.dosage && (
+                          <div className="mt-2 text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 border border-slate-100 italic">
+                            {prod.dosage}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white/70 border border-amber-200/60 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                    <Package size={28} className="text-amber-400 mb-2" />
+                    <p className="text-sm font-bold text-slate-700">Nenhum kit nutricional registrado no último atendimento</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md">
+                      Ao realizar uma consulta ou acompanhamento, selecione os kits correspondentes (Cesta Básica, 0-6m, 6-24m, HIV) para que os produtos fiquem listados aqui.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Active Medications Section */}
@@ -1700,11 +1787,56 @@ export function PatientDetails() {
                         )}
 
                         {event.kit_delivered && event.kit_delivered.length > 0 && (
-                          <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-100 mb-4">
-                            <Package className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm text-orange-800">
-                              KIT ENTREGUE: <span className="font-semibold">{kits.find(k => k.id === event.kit_delivered?.[0])?.name || 'Kit Padrão'}</span>
-                            </span>
+                          <div className="space-y-2.5 mb-4">
+                            {event.kit_delivered.map((kitId, kIdx) => {
+                              const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
+                              const kitName = kit?.name || 'Kit de Nutrição';
+                              const kitItemsList = kit?.items || [];
+
+                              return (
+                                <div key={kIdx} className="p-3.5 bg-gradient-to-r from-orange-50/90 via-amber-50/50 to-orange-50/30 rounded-2xl border border-orange-200/80 shadow-xs">
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                                        <Package size={14} />
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-orange-600 block">Kit Entregue</span>
+                                        <span className="text-sm font-bold text-slate-900">{kitName}</span>
+                                      </div>
+                                    </div>
+                                    {kitItemsList.length > 0 && (
+                                      <span className="text-[10px] font-black text-orange-700 bg-white/90 border border-orange-200 px-2 py-0.5 rounded-md shadow-2xs">
+                                        {kitItemsList.length} {kitItemsList.length === 1 ? 'produto' : 'produtos'}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {kitItemsList.length > 0 ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 pt-2 border-t border-orange-100">
+                                      {kitItemsList.map((ki, kiIdx) => {
+                                        const invItem = items.find(i => i.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
+                                        const prodName = invItem?.name || (ki as any).item_name || 'Insumo';
+                                        const prodUnit = invItem?.unit || 'un';
+
+                                        return (
+                                          <div key={kiIdx} className="flex items-center justify-between gap-1.5 bg-white/95 border border-orange-100/90 rounded-xl px-2.5 py-1.5 text-xs shadow-2xs">
+                                            <span className="font-semibold text-slate-800 truncate" title={prodName}>
+                                              {prodName}
+                                            </span>
+                                            <span className="font-black text-orange-800 bg-orange-100/80 px-2 py-0.5 rounded text-[11px] shrink-0">
+                                              {ki.quantity} {prodUnit}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[11px] text-orange-700 italic mt-1">Produtos registrados no kit de distribuição.</p>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
 
@@ -2001,21 +2133,39 @@ export function PatientDetails() {
                 </div>
 
                 {/* Auto-calculated Results */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 mb-1">IMC Calculado</p>
-                    <p className="text-lg font-bold text-slate-800">{bmi}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 mb-1">P/E (DP - Z-Score)</p>
-                    <p className="text-lg font-bold text-slate-800">{zScore !== null ? zScore : '--'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 mb-1">Grau de Nutrição</p>
-                    <div className="mt-1">
-                      <StatusBadge status={calcStatus} />
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 mb-1">IMC Calculado</p>
+                      <p className="text-lg font-bold text-slate-800">{bmi}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 mb-1">P/E (Z-Score OMS)</p>
+                      <p className="text-lg font-bold text-slate-800">{zScore !== null ? zScore : '--'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 mb-1">Status Nutricional (OMS)</p>
+                      <div className="mt-1">
+                        <StatusBadge status={calcStatus} />
+                      </div>
                     </div>
                   </div>
+
+                  {criteriaExplanation && criteriaExplanation.length > 0 && (
+                    <div className="pt-2 border-t border-slate-200/70 text-[11px] text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-semibold text-slate-700">Critério OMS:</span>
+                      {criteriaExplanation.map((crit, idx) => (
+                        <span key={idx} className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-700">
+                          {crit}
+                        </span>
+                      ))}
+                      {stuntingStatus && stuntingStatus !== 'N/A' && stuntingStatus !== 'Adequada' && (
+                        <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-amber-800 font-medium" title="Déficit estatural crônico (não altera o diagnóstico agudo)">
+                          E/I: {stuntingStatus} (Crônico)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -2048,8 +2198,29 @@ export function PatientDetails() {
                         </button>
                       ))}
                     </div>
-                    {selectedKits.length === 0 && (
+                    {selectedKits.length === 0 ? (
                       <p className="text-[10px] text-slate-400 italic">Nenhum kit selecionado</p>
+                    ) : (
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl space-y-1.5 mt-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                          Produtos inclusos nos kits selecionados:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedKits.flatMap(kitId => {
+                            const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
+                            return kit?.items || [];
+                          }).map((ki, i) => {
+                            const invItem = items.find(it => it.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
+                            const pName = invItem?.name || (ki as any).item_name || 'Insumo';
+                            const pUnit = invItem?.unit || 'un';
+                            return (
+                              <span key={i} className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                                • {pName}: {ki.quantity} {pUnit}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../services/currencyService';
 import { saveExpenseTransaction } from '../services/financeTransactionService';
 import { getLocalCategories, fetchAndSyncCategories } from '../services/financeCategoryService';
+import { matchInventoryItem } from '../lib/defaultNutritionKits';
 
 const KitItemSelect = ({ items, categories, value, onChange }: { items: InventoryItem[], categories: any[], value: string, onChange: (id: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -280,7 +281,7 @@ export function Inventory() {
     let hasMissingPrice = false;
 
     kit.items.forEach(ki => {
-      const item = items.find(i => i.id === ki.item_id);
+      const item = items.find(i => i.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
       if (!item || item.purchase_price === undefined || item.purchase_price === null) {
         hasMissingPrice = true;
         return;
@@ -722,7 +723,7 @@ export function Inventory() {
               </Link>
               <button 
                 onClick={() => openKitModal()}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
               >
                 <Plus size={18} />
                 Novo Kit
@@ -1260,38 +1261,51 @@ export function Inventory() {
                       </div>
                     </div>
                     <div className="space-y-3 mt-2 flex-grow">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Itens do Kit</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Produtos do Kit</h4>
+                        <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {kit.items.length} {kit.items.length === 1 ? 'item' : 'itens'}
+                        </span>
+                      </div>
+                      
                       {[...kit.items].sort((a, b) => {
-                        const itemA = items.find(i => i.id === a.item_id);
-                        const itemB = items.find(i => i.id === b.item_id);
-                        if (!itemA || !itemB) return 0;
-                        return itemA.name.localeCompare(itemB.name);
-                      }).map(ki => {
-                        const item = items.find(i => i.id === ki.item_id);
-                        if (!item) return null;
+                        const itemA = items.find(i => i.id === a.item_id) || matchInventoryItem({ itemId: a.item_id, itemName: (a as any).item_name }, items);
+                        const itemB = items.find(i => i.id === b.item_id) || matchInventoryItem({ itemId: b.item_id, itemName: (b as any).item_name }, items);
+                        const nameA = itemA?.name || (a as any).item_name || '';
+                        const nameB = itemB?.name || (b as any).item_name || '';
+                        return nameA.localeCompare(nameB);
+                      }).map((ki, kiIdx) => {
+                        const item = items.find(i => i.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
+                        const itemName = item?.name || (ki as any).item_name || 'Insumo Nutricional';
+                        const itemUnit = item?.unit || 'un';
 
-                        const itemPrice = item.purchase_price;
-                        const itemCurr = item.currency || 'MZN';
+                        const itemPrice = item?.purchase_price;
+                        const itemCurr = item?.currency || 'MZN';
                         const priceMzn = itemPrice !== undefined && itemPrice !== null
                           ? (itemCurr === 'BRL' ? convertBrlToMzn(itemPrice, mznRate) : itemPrice)
                           : null;
                         const subtotalMzn = priceMzn !== null ? priceMzn * ki.quantity : null;
 
                         return (
-                          <div key={ki.item_id} className="flex justify-between items-center text-sm border-b border-slate-200/50 pb-2 last:border-0 last:pb-0">
-                            <span className="text-slate-700 font-medium">{item.name}</span>
+                          <div key={ki.item_id || kiIdx} className="flex justify-between items-center text-sm border-b border-slate-200/50 pb-2 last:border-0 last:pb-0">
+                            <div>
+                              <span className="text-slate-700 font-medium block">{itemName}</span>
+                              {ki.dosage && (
+                                <span className="text-[10px] text-slate-500 block">{ki.dosage}</span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2">
-                              <span className="bg-white px-2 py-1 rounded-md text-slate-600 border border-slate-100 font-bold text-xs">
-                                {ki.quantity} {item.unit}
+                              <span className="bg-white px-2 py-1 rounded-md text-slate-600 border border-slate-100 font-bold text-xs whitespace-nowrap">
+                                {ki.quantity} {itemUnit}
                               </span>
                               {subtotalMzn !== null ? (
-                                <div className="text-right">
+                                <div className="text-right shrink-0">
                                   <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80 inline-block">
                                     {subtotalMzn.toFixed(2)} MT
                                   </span>
                                   {priceMzn !== null && ki.quantity > 1 && (
                                     <span className="text-[10px] text-slate-400 block mt-0.5">
-                                      ({priceMzn.toFixed(2)} MT/{item.unit})
+                                      ({priceMzn.toFixed(2)} MT/{itemUnit})
                                     </span>
                                   )}
                                 </div>
@@ -1302,6 +1316,19 @@ export function Inventory() {
                           </div>
                         );
                       })}
+
+                      {kit.items.length === 0 && (
+                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+                          <span>Nenhum produto cadastrado neste kit.</span>
+                          <button
+                            type="button"
+                            onClick={handleRestoreDefaults}
+                            className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg ml-2 cursor-pointer"
+                          >
+                            Restaurar
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Custo Total do Kit */}

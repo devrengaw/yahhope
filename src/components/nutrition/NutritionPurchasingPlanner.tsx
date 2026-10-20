@@ -33,6 +33,7 @@ import { usePatients } from '../../contexts/PatientContext';
 import { supabase } from '../../lib/supabase';
 import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../../services/currencyService';
 import { saveExpenseTransaction } from '../../services/financeTransactionService';
+import { matchInventoryItem } from '../../lib/defaultNutritionKits';
 import { cn } from '../../lib/utils';
 import { Kit, InventoryItem } from '../../lib/mockData';
 
@@ -223,7 +224,7 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       let hasMissingPrice = false;
 
       kit.items.forEach(ki => {
-        const item = items.find(i => i.id === ki.item_id);
+        const item = items.find(i => i.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
         if (!item || item.purchase_price === undefined || item.purchase_price === null) {
           hasMissingPrice = true;
           return;
@@ -367,9 +368,9 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       const effectiveTarget = targetCount > 0 ? targetCount : (activeKitFilter === kit.id ? 1 : 0);
 
       kit.items.forEach(ki => {
-        const item = items.find(i => i.id === ki.item_id);
-        const itemId = ki.item_id;
-        const name = item ? item.name : 'Insumo Removido';
+        const item = items.find(i => i.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
+        const itemId = item?.id || ki.item_id;
+        const name = item ? item.name : ((ki as any).item_name || 'Insumo Nutricional');
         const unit = item ? item.unit : 'un';
         const category = item ? item.category : 'Geral';
         const currentStock = item ? item.quantity : 0;

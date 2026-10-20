@@ -4,6 +4,7 @@ import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveCo
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { cn, parseLocalDate } from '../lib/utils';
+import { getWhoWfhThresholds } from '../lib/whoStandards';
 
 interface GrowthChartsProps {
   patient: Patient;
@@ -83,17 +84,12 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
       point.z_2 = median - z2Offset;
       point.z_3 = median - z3Offset;
     } else if (type === 'weightForHeight') {
-      const base = gender === 'M' ? 2.5 : 2.4;
-      const calcX = Math.max(45, Math.min(120, x));
-      const median = base + 0.15 * (calcX - 45) + 0.0015 * Math.pow(calcX - 45, 2);
-      const z2Offset = 0.5 + (calcX - 45) * 0.03;
-      const z3Offset = 0.8 + (calcX - 45) * 0.04;
-
-      point.z3 = median + z3Offset;
-      point.z2 = median + z2Offset;
-      point.z0 = median;
-      point.z_2 = median - z2Offset;
-      point.z_3 = median - z3Offset;
+      const t = getWhoWfhThresholds(x, gender);
+      point.z3 = t.sd3pos;
+      point.z2 = t.sd2pos;
+      point.z0 = t.median;
+      point.z_2 = t.sd2neg;
+      point.z_3 = t.sd3neg;
     } else if (type === 'hcForAge') {
       const base = gender === 'M' ? 34.5 : 33.5;
       const median = base + 12 * Math.pow(x / 12, 0.3);

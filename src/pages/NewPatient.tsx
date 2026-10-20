@@ -7,6 +7,8 @@ import { usePatients } from '../contexts/PatientContext';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadChildPhoto } from '../lib/imageUpload';
+import { matchDefaultKitByIdOrName, matchInventoryItem } from '../lib/defaultNutritionKits';
+import { calculateWeightForHeightZScore, calculateHeightForAgeZScore } from '../lib/whoStandards';
 
 const STEPS = [
   { id: 1, title: 'Identificação', icon: User },
@@ -224,23 +226,16 @@ export function NewPatient() {
       const heightInMeters = height / 100;
       const calcBmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
       
-      // Z-Score Weight/Height (WHO approximation)
+      // Z-Score Weight/Height (WHO Child Growth Standards)
       let zWHCalc = '';
-      if (height >= 45 && height <= 120) {
-        const baseWH = gender === 'M' ? 2.5 : 2.4;
-        const medianWH = baseWH + 0.15 * (height - 45) + 0.0015 * Math.pow(height - 45, 2);
-        const z2OffsetWH = 0.5 + (height - 45) * 0.03;
-        let zWH = 0;
-        if (weight < medianWH) {
-          zWH = -((medianWH - weight) / (z2OffsetWH / 2));
-        } else {
-          zWH = (weight - medianWH) / (z2OffsetWH / 2);
-        }
-        zWHCalc = zWH.toFixed(2);
+      const g = (gender === 'F' ? 'F' : 'M');
+      const calcZ = calculateWeightForHeightZScore(weight, height, g);
+      if (calcZ !== null) {
+        zWHCalc = calcZ.toFixed(2);
       }
 
       updates.bmi = calcBmi;
-      updates.bmi_gestational = calcBmi; // Preenchendo com o mesmo cálculo conforme solicitado
+      updates.bmi_gestational = calcBmi;
       updates.z_score_weight_height = zWHCalc;
     } else {
       if (formData.bmi !== '') updates.bmi = '';
@@ -249,14 +244,12 @@ export function NewPatient() {
     }
 
     if (height > 0 && dob) {
-      // Z-Score Height/Age (WHO approximation)
+      // Z-Score Height/Age (WHO Child Growth Standards)
       const ageM = differenceInMonths(new Date(), parseLocalDate(dob));
-      if (ageM >= 0 && ageM <= 60) {
-        const baseHA = gender === 'M' ? 50 : 49;
-        const medianHA = baseHA + 25 * Math.pow(ageM / 12, 0.6);
-        const z2OffsetHA = 4 + ageM * 0.05;
-        const zHA = (height - medianHA) / (z2OffsetHA / 2);
-        updates.z_score_height_age = zHA.toFixed(2);
+      const g = (gender === 'F' ? 'F' : 'M');
+      const calcHA = calculateHeightForAgeZScore(height, ageM, g);
+      if (calcHA !== null) {
+        updates.z_score_height_age = calcHA.toFixed(2);
       } else {
         if (formData.z_score_height_age !== '') updates.z_score_height_age = '';
       }
@@ -298,10 +291,10 @@ export function NewPatient() {
       // Auto-add kit items to prescriptions so they show up in medications area permanently
       if (selectedKits.length > 0) {
         selectedKits.forEach(kitId => {
-          const kit = kits.find(k => k.id === kitId);
+          const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
           if (kit) {
             kit.items.forEach(kitItem => {
-              const invItem = items.find(i => i.id === kitItem.item_id);
+              const invItem = items.find(i => i.id === kitItem.item_id) || matchInventoryItem({ itemId: kitItem.item_id, itemName: (kitItem as any).item_name }, items);
               if (invItem) {
                 const cat = invItem.category?.toLowerCase() || '';
                 const isMedication = cat.includes('medicamento') || cat.includes('remédio') || cat.includes('remedio') || cat.includes('suplemento');
@@ -818,8 +811,29 @@ export function NewPatient() {
                         </button>
                       ))}
                     </div>
-                    {selectedKits.length === 0 && (
+                    {selectedKits.length === 0 ? (
                       <p className="text-[10px] text-slate-400 italic">Nenhum kit selecionado</p>
+                    ) : (
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl space-y-1.5 mt-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                          Produtos inclusos nos kits selecionados:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedKits.flatMap(kitId => {
+                            const kit = kits.find(k => k.id === kitId) || matchDefaultKitByIdOrName(kitId);
+                            return kit?.items || [];
+                          }).map((ki, i) => {
+                            const invItem = items.find(it => it.id === ki.item_id) || matchInventoryItem({ itemId: ki.item_id, itemName: (ki as any).item_name }, items);
+                            const pName = invItem?.name || (ki as any).item_name || 'Insumo';
+                            const pUnit = invItem?.unit || 'un';
+                            return (
+                              <span key={i} className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                                • {pName}: {ki.quantity} {pUnit}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
                   

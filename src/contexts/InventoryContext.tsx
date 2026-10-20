@@ -95,9 +95,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         setCategories(catsRes.data.map(c => ({ id: c.id, name: c.name, description: c.description || '' })));
       }
 
+      let currentInventory: InventoryItem[] = [];
       if (itemsRes.data) {
         const medMeta = getMedMetadata();
-        setItems(itemsRes.data.map(i => ({
+        currentInventory = itemsRes.data.map(i => ({
           id: i.id,
           name: i.name,
           category: i.category,
@@ -115,7 +116,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           dosage_form: i.dosage_form || medMeta[i.id]?.dosage_form || (i.unit?.toLowerCase().includes('frasco') ? 'liquido' : i.unit?.toLowerCase().includes('caixa') ? 'comprimido' : undefined),
           package_units: i.package_units !== undefined && i.package_units !== null ? Number(i.package_units) : medMeta[i.id]?.package_units,
           liquid_volume_ml: i.liquid_volume_ml !== undefined && i.liquid_volume_ml !== null ? Number(i.liquid_volume_ml) : medMeta[i.id]?.liquid_volume_ml
-        })));
+        }));
       }
 
       if (transRes.data) {
@@ -130,17 +131,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      // Reconcile and protect kits from disappearing on refresh
+      // Carrega os kits existentes respeitando o banco de dados e preservando itens locais se houver
       const localCachedKits = getLocalKits();
+      let mergedKits: Kit[] = [];
       if (kitsRes.data && kitsRes.data.length > 0) {
-        const kData = kitsRes.data.map(k => {
+        mergedKits = kitsRes.data.map(k => {
           const dbItems = kitItemsRes.data ? kitItemsRes.data.filter(ki => ki.kit_id === k.id).map(ki => ({
             item_id: ki.item_id,
             quantity: ki.quantity,
             dosage: ki.dosage || undefined
           })) : [];
 
-          // If DB has items, use them; if DB items is empty (or kit_items table failed), retain local items
+          // Se o DB já tem itens, usa os do DB; se não, mantém os que o usuário já tinha salvo localmente
           const matchingLocal = localCachedKits.find(lk => lk.id === k.id || lk.name.trim().toLowerCase() === k.name.trim().toLowerCase());
           const finalItems = dbItems.length > 0 ? dbItems : (matchingLocal?.items || []);
 
@@ -152,20 +154,19 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
           };
         });
 
-        // Retain any local kits that haven't synced to DB yet
-        const mergedKits = [...kData];
+        // Mantém kits criados localmente que ainda não foram sincronizados
         localCachedKits.forEach(lk => {
           if (!mergedKits.some(mk => mk.id === lk.id || mk.name.trim().toLowerCase() === lk.name.trim().toLowerCase())) {
             mergedKits.push(lk);
           }
         });
-
-        setKits(mergedKits);
-        saveKitsToStorage(mergedKits);
       } else if (localCachedKits.length > 0) {
-        // DB returned 0 kits or error: preserve our local kits so they never zero out
-        setKits(localCachedKits);
+        mergedKits = [...localCachedKits];
       }
+
+      setItems(currentInventory);
+      setKits(mergedKits);
+      saveKitsToStorage(mergedKits);
       
       setIsLoaded(true);
     } catch (e) {
@@ -350,12 +351,20 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         const validItems = kit.items.filter(ki => ki.item_id && ki.quantity > 0);
         if (validItems.length > 0) {
           try {
-            await supabase.from('kit_items').insert(validItems.map(ki => ({
+            const { error: insertErr } = await supabase.from('kit_items').insert(validItems.map(ki => ({
               kit_id: insertedId,
               item_id: ki.item_id,
               quantity: ki.quantity,
               dosage: ki.dosage || null
             })));
+            if (insertErr && (insertErr.message?.includes('dosage') || insertErr.code === '42703')) {
+              // Fallback se a coluna dosage não existir na tabela
+              await supabase.from('kit_items').insert(validItems.map(ki => ({
+                kit_id: insertedId,
+                item_id: ki.item_id,
+                quantity: ki.quantity
+              })));
+            }
           } catch (itemErr) {
             console.warn('Supabase kit_items insert warning, preserved locally:', itemErr);
           }
@@ -396,7 +405,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
               quantity: ki.quantity,
               dosage: ki.dosage || null
             })));
-            if (itemsErr) {
+            if (itemsErr && (itemsErr.message?.includes('dosage') || itemsErr.code === '42703')) {
+              // Fallback se a coluna dosage não existir na tabela kit_items
+              await supabase.from('kit_items').insert(validItems.map(ki => ({
+                kit_id: id,
+                item_id: ki.item_id,
+                quantity: ki.quantity
+              })));
+            } else if (itemsErr) {
               console.warn('Supabase kit_items update warning, preserved locally:', itemsErr);
             }
           }
@@ -533,7 +549,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     <InventoryContext.Provider value={{ 
       items, kits, categories, transactions, 
       addItem, updateItem, deleteItem,
-      addKit, updateKit, deleteKit,
+      addKit, updateKit, deleteKit, restoreDefaultNutritionKits,
       addCategory, updateCategory, deleteCategory,
       deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction,
       refreshData: fetchData
