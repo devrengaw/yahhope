@@ -13,6 +13,7 @@ import { getMznToBrlRate, convertMznToBrl, convertBrlToMzn } from '../services/c
 import { saveExpenseTransaction } from '../services/financeTransactionService';
 import { getLocalCategories, fetchAndSyncCategories } from '../services/financeCategoryService';
 import { matchInventoryItem } from '../lib/defaultNutritionKits';
+import { cn } from '../lib/utils';
 
 const KitItemSelect = ({ items, categories, value, onChange }: { items: InventoryItem[], categories: any[], value: string, onChange: (id: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -1318,15 +1319,8 @@ export function Inventory() {
                       })}
 
                       {kit.items.length === 0 && (
-                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-                          <span>Nenhum produto cadastrado neste kit.</span>
-                          <button
-                            type="button"
-                            onClick={handleRestoreDefaults}
-                            className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg ml-2 cursor-pointer"
-                          >
-                            Restaurar
-                          </button>
+                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
+                          Nenhum produto cadastrado neste kit. Clique no lápis acima para adicionar produtos.
                         </div>
                       )}
                     </div>

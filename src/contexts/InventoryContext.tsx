@@ -549,7 +549,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     <InventoryContext.Provider value={{ 
       items, kits, categories, transactions, 
       addItem, updateItem, deleteItem,
-      addKit, updateKit, deleteKit, restoreDefaultNutritionKits,
+      addKit, updateKit, deleteKit,
       addCategory, updateCategory, deleteCategory,
       deductKitFromInventory, deductPrescriptionsFromInventory, addTransaction,
       refreshData: fetchData

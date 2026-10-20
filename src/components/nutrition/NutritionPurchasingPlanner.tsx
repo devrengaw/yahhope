@@ -487,7 +487,7 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
     const itemsSufficientCount = purchasingAnalysis.filter(r => r.status === 'sufficient').length;
 
     // Total de kits somados
-    const totalKitsPlanned = Object.values(kitTargets).reduce((acc, q) => acc + q, 0);
+    const totalKitsPlanned = Object.values(kitTargets).reduce((acc: number, q: any) => acc + (Number(q) || 0), 0);
 
     return {
       theoreticalBudgetMzn,

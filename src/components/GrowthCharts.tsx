@@ -34,7 +34,7 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
         ageMonths += 0.001;
       }
       
-      const existing = { x: ageMonths };
+      const existing: any = { x: ageMonths };
       existing.patientValue = Number(e.height);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(ageMonths, existing);
@@ -46,7 +46,7 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
         h += 0.001;
       }
 
-      const existing = { x: h };
+      const existing: any = { x: h };
       existing.patientValue = Number(e.weight);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(h, existing);
@@ -59,7 +59,7 @@ const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'h
         ageMonths += 0.001;
       }
       
-      const existing = { x: ageMonths };
+      const existing: any = { x: ageMonths };
       existing.patientValue = Number(e.head_circumference);
       existing.date = parseLocalDate(e.date).toLocaleDateString();
       dataMap.set(ageMonths, existing);
