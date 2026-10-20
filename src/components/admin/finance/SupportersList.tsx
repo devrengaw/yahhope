@@ -40,15 +40,25 @@ export function SupportersList() {
     try {
       purgeSpamUsersFromDatabase();
 
-      const [usersRes, sponsorshipsRes, donationsRes] = await Promise.all([
+      const [usersRes, sponsorshipsRes, donationsRes, childrenRes] = await Promise.all([
         supabase.from('users').select('*').order('created_at', { ascending: false }),
-        supabase.from('sponsorships').select('*, children(id, name, address)'),
-        supabase.from('donations').select('*').order('created_at', { ascending: false })
+        supabase.from('sponsorships').select('*').order('created_at', { ascending: false }),
+        supabase.from('donations').select('*').order('created_at', { ascending: false }),
+        supabase.from('children').select('id, name, address')
       ]);
 
       const dbUsers = (usersRes.data || []).filter(u => !isSpamOrMockUser(u));
-      const dbSponsorships = sponsorshipsRes.data || [];
+      const rawSponsorships = sponsorshipsRes.data || [];
       const dbDonations = donationsRes.data || [];
+      const childrenMap = new Map((childrenRes.data || []).map(c => [c.id, c]));
+
+      // Enriquece os apadrinhamentos com os dados da criança correspondente
+      const dbSponsorships = rawSponsorships.map(sp => {
+        if (!sp.children && sp.child_id && childrenMap.has(sp.child_id)) {
+          return { ...sp, children: childrenMap.get(sp.child_id) };
+        }
+        return sp;
+      });
 
       // Mapear usuários por email e id
       const usersByEmail = new Map<string, any>();

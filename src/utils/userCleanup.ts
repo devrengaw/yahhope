@@ -66,6 +66,12 @@ export function isSpamOrMockUser(user?: {
 } | null): boolean {
   if (!user) return false;
 
+  // Apoiadores, padrinhos e mantenedores reais NUNCA são considerados spam
+  const role = (user.role || '').trim().toUpperCase();
+  if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR') {
+    return false;
+  }
+
   const email = (user.email || '').trim().toLowerCase();
   const name = (user.name || '').trim();
 

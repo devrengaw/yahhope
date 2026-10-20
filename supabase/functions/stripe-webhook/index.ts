@@ -56,8 +56,7 @@ async function syncMaintainerProfile(data: {
   if (existingUser) {
     const updates: any = {
       name: donorName || existingUser.name,
-      phone: donorPhone || existingUser.phone,
-      status: 'active'
+      phone: donorPhone || existingUser.phone
     };
     if (isSponsor) {
       updates.role = 'SPONSOR';
@@ -70,11 +69,10 @@ async function syncMaintainerProfile(data: {
         name: donorName,
         email: cleanEmail,
         phone: donorPhone,
-        role: isSponsor ? 'SPONSOR' : 'USER',
-        status: 'active'
+        role: isSponsor ? 'SPONSOR' : 'USER'
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (!userErr && newUser) {
       userId = newUser.id;
@@ -155,6 +153,7 @@ async function syncMaintainerProfile(data: {
  */
 async function handleStripeSync(filterEmail?: string) {
   const results = {
+    synced_customers: 0,
     synced_maintainers: 0,
     synced_subscriptions: 0,
     synced_donations: 0,
@@ -163,61 +162,74 @@ async function handleStripeSync(filterEmail?: string) {
   };
 
   try {
-    console.log('Iniciando busca direta de assinaturas e doações no Stripe...');
+    console.log('Iniciando sincronização completa de clientes, assinaturas e cobranças no Stripe...');
 
-    // 1. Busca todas as assinaturas reais da Stripe
+    // 1. Busca todos os clientes cadastrados na Stripe (garante os 27 clientes)
+    const customers = await stripe.customers.list({
+      limit: 100
+    });
+    console.log(`Localizados ${customers.data.length} clientes na Stripe.`);
+
+    // 2. Busca todas as assinaturas (ativas, canceladas, trialing, etc.)
     const subscriptions = await stripe.subscriptions.list({
       status: 'all',
       limit: 100,
       expand: ['data.customer']
     });
+    console.log(`Localizadas ${subscriptions.data.length} assinaturas na Stripe.`);
+
+    // Mapa de assinaturas ativas por customer ID e por email
+    const subsByCustomer = new Map<string, any>();
+    const subsByEmail = new Map<string, any>();
 
     for (const sub of subscriptions.data) {
       let customer: any = sub.customer;
-      if (typeof customer === 'string') {
-        customer = await stripe.customers.retrieve(customer);
-      }
+      const custId = typeof customer === 'string' ? customer : customer?.id;
+      const custEmail = (typeof customer === 'object' ? customer?.email : sub.metadata?.donorEmail || '')?.toLowerCase().trim();
 
-      const email = customer?.email || sub.metadata?.donorEmail || '';
-      if (!email) continue;
-      if (filterEmail && email.toLowerCase() !== filterEmail.toLowerCase().trim()) continue;
-
-      const name = customer?.name || sub.metadata?.donorName || email.split('@')[0];
-      const phone = customer?.phone || sub.metadata?.donorPhone || null;
-      const amount = sub.items?.data?.[0]?.price?.unit_amount ? sub.items.data[0].price.unit_amount / 100 : 90;
       const isActive = sub.status === 'active' || sub.status === 'trialing';
+      if (custId && (isActive || !subsByCustomer.has(custId))) {
+        subsByCustomer.set(custId, sub);
+      }
+      if (custEmail && (isActive || !subsByEmail.has(custEmail))) {
+        subsByEmail.set(custEmail, sub);
+      }
+    }
+
+    // 3. Processa e garante o cadastro de cada cliente da Stripe no banco
+    for (const customer of customers.data) {
+      const email = (customer.email || '').toLowerCase().trim();
+      if (!email) continue;
+      if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
+
+      const name = customer.name || email.split('@')[0];
+      const phone = customer.phone || null;
+
+      const sub = subsByCustomer.get(customer.id) || subsByEmail.get(email);
+      const isSponsor = Boolean(sub && (sub.status === 'active' || sub.status === 'trialing'));
+      const subAmount = sub?.items?.data?.[0]?.price?.unit_amount ? sub.items.data[0].price.unit_amount / 100 : 90;
 
       await syncMaintainerProfile({
         email,
         name,
         phone,
-        isSponsor: true,
-        isMonthly: true,
-        amount,
-        lastSponsoredAt: new Date(sub.current_period_start * 1000).toISOString(),
+        isSponsor,
+        isMonthly: isSponsor,
+        amount: subAmount,
+        lastSponsoredAt: sub ? new Date(sub.current_period_start * 1000).toISOString() : new Date(customer.created * 1000).toISOString(),
         paymentMethod: 'credit_card',
-        subscriptionId: sub.id,
-        customerId: customer?.id
+        subscriptionId: sub?.id,
+        customerId: customer.id
       });
 
-      results.synced_maintainers++;
-      results.synced_subscriptions++;
-      results.total_amount += amount;
-      results.details.push({
-        type: 'subscription',
-        email,
-        name,
-        amount,
-        status: sub.status
-      });
+      results.synced_customers++;
+      if (isSponsor) {
+        results.synced_maintainers++;
+        results.synced_subscriptions++;
+      }
     }
 
-    // 2. Busca cobranças avulsas aprovadas na Stripe
-    const charges = await stripe.charges.list({
-      limit: 100
-    });
-
-    // Pega a primeira campanha da régua (Fase 1: Casa Nutri)
+    // Pega a primeira campanha da régua para associar cobranças avulsas
     const { data: firstCamp } = await supabase
       .from('campaigns')
       .select('id, current_amount')
@@ -225,66 +237,90 @@ async function handleStripeSync(filterEmail?: string) {
       .limit(1)
       .maybeSingle();
 
-    for (const charge of charges.data) {
-      if (charge.status !== 'succeeded') continue;
-      // Cobranças geradas por fatura de assinatura já foram processadas acima
-      if (charge.invoice) continue;
+    // 4. Busca faturas pagas (invoices) das assinaturas
+    const invoices = await stripe.invoices.list({
+      status: 'paid',
+      limit: 100
+    });
 
-      const email = (charge.billing_details?.email || charge.receipt_email || '').toLowerCase().trim();
+    for (const inv of invoices.data) {
+      const email = (inv.customer_email || '').toLowerCase().trim();
       if (!email) continue;
       if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
 
-      const name = charge.billing_details?.name || email.split('@')[0];
-      const phone = charge.billing_details?.phone || null;
-      const amount = charge.amount / 100;
-      const paymentDate = new Date(charge.created * 1000).toISOString();
-      const paymentMethod = charge.payment_method_details?.type === 'pix' ? 'pix' : 'credit_card';
+      const amount = inv.amount_paid ? inv.amount_paid / 100 : 0;
+      if (amount <= 0) continue;
 
-      // Atualiza perfil no users
-      await syncMaintainerProfile({
-        email,
-        name,
-        phone,
-        isSponsor: false,
-        amount,
-        lastSponsoredAt: paymentDate,
-        paymentMethod
-      });
-
-      // Checa se doação já existe
+      const paymentId = (inv.payment_intent as string) || inv.id;
       const { data: existingDonation } = await supabase
         .from('donations')
         .select('id')
-        .ilike('donor_email', email)
-        .eq('amount', amount)
+        .eq('stripe_payment_id', paymentId)
         .maybeSingle();
 
       if (!existingDonation) {
         await supabase.from('donations').insert({
-          campaign_id: firstCamp?.id || null,
-          donor_name: name,
+          campaign_id: null,
+          donor_name: inv.customer_name || email.split('@')[0],
           donor_email: email,
-          donor_phone: phone,
+          donor_phone: inv.customer_phone || null,
+          amount,
+          status: 'paid',
+          payment_method: 'credit_card',
+          created_at: new Date(inv.created * 1000).toISOString(),
+          paid_at: new Date(inv.created * 1000).toISOString(),
+          stripe_payment_id: paymentId,
+          stripe_subscription_id: (inv.subscription as string) || null,
+          is_sponsorship: Boolean(inv.subscription)
+        });
+        results.synced_donations++;
+        results.total_amount += amount;
+      }
+    }
+
+    // 5. Busca cobranças avulsas aprovadas na Stripe (inclui doações da ação do dia 06 de junho)
+    const charges = await stripe.charges.list({
+      limit: 100
+    });
+
+    for (const charge of charges.data) {
+      if (charge.status !== 'succeeded') continue;
+      // Se já foi processada via fatura de assinatura com mesmo payment_intent, evita duplicar
+      const email = (charge.billing_details?.email || charge.receipt_email || '').toLowerCase().trim();
+      if (!email) continue;
+      if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
+
+      const amount = charge.amount / 100;
+      const paymentDate = new Date(charge.created * 1000).toISOString();
+      const paymentMethod = charge.payment_method_details?.type === 'pix' ? 'pix' : 'credit_card';
+      const paymentId = charge.id;
+
+      const { data: existingDonation } = await supabase
+        .from('donations')
+        .select('id')
+        .eq('stripe_payment_id', paymentId)
+        .maybeSingle();
+
+      if (!existingDonation) {
+        await supabase.from('donations').insert({
+          campaign_id: charge.invoice ? null : (firstCamp?.id || null),
+          donor_name: charge.billing_details?.name || email.split('@')[0],
+          donor_email: email,
+          donor_phone: charge.billing_details?.phone || null,
           amount,
           status: 'paid',
           payment_method: paymentMethod,
           created_at: paymentDate,
-          paid_at: paymentDate
+          paid_at: paymentDate,
+          stripe_payment_id: paymentId,
+          is_sponsorship: Boolean(charge.invoice)
         });
+        results.synced_donations++;
+        results.total_amount += amount;
       }
-
-      results.synced_donations++;
-      results.total_amount += amount;
-      results.details.push({
-        type: 'donation',
-        email,
-        name,
-        amount,
-        payment_method: paymentMethod
-      });
     }
 
-    // 3. Atualiza a arrecadação da Fase 1 com os valores reais consolidados
+    // 6. Atualiza a arrecadação da Fase 1 com os valores reais consolidados
     if (firstCamp) {
       const { data: allPaidDonations } = await supabase.from('donations').select('amount').eq('status', 'paid');
       const { data: allActiveSp } = await supabase.from('sponsorships').select('monthly_amount').eq('status', 'active');
@@ -302,7 +338,7 @@ async function handleStripeSync(filterEmail?: string) {
 
     return {
       success: true,
-      message: `Sincronização Stripe concluída com sucesso: ${results.synced_subscriptions} apadrinhamento(s) e ${results.synced_donations} doação(ões) sincronizados.`,
+      message: `Sincronização Stripe concluída com sucesso: ${results.synced_customers} cliente(s), ${results.synced_subscriptions} apadrinhamento(s) e ${results.synced_donations} doação(ões) recuperadas.`,
       ...results
     };
   } catch (err: any) {
