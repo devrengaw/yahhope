@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useFundraising } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
 import { CheckCircle2, Calendar, Target, Sparkles, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { SEO } from '../../components/common/SEO';
 
 export function CampaignDisplay() {
   const [searchParams] = useSearchParams();
@@ -117,6 +118,11 @@ export function CampaignDisplay() {
         backgroundPosition: 'center'
       }}
     >
+      <SEO
+        title="Painel da Campanha | YAH Hope"
+        canonical="https://yahhope.com/campanha-display"
+        noIndex={true}
+      />
       {/* Background Elements */}
       <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-400 via-transparent to-transparent z-0" />
 

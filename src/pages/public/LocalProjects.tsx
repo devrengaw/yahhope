@@ -64,6 +64,8 @@ export function LocalProjects() {
         <img 
           src={project.image_url} 
           alt={project.title} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif';
@@ -116,7 +118,25 @@ export function LocalProjects() {
         title="Nossos Projetos e Alcance Global | YAH Hope"
         description="Conheça os projetos humanitários da YAH Hope: combate à desnutrição, acesso a água limpa e educação em Moçambique, e nossa base de mobilização e governança no Brasil."
         keywords="projetos humanitários, ONG Moçambique, Nampula, poços de água potável África, combate à desnutrição infantil, YAH Hope Brasil"
-        canonical="https://yahhope.org/projetos"
+        canonical="https://yahhope.com/projetos"
+        ogImage="https://yahhope.com/projetos_hero.jpg"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          "name": "Nossos Projetos e Alcance Global | YAH Hope",
+          "url": "https://yahhope.com/projetos",
+          "description": "Iniciativas de alto impacto da YAH Hope em Moçambique e no Brasil.",
+          "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": projects.map((p, index) => ({
+              "@type": "ListItem",
+              "position": index + 1,
+              "name": p.title,
+              "description": p.description,
+              "url": `https://yahhope.com/projetos#${p.id}`
+            }))
+          }
+        }}
       />
 
       {/* Hero Section com Imagem de Fundo e Filtro */}

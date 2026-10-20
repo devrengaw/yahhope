@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { KeyRound, Lock, ArrowRight, User, Mail, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { SEO } from '../../components/common/SEO';
 
 export function SponsorSetup() {
   const [searchParams] = useSearchParams();
@@ -73,6 +74,12 @@ export function SponsorSetup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center font-sans relative py-12 px-4 sm:px-6 lg:px-8 bg-slate-900 overflow-hidden">
+      <SEO
+        title="Finalizar Cadastro | Portal do Mantenedor - YAH Hope"
+        description="Finalize seu cadastro de mantenedor da YAH Hope para acessar o portal exclusivo."
+        canonical="https://yahhope.com/finalizar-cadastro"
+        noIndex={true}
+      />
       
       {/* Background Image Setup */}
       <div className="absolute inset-0 z-0">

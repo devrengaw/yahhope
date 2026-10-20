@@ -8,7 +8,7 @@ export function PrivacyPolicy() {
       <SEO 
         title="Política de Privacidade | YAH Hope"
         description="Saiba como a YAH Hope protege sua privacidade e gerencia dados de doações e apoiadores com total segurança e transparência."
-        canonical="https://yahhope.org/politica-de-privacidade"
+        canonical="https://yahhope.com/politica-de-privacidade"
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         

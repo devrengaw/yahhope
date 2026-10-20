@@ -201,7 +201,16 @@ export function VolunteerAndPartnerships() {
       <SEO 
         title="Voluntariado & Parcerias Empresariais | YAH Hope" 
         description="Junte-se à nossa missão no Brasil ou em Moçambique. Seja voluntário ou torne sua empresa uma parceira doadora investindo em um Brasil e em um mundo melhor."
-        keywords="voluntariado, empresas parceiras, investimento social privado, doacao corporativa, esg ong, doar para ong, yah hope"
+        keywords="voluntariado, voluntariado Moçambique, voluntariado África, empresas parceiras, investimento social privado, doação corporativa, ESG ONG, doar para ONG, YAH Hope"
+        canonical="https://yahhope.com/voluntariado-e-parcerias"
+        ogImage="https://yahhope.com/voluntariado_hero.jpg"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          "name": "Voluntariado & Parcerias Empresariais | YAH Hope",
+          "url": "https://yahhope.com/voluntariado-e-parcerias",
+          "description": "Programa de voluntariado humanitário no Brasil e em Moçambique e parcerias corporativas ESG com a YAH Hope."
+        }}
       />
 
       {/* Hero Section */}

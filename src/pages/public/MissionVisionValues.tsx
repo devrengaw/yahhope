@@ -73,7 +73,20 @@ export function MissionVisionValues() {
         title="Missão, Visão e Valores | YAH Hope"
         description="Conheça a missão humanitária, a visão de futuro e os valores inegociáveis que regem as ações da YAH Hope no combate à desnutrição e na promoção da dignidade humana."
         keywords="missão YAH Hope, visão YAH Hope, valores humanitários, ética na ONG, princípios YAH Hope"
-        canonical="https://yahhope.org/missao-visao-valores"
+        canonical="https://yahhope.com/missao-visao-valores"
+        ogImage="https://yahhope.com/missao_visao_valores_hero.jpg"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": "Missão, Visão e Valores | YAH Hope",
+          "url": "https://yahhope.com/missao-visao-valores",
+          "description": "Princípios inegociáveis, missão humanitária e visão de futuro da YAH Hope.",
+          "about": {
+            "@type": "NGO",
+            "name": "YAH Hope",
+            "slogan": "Guardiões da Dignidade Humana"
+          }
+        }}
       />
 
       {/* 1. Hero Section */}

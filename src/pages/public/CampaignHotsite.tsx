@@ -174,6 +174,9 @@ export function CampaignHotsite() {
       <SEO 
         title="Um convite para levar esperança | YAH Hope" 
         description="A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas."
+        keywords="YAH Hope, apadrinhar criança, mantenedor YAH Hope, desnutrição infantil Moçambique, ONG ajuda humanitária"
+        canonical="https://yahhope.com/campanha-yahhope"
+        ogImage="https://yahhope.com/login_bg_real.jpg"
       />
 
       {/* TOPO INSTITUCIONAL LIMPO: Apenas o Logo Centralizado apontando para www.yahhope.com */}

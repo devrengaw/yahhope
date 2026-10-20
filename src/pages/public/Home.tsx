@@ -176,7 +176,8 @@ export function Home() {
         title="YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social"
         description="A YAH Hope é uma agência humanitária que combate a desnutrição infantil, garante acesso à água potável, saúde e educação em Moçambique e no Brasil. Conheça e apoie!"
         keywords="YAH Hope, ONG, ajuda humanitária, combate à desnutrição infantil, Moçambique, Nampula, apadrinhar criança, doação ONG, projetos sociais"
-        canonical="https://yahhope.org/"
+        canonical="https://yahhope.com/"
+        ogImage="https://yahhope.com/hero_bg.jpg"
       />
       
       {/* Hero Home Block with YAH Hope Visual Identity & Floating Stripe Donation Card */}
@@ -186,6 +187,7 @@ export function Home() {
           <img 
             src="/hero_bg.jpg" 
             alt="Comunidade e Acesso à Água - YAH Hope Moçambique" 
+            fetchPriority="high"
             className="w-full h-full object-cover object-center filter contrast-115 brightness-95"
           />
           {/* Official YAH Hope Orange Duotone & Gradient Filter */}
@@ -650,6 +652,8 @@ export function Home() {
                 <img 
                   src={project.image_url} 
                   alt={project.title} 
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/HOPE-ALFACES.avif';
@@ -736,6 +740,8 @@ export function Home() {
         <img 
           src="/login_bg_real.jpg" 
           alt="Comunidade YAH Hope" 
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover object-center filter brightness-90 contrast-105"
         />
         {/* Warm Slate & Ambient Gradient overlay (replaces pitch black so the children's photo is clearly visible) */}
@@ -911,10 +917,10 @@ export function Home() {
                   <Link
                     to={
                       readingHighlight.blogPostId
-                        ? `/blog?post=${readingHighlight.blogPostId}`
+                        ? `/blog/${readingHighlight.blogPostId}`
                         : readingHighlight.link.startsWith('/blog')
-                          ? readingHighlight.link
-                          : `/blog?post=${readingHighlight.id}`
+                          ? readingHighlight.link.replace('/blog?post=', '/blog/')
+                          : `/blog/${readingHighlight.id}`
                     }
                     onClick={() => setReadingHighlight(null)}
                     className="w-full sm:w-auto text-xs font-gotham-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-center transition-colors flex items-center justify-center gap-1.5"

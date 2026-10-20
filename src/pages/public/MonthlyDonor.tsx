@@ -367,10 +367,23 @@ export function MonthlyDonor() {
   return (
     <div className="min-h-screen bg-white font-gotham-regular text-slate-800">
       <SEO 
-        title="Seja um Mantenedor Mensal | YAH Hope"
+        title="Seja um Mantenedor Mensal e Apadrinhe | YAH Hope"
         description="Junte-se à família de mantenedores mensais da YAH Hope. Sua fidelidade salva vidas todos os dias, combate a desnutrição infantil e constrói futuro em Moçambique e no Brasil."
-        keywords="mantenedor mensal YAH Hope, doar mensalmente ONG, combater desnutrição Moçambique, apadrinhar causa, doação recorrente"
-        canonical="https://yahhope.org/mantenedor"
+        keywords="mantenedor mensal YAH Hope, doar mensalmente ONG, combater desnutrição Moçambique, apadrinhar criança, doação recorrente"
+        canonical="https://yahhope.com/mantenedor"
+        ogImage="https://yahhope.com/mantenedor_hero_novo.jpg"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": FAQS.map(faq => ({
+            "@type": "Question",
+            "name": faq.question,
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": faq.answer
+            }
+          }))
+        }}
       />
 
       {/* 1. SEÇÃO UNIFICADA: HERO & DOAÇÃO DO MANTENEDOR (LOGO APÓS O HEADER) */}
@@ -380,6 +393,7 @@ export function MonthlyDonor() {
           <img 
             src="/mantenedor_hero_novo.jpg" 
             alt="Crianças jogando futebol acolhidas pela YAH Hope" 
+            fetchPriority="high"
             className="w-full h-full object-cover object-[15%_25%] sm:object-[20%_25%] filter brightness-[0.92] contrast-105 scale-100 transition-transform duration-1000"
           />
           {/* Gradientes equilibrados: foto nítida e destacada à esquerda com contraste para o formulário à direita */}

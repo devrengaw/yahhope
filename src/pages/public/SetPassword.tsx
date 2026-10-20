@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { KeyRound, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { SEO } from '../../components/common/SEO';
 
 export function SetPassword() {
   const [password, setPassword] = useState('');
@@ -55,6 +56,12 @@ export function SetPassword() {
 
   return (
     <div className="relative flex-1 min-h-[calc(100vh-140px)] flex items-center justify-center font-gotham-regular py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <SEO
+        title="Configurar Senha | YAH Hope"
+        description="Configure sua senha de acesso à plataforma YAH Hope."
+        canonical="https://yahhope.com/set-password"
+        noIndex={true}
+      />
       
       {/* Background Image Setup com Alta Transparência */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">

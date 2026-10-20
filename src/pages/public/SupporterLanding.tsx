@@ -26,7 +26,7 @@ export function SupporterLanding() {
         title="Seja um Apoiador e Apadrinhe | YAH Hope"
         description="Torne-se um apoiador da YAH Hope. Apadrinhe uma criança, receba relatórios médicos e pedagógicos transparentes e transforme vidas com amor e dignidade."
         keywords="apadrinhar criança, ser apoiador ONG, apadrinhamento infantil Moçambique, doar mensalmente, YAH Hope portal"
-        canonical="https://yahhope.org/apoiador"
+        canonical="https://yahhope.com/apoiador"
       />
       {/* Hero Section */}
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">

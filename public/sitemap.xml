@@ -5,72 +5,136 @@
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <!-- Página Inicial / Home -->
   <url>
-    <loc>https://yahhope.org/</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
-  <!-- Projetos Humanitários -->
+  <!-- Seja um Mantenedor Mensal & Apadrinhamento -->
   <url>
-    <loc>https://yahhope.org/projetos</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/mantenedor</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- Hotsite Oficial da Campanha -->
+  <url>
+    <loc>https://yahhope.com/campanha-yahhope</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Projetos Humanitários e Alcance Global -->
+  <url>
+    <loc>https://yahhope.com/projetos</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <!-- Campanha de Doações -->
   <url>
-    <loc>https://yahhope.org/campanha</loc>
-    <lastmod>2026-10-06</lastmod>
+    <loc>https://yahhope.com/campanha</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
-  <!-- Seja um Mantenedor Mensal -->
+  <!-- Sobre Nós e Manifesto -->
   <url>
-    <loc>https://yahhope.org/mantenedor</loc>
-    <lastmod>2026-10-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.95</priority>
+    <loc>https://yahhope.com/sobre-nos</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Missão, Visão e Valores -->
+  <url>
+    <loc>https://yahhope.com/missao-visao-valores</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Voluntariado e Parcerias Empresariais -->
+  <url>
+    <loc>https://yahhope.com/voluntariado-e-parcerias</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
   </url>
 
   <!-- Blog e Histórias de Esperança -->
   <url>
-    <loc>https://yahhope.org/blog</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/blog</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
+  <!-- Artigos Publicados do Blog -->
+  <url>
+    <loc>https://yahhope.com/blog/post-1</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://yahhope.com/blog/post-2</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://yahhope.com/blog/post-3</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://yahhope.com/blog/post-4</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://yahhope.com/blog/post-5</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+
   <!-- Portal do Apoiador / Apadrinhamento -->
   <url>
-    <loc>https://yahhope.org/apoiador</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/apoiador</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Loja Solidária -->
   <url>
-    <loc>https://yahhope.org/loja</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/loja</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Termos de Serviço -->
   <url>
-    <loc>https://yahhope.org/termos-de-servico</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/termos-de-servico</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <!-- Política de Privacidade -->
   <url>
-    <loc>https://yahhope.org/politica-de-privacidade</loc>
-    <lastmod>2026-09-25</lastmod>
+    <loc>https://yahhope.com/politica-de-privacidade</loc>
+    <lastmod>2026-10-20</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -8,8 +8,8 @@
           "value": "yahhope.org"
         }
       ],
-      "destination": "https://yahhope.com/campanha",
-      "permanent": false
+      "destination": "https://yahhope.com/$1",
+      "permanent": true
     },
     {
       "source": "/(.*)",
@@ -19,8 +19,8 @@
           "value": "www.yahhope.org"
         }
       ],
-      "destination": "https://yahhope.com/campanha",
-      "permanent": false
+      "destination": "https://yahhope.com/$1",
+      "permanent": true
     }
   ],
   "rewrites": [

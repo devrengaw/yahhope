@@ -25,7 +25,23 @@ export function AboutUs() {
         title="Sobre Nós | YAH Hope - Fé em Ação e Dignidade Humana"
         description="Conheça a YAH Hope, nossa história, pilares de atuação e leia o nosso Manifesto oficial. Transformamos realidades através da nutrição, educação e dignidade em Moçambique e no Brasil."
         keywords="sobre YAH Hope, manifesto YAH Hope, ONG Moçambique, ajuda humanitária, nutrição infantil, dignidade humana"
-        canonical="https://yahhope.org/sobre-nos"
+        canonical="https://yahhope.com/sobre-nos"
+        ogImage="https://yahhope.com/login_bg_real.jpg"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          "name": "Sobre Nós | YAH Hope - Fé em Ação e Dignidade Humana",
+          "url": "https://yahhope.com/sobre-nos",
+          "description": "Conheça a YAH Hope, nossa história, pilares de atuação e o Manifesto oficial no combate à desnutrição infantil em Moçambique e no Brasil.",
+          "mainEntity": {
+            "@type": "NGO",
+            "name": "YAH Hope",
+            "url": "https://yahhope.com",
+            "logo": "https://yahhope.com/logo.png",
+            "foundingLocation": "Brasil",
+            "areaServed": ["Moçambique", "Brasil"]
+          }
+        }}
       />
 
       {/* 1. Hero Section */}
@@ -33,6 +49,7 @@ export function AboutUs() {
         <img 
           src="/login_bg_real.jpg" 
           alt="Comunidade acolhida pela YAH Hope" 
+          fetchPriority="high"
           className="absolute inset-0 w-full h-full object-cover object-center filter brightness-75 contrast-105"
         />
         {/* Gradients */}

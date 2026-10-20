@@ -12,7 +12,33 @@ export function Ecommerce() {
         title="Loja Solidária | Produtos com Propósito | YAH Hope"
         description="Adquira produtos exclusivos na Loja Solidária da YAH Hope. Todo o valor arrecadado financia ações de combate à desnutrição e desenvolvimento social."
         keywords="loja solidária, produtos sociais, compras beneficentes, YAH Hope loja"
-        canonical="https://yahhope.org/loja"
+        canonical="https://yahhope.com/loja"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          "name": "Loja Solidária | YAH Hope",
+          "url": "https://yahhope.com/loja",
+          "description": "Adquira produtos exclusivos na Loja Solidária da YAH Hope. Todo o valor arrecadado financia ações de combate à desnutrição infantil.",
+          "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": activeProducts.map((product, index) => ({
+              "@type": "ListItem",
+              "position": index + 1,
+              "item": {
+                "@type": "Product",
+                "name": product.name,
+                "description": product.description,
+                "image": product.image_url,
+                "offers": {
+                  "@type": "Offer",
+                  "priceCurrency": "BRL",
+                  "price": product.sale_price,
+                  "availability": product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+                }
+              }
+            }))
+          }
+        }}
       />
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-slate-900 mb-4">Loja Solidária</h1>
@@ -28,6 +54,8 @@ export function Ecommerce() {
               <img 
                 src={product.image_url || 'https://images.unsplash.com/photo-1555487505-8603a1a69755?w=800&q=80'} 
                 alt={product.name} 
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />

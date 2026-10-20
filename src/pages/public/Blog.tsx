@@ -101,7 +101,7 @@ export function Blog() {
 
   const handleOpenPost = (post: BlogPost) => {
     setSelectedPost(post);
-    navigate(`/blog?post=${post.id}`);
+    navigate(`/blog/${post.id}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -151,15 +151,20 @@ export function Blog() {
       <div className="min-h-screen bg-slate-50/60 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 font-gotham-regular">
         <SEO 
           title={`${selectedPost.title} | Blog YAH Hope`}
-          description={selectedPost.excerpt || selectedPost.content?.slice(0, 155) || 'Acompanhe esta história de transformação e impacto social da YAH Hope.'}
+          description={selectedPost.excerpt || selectedPost.content?.replace(/<[^>]*>/g, '').slice(0, 155) || 'Acompanhe esta história de transformação e impacto social da YAH Hope.'}
           ogImage={selectedPost.image}
           ogType="article"
-          canonical={`https://yahhope.org/blog/${selectedPost.id}`}
+          canonical={`https://yahhope.com/blog/${selectedPost.id}`}
           jsonLd={{
             "@context": "https://schema.org",
             "@type": "BlogPosting",
+            "mainEntityOfPage": {
+              "@type": "WebPage",
+              "@id": `https://yahhope.com/blog/${selectedPost.id}`
+            },
             "headline": selectedPost.title,
             "image": selectedPost.image ? [selectedPost.image] : undefined,
+            "datePublished": selectedPost.date,
             "author": {
               "@type": "Person",
               "name": selectedPost.author || 'Equipe YAH Hope'
@@ -169,10 +174,10 @@ export function Blog() {
               "name": "YAH Hope",
               "logo": {
                 "@type": "ImageObject",
-                "url": "https://yahhope.org/logo.png"
+                "url": "https://yahhope.com/logo.png"
               }
             },
-            "description": selectedPost.excerpt || selectedPost.title
+            "description": selectedPost.excerpt || selectedPost.content?.replace(/<[^>]*>/g, '').slice(0, 155) || selectedPost.title
           }}
         />
         <div className="max-w-4xl mx-auto">
@@ -415,7 +420,13 @@ export function Blog() {
                         {rel.category}
                       </span>
                       <h4 className="font-heading font-bold text-slate-900 text-sm group-hover:text-[#F49853] transition-colors line-clamp-2 leading-snug">
-                        {rel.title}
+                        <Link
+                          to={`/blog/${rel.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline"
+                        >
+                          {rel.title}
+                        </Link>
                       </h4>
                       <p className="text-xs text-slate-500 line-clamp-2 mt-2 font-gotham-light">
                         {rel.excerpt}
@@ -456,7 +467,29 @@ export function Blog() {
         title="Histórias de Esperança e Notícias | Blog YAH Hope"
         description="Acompanhe histórias reais de transformação, notícias de ações humanitárias e relatórios de campo da YAH Hope em Moçambique e no Brasil."
         keywords="blog YAH Hope, histórias de superação, missões Moçambique, ajuda humanitária notícias, testemunhos, voluntariado"
-        canonical="https://yahhope.org/blog"
+        canonical="https://yahhope.com/blog"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Blog",
+          "name": "Blog YAH Hope | Histórias de Esperança e Notícias",
+          "url": "https://yahhope.com/blog",
+          "description": "Histórias reais de transformação, notícias de ações humanitárias e relatórios de campo da YAH Hope em Moçambique e no Brasil.",
+          "publisher": {
+            "@type": "NGO",
+            "name": "YAH Hope",
+            "url": "https://yahhope.com"
+          },
+          "blogPost": publishedPosts.map(post => ({
+            "@type": "BlogPosting",
+            "headline": post.title,
+            "url": `https://yahhope.com/blog/${post.id}`,
+            "datePublished": post.date,
+            "author": {
+              "@type": "Person",
+              "name": post.author || "Equipe YAH Hope"
+            }
+          }))
+        }}
       />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -532,7 +565,13 @@ export function Blog() {
                     </div>
 
                     <h2 className="text-lg sm:text-xl font-heading font-bold text-slate-900 group-hover:text-[#F49853] transition-colors leading-snug line-clamp-2">
-                      {post.title}
+                      <Link
+                        to={`/blog/${post.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:underline"
+                      >
+                        {post.title}
+                      </Link>
                     </h2>
 
                     <p className="text-slate-600 text-sm mt-2.5 font-gotham-light line-clamp-3 leading-relaxed">

@@ -167,6 +167,7 @@ export function Login() {
         title={isAdminMode ? "Área Administrativa | YAH Hope" : activeTab === 'register' ? "Cadastro de Mantenedor | YAH Hope" : "Entrar | Portal do Mantenedor - YAH Hope"}
         description={isAdminMode ? "Acesso administrativo restrito para colaboradores e gestão da YAH Hope." : "Acesse sua área exclusiva para acompanhar crianças atendidas pela Casa Nutri, projetos e relatórios de transparência."}
         canonical="https://yahhope.com/login"
+        noIndex={true}
       />
 
       {/* Full Background Image com Alta Transparência e Nitidez */}

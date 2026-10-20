@@ -593,16 +593,17 @@ export function Campaign() {
         title={`${targetCampaign.title} | Faça sua Doação - YAH Hope`}
         description={targetCampaign.description || "Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos sociais."}
         keywords="doação humanitária, doar para ONG, combate à desnutrição, doação Moçambique, apadrinhar criança YAH Hope"
-        canonical={`https://yahhope.org/campanha?id=${targetCampaign.id}`}
+        canonical="https://yahhope.com/campanha"
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "DonateAction",
           "name": targetCampaign.title,
           "description": targetCampaign.description || "Contribua com a campanha solidária da YAH Hope.",
+          "target": "https://yahhope.com/campanha",
           "recipient": {
             "@type": "NGO",
             "name": "YAH Hope",
-            "url": "https://yahhope.org"
+            "url": "https://yahhope.com"
           }
         }}
       />
