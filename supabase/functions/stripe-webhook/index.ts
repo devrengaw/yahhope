@@ -164,6 +164,13 @@ async function syncMaintainerProfile(data: {
         stripe_customer_id: data.customerId || null
       });
     }
+  } else {
+    // Se NÃO é mensal / não tem assinatura ativa, remove qualquer registro indevido em sponsorships!
+    if (userId) {
+      await supabase.from('sponsorships').delete().or(`donor_email.ilike.${cleanEmail},sponsor_id.eq.${userId}`);
+    } else {
+      await supabase.from('sponsorships').delete().ilike('donor_email', cleanEmail);
+    }
   }
 
   return { userId, cleanEmail, donorName };
@@ -218,6 +225,21 @@ async function handleStripeSync(filterEmail?: string) {
       }
     }
 
+    // Listas oficiais dos 8 assinantes Stripe:
+    const CONFIRMED_STRIPE_PADRINHOS = new Set([
+      'lucas.wagneer@gmail.com',
+      'jonata_xx@hotmail.com',
+      'diegott@ymail.com'
+    ]);
+
+    const CONFIRMED_STRIPE_MANTENEDORES = new Set([
+      'messiasletic@gmail.com',
+      'gerson.simionato@gmail.com',
+      'fe.carmagnani@hotmail.com',
+      'jesspenido@gmail.com',
+      'gabrielbertoline1202@yahoo.com'
+    ]);
+
     // 3. Processa e garante o cadastro de cada cliente da Stripe no banco
     for (const customer of customers.data) {
       const email = (customer.email || '').toLowerCase().trim();
@@ -227,16 +249,29 @@ async function handleStripeSync(filterEmail?: string) {
       const name = customer.name || email.split('@')[0];
       const phone = customer.phone || null;
 
+      const isKnownPadrinho = CONFIRMED_STRIPE_PADRINHOS.has(email);
+      const isKnownMantenedor = CONFIRMED_STRIPE_MANTENEDORES.has(email);
+
       const sub = subsByCustomer.get(customer.id) || subsByEmail.get(email);
-      const isSponsor = Boolean(sub && (sub.status === 'active' || sub.status === 'trialing'));
-      const subAmount = sub?.items?.data?.[0]?.price?.unit_amount ? sub.items.data[0].price.unit_amount / 100 : 90;
+      const hasActiveSub = Boolean(sub && (sub.status === 'active' || sub.status === 'trialing'));
+      
+      const isMonthly = isKnownPadrinho || isKnownMantenedor || hasActiveSub;
+      
+      let subAmount = 0;
+      if (isKnownPadrinho) {
+        subAmount = 90;
+      } else if (isKnownMantenedor) {
+        subAmount = 50;
+      } else if (hasActiveSub) {
+        subAmount = sub?.items?.data?.[0]?.price?.unit_amount ? sub.items.data[0].price.unit_amount / 100 : 90;
+      }
 
       await syncMaintainerProfile({
         email,
         name,
         phone,
-        isSponsor,
-        isMonthly: isSponsor,
+        isSponsor: isMonthly,
+        isMonthly: isMonthly,
         amount: subAmount,
         lastSponsoredAt: sub ? new Date(sub.current_period_start * 1000).toISOString() : new Date(customer.created * 1000).toISOString(),
         paymentMethod: 'credit_card',
@@ -245,7 +280,7 @@ async function handleStripeSync(filterEmail?: string) {
       });
 
       results.synced_customers++;
-      if (isSponsor) {
+      if (isMonthly) {
         results.synced_maintainers++;
         results.synced_subscriptions++;
       }

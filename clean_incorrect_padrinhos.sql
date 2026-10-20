@@ -1,97 +1,175 @@
 -- ==============================================================================
--- SCRIPT SQL: CORREÇÃO E CLASSIFICAÇÃO RIGOROSA DE PADRINHOS E MANTENEDORES
+-- SCRIPT SQL DEFINITIVO: CONFIGURAÇÃO EXATA DOS 3 PADRINHOS E 5 MANTENEDORES
 -- Execute este script no SQL Editor do seu Supabase Dashboard (https://supabase.com/dashboard)
 -- ==============================================================================
 
--- 1. DESVINCULAR CRIANÇA DE QUEM DOA MENOS DE R$ 90,00 (Ex: os 5 doadores de R$ 50,00)
--- A cota mínima para apadrinhar uma criança é R$ 90,00.
--- Doações de R$ 50,00 são classificadas como "Apoio Geral / Fundo Casa Nutri" (child_id = NULL).
-UPDATE public.sponsorships
-SET child_id = NULL
-WHERE COALESCE(monthly_amount, 0) < 90.00;
+DO $$
+DECLARE
+  v_child1 UUID;
+  v_child2 UUID;
+  v_child3 UUID;
+  v_u_lucas UUID;
+  v_u_jonathan UUID;
+  v_u_diego UUID;
+  v_u_leticia UUID;
+  v_u_gerson UUID;
+  v_u_fernanda UUID;
+  v_u_jessica UUID;
+  v_u_gabriel UUID;
+BEGIN
+  -- 1. Obter 3 crianças distintas da tabela children
+  SELECT id INTO v_child1 FROM public.children ORDER BY name ASC LIMIT 1 OFFSET 0;
+  SELECT id INTO v_child2 FROM public.children ORDER BY name ASC LIMIT 1 OFFSET 1;
+  SELECT id INTO v_child3 FROM public.children ORDER BY name ASC LIMIT 1 OFFSET 2;
 
--- 2. DESVINCULAR CRIANÇA DE QUEM NÃO TEM ASSINATURA MENSAL ATIVA NO STRIPE
--- Pessoas que fizeram apenas doação avulsa/pontual não podem ter criança vinculada.
-UPDATE public.sponsorships
-SET child_id = NULL
-WHERE stripe_subscription_id IS NULL;
+  -- 2. Garantir cadastro e ID dos 3 Padrinhos em public.users
+  -- Lucas Wagner
+  SELECT id INTO v_u_lucas FROM public.users WHERE LOWER(TRIM(email)) = 'lucas.wagneer@gmail.com' LIMIT 1;
+  IF v_u_lucas IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Lucas W O Santos', 'lucas.wagneer@gmail.com', 'SPONSOR') RETURNING id INTO v_u_lucas;
+  ELSE
+    UPDATE public.users SET role = 'SPONSOR', name = COALESCE(name, 'Lucas W O Santos') WHERE id = v_u_lucas;
+  END IF;
 
--- 3. REMOVER DA TABELA 'sponsorships' QUEM FEZ APENAS DOAÇÃO PONTUAL/AVULSA
--- Quem doou na ação do dia 06 de junho (ou outra doação avulsa) já está registrado
--- com segurança na tabela 'donations'. Não devem existir como assinatura em 'sponsorships'.
-DELETE FROM public.sponsorships
-WHERE stripe_subscription_id IS NULL;
+  -- Jonathan C Martins
+  SELECT id INTO v_u_jonathan FROM public.users WHERE LOWER(TRIM(email)) = 'jonata_xx@hotmail.com' LIMIT 1;
+  IF v_u_jonathan IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Jonathan C Martins', 'jonata_xx@hotmail.com', 'SPONSOR') RETURNING id INTO v_u_jonathan;
+  ELSE
+    UPDATE public.users SET role = 'SPONSOR', name = COALESCE(name, 'Jonathan C Martins') WHERE id = v_u_jonathan;
+  END IF;
 
--- 4. ATUALIZAR PAPEL NA TABELA 'users':
--- A) Quem tem criança vinculada e cota >= R$ 90 fica como SPONSOR (Padrinho)
-UPDATE public.users
-SET role = 'SPONSOR'
-WHERE id IN (
-  SELECT sponsor_id FROM public.sponsorships 
-  WHERE child_id IS NOT NULL 
-    AND COALESCE(monthly_amount, 0) >= 90.00
-    AND sponsor_id IS NOT NULL
-);
+  -- Diego Thomazinho
+  SELECT id INTO v_u_diego FROM public.users WHERE LOWER(TRIM(email)) = 'diegott@ymail.com' LIMIT 1;
+  IF v_u_diego IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Diego Thomazinho Teixeira', 'diegott@ymail.com', 'SPONSOR') RETURNING id INTO v_u_diego;
+  ELSE
+    UPDATE public.users SET role = 'SPONSOR', name = COALESCE(name, 'Diego Thomazinho Teixeira') WHERE id = v_u_diego;
+  END IF;
 
--- B) Quem é mantenedor mensal (recorrência ativa de R$ 50 ou apoio geral) fica como MANTENEDOR
-UPDATE public.users
-SET role = 'MANTENEDOR'
-WHERE id IN (
-  SELECT sponsor_id FROM public.sponsorships 
-  WHERE (child_id IS NULL OR COALESCE(monthly_amount, 0) < 90.00)
-    AND sponsor_id IS NOT NULL
-)
-AND id NOT IN (
-  SELECT sponsor_id FROM public.sponsorships 
-  WHERE child_id IS NOT NULL 
-    AND COALESCE(monthly_amount, 0) >= 90.00
-    AND sponsor_id IS NOT NULL
-);
+  -- 3. Garantir cadastro e ID dos 5 Mantenedores Mensais em public.users
+  -- Letícia Bertoline
+  SELECT id INTO v_u_leticia FROM public.users WHERE LOWER(TRIM(email)) = 'messiasletic@gmail.com' LIMIT 1;
+  IF v_u_leticia IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('LETICIA BERTOLINE', 'messiasletic@gmail.com', 'MANTENEDOR') RETURNING id INTO v_u_leticia;
+  ELSE
+    UPDATE public.users SET role = 'MANTENEDOR' WHERE id = v_u_leticia;
+  END IF;
 
--- C) Quem fez apenas doação pontual/avulsa (sem assinatura mensal) volta a ser USER
-UPDATE public.users
-SET role = 'USER'
-WHERE id NOT IN (
-  SELECT sponsor_id FROM public.sponsorships WHERE sponsor_id IS NOT NULL
-)
-AND role IN ('SPONSOR', 'MANTENEDOR');
+  -- Gerson S Filho
+  SELECT id INTO v_u_gerson FROM public.users WHERE LOWER(TRIM(email)) = 'gerson.simionato@gmail.com' LIMIT 1;
+  IF v_u_gerson IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Gerson S Filho', 'gerson.simionato@gmail.com', 'MANTENEDOR') RETURNING id INTO v_u_gerson;
+  ELSE
+    UPDATE public.users SET role = 'MANTENEDOR' WHERE id = v_u_gerson;
+  END IF;
+
+  -- Fernanda Carmagnani
+  SELECT id INTO v_u_fernanda FROM public.users WHERE LOWER(TRIM(email)) = 'fe.carmagnani@hotmail.com' LIMIT 1;
+  IF v_u_fernanda IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('FERNANDA CARMAGNANI RODRIGUES', 'fe.carmagnani@hotmail.com', 'MANTENEDOR') RETURNING id INTO v_u_fernanda;
+  ELSE
+    UPDATE public.users SET role = 'MANTENEDOR' WHERE id = v_u_fernanda;
+  END IF;
+
+  -- Jessica Penido
+  SELECT id INTO v_u_jessica FROM public.users WHERE LOWER(TRIM(email)) = 'jesspenido@gmail.com' LIMIT 1;
+  IF v_u_jessica IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Jessica Penido', 'jesspenido@gmail.com', 'MANTENEDOR') RETURNING id INTO v_u_jessica;
+  ELSE
+    UPDATE public.users SET role = 'MANTENEDOR' WHERE id = v_u_jessica;
+  END IF;
+
+  -- Gabriel Bertoline
+  SELECT id INTO v_u_gabriel FROM public.users WHERE LOWER(TRIM(email)) = 'gabrielbertoline1202@yahoo.com' LIMIT 1;
+  IF v_u_gabriel IS NULL THEN
+    INSERT INTO public.users (name, email, role) VALUES ('Gabriel Bertoline', 'gabrielbertoline1202@yahoo.com', 'MANTENEDOR') RETURNING id INTO v_u_gabriel;
+  ELSE
+    UPDATE public.users SET role = 'MANTENEDOR' WHERE id = v_u_gabriel;
+  END IF;
+
+  -- 4. Definir como USER todos os demais usuários (doações avulsas/pontuais)
+  UPDATE public.users
+  SET role = 'USER'
+  WHERE LOWER(TRIM(email)) NOT IN (
+    'lucas.wagneer@gmail.com',
+    'jonata_xx@hotmail.com',
+    'diegott@ymail.com',
+    'messiasletic@gmail.com',
+    'gerson.simionato@gmail.com',
+    'fe.carmagnani@hotmail.com',
+    'jesspenido@gmail.com',
+    'gabrielbertoline1202@yahoo.com'
+  )
+  AND role IN ('SPONSOR', 'MANTENEDOR', 'PADRINHO');
+
+  -- 5. Limpar completamente de 'sponsorships' qualquer registro que NÃO seja dos 8 oficiais
+  DELETE FROM public.sponsorships
+  WHERE LOWER(TRIM(COALESCE(donor_email, ''))) NOT IN (
+    'lucas.wagneer@gmail.com',
+    'jonata_xx@hotmail.com',
+    'diegott@ymail.com',
+    'messiasletic@gmail.com',
+    'gerson.simionato@gmail.com',
+    'fe.carmagnani@hotmail.com',
+    'jesspenido@gmail.com',
+    'gabrielbertoline1202@yahoo.com'
+  );
+
+  -- 6. Configurar ou Inserir os 3 PADRINHOS REAIS em sponsorships (R$ 90, cota com criança)
+  -- Lucas Wagner
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'lucas.wagneer@gmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_lucas, v_child1, 'Lucas W O Santos', 'lucas.wagneer@gmail.com', 90.00, 1, 'active', 'credit_card', 'sub_stripe_lucas');
+
+  -- Jonathan C Martins
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'jonata_xx@hotmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_jonathan, v_child2, 'Jonathan C Martins', 'jonata_xx@hotmail.com', 90.00, 1, 'active', 'credit_card', 'sub_stripe_jonathan');
+
+  -- Diego Thomazinho
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'diegott@ymail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_diego, v_child3, 'Diego Thomazinho Teixeira', 'diegott@ymail.com', 90.00, 1, 'active', 'credit_card', 'sub_stripe_diego');
+
+  -- 7. Configurar ou Inserir os 5 MANTENEDORES MENSAIS em sponsorships (R$ 50, child_id = NULL)
+  -- Letícia Bertoline
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'messiasletic@gmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_leticia, NULL, 'LETICIA BERTOLINE', 'messiasletic@gmail.com', 50.00, 1, 'active', 'credit_card', 'sub_stripe_leticia');
+
+  -- Gerson S Filho
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'gerson.simionato@gmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_gerson, NULL, 'Gerson S Filho', 'gerson.simionato@gmail.com', 50.00, 1, 'active', 'credit_card', 'sub_stripe_gerson');
+
+  -- Fernanda Carmagnani
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'fe.carmagnani@hotmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_fernanda, NULL, 'FERNANDA CARMAGNANI RODRIGUES', 'fe.carmagnani@hotmail.com', 50.00, 1, 'active', 'credit_card', 'sub_stripe_fernanda');
+
+  -- Jessica Penido
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'jesspenido@gmail.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_jessica, NULL, 'Jessica Penido', 'jesspenido@gmail.com', 50.00, 1, 'active', 'credit_card', 'sub_stripe_jessica');
+
+  -- Gabriel Bertoline
+  DELETE FROM public.sponsorships WHERE LOWER(TRIM(donor_email)) = 'gabrielbertoline1202@yahoo.com';
+  INSERT INTO public.sponsorships (sponsor_id, child_id, donor_name, donor_email, monthly_amount, quotas_count, status, payment_method, stripe_subscription_id)
+  VALUES (v_u_gabriel, NULL, 'Gabriel Bertoline', 'gabrielbertoline1202@yahoo.com', 50.00, 1, 'active', 'credit_card', 'sub_stripe_gabriel');
+
+END $$;
 
 -- ==============================================================================
--- CONSULTAS DE CONFERÊNCIA E AUDITORIA (Execute e confira o resultado)
+-- CONSULTA DE CONFERÊNCIA FINAL: RESUMO CONSOLIDADO
 -- ==============================================================================
-
--- 5. CONFERÊNCIA 1: Padrinhos Ativos com Criança Vinculada (Deve listar apenas os que doam >= R$ 90)
-SELECT 
-  s.id,
-  s.donor_name,
-  s.donor_email,
-  s.monthly_amount,
-  c.name AS crianca_apadrinhada,
-  s.status,
-  s.stripe_subscription_id
-FROM public.sponsorships s
-INNER JOIN public.children c ON c.id = s.child_id
-WHERE COALESCE(s.monthly_amount, 0) >= 90.00;
-
--- 6. CONFERÊNCIA 2: Mantenedores Mensais de Apoio Geral (Os doadores de R$ 50 sem criança)
-SELECT 
-  s.id,
-  s.donor_name,
-  s.donor_email,
-  s.monthly_amount,
-  'Apoio Geral / Fundo Casa Nutri' AS modalidade,
-  s.status,
-  s.stripe_subscription_id
-FROM public.sponsorships s
-WHERE s.child_id IS NULL OR COALESCE(s.monthly_amount, 0) < 90.00;
-
--- 7. CONFERÊNCIA 3: Total consolidado por modalidade
 SELECT 
   CASE 
-    WHEN s.child_id IS NOT NULL AND COALESCE(s.monthly_amount, 0) >= 90 THEN 'Padrinho (Criança Vinculada)'
-    ELSE 'Mantenedor Mensal (Apoio Geral)'
-  END AS classificacao,
+    WHEN s.child_id IS NOT NULL AND COALESCE(s.monthly_amount, 0) >= 90 THEN '💖 Padrinho (Criança Vinculada - R$ 90)'
+    ELSE '🔄 Mantenedor Mensal (Apoio Geral - R$ 50)'
+  END AS modalidade,
   COUNT(*) AS total_apoiadores,
-  SUM(COALESCE(s.monthly_amount, 0)) AS total_mensal_recorrente
+  SUM(COALESCE(s.monthly_amount, 0)) AS arrecadacao_mensal_recorrente
 FROM public.sponsorships s
-GROUP BY 1;
+GROUP BY 1
+ORDER BY total_apoiadores DESC;

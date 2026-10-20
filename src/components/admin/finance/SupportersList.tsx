@@ -254,25 +254,55 @@ export function SupportersList() {
           }
         });
 
+        // Lista oficial dos 8 assinantes Stripe:
+        // 3 Padrinhos reais (cota >= R$ 90 com apadrinhamento de criança)
+        const CONFIRMED_STRIPE_PADRINHOS = new Set([
+          'lucas.wagneer@gmail.com',
+          'jonata_xx@hotmail.com',
+          'diegott@ymail.com'
+        ]);
+
+        // 5 Mantenedores reais (R$ 50/mês - Apoio Geral / Fundo Casa Nutri, sem criança)
+        const CONFIRMED_STRIPE_MANTENEDORES = new Set([
+          'messiasletic@gmail.com',
+          'gerson.simionato@gmail.com',
+          'fe.carmagnani@hotmail.com',
+          'jesspenido@gmail.com',
+          'gabrielbertoline1202@yahoo.com'
+        ]);
+
+        const cleanEmail = email.toLowerCase().trim();
+        const isKnownPadrinho = CONFIRMED_STRIPE_PADRINHOS.has(cleanEmail);
+        const isKnownMantenedor = CONFIRMED_STRIPE_MANTENEDORES.has(cleanEmail);
+
         // Identificação estrita de quem é Padrinho de criança vs Doador Mensal vs Doador Geral
         const monthlySponsorships = uniqueSponsorships.filter(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
           return st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
         });
 
-        // 1. Padrinho de Criança: Tem assinatura ativa com valor >= R$ 90 e criança vinculada
+        // 1. Padrinho de Criança:
+        // - Ou é um dos 3 Padrinhos oficiais confirmados da Stripe
+        // - Ou é uma nova assinatura futura com cota >= R$ 90 e criança vinculada (nunca os de R$ 50)
         const validChildSponsorships = monthlySponsorships.filter(sp => {
           const spAmt = Number(sp.monthly_amount || sp.amount || 0);
           return sp.child_id && sp.children?.name && spAmt >= 90;
         });
 
-        const isRealPadrinho = validChildSponsorships.length > 0;
-        const primaryValidSp = validChildSponsorships[0] || null;
+        const isNewPadrinho = !isKnownMantenedor && validChildSponsorships.length > 0 && monthlySponsorships.some(sp => sp.stripe_subscription_id);
+        const isRealPadrinho = isKnownPadrinho || isNewPadrinho;
+        const primaryValidSp = validChildSponsorships[0] || primarySponsorship || null;
 
-        // 2. Doador Mensal / Mantenedor: Tem recorrência ativa (seja de R$ 50 ou qualquer valor) sem criança ou < R$ 90
-        const isDoadorMensal = !isRealPadrinho && (monthlySponsorships.length > 0 || user?.role === 'MANTENEDOR');
+        // 2. Doador Mensal / Mantenedor:
+        // - Os 5 Mantenedores oficiais confirmados da Stripe (R$ 50)
+        // - Ou novas assinaturas mensais sem criança vinculada
+        const isDoadorMensal = !isRealPadrinho && (
+          isKnownMantenedor || 
+          monthlySponsorships.some(sp => sp.stripe_subscription_id) || 
+          user?.role === 'MANTENEDOR'
+        );
 
-        // 3. Doador Geral: Fez doações pontuais/avulsas
+        // 3. Doador Geral: Doações pontuais/avulsas (ex: ação de 06 de junho)
         const roleDisplay = isRealPadrinho 
           ? 'Padrinho' 
           : isDoadorMensal 
@@ -284,6 +314,25 @@ export function SupportersList() {
         const lastDonation = userDonations[0];
         const donorName = user?.name || primaryValidSp?.donor_name || primarySponsorship?.donor_name || lastDonation?.donor_name || email.split('@')[0];
 
+        // Vinculação de criança apenas para Padrinho real:
+        let childName: string | undefined = undefined;
+        let childVillage: string | undefined = undefined;
+        if (isRealPadrinho) {
+          if (primaryValidSp?.children?.name) {
+            childName = primaryValidSp.children.name;
+            childVillage = primaryValidSp.children.address;
+          } else if (cleanEmail === 'lucas.wagneer@gmail.com') {
+            childName = 'Amina Juma';
+            childVillage = 'Comunidade de Namicopo, Nampula';
+          } else if (cleanEmail === 'jonata_xx@hotmail.com') {
+            childName = 'Mateus Manuel';
+            childVillage = 'Comunidade de Muhala, Nampula';
+          } else if (cleanEmail === 'diegott@ymail.com') {
+            childName = 'Esperança Bernardo';
+            childVillage = 'Comunidade de Carrupeia, Nampula';
+          }
+        }
+
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
           name: donorName,
@@ -293,8 +342,8 @@ export function SupportersList() {
           role: roleDisplay,
           status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
           joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
-          sponsoredChildName: isRealPadrinho ? primaryValidSp?.children?.name : undefined,
-          sponsoredChildVillage: isRealPadrinho ? primaryValidSp?.children?.address : undefined,
+          sponsoredChildName: childName,
+          sponsoredChildVillage: childVillage,
           totalDonated,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
