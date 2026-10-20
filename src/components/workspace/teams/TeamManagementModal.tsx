@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, Users, Shield, User as UserIcon, Check } from 'lucide-react';
 import { useTeam } from '../../../contexts/TeamContext';
 import { supabase } from '../../../lib/supabase';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 
 interface TeamManagementModalProps {
   onClose: () => void;
@@ -25,7 +26,7 @@ export function TeamManagementModal({ onClose, initialTeam }: TeamManagementModa
     // Fetch all users to allow admin to add them
     const fetchUsers = async () => {
       const { data } = await supabase.from('users').select('id, name, email, role');
-      if (data) setAllUsers(data);
+      if (data) setAllUsers(data.filter(u => isInternalTeamUser(u)));
     };
     fetchUsers();
   }, []);

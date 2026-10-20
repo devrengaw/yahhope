@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 import { X, Plus, Trash2, CheckCircle2, Circle, Lock, Globe, UserPlus, Users, AlertCircle } from 'lucide-react';
 import { ProjectTask, TaskStatus, SubTask, Priority } from '../../../lib/mockData';
 
@@ -23,8 +24,8 @@ export function ProjectTaskModal({ isOpen, onClose, onSave, initialTask }: Proje
 
   useEffect(() => {
     if (isOpen) {
-      supabase.from('users').select('id, name, department').then(({ data }) => {
-        if (data) setAvailableMembers(data);
+      supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
+        if (data) setAvailableMembers(data.filter(u => isInternalTeamUser(u)));
       });
     }
   }, [isOpen]);

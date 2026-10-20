@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { KeyRound, Lock, ArrowRight, User, Mail, HeartHandshake } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { SEO } from '../../components/common/SEO';
+import { isSpamOrMockUser } from '../../utils/userCleanup';
 
 export function SponsorSetup() {
   const [searchParams] = useSearchParams();
@@ -35,6 +36,11 @@ export function SponsorSetup() {
     
     if (password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    if (isSpamOrMockUser({ name, email })) {
+      setError('Por favor, informe seu nome completo válido.');
       return;
     }
 

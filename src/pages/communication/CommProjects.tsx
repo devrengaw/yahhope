@@ -14,6 +14,7 @@ import { Project, ProjectTask, ColumnDefinition, ColumnType } from '../../lib/mo
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { isInternalTeamUser } from '../../utils/userCleanup';
 
 export function CommProjects() {
   const { 
@@ -32,8 +33,8 @@ export function CommProjects() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from('users').select('id, name, role');
-      if (data) setUsers(data);
+      const { data } = await supabase.from('users').select('id, name, email, role');
+      if (data) setUsers(data.filter(u => isInternalTeamUser(u)));
     };
     fetchUsers();
   }, []);

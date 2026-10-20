@@ -424,9 +424,12 @@ export async function getCampaignAnalytics(
     // ignore
   }
 
-  // Deduplicar eventos
+  // Deduplicar eventos e manter apenas eventos do Hotsite da Campanha
   const eventKeys = new Set<string>();
   allEvents = allEvents.filter(e => {
+    if (e.path && !e.path.includes('hotsite') && !e.path.includes('campanha-yahhope') && !e.path.includes('participe') && !e.path.includes('fazer-parte')) {
+      return false;
+    }
     const key = `${e.visitor_id}_${e.created_at}_${e.button_label}`;
     if (eventKeys.has(key)) return false;
     eventKeys.add(key);

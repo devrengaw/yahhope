@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCalendar } from '../../../contexts/CalendarContext';
 import { supabase } from '../../../lib/supabase';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 import { X, Calendar as CalendarIcon, Clock, Users } from 'lucide-react';
 
 interface UserOption {
@@ -23,8 +24,8 @@ export function EventModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     async function loadUsers() {
-      const { data } = await supabase.from('users').select('id, name, email');
-      if (data) setUsers(data);
+      const { data } = await supabase.from('users').select('id, name, email, role');
+      if (data) setUsers(data.filter(u => isInternalTeamUser(u)));
     }
     loadUsers();
   }, []);

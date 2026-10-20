@@ -22,19 +22,18 @@ Deno.serve(async (req) => {
       throw new Error("ID do usuário é obrigatório")
     }
 
-    // 1. Deletar do auth.users (isso automaticamente deleta de public.users se houver CASCADE, mas vamos deletar explicitamente caso não tenha)
+    // 1. Deletar do auth.users (ignora se já não existir no Auth)
     const { error: authError } = await supabase.auth.admin.deleteUser(id)
     
-    if (authError) {
-      throw new Error(`Erro ao deletar do Auth: ${authError.message}`)
+    if (authError && !authError.message?.toLowerCase().includes('not found')) {
+      console.warn(`Aviso ao deletar do Auth: ${authError.message}`)
     }
 
-    // 2. Deletar de public.users (fallback, caso não tenha CASCADE trigger)
+    // 2. Deletar de public.users
     const { error: dbError } = await supabase.from('users').delete().eq('id', id)
     
     if (dbError) {
-      console.error('Erro ao deletar de public.users:', dbError)
-      // Não damos throw aqui porque o mais importante é deletar a conta auth.
+      throw new Error(`Erro ao deletar de public.users: ${dbError.message}`)
     }
 
     return new Response(JSON.stringify({ success: true, message: 'Usuário deletado com sucesso.' }), {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Layout, Plus, CheckCircle2, Circle, Clock, PlayCircle, MessageSquare, DollarSign, Users, Shield, Edit3, Save, UserPlus, Trash2, Globe, Lock } from 'lucide-react';
 import { Project, ProjectTask, TaskStatus, Priority } from '../../../lib/mockData';
 import { supabase } from '../../../lib/supabase';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 import { ProjectTaskModal } from './ProjectTaskModal';
 import { ProjectModal } from './ProjectModal';
 
@@ -22,7 +23,7 @@ export function ProjectDetails({ project, onClose, onUpdateProject }: ProjectDet
 
   useEffect(() => {
     supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
-      if (data) setTeamMembers(data);
+      if (data) setTeamMembers(data.filter(u => isInternalTeamUser(u)));
     });
   }, []);
 

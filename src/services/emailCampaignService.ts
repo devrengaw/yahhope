@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isSpamOrMockUser } from '../utils/userCleanup';
 
 export interface EmailCampaign {
   id: string;
@@ -67,8 +68,9 @@ export const emailCampaignService = {
     try {
       // 1. Apoiadores Cadastrados (usuários do sistema e/ou tabela apoiadores)
       const uniqueSupporters = new Set<string>();
-      const { data: uData } = await supabase.from('users').select('email').not('email', 'is', null);
+      const { data: uData } = await supabase.from('users').select('name, email').not('email', 'is', null);
       (uData || []).forEach(u => {
+        if (isSpamOrMockUser(u)) return;
         if (u.email && u.email.includes('@')) uniqueSupporters.add(u.email.toLowerCase().trim());
       });
 
@@ -129,6 +131,7 @@ export const emailCampaignService = {
     if (selectedSegments.includes('apoiadores') || selectedSegments.includes('all_users')) {
       const { data: uData } = await supabase.from('users').select('name, email').not('email', 'is', null);
       (uData || []).forEach(u => {
+        if (isSpamOrMockUser(u)) return;
         if (u.email && u.email.includes('@')) {
           recipientMap.set(u.email.toLowerCase().trim(), {
             email: u.email.toLowerCase().trim(),

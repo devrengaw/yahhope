@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../contexts/AuthContext';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 
 interface UserRecord {
   id: string;
@@ -54,7 +55,7 @@ export function ManageCostsAccessModal({
     try {
       const { data, error } = await supabase.from('users').select('*').order('name');
       if (data) {
-        setUsers(data as UserRecord[]);
+        setUsers((data as UserRecord[]).filter(u => isInternalTeamUser(u)));
       }
     } catch (err) {
       console.error('Erro ao buscar usuários:', err);

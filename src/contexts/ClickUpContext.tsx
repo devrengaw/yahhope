@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { isInternalTeamUser, purgeSpamUsersFromDatabase } from '../utils/userCleanup';
 
 export interface CU_Space {
   id: string;
@@ -326,16 +327,19 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
       ]);
 
       // Process Users from DB
+      purgeSpamUsersFromDatabase();
       let loadedUsers: SystemUser[] = [];
       if (resUsers.status === 'fulfilled' && resUsers.value.data && resUsers.value.data.length > 0) {
-        loadedUsers = resUsers.value.data.map((u: any) => ({
-          id: u.id,
-          name: u.name || (u.email ? u.email.split('@')[0] : 'Usuário'),
-          email: u.email || '',
-          avatar: u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=random`,
-          role: u.role || 'USER',
-          department: u.department || ''
-        }));
+        loadedUsers = resUsers.value.data
+          .filter((u: any) => isInternalTeamUser(u))
+          .map((u: any) => ({
+            id: u.id,
+            name: u.name || (u.email ? u.email.split('@')[0] : 'Usuário'),
+            email: u.email || '',
+            avatar: u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=random`,
+            role: u.role || 'USER',
+            department: u.department || ''
+          }));
       } else if (user) {
         loadedUsers = [{
           id: user.id,

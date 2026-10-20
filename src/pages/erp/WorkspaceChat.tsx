@@ -10,6 +10,7 @@ import { useClickUp } from '../../contexts/ClickUpContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { isInternalTeamUser } from '../../utils/userCleanup';
 
 export function WorkspaceChat() {
   const { id } = useParams<{ id: string }>();
@@ -70,8 +71,8 @@ export function WorkspaceChat() {
 
   useEffect(() => {
     if (isAddMemberModalOpen) {
-      supabase.from('users').select('id, name, email').then(({ data }) => {
-        if (data) setAvailableUsers(data);
+      supabase.from('users').select('id, name, email, role').then(({ data }) => {
+        if (data) setAvailableUsers(data.filter(u => isInternalTeamUser(u)));
       });
     }
   }, [isAddMemberModalOpen]);

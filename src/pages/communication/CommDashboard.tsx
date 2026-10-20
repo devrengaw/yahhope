@@ -20,6 +20,7 @@ import { cn } from '../../lib/utils';
 import { PersonalActivity } from '../../lib/mockData';
 import { Announcement } from '../../contexts/AnnouncementContext';
 import { supabase } from '../../lib/supabase';
+import { isInternalTeamUser } from '../../utils/userCleanup';
 
 export function CommDashboard() {
   const { user } = useAuth();
@@ -39,8 +40,8 @@ export function CommDashboard() {
 
   React.useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from('users').select('id, name');
-      if (data) setUsers(data);
+      const { data } = await supabase.from('users').select('id, name, email, role');
+      if (data) setUsers(data.filter(u => isInternalTeamUser(u)));
     };
     fetchUsers();
   }, []);

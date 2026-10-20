@@ -39,6 +39,7 @@ import {
   saveOrgSettings, 
   OrganizationSettings 
 } from '../../services/organizationSettingsService';
+import { isInternalTeamUser, purgeSpamUsersFromDatabase } from '../../utils/userCleanup';
 import { Loader2, Check } from 'lucide-react';
 
 type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
@@ -88,10 +89,14 @@ export function Settings() {
 
   const fetchUsers = async () => {
     try {
+      // Remove silenciosamente do banco eventuais registros falsos/bots
+      purgeSpamUsersFromDatabase();
+
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       if (data) {
-        const mappedMembers = data.map(u => ({
+        const validTeamUsers = data.filter(u => isInternalTeamUser(u));
+        const mappedMembers = validTeamUsers.map(u => ({
           id: u.id,
           name: u.name || 'Sem Nome',
           email: u.email || '',
@@ -205,12 +210,12 @@ export function Settings() {
   const handleDeleteMember = async (id: string) => {
     if (await confirm({ title: 'Excluir Usuário', message: 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.', type: 'danger' })) {
       try {
-        // Usa a Edge Function para deletar do Supabase Auth e também da tabela public.users
-        const { error } = await supabase.functions.invoke('delete-user', {
+        // Garante exclusão na tabela public.users e tenta remover do Supabase Auth via Edge Function
+        await supabase.from('users').delete().eq('id', id);
+        await supabase.functions.invoke('delete-user', {
           body: { id }
-        });
+        }).catch(() => {});
         
-        if (error) throw error;
         setMembers(members.filter(m => m.id !== id));
       } catch (err: any) {
         console.error('Error deleting user:', err);

@@ -5,6 +5,7 @@ import { X, Lock, Globe, UserPlus, Trash2, Plus } from 'lucide-react';
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { generateSafeUUID } from '../../../contexts/ProjectContext';
+import { isInternalTeamUser } from '../../../utils/userCleanup';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -32,8 +33,8 @@ export function ProjectModal({ isOpen, onClose, onSave, initialProject }: Projec
 
   useEffect(() => {
     if (isOpen) {
-      supabase.from('users').select('id, name, department').then(({ data }) => {
-        if (data) setAvailableMembers(data);
+      supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
+        if (data) setAvailableMembers(data.filter(u => isInternalTeamUser(u)));
       });
     }
   }, [isOpen]);

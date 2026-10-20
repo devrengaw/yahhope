@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { isSpamOrMockUser } from '../utils/userCleanup';
 
 export type Role = 'ADMIN' | 'USER' | 'SPONSOR' | 'OBSERVER';
 
@@ -84,14 +85,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let finalUser = publicUser;
 
-      // 2. If it doesn't exist, auto-register them
+      // 2. If it doesn't exist, auto-register them (unless identified as bot/spam)
       if (!publicUser) {
+        const candidateName = authUser.user_metadata?.full_name || authUser.email.split('@')[0];
+        if (isSpamOrMockUser({ name: candidateName, email: authUser.email })) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         // Special case: if the email is the admin email, give them ADMIN role automatically
         const isMasterAdmin = authUser.email.toLowerCase() === 'contato@yahhope.com';
         
         const newUser = {
           id: authUser.id,
-          name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+          name: candidateName,
           email: authUser.email,
           role: isMasterAdmin ? 'ADMIN' : 'SPONSOR'
         };
@@ -216,6 +225,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     consents?: { communication?: boolean; privacy?: boolean }
   ): Promise<{ success: boolean; error?: string }> => {
     if (!password) return { success: false, error: 'Por favor, informe uma senha.' };
+    if (isSpamOrMockUser({ name, email })) {
+      return { success: false, error: 'Por favor, informe seu nome completo válido.' };
+    }
     
     // Create the user in Supabase Auth
     const cleanEmail = email.trim().toLowerCase();

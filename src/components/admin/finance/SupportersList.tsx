@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
+import { isSpamOrMockUser, purgeSpamUsersFromDatabase } from '../../../utils/userCleanup';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
 
 export function SupportersList() {
@@ -37,13 +38,15 @@ export function SupportersList() {
   const fetchSupporters = async () => {
     setIsLoading(true);
     try {
+      purgeSpamUsersFromDatabase();
+
       const [usersRes, sponsorshipsRes, donationsRes] = await Promise.all([
         supabase.from('users').select('*').order('created_at', { ascending: false }),
         supabase.from('sponsorships').select('*, children(id, name, address)'),
         supabase.from('donations').select('*').order('created_at', { ascending: false })
       ]);
 
-      const dbUsers = usersRes.data || [];
+      const dbUsers = (usersRes.data || []).filter(u => !isSpamOrMockUser(u));
       const dbSponsorships = sponsorshipsRes.data || [];
       const dbDonations = donationsRes.data || [];
 

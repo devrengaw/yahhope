@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isSpamOrMockUser } from '../utils/userCleanup';
 
 export interface MonthlySupportersData {
   count: number;
@@ -65,10 +66,11 @@ export async function getUniqueMonthlySupportersCount(): Promise<number> {
     // 3. Usuários com perfil específico de apoiador contínuo (SPONSOR, PADRINHO, MANTENEDOR)
     const { data: users } = await supabase
       .from('users')
-      .select('email, id, role');
+      .select('email, id, name, role');
 
     if (users && users.length > 0) {
       users.forEach(u => {
+        if (isSpamOrMockUser(u)) return;
         const role = (u.role || '').toUpperCase();
         if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR') {
           const email = (u.email || u.id || '').toLowerCase().trim();
