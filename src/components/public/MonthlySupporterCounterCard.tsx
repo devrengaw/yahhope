@@ -66,7 +66,7 @@ export function MonthlySupporterCounterCard({
       </div>
 
       {/* Número e Título */}
-      <div className="space-y-1 mb-4">
+      <div className="space-y-1">
         <div className="flex items-baseline gap-2.5">
           <span 
             className={cn(
@@ -93,24 +93,6 @@ export function MonthlySupporterCounterCard({
           Padrinhos e mantenedores unidos em um compromisso contínuo com a dignidade e o futuro de vidas preciosas.
         </p>
       </div>
-
-      {/* Detalhes de Transparência e Critérios */}
-      {showDetails && (
-        <div className={cn("pt-4 border-t space-y-2.5 text-xs font-medium", isDark ? "border-white/10 text-slate-300" : "border-slate-100 text-slate-600")}>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-            <span>Contagem individual (cada pessoa conta apenas uma vez)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-            <span>Exclusivo para apoiadores com fidelidade mensal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-            <span>Sem distinção: mantenedores do projeto e padrinhos somam juntos</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

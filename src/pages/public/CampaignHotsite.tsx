@@ -218,11 +218,6 @@ export function CampaignHotsite() {
 
           <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 md:py-28 w-full">
             <div className="max-w-2xl space-y-6 text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs font-medium text-amber-200">
-                <span className="w-2 h-2 rounded-full bg-[#F49853]" />
-                <span>YAH Hope • Cuidado, Dignidade e Oportunidades</span>
-              </div>
-
               <h1 
                 id="hero-heading"
                 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] drop-shadow-sm"
@@ -418,7 +413,7 @@ export function CampaignHotsite() {
                   <span>Visão de continuidade e novas iniciativas</span>
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-                  À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.
+                  À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo o acolhimento a mais crianças, oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.
                 </p>
               </div>
             </div>
@@ -431,20 +426,32 @@ export function CampaignHotsite() {
         <section 
           id="formas-de-participar" 
           aria-labelledby="modalidades-heading"
-          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#070B12] scroll-mt-20"
+          className="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-[#070B12] overflow-hidden scroll-mt-20"
         >
-          <div className="max-w-6xl mx-auto space-y-12">
+          {/* Fotografia de fundo da seção Formas de Participar */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img
+              src="/formas_participar_bg.jpg"
+              alt="Criança sorrindo acompanhada pela YAH Hope"
+              className="w-full h-full object-cover object-[center_25%]"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-slate-950/70" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0B111E] via-transparent to-[#0B111E]" />
+          </div>
+
+          <div className="relative z-10 max-w-6xl mx-auto space-y-12">
             <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block drop-shadow-sm">
                 Formas de Participar
               </span>
               <h2 
                 id="modalidades-heading"
-                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md"
               >
                 Existem muitas formas de fazer parte dessa história.
               </h2>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+              <p className="text-base sm:text-lg text-slate-200 leading-relaxed drop-shadow-sm">
                 Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Escolha como você prefere caminhar com a YAH Hope:
               </p>
             </div>
@@ -453,7 +460,7 @@ export function CampaignHotsite() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
               
               {/* MODALIDADE 1 — MANTENEDOR YAH HOPE */}
-              <div className="rounded-3xl p-6 sm:p-8 bg-slate-900/80 border border-white/15 hover:border-white/25 transition-all flex flex-col justify-between space-y-6">
+              <div className="rounded-3xl p-6 sm:p-8 bg-slate-950/80 backdrop-blur-md border border-white/15 hover:border-white/25 transition-all flex flex-col justify-between space-y-6 shadow-2xl">
                 <div className="space-y-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-white/10 text-white flex items-center justify-center border border-white/15">
@@ -500,7 +507,7 @@ export function CampaignHotsite() {
               </div>
 
               {/* MODALIDADE 2 — PADRINHO OU MADRINHA */}
-              <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-b from-slate-900/95 to-slate-900/80 border-2 border-[#F49853]/40 hover:border-[#F49853]/70 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden">
+              <div className="rounded-3xl p-6 sm:p-8 bg-slate-950/80 backdrop-blur-md border-2 border-[#F49853]/45 hover:border-[#F49853]/75 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden shadow-2xl">
                 <div className="space-y-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center border border-[#F49853]/30">
