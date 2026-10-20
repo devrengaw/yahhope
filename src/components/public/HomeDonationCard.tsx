@@ -22,20 +22,36 @@ interface HomeDonationCardProps {
   isModal?: boolean;
   className?: string;
   initialTab?: 'sponsorship' | 'general';
+  initialQuotas?: number;
 }
 
 export function HomeDonationCard({
   onClose,
   isModal = false,
   className = '',
-  initialTab = 'sponsorship'
+  initialTab = 'sponsorship',
+  initialQuotas
 }: HomeDonationCardProps) {
   const { user } = useAuth();
 
   // Estados do Card de Doação / Apoio (Idêntico à Página Inicial)
   const [headerTab, setHeaderTab] = useState<'sponsorship' | 'general'>(initialTab);
   const [isSingleDonation, setIsSingleDonation] = useState(false);
-  const [sponsorshipQuotas, setSponsorshipQuotas] = useState<number>(1);
+  const [sponsorshipQuotas, setSponsorshipQuotas] = useState<number>(initialQuotas || 1);
+
+  // Sincroniza aba e cotas quando acionado externamente por botões da página
+  useEffect(() => {
+    setHeaderTab(initialTab);
+    if (initialTab === 'general') {
+      setIsSingleDonation(false);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialQuotas && initialQuotas >= 1 && initialQuotas <= 4) {
+      setSponsorshipQuotas(initialQuotas);
+    }
+  }, [initialQuotas]);
   const [sponsorshipMetrics, setSponsorshipMetrics] = useState<SponsorshipMetrics | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [isCustom, setIsCustom] = useState(false);

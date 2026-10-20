@@ -1,8 +1,22 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Heart, 
-  Lock, 
-  ShieldCheck 
+  Users, 
+  ShieldCheck, 
+  Sparkles, 
+  CheckCircle2, 
+  ArrowRight, 
+  MapPin, 
+  HeartHandshake, 
+  Sprout, 
+  Compass, 
+  FileText, 
+  Bell, 
+  LayoutDashboard, 
+  ChevronDown, 
+  ChevronUp, 
+  Lock,
+  Activity
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
@@ -13,10 +27,125 @@ import {
 import { trackPageView } from '../../services/analyticsService';
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
 import { PublicFooter } from '../../components/PublicFooter';
+import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
+
+/**
+ * Estrutura escalável de projetos para a campanha institucional da YAH Hope.
+ * Permite cadastrar e exibir novas frentes aprovadas no futuro (Educação, Geração de Renda,
+ * Desenvolvimento Comunitário, Assistência Humanitária) sem necessidade de refatorar a página.
+ */
+export interface CampaignProjectItem {
+  id: string;
+  name: string;
+  summary: string;
+  image: string;
+  imageAlt: string;
+  location: string;
+  category: string;
+  status: 'active' | 'completed';
+  statusLabel: string;
+  verifiedHighlights: string[];
+  contributionMode: 'sponsorship' | 'general';
+}
+
+/**
+ * Lista estrita de projetos efetivamente em execução e verificados para publicação.
+ * Projetos em fase de planejamento não são exibidos como cards ativos.
+ */
+const PUBLISHED_CAMPAIGN_PROJECTS: CampaignProjectItem[] = [
+  {
+    id: 'acompanhamento-nutricional-mocambique',
+    name: 'Acompanhamento nutricional infantil — Moçambique',
+    summary:
+      'Atualmente, acompanhamos 10 crianças em situação de desnutrição infantil, oferecendo cuidado contínuo e apoio às suas famílias. Nosso compromisso é acompanhar cada história com responsabilidade, atenção e proximidade.',
+    image: '/login_bg_real.jpg',
+    imageAlt: 'Crianças acompanhadas pela YAH Hope em Moçambique',
+    location: 'Moçambique',
+    category: 'Saúde e Nutrição',
+    status: 'active',
+    statusLabel: 'Em execução',
+    verifiedHighlights: [
+      '10 crianças atualmente acompanhadas',
+      'Apoio e orientação às famílias',
+      'Continuidade do acompanhamento'
+    ],
+    contributionMode: 'sponsorship'
+  }
+];
+
+const INSTITUTIONAL_PILLARS = [
+  {
+    id: 'cuidar',
+    title: 'CUIDAR',
+    description:
+      'Estar presente diante das necessidades humanas, oferecendo acolhimento, atenção e apoio.',
+    icon: HeartHandshake,
+    accentClass: 'text-[#F49853] bg-[#F49853]/15 border-[#F49853]/25'
+  },
+  {
+    id: 'fortalecer',
+    title: 'FORTALECER',
+    description:
+      'Contribuir para que famílias e comunidades desenvolvam autonomia, segurança e novas possibilidades.',
+    icon: Sprout,
+    accentClass: 'text-[#92BF78] bg-[#92BF78]/15 border-[#92BF78]/25'
+  },
+  {
+    id: 'transformar',
+    title: 'TRANSFORMAR',
+    description:
+      'Construir oportunidades que possam gerar mudanças duradouras na vida das pessoas.',
+    icon: Compass,
+    accentClass: 'text-[#88A1F2] bg-[#88A1F2]/15 border-[#88A1F2]/25'
+  }
+];
+
+const TRANSPARENCY_FEATURES = [
+  {
+    title: 'Portal exclusivo',
+    description: 'Ambiente dedicado para mantenedores, padrinhos e madrinhas acompanharem sua caminhada com a YAH Hope.',
+    icon: LayoutDashboard
+  },
+  {
+    title: 'Notícias das crianças',
+    description: 'Informações cuidadosas e respeitosas sobre o desenvolvimento das crianças acompanhadas pelo projeto.',
+    icon: Heart
+  },
+  {
+    title: 'Atualizações dos projetos',
+    description: 'Relatos periódicos sobre o andamento das ações em execução e os passos dados em campo.',
+    icon: Sparkles
+  },
+  {
+    title: 'Acompanhamento das iniciativas',
+    description: 'Visão clara de como cada frente de trabalho evolui junto às famílias e comunidades atendidas.',
+    icon: Activity
+  },
+  {
+    title: 'Aplicação dos recursos',
+    description: 'Consulta transparente às suas contribuições mensais e à prestação de contas das atividades.',
+    icon: FileText
+  },
+  {
+    title: 'Comunicação da YAH Hope',
+    description: 'Acesso em primeira mão aos comunicados institucionais, novidades e próximos passos da organização.',
+    icon: Bell
+  }
+];
+
+const SPONSORSHIP_QUOTA_OPTIONS = [
+  { quotas: 1, label: '1 criança', price: 'R$ 90/mês' },
+  { quotas: 2, label: '2 crianças', price: 'R$ 180/mês' },
+  { quotas: 3, label: '3 crianças', price: 'R$ 270/mês' },
+  { quotas: 4, label: '4 crianças', price: 'R$ 360/mês' }
+];
 
 export function CampaignHotsite() {
+  const [selectedModality, setSelectedModality] = useState<'sponsorship' | 'general'>('sponsorship');
+  const [selectedQuotas, setSelectedQuotas] = useState<number>(1);
+  const [isManifestoExpanded, setIsManifestoExpanded] = useState<boolean>(false);
+
   useEffect(() => {
-    // Registra a visualização do hotsite de mantenedores
     trackPageView('/campanha-yahhope', 'Hotsite - Um convite para levar esperança | YAH Hope');
     recordCampaignClick('Visualização do Hotsite de Mantenedores', 'page_view', {
       source: detectTrafficSource(),
@@ -24,185 +153,539 @@ export function CampaignHotsite() {
     });
   }, []);
 
+  const scrollToSection = (sectionId: string, buttonLabel: string) => {
+    recordCampaignClick(buttonLabel, 'cta_click', { target: sectionId });
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleSelectModality = (
+    modality: 'sponsorship' | 'general',
+    buttonLabel: string,
+    quotas?: number
+  ) => {
+    setSelectedModality(modality);
+    if (quotas) {
+      setSelectedQuotas(quotas);
+    }
+    scrollToSection('participar', buttonLabel);
+  };
+
   return (
-    <div className="min-h-screen bg-[#070B12] text-slate-100 antialiased selection:bg-[#F49853] selection:text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#070B12] text-slate-100 antialiased selection:bg-[#F49853] selection:text-white overflow-x-hidden flex flex-col">
       <SEO 
         title="Um convite para levar esperança | YAH Hope" 
-        description="Há muitas formas de fazer parte da vida de alguém. Hoje, queremos convidar você a fazer parte da YAH Hope."
+        description="A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas."
       />
 
-      {/* Mesma foto de fundo oficial da tela de login com overlay suave e nítido */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <img
-          src="/login_bg_real.jpg"
-          alt="Crianças sorrindo, YAH Hope"
-          className="w-full h-full object-cover object-center scale-100"
-        />
-        {/* Overlay equilibrado idêntico à atmosfera da tela de login */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/65 to-slate-950/85" />
-        <div className="absolute inset-0 bg-orange-950/10 mix-blend-overlay" />
-      </div>
+      {/* TOPO INSTITUCIONAL LIMPO: Apenas o Logo Centralizado apontando para www.yahhope.com */}
+      <header className="sticky top-0 z-40 py-2.5 sm:py-3 px-4 border-b border-white/10 bg-[#070B12]/85 backdrop-blur-md flex items-center justify-center">
+        <a 
+          href="https://www.yahhope.com" 
+          title="Ir para o site principal da YAH Hope"
+          className="inline-block transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F49853] rounded-lg"
+        >
+          <img 
+            src="/logo.png" 
+            alt="YAH Hope" 
+            className="h-14 sm:h-18 md:h-20 w-auto object-contain drop-shadow-xl"
+          />
+        </a>
+      </header>
 
-      {/* Conteúdo da Página */}
-      <div className="relative z-10 flex flex-col min-h-screen">
-        
-        {/* Topo Limpo e Compacto: Apenas o Logo Centralizado (Clica e abre www.yahhope.com) */}
-        <header className="py-2.5 sm:py-3 px-4 border-b border-white/10 bg-black/25 backdrop-blur-md flex items-center justify-center">
-          <a 
-            href="https://www.yahhope.com" 
-            title="Ir para o site principal da YAH Hope"
-            className="inline-block transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <img 
-              src="/logo.png" 
-              alt="YAH Hope" 
-              className="h-16 sm:h-20 md:h-24 w-auto object-contain drop-shadow-xl"
+      <main className="flex-1">
+        {/* =====================================================================
+            SEÇÃO 01 — HERO: UM CONVITE PARA LEVAR ESPERANÇA
+        ===================================================================== */}
+        <section 
+          aria-labelledby="hero-heading"
+          className="relative min-h-[78vh] sm:min-h-[82vh] flex items-center overflow-hidden border-b border-white/10"
+        >
+          {/* Fotografia real com enquadramento cuidadoso e contraste controlado */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img
+              src="/login_bg_real.jpg"
+              alt="Crianças acompanhadas pela YAH Hope em Moçambique"
+              className="w-full h-full object-cover object-[65%_30%] sm:object-center"
+              fetchPriority="high"
             />
-          </a>
-        </header>
+            {/* Gradiente direcional para garantir leitura WCAG AA sem esconder a fotografia */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#070B12]/95 via-[#070B12]/80 to-[#070B12]/40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070B12] via-[#070B12]/30 to-transparent" />
+          </div>
 
-        {/* Artigo com o Texto Completo Solicitado */}
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex-1">
-          <article className="space-y-10 text-left">
-            
-            {/* Bloco 1: Título Principal direto (Sem balão, sem nada no lugar) */}
-            <div className="space-y-6">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-[1.15] drop-shadow-sm">
+          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 md:py-28 w-full">
+            <div className="max-w-2xl space-y-6 text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs font-medium text-amber-200">
+                <span className="w-2 h-2 rounded-full bg-[#F49853]" />
+                <span>YAH Hope • Cuidado, Dignidade e Oportunidades</span>
+              </div>
+
+              <h1 
+                id="hero-heading"
+                className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] drop-shadow-sm"
+              >
                 Um convite para levar esperança.
               </h1>
 
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
-                <p>
-                  Há muitas formas de fazer parte da vida de alguém. Hoje, queremos convidar você a fazer parte da YAH Hope.
-                </p>
-                <p>
-                  Atualmente, acompanhamos 10 crianças que enfrentam a desnutrição infantil. Nosso cuidado também alcança suas famílias, que recebem atendimento e orientação, porque cuidar de uma criança envolve olhar para quem caminha com ela todos os dias.
-                </p>
-                <p>
-                  Queremos continuar presentes na vida dessas famílias e alcançar outras que também precisam desse apoio. E você pode caminhar com a gente.
-                </p>
+              <p className="text-base sm:text-xl text-slate-200 leading-relaxed font-normal max-w-xl">
+                A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas.
+              </p>
+
+              {/* CTAs Primário e Secundário */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 sm:gap-4">
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('participar', 'Hero CTA - Quero fazer parte')}
+                  className="min-h-[50px] px-7 py-3.5 rounded-2xl bg-[#F49853] hover:bg-[#e38640] text-white font-bold text-sm sm:text-base tracking-wide shadow-xl shadow-[#F49853]/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99]"
+                >
+                  <Heart size={18} className="fill-current" />
+                  <span>Quero fazer parte</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('quem-somos', 'Hero CTA - Conheça nosso trabalho')}
+                  className="min-h-[50px] px-7 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/25 backdrop-blur-md font-semibold text-sm sm:text-base transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                >
+                  <span>Conheça nosso trabalho</span>
+                  <ArrowRight size={17} />
+                </button>
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Bloco 2: Cuidar hoje. Construir possibilidades para o amanhã. */}
-            <div className="space-y-4 pt-4 border-t border-white/10">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-sm">
+        {/* =====================================================================
+            SEÇÃO 02 — QUEM SOMOS E O QUE NOS MOVE
+        ===================================================================== */}
+        <section 
+          id="quem-somos" 
+          aria-labelledby="quem-somos-heading"
+          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#070B12] scroll-mt-20"
+        >
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
+                Quem Somos e o Que Nos Move
+              </span>
+              <h2 
+                id="quem-somos-heading"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+              >
                 Cuidar hoje. Construir possibilidades para o amanhã.
               </h2>
-              
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
-                <p>
-                  Cada criança tem uma história, vínculos e um futuro a descobrir. Nosso compromisso começa com suas necessidades de hoje e se estende às oportunidades que ela e sua família podem encontrar ao longo do caminho.
-                </p>
-                <p>
-                  Por isso, nossos próximos passos incluem criar oficinas para ajudar as famílias a desenvolver habilidades e gerar renda, fortalecendo a autonomia e o sustento de suas casas.
-                </p>
-                <p>
-                  Também estamos preparando uma nova frente de atuação: acompanhar jovens universitários e custear seus estudos, para que tenham apoio para seguir sua formação.
-                </p>
-                <p className="text-amber-200/90 font-medium">
-                  São passos que queremos dar com responsabilidade, continuidade e pessoas ao nosso lado.
-                </p>
-              </div>
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+                Acreditamos que cada vida carrega uma história e um futuro de possibilidades. Nosso compromisso é caminhar ao lado de pessoas e comunidades, oferecendo cuidado, fortalecendo vínculos e criando oportunidades de transformação.
+              </p>
             </div>
 
-            {/* Bloco 3: A esperança precisa de continuidade. Seu apoio ajuda a construí-la. */}
-            <div className="space-y-5 pt-4 border-t border-white/10">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-sm">
-                A esperança precisa de continuidade. Seu apoio ajuda a construí-la.
+            {/* Três Pilares Institucionais */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {INSTITUTIONAL_PILLARS.map((pillar) => {
+                const IconComponent = pillar.icon;
+                return (
+                  <div
+                    key={pillar.id}
+                    className="rounded-3xl p-6 sm:p-8 bg-slate-900/70 border border-white/10 hover:border-white/20 transition-colors flex flex-col justify-between space-y-5"
+                  >
+                    <div className="space-y-4">
+                      <div className={cn("w-12 h-12 rounded-2xl border flex items-center justify-center", pillar.accentClass)}>
+                        <IconComponent size={22} />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
+                        {pillar.title}
+                      </h3>
+                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                        {pillar.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================================
+            SEÇÃO 03 — NOSSO TRABALHO NA PRÁTICA (ARQUITETURA ESCALÁVEL DE PROJETOS)
+        ===================================================================== */}
+        <section 
+          id="projetos" 
+          aria-labelledby="projetos-heading"
+          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#0B111E] border-y border-white/10 scroll-mt-20"
+        >
+          <div className="max-w-6xl mx-auto space-y-10">
+            <div className="max-w-3xl text-left space-y-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#92BF78] block">
+                Nosso Trabalho na Prática
+              </span>
+              <h2 
+                id="projetos-heading"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+              >
+                Esperança que se transforma em ação.
               </h2>
-
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
-                Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Ela ajuda a dar continuidade ao trabalho e cria condições para que a YAH Hope alcance mais pessoas.
-              </p>
-
-              <p className="text-base sm:text-lg text-white font-medium">
-                Você pode fazer parte dessa história de duas formas:
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                {/* Opção 1: Mantenedor */}
-                <div className="p-5 rounded-2xl bg-white/[0.08] border border-white/15 backdrop-blur-md space-y-2">
-                  <div className="w-8 h-8 rounded-xl bg-[#F49853]/25 text-[#F49853] flex items-center justify-center font-bold text-sm">
-                    1
-                  </div>
-                  <h3 className="text-base font-bold text-white">Como mantenedor do projeto</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed text-justify">
-                    Contribuindo mensalmente para o trabalho da YAH Hope como um todo, apoiando suas ações e seu crescimento.
-                  </p>
-                </div>
-
-                {/* Opção 2: Padrinho / Madrinha */}
-                <div className="p-5 rounded-2xl bg-white/[0.08] border border-white/15 backdrop-blur-md space-y-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/25 text-emerald-400 flex items-center justify-center font-bold text-sm">
-                    2
-                  </div>
-                  <h3 className="text-base font-bold text-white">Como padrinho ou madrinha de uma criança</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed text-justify">
-                    Assumindo uma contribuição mensal por meio do apadrinhamento e participando mais de perto dessa caminhada de cuidado.
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal pt-1 text-justify">
-                Em qualquer uma dessas escolhas, você se une a uma rede de pessoas que ajudam a tornar esse trabalho possível.
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+                Cada iniciativa da YAH Hope nasce para responder a necessidades reais com responsabilidade, acompanhamento próximo e compromisso com a dignidade humana.
               </p>
             </div>
 
-            {/* Bloco 4: Você faz parte e acompanha essa história. */}
-            <div className="space-y-4 pt-4 border-t border-white/10">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-sm">
+            {/* Lista de Projetos Ativos Aprovados */}
+            <div className="space-y-8">
+              {PUBLISHED_CAMPAIGN_PROJECTS.map((project) => (
+                <div
+                  key={project.id}
+                  className="rounded-3xl bg-slate-900/90 border border-white/15 overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12"
+                >
+                  {/* Imagem do Projeto */}
+                  <div className="lg:col-span-5 relative min-h-[260px] sm:min-h-[320px] overflow-hidden">
+                    <img
+                      src={project.image}
+                      alt={project.imageAlt}
+                      className="w-full h-full object-cover object-center"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900/80" />
+                    <div className="absolute top-4 left-4 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#92BF78] text-slate-950 shadow-md">
+                        <span className="w-2 h-2 rounded-full bg-slate-950 animate-pulse" />
+                        {project.statusLabel}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-slate-950/75 text-slate-200 backdrop-blur-md border border-white/15">
+                        <MapPin size={12} className="text-[#F49853]" />
+                        {project.location}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo do Projeto */}
+                  <div className="lg:col-span-7 p-6 sm:p-8 md:p-10 flex flex-col justify-between space-y-6">
+                    <div className="space-y-4">
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#F49853]">
+                        {project.category} • Projeto Ativo
+                      </div>
+
+                      <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-snug">
+                        {project.name}
+                      </h3>
+
+                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                        {project.summary}
+                      </p>
+
+                      {/* Destaques Verificados */}
+                      <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {project.verifiedHighlights.map((highlight, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-2.5"
+                          >
+                            <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                            <span className="text-xs sm:text-sm font-medium text-slate-200 leading-snug">
+                              {highlight}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/10">
+                      <p className="text-xs sm:text-sm text-slate-400">
+                        Cuidado integral voltado à criança e à orientação da sua família.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectModality(project.contributionMode, `Projeto Ativo CTA - ${project.name}`)}
+                        className="px-5 py-3 rounded-xl bg-white/10 hover:bg-[#F49853] text-white font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                      >
+                        <span>Participar desta história</span>
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Nota transparente sobre visão de futuro (sem apresentar como projeto já ativo) */}
+            <div className="rounded-2xl p-5 sm:p-6 bg-slate-900/50 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                  <Sparkles size={16} className="text-[#F49853] shrink-0" />
+                  <span>Visão de continuidade e novas iniciativas</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
+                  À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================================
+            SEÇÃO 04 — FORMAS DE PARTICIPAR
+        ===================================================================== */}
+        <section 
+          id="formas-de-participar" 
+          aria-labelledby="modalidades-heading"
+          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#070B12] scroll-mt-20"
+        >
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
+                Formas de Participar
+              </span>
+              <h2 
+                id="modalidades-heading"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+              >
+                Existem muitas formas de fazer parte dessa história.
+              </h2>
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+                Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Escolha como você prefere caminhar com a YAH Hope:
+              </p>
+            </div>
+
+            {/* Dois Cards Comparativos Bem Diferenciados */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
+              
+              {/* MODALIDADE 1 — MANTENEDOR YAH HOPE */}
+              <div className="rounded-3xl p-6 sm:p-8 bg-slate-900/80 border border-white/15 hover:border-white/25 transition-all flex flex-col justify-between space-y-6">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 text-white flex items-center justify-center border border-white/15">
+                      <Users size={22} />
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-slate-200 border border-white/10">
+                      Apoio Institucional Mensal
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xl sm:text-2xl font-black text-white">
+                      Mantenedor YAH Hope
+                    </h3>
+                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                      Como mantenedor, você contribui mensalmente para a continuidade do trabalho da YAH Hope, apoiando suas ações e seu crescimento.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 space-y-3 border-t border-white/10 text-xs sm:text-sm text-slate-300">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                      <span>Sua contribuição é destinada à sustentação global dos projetos ativos e à estruturação de novas iniciativas da organização.</span>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                      <span>Opções mensais sugeridas de <strong>R$ 50</strong>, <strong>R$ 100</strong>, <strong>R$ 200</strong> ou qualquer outro valor de sua escolha.</span>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                      <span>Acesso completo ao Portal Exclusivo com atualizações dos projetos e relatórios de prestação de contas.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectModality('general', 'Card Modalidade - Quero ser mantenedor')}
+                  className="w-full min-h-[48px] py-3.5 px-6 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
+                >
+                  <Users size={17} />
+                  <span>Quero ser mantenedor</span>
+                </button>
+              </div>
+
+              {/* MODALIDADE 2 — PADRINHO OU MADRINHA */}
+              <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-b from-slate-900/95 to-slate-900/80 border-2 border-[#F49853]/40 hover:border-[#F49853]/70 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[#F49853]/20 text-[#F49853] flex items-center justify-center border border-[#F49853]/30">
+                      <Heart size={22} className="fill-[#F49853]" />
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F49853]/20 text-[#F49853] border border-[#F49853]/30">
+                      Programa de Apadrinhamento
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xl sm:text-2xl font-black text-white">
+                      Padrinho ou Madrinha
+                    </h3>
+                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                      Como padrinho ou madrinha, você participa do programa de apadrinhamento, contribuindo mensalmente para o cuidado das crianças acompanhadas.
+                    </p>
+                  </div>
+
+                  {/* Opções de Cotas (1 a 4 crianças) */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
+                      Opções de participação mensal:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {SPONSORSHIP_QUOTA_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.quotas}
+                          type="button"
+                          onClick={() =>
+                            handleSelectModality(
+                              'sponsorship',
+                              `Card Modalidade Cota - ${opt.label}`,
+                              opt.quotas
+                            )
+                          }
+                          className="p-2.5 rounded-xl bg-white/[0.06] hover:bg-[#F49853]/20 border border-white/10 hover:border-[#F49853]/50 text-center transition-all cursor-pointer group"
+                        >
+                          <span className="block text-xs font-bold text-white group-hover:text-[#F49853]">
+                            {opt.label}
+                          </span>
+                          <span className="block text-xs font-black text-[#F49853] mt-0.5">
+                            {opt.price}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 space-y-2.5 border-t border-white/10 text-xs sm:text-sm text-slate-300">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                      <span><strong>Distribuição justa e coletiva:</strong> As contribuições sustentam o cuidado integral de todas as crianças acompanhadas com equidade.</span>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
+                      <span>Após a confirmação, você recebe por e-mail e no portal o perfil de acompanhamento e notícias periódicas do desenvolvimento.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectModality('sponsorship', 'Card Modalidade - Quero apadrinhar')}
+                  className="w-full min-h-[48px] py-3.5 px-6 rounded-2xl bg-[#F49853] hover:bg-[#e38640] text-white font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#F49853]/25 cursor-pointer active:scale-[0.99]"
+                >
+                  <Heart size={17} className="fill-current" />
+                  <span>Quero ser padrinho ou madrinha</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================================
+            SEÇÃO 05 — ACOMPANHAMENTO E TRANSPARÊNCIA
+        ===================================================================== */}
+        <section 
+          id="transparencia" 
+          aria-labelledby="transparencia-heading"
+          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-[#0B111E] border-t border-white/10 scroll-mt-20"
+        >
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#92BF78] block">
+                Acompanhamento e Transparência
+              </span>
+              <h2 
+                id="transparencia-heading"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+              >
                 Você faz parte e acompanha essa história.
               </h2>
-
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
-                <p>
-                  Queremos que você saiba como o projeto está caminhando e o que seu apoio ajuda a construir.
-                </p>
-
-                <div className="p-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-md space-y-2 text-slate-100">
-                  <p className="text-sm sm:text-base leading-relaxed text-justify">
-                    Mantenedores, padrinhos e madrinhas têm acesso a um portal exclusivo, onde podem receber notícias das crianças, acompanhar as atualizações do projeto e consultar suas doações. Também recebem em primeira mão as novidades da YAH Hope.
-                  </p>
-                </div>
-
-                <p>
-                  É uma forma de manter você por perto, compartilhar os próximos passos e cultivar uma relação de confiança ao longo do tempo.
-                </p>
-              </div>
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+                Queremos que você saiba como o trabalho está caminhando e o que seu apoio ajuda a construir. É uma forma de manter você por perto e cultivar uma relação de confiança ao longo do tempo.
+              </p>
             </div>
 
-            {/* Bloco 5: Vamos levar esperança juntos? */}
-            <div className="space-y-4 pt-4 border-t border-white/10">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-sm">
+            {/* Grid de 6 Cards Visuais do Portal do Mantenedor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {TRANSPARENCY_FEATURES.map((item, idx) => {
+                const IconComp = item.icon;
+                return (
+                  <div
+                    key={idx}
+                    className="p-6 rounded-2xl bg-slate-900/75 border border-white/10 flex flex-col justify-between space-y-3"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-[#F49853] flex items-center justify-center">
+                      <IconComp size={19} />
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================================
+            SEÇÃO 06 — FORMULÁRIO DE PARTICIPAÇÃO + CONTADOR DE APOIADORES
+        ===================================================================== */}
+        <section 
+          id="participar" 
+          aria-labelledby="participar-heading"
+          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#070B12] to-[#0B111E] border-t border-white/10 scroll-mt-16"
+        >
+          <div className="max-w-5xl mx-auto space-y-10">
+            <div className="max-w-2xl mx-auto text-left sm:text-center space-y-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
+                Sua Participação Começa Aqui
+              </span>
+              <h2 
+                id="participar-heading"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+              >
                 Vamos levar esperança juntos?
               </h2>
-
-              <div className="space-y-4 text-base sm:text-lg text-slate-200 leading-relaxed font-normal text-justify">
-                <p>
-                  Nosso convite é para que você escolha uma forma de participar e caminhe com a YAH Hope.
-                </p>
-                <p className="text-white font-medium text-lg sm:text-xl">
-                  Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.
-                </p>
-              </div>
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.
+              </p>
             </div>
 
-          </article>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center justify-center">
+              {/* Contador de Mantenedores e Padrinhos Mensais */}
+              <div className="lg:col-span-5 w-full flex justify-center order-2 lg:order-1">
+                <div className="w-full max-w-md space-y-4">
+                  <MonthlySupporterCounterCard 
+                    theme="dark" 
+                    className="w-full shadow-2xl" 
+                  />
 
-          {/* Caixa de Doação / Apadrinhamento: Limpa, Sem Barras Externas, Centralizada */}
-          <section className="mt-14 mb-16 flex flex-col items-center justify-center">
-            <HomeDonationCard 
-              initialTab="sponsorship" 
-              className="w-full max-w-md shadow-2xl mx-auto" 
-            />
-          </section>
+                  <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3 text-xs text-slate-300">
+                    <ShieldCheck size={18} className="text-[#92BF78] shrink-0" />
+                    <span>
+                      Ambiente criptografado. Você pode gerenciar sua assinatura a qualquer momento pelo Portal do Mantenedor.
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-        </main>
+              {/* Formulário Oficial de Participação (Preservado Integralmente) */}
+              <div className="lg:col-span-7 w-full flex justify-center order-1 lg:order-2">
+                <HomeDonationCard 
+                  initialTab={selectedModality}
+                  initialQuotas={selectedQuotas}
+                  className="w-full max-w-md shadow-2xl mx-auto" 
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
-        {/* Seção Oficial do Manifesto YAH Hope */}
+        {/* =====================================================================
+            SEÇÃO 07 — MANIFESTO YAH HOPE (INTRODUÇÃO + LEITURA COMPLETA EXPANSÍVEL)
+        ===================================================================== */}
         <section 
-          className="py-20 md:py-24 text-white relative overflow-hidden border-t border-white/10"
+          id="manifesto"
+          aria-labelledby="manifesto-heading"
+          className="py-16 sm:py-20 text-white relative overflow-hidden border-t border-white/10"
           style={{ 
             backgroundColor: '#F49853', 
             backgroundImage: 'url("https://hope.yahchurch.com/wp-content/uploads/2025/09/Pattern-1.png")',
@@ -211,54 +694,87 @@ export function CampaignHotsite() {
             backgroundPosition: 'center'
           }}
         >
-          <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+          <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
-          <div className="max-w-5xl mx-auto px-6 sm:px-8 relative z-10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               
-              {/* Coluna Esquerda: Título MANI-FESTO */}
+              {/* Coluna Esquerda: Identidade MANI-FESTO */}
               <div className="lg:col-span-5 text-left">
-                <h2 className="text-6xl sm:text-7xl md:text-8xl font-heading font-black text-white uppercase tracking-tight leading-[0.88] select-none drop-shadow-md">
+                <span className="inline-block text-xs font-bold uppercase tracking-widest text-slate-950 bg-white/85 px-3 py-1 rounded-full mb-3">
+                  Identidade Institucional
+                </span>
+                <h2 
+                  id="manifesto-heading"
+                  className="text-5xl sm:text-6xl md:text-7xl font-heading font-black text-white uppercase tracking-tight leading-[0.9] select-none drop-shadow-md"
+                >
                   MANI-<br />FESTO
                 </h2>
-                <p className="text-2xl sm:text-3xl font-heading font-black text-slate-900 tracking-tight mt-3">
-                  YAH Hope
+                <p className="text-xl sm:text-2xl font-heading font-black text-slate-950 tracking-tight mt-2">
+                  Nossa esperança vai além do presente.
                 </p>
               </div>
 
-              {/* Coluna Direita: Texto Integral do Manifesto */}
-              <div className="lg:col-span-7 text-left space-y-4">
-                <h3 className="font-heading font-bold text-base sm:text-lg md:text-xl text-white leading-snug drop-shadow-xs">
+              {/* Coluna Direita: Introdução Destacada + Botão de Leitura Integral */}
+              <div className="lg:col-span-7 text-left space-y-5 bg-slate-950/25 backdrop-blur-xs p-6 sm:p-8 rounded-3xl border border-white/20">
+                <h3 className="font-heading font-bold text-lg sm:text-xl text-white leading-snug">
                   Como encontrar futuro em cenários que para muitos são impossíveis de serem mudados?
                 </h3>
 
-                <div className="space-y-3.5 text-xs sm:text-sm md:text-base font-gotham-regular text-white/95 text-justify leading-relaxed drop-shadow-xs">
-                  <p>
-                    Na jornada da esperança, nasce a missão da YAH Hope. Somos mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.
-                  </p>
-                  <p>
-                    Acreditamos no poder transformador da esperança. Plantamos sementes através de ações conectadas a nutrição, geração de renda, escolaridade e entre tantas outras que são essenciais para o desenvolvimento humano. E assim, cultivamos um futuro em que cada indivíduo possa crescer independentemente das adversidades.
-                  </p>
-                  <p>
-                    Nosso compromisso com a dignidade vai além do presente. Adotamos uma abordagem sustentável em todas as nossas iniciativas, assegurando que o impacto positivo seja duradouro e capaz de transformar gerações futuras.
-                  </p>
-                  <p>
-                    Trabalhamos para que cada pessoa não apenas sobreviva, mas viva com dignidade. Somos construtores de comunidades resilientes. Através de cada projeto executado juntamente com a população local, subimos um degrau na promoção da dignidade humana.
-                  </p>
-                  <p>
-                    Junte-se a nós nessa jornada. A YAH Hope é mais do que uma organização; é um movimento, uma chama ardente que ilumina caminhos antes obscuros. Onde há esperança, há dignidade, e onde há dignidade, há a promessa de uma população mais forte e resplandecente.
-                  </p>
+                <p className="text-sm sm:text-base text-white/95 leading-relaxed">
+                  Na jornada da esperança, nasce a missão da YAH Hope. Somos mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.
+                </p>
+
+                {/* Conteúdo Integral Expansível (Preserva 100% do Manifesto Oficial) */}
+                {isManifestoExpanded && (
+                  <div 
+                    id="manifesto-complete-text"
+                    className="space-y-4 pt-3 border-t border-white/20 text-sm sm:text-base text-white/95 leading-relaxed animate-fade-in"
+                  >
+                    <p>
+                      Acreditamos no poder transformador da esperança. Plantamos sementes através de ações conectadas a nutrição, geração de renda, escolaridade e entre tantas outras que são essenciais para o desenvolvimento humano. E assim, cultivamos um futuro em que cada indivíduo possa crescer independentemente das adversidades.
+                    </p>
+                    <p>
+                      Nosso compromisso com a dignidade vai além do presente. Adotamos uma abordagem sustentável em todas as nossas iniciativas, assegurando que o impacto positivo seja duradouro e capaz de transformar gerações futuras.
+                    </p>
+                    <p>
+                      Trabalhamos para que cada pessoa não apenas sobreviva, mas viva com dignidade. Somos construtores de comunidades resilientes. Através de cada projeto executado juntamente com a população local, subimos um degrau na promoção da dignidade humana.
+                    </p>
+                    <p>
+                      Junte-se a nós nessa jornada. A YAH Hope é mais do que uma organização; é um movimento, uma chama ardente que ilumina caminhos antes obscuros. Onde há esperança, há dignidade, e onde há dignidade, há a promessa de uma população mais forte e resplandecente.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    aria-expanded={isManifestoExpanded}
+                    aria-controls="manifesto-complete-text"
+                    onClick={() => {
+                      const nextState = !isManifestoExpanded;
+                      setIsManifestoExpanded(nextState);
+                      if (nextState) {
+                        recordCampaignClick('Expandir Manifesto YAH Hope', 'interaction');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer border border-white/15"
+                  >
+                    <span>
+                      {isManifestoExpanded ? 'Recolher Manifesto' : 'Ler o Manifesto completo'}
+                    </span>
+                    {isManifestoExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
                 </div>
               </div>
 
             </div>
           </div>
         </section>
+      </main>
 
-        {/* Footer Oficial do Site Principal */}
-        <PublicFooter />
-
-      </div>
+      {/* Footer Oficial do Site Principal */}
+      <PublicFooter />
     </div>
   );
 }

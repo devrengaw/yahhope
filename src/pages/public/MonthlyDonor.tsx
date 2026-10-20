@@ -29,6 +29,8 @@ import { useFundraising } from '../../contexts/FundraisingContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail } from '../../services/sponsorshipService';
 import { cn } from '../../lib/utils';
+import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
+import { getUniqueMonthlySupportersCount } from '../../services/monthlySupportersService';
 
 interface PlanOption {
   id: string;
@@ -157,6 +159,16 @@ export function MonthlyDonor() {
     sponsorshipService.getMetrics().then(m => {
       setSponsorshipMetrics(m);
     });
+  }, []);
+
+  // Carrega contagem oficial de apoiadores mensais únicos (Mantenedores + Padrinhos)
+  const [uniqueSupportersCount, setUniqueSupportersCount] = useState<number | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    getUniqueMonthlySupportersCount().then(total => {
+      if (mounted) setUniqueSupportersCount(total);
+    });
+    return () => { mounted = false; };
   }, []);
 
   // Sincroniza plano ou valor vindo da URL
@@ -392,7 +404,13 @@ export function MonthlyDonor() {
             </p>
 
             {/* Métricas Rápidas de Impacto e Confiança */}
-            <div className="pt-2 pb-2 grid grid-cols-3 gap-4 border-y border-white/20 max-w-xl mx-auto backdrop-blur-xs">
+            <div className="pt-2.5 pb-2.5 grid grid-cols-2 sm:grid-cols-4 gap-4 border-y border-white/20 max-w-2xl mx-auto backdrop-blur-xs">
+              <div>
+                <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">
+                  {uniqueSupportersCount !== null ? uniqueSupportersCount : '...'}
+                </p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Apoiadores Mensais</p>
+              </div>
               <div>
                 <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">500+</p>
                 <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Vidas Resgatadas</p>
@@ -577,6 +595,12 @@ export function MonthlyDonor() {
               
               {/* Coluna Esquerda: Conteúdo Dinâmico por Modalidade (lg:col-span-7) */}
               <div className="lg:col-span-7 space-y-6">
+
+                {/* Contador Oficial de Mantenedores e Padrinhos Mensais */}
+                <MonthlySupporterCounterCard 
+                  theme="dark" 
+                  className="border-white/15 bg-slate-900/85 backdrop-blur-md shadow-xl" 
+                />
 
                 {/* CENÁRIO A: APADRINHAMENTO DE CRIANÇA */}
                 {donationType === 'sponsorship' ? (
