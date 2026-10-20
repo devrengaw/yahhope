@@ -13,9 +13,6 @@ import {
   FileText, 
   Bell, 
   LayoutDashboard, 
-  ChevronDown, 
-  ChevronUp, 
-  Lock,
   Activity
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
@@ -143,7 +140,6 @@ const SPONSORSHIP_QUOTA_OPTIONS = [
 export function CampaignHotsite() {
   const [selectedModality, setSelectedModality] = useState<'sponsorship' | 'general'>('sponsorship');
   const [selectedQuotas, setSelectedQuotas] = useState<number>(1);
-  const [isManifestoExpanded, setIsManifestoExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     trackPageView('/campanha-yahhope', 'Hotsite - Um convite para levar esperança | YAH Hope');
@@ -682,99 +678,6 @@ export function CampaignHotsite() {
                   className="w-full max-w-md shadow-2xl mx-auto" 
                 />
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================================
-            SEÇÃO 07 — MANIFESTO YAH HOPE (INTRODUÇÃO + LEITURA COMPLETA EXPANSÍVEL)
-        ===================================================================== */}
-        <section 
-          id="manifesto"
-          aria-labelledby="manifesto-heading"
-          className="py-16 sm:py-20 text-white relative overflow-hidden border-t border-white/10"
-          style={{ 
-            backgroundColor: '#F49853', 
-            backgroundImage: 'url("https://hope.yahchurch.com/wp-content/uploads/2025/09/Pattern-1.png")',
-            backgroundRepeat: 'repeat',
-            backgroundSize: 'contain',
-            backgroundPosition: 'center'
-          }}
-        >
-          <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-              
-              {/* Coluna Esquerda: Identidade MANI-FESTO */}
-              <div className="lg:col-span-5 text-left">
-                <span className="inline-block text-xs font-bold uppercase tracking-widest text-slate-950 bg-white/85 px-3 py-1 rounded-full mb-3">
-                  Identidade Institucional
-                </span>
-                <h2 
-                  id="manifesto-heading"
-                  className="text-5xl sm:text-6xl md:text-7xl font-heading font-black text-white uppercase tracking-tight leading-[0.9] select-none drop-shadow-md"
-                >
-                  MANI-<br />FESTO
-                </h2>
-                <p className="text-xl sm:text-2xl font-heading font-black text-slate-950 tracking-tight mt-2">
-                  Nossa esperança vai além do presente.
-                </p>
-              </div>
-
-              {/* Coluna Direita: Introdução Destacada + Botão de Leitura Integral */}
-              <div className="lg:col-span-7 text-left space-y-5 bg-slate-950/25 backdrop-blur-xs p-6 sm:p-8 rounded-3xl border border-white/20">
-                <h3 className="font-heading font-bold text-lg sm:text-xl text-white leading-snug">
-                  Como encontrar futuro em cenários que para muitos são impossíveis de serem mudados?
-                </h3>
-
-                <p className="text-sm sm:text-base text-white/95 leading-relaxed">
-                  Na jornada da esperança, nasce a missão da YAH Hope. Somos mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.
-                </p>
-
-                {/* Conteúdo Integral Expansível (Preserva 100% do Manifesto Oficial) */}
-                {isManifestoExpanded && (
-                  <div 
-                    id="manifesto-complete-text"
-                    className="space-y-4 pt-3 border-t border-white/20 text-sm sm:text-base text-white/95 leading-relaxed animate-fade-in"
-                  >
-                    <p>
-                      Acreditamos no poder transformador da esperança. Plantamos sementes através de ações conectadas a nutrição, geração de renda, escolaridade e entre tantas outras que são essenciais para o desenvolvimento humano. E assim, cultivamos um futuro em que cada indivíduo possa crescer independentemente das adversidades.
-                    </p>
-                    <p>
-                      Nosso compromisso com a dignidade vai além do presente. Adotamos uma abordagem sustentável em todas as nossas iniciativas, assegurando que o impacto positivo seja duradouro e capaz de transformar gerações futuras.
-                    </p>
-                    <p>
-                      Trabalhamos para que cada pessoa não apenas sobreviva, mas viva com dignidade. Somos construtores de comunidades resilientes. Através de cada projeto executado juntamente com a população local, subimos um degrau na promoção da dignidade humana.
-                    </p>
-                    <p>
-                      Junte-se a nós nessa jornada. A YAH Hope é mais do que uma organização; é um movimento, uma chama ardente que ilumina caminhos antes obscuros. Onde há esperança, há dignidade, e onde há dignidade, há a promessa de uma população mais forte e resplandecente.
-                    </p>
-                  </div>
-                )}
-
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    aria-expanded={isManifestoExpanded}
-                    aria-controls="manifesto-complete-text"
-                    onClick={() => {
-                      const nextState = !isManifestoExpanded;
-                      setIsManifestoExpanded(nextState);
-                      if (nextState) {
-                        recordCampaignClick('Expandir Manifesto YAH Hope', 'interaction');
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer border border-white/15"
-                  >
-                    <span>
-                      {isManifestoExpanded ? 'Recolher Manifesto' : 'Ler o Manifesto completo'}
-                    </span>
-                    {isManifestoExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                </div>
-              </div>
-
             </div>
           </div>
         </section>

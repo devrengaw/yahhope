@@ -34,7 +34,7 @@ export function PublicFooter() {
                 <span className="font-gotham-bold text-slate-300">Presença:</span> Moçambique (Nampula) & Brasil (São Paulo)
               </p>
               <p className="flex items-center gap-2">
-                <span className="font-gotham-bold text-slate-300">Contato:</span> contato@yahhope.org
+                <span className="font-gotham-bold text-slate-300">Contato:</span> contato@yahhope.com
               </p>
               <p className="text-slate-500">Organização da Sociedade Civil sem Fins Lucrativos</p>
             </div>
