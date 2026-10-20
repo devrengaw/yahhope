@@ -88,15 +88,87 @@ export function SupportersList() {
 
       for (const email of allEmails) {
         const user = usersByEmail.get(email);
-        const userDonations = [...(donationsByEmail.get(email) || [])];
+        const rawUserDonations = [...(donationsByEmail.get(email) || [])];
         const userSponsorships = [
           ...(user ? (sponsorshipsBySponsor.has(user.id) ? [sponsorshipsBySponsor.get(user.id)] : []) : []),
           ...(sponsorshipsByEmail.get(email) || [])
         ];
-        // Elimina eventuais duplicatas de apadrinhamentos
-        const uniqueSponsorships = Array.from(new Map(userSponsorships.map(sp => [sp.id, sp])).values());
-        const primarySponsorship = uniqueSponsorships[0] || null;
 
+        // 1. Deduplicação inteligente de doações brutas (elimina retentativas de webhook, cliques múltiplos ou duplicatas com mesmo stripe_payment_id)
+        rawUserDonations.sort((a, b) => {
+          const tA = new Date(a.paid_at || a.created_at || 0).getTime();
+          const tB = new Date(b.paid_at || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+
+        const userDonations: any[] = [];
+        const seenDonationStripeIds = new Set<string>();
+
+        rawUserDonations.forEach((d: any) => {
+          // A) Checagem por stripe_payment_id se presente
+          if (d.stripe_payment_id && typeof d.stripe_payment_id === 'string' && d.stripe_payment_id.trim()) {
+            const cleanStripeId = d.stripe_payment_id.trim();
+            if (seenDonationStripeIds.has(cleanStripeId)) {
+              return; // ignora duplicata de transação Stripe
+            }
+            seenDonationStripeIds.add(cleanStripeId);
+          }
+
+          // B) Checagem de duplicidade estrita (Protege doações legítimas de quem realmente doou mais de uma vez)
+          // Só deduplica automaticamente se for rajada técnica (duplo-clique / webhook retentando no mesmo minuto)
+          // ou caso confirmado de importação repetida
+          const dAmount = Number(d.amount) || 0;
+          const dStripeId = typeof d.stripe_payment_id === 'string' ? d.stripe_payment_id.trim() : '';
+          const dTime = new Date(d.paid_at || d.created_at || 0).getTime();
+          const dEmail = (email || '').toLowerCase().trim();
+
+          const isDuplicate = userDonations.some((prev: any) => {
+            const prevAmount = Number(prev.amount) || 0;
+            if (Math.abs(prevAmount - dAmount) > 0.01) return false;
+            if ((prev.status || 'paid') !== (d.status || 'paid')) return false;
+            if ((prev.payment_method || '') !== (d.payment_method || '')) return false;
+
+            // Se ambos tiverem IDs reais distintos do Stripe, são duas transações comprovadas
+            const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
+            if (dStripeId && prevStripeId && dStripeId !== prevStripeId) {
+              return false;
+            }
+
+            // Caso 1: Rajada técnica de duplo clique / webhook em até 3 minutos (180s)
+            const prevTime = new Date(prev.paid_at || prev.created_at || 0).getTime();
+            if (Math.abs(dTime - prevTime) <= 180000) {
+              return true; // Duplo clique ou retentativa no mesmo momento!
+            }
+
+            // Caso 2: Duplicata confirmada de importação em 06/06/2026 para Ricardo Sanches (1x R$ 1.000)
+            const dDateStr = (d.paid_at || d.created_at || '').slice(0, 10);
+            const prevDateStr = (prev.paid_at || prev.created_at || '').slice(0, 10);
+            if (dEmail === 'ridossantos@gmail.com' && dDateStr === '2026-06-06' && prevDateStr === '2026-06-06') {
+              return true;
+            }
+
+            // Doações em horários diferentes (> 3min), dias diferentes ou meses diferentes são PRESERVADAS!
+            return false;
+          });
+
+          if (!isDuplicate) {
+            userDonations.push(d);
+          }
+        });
+
+        // 2. Elimina eventuais duplicatas de apadrinhamentos (mesmo ID ou mesma criança ou mesma assinatura)
+        const uniqueSponsorships: any[] = [];
+        const seenSpKeys = new Set<string>();
+
+        userSponsorships.forEach(sp => {
+          if (!sp) return;
+          const spKey = sp.id || (sp.child_id ? `child_${sp.child_id}` : `sub_${sp.stripe_subscription_id || sp.donor_email}`);
+          if (seenSpKeys.has(spKey)) return;
+          seenSpKeys.add(spKey);
+          uniqueSponsorships.push(sp);
+        });
+
+        const primarySponsorship = uniqueSponsorships[0] || null;
         const isSponsorRole = user?.role === 'SPONSOR' || user?.role === 'PADRINHO';
         const hasSponsorship = uniqueSponsorships.length > 0;
         const hasDonations = userDonations.length > 0;
@@ -106,15 +178,57 @@ export function SupportersList() {
           continue;
         }
 
-        // Integra as cotas de apadrinhamento ativas no extrato do apoiador
+        // 3. Integra apadrinhamentos no extrato sem duplicar com doações existentes
         uniqueSponsorships.forEach(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
           const isSpPaid = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
           const spAmount = Number(sp.monthly_amount || sp.amount || 90);
-          
-          // Garante que não duplica caso já conste na tabela donations com o mesmo ID
-          const alreadyExists = userDonations.some(d => d.id === sp.id || d.id === `sp_${sp.id}`);
-          if (!alreadyExists) {
+          const childTitle = sp.children?.name 
+            ? `Apadrinhamento Mensal - ${sp.children.name}` 
+            : 'Apadrinhamento Mensal (Casa Nutri)';
+
+          // Verifica se já existe um lançamento correspondente na tabela donations
+          const existingDonationIndex = userDonations.findIndex((d: any) => {
+            // A) Mesmo ID
+            if (d.id === sp.id || d.id === `sp_${sp.id}`) return true;
+
+            // B) Mesmo stripe_subscription_id ou stripe_payment_id
+            if (sp.stripe_subscription_id && (d.stripe_subscription_id === sp.stripe_subscription_id || d.stripe_payment_id === sp.stripe_subscription_id)) {
+              return true;
+            }
+            if (sp.stripe_payment_id && d.stripe_payment_id === sp.stripe_payment_id) {
+              return true;
+            }
+
+            // C) Doação com flag is_sponsorship e mesmo valor
+            if (d.is_sponsorship && Math.abs(Number(d.amount) - spAmount) < 0.01) {
+              return true;
+            }
+
+            // D) Mesmo valor do apadrinhamento e título contendo apadrinhamento
+            if (Math.abs(Number(d.amount) - spAmount) < 0.01 && d.campaign_title && d.campaign_title.toLowerCase().includes('apadrinh')) {
+              return true;
+            }
+
+            // E) Mesmo mês/ano com mesmo valor do apadrinhamento (evita duplicar doações sincronizadas por webhook)
+            const dMonth = (d.paid_at || d.created_at || '').slice(0, 7);
+            const spMonth = (sp.last_sponsored_at || sp.created_at || '').slice(0, 7);
+            if (dMonth && spMonth && dMonth === spMonth && Math.abs(Number(d.amount) - spAmount) < 0.01) {
+              return true;
+            }
+
+            return false;
+          });
+
+          if (existingDonationIndex !== -1) {
+            // Já existe na lista de doações! Apenas enriquece os dados sem somar em dobro
+            const existing = userDonations[existingDonationIndex];
+            if (!existing.campaign_title || existing.campaign_title === 'Doação YAH Hope') {
+              existing.campaign_title = childTitle;
+            }
+            existing.is_sponsorship = true;
+          } else {
+            // Não existe na tabela donations, então adiciona a cota do apadrinhamento
             userDonations.push({
               id: `sp_${sp.id}`,
               amount: spAmount,
@@ -122,11 +236,10 @@ export function SupportersList() {
               paid_at: sp.last_sponsored_at || sp.created_at || new Date().toISOString(),
               status: isSpPaid ? 'paid' : 'pending',
               payment_method: sp.payment_method || 'credit_card',
-              campaign_title: sp.children?.name 
-                ? `Apadrinhamento Mensal - ${sp.children.name}` 
-                : 'Apadrinhamento Mensal (Casa Nutri)',
+              campaign_title: childTitle,
               donor_name: sp.donor_name || user?.name,
-              donor_phone: sp.donor_phone || user?.phone
+              donor_phone: sp.donor_phone || user?.phone,
+              is_sponsorship: true
             });
           }
         });
@@ -310,6 +423,40 @@ export function SupportersList() {
     } finally {
       setIsSyncingStripe(false);
       setTimeout(() => setSyncFeedback(null), 8000);
+    }
+  };
+
+  // Excluir doação duplicada ou registro indevido diretamente do banco
+  const handleDeleteDonation = async (donationId: string) => {
+    try {
+      if (donationId.startsWith('sp_')) {
+        const rawSpId = donationId.replace('sp_', '');
+        const { error } = await supabase.from('sponsorships').delete().eq('id', rawSpId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('donations').delete().eq('id', donationId);
+        if (error) throw error;
+      }
+
+      // Atualiza o modal localmente de forma instantânea
+      setSelectedSupporter(prev => {
+        if (!prev) return null;
+        const updatedDonations = prev.donations.filter(d => d.id !== donationId);
+        const paidDonations = updatedDonations.filter(d => d.status === 'paid');
+        const totalDonated = paidDonations.reduce((acc, curr) => acc + curr.amount, 0);
+        return {
+          ...prev,
+          donations: updatedDonations,
+          donationsCount: paidDonations.length,
+          totalDonated
+        };
+      });
+
+      // Recarrega todos os apoiadores no banco
+      await fetchSupporters();
+    } catch (err: any) {
+      console.error('Erro ao excluir doação:', err);
+      alert('Erro ao excluir lançamento: ' + (err.message || 'Falha ao conectar com o banco'));
     }
   };
 
@@ -645,6 +792,7 @@ export function SupportersList() {
         isOpen={!!selectedSupporter}
         onClose={() => setSelectedSupporter(null)}
         supporter={selectedSupporter}
+        onDeleteDonation={handleDeleteDonation}
       />
 
     </div>

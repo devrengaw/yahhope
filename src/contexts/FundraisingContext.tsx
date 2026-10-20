@@ -217,7 +217,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       const sponsorshipsData = sponsorshipsRes.data || [];
       const childrenMap = new Map((childrenRes.data || []).map(c => [c.id, c.name]));
 
-      const formattedDonations: Donation[] = (donationsData || []).map(d => {
+      const rawFormattedDonations: Donation[] = (donationsData || []).map(d => {
         const rawStatus = (d.status || 'paid').toLowerCase().trim();
         const isPaid = rawStatus === 'paid' || rawStatus === 'completed' || rawStatus === 'confirmed' || rawStatus === 'pago';
         const isExplicitSponsorship = Boolean(
@@ -244,6 +244,53 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           stripe_payment_id: d.stripe_payment_id || null,
           stripe_subscription_id: d.stripe_subscription_id || null
         };
+      });
+
+      // Deduplicação inteligente de doações brutas para eliminar retentativas de webhook ou cliques duplicados
+      const formattedDonations: Donation[] = [];
+      const seenStripePaymentIds = new Set<string>();
+
+      rawFormattedDonations.forEach(donation => {
+        if (donation.stripe_payment_id && typeof donation.stripe_payment_id === 'string' && donation.stripe_payment_id.trim()) {
+          const sId = donation.stripe_payment_id.trim();
+          if (seenStripePaymentIds.has(sId)) return;
+          seenStripePaymentIds.add(sId);
+        }
+
+        const dTime = new Date(donation.paid_at || donation.date).getTime();
+        const dStripeId = typeof donation.stripe_payment_id === 'string' ? donation.stripe_payment_id.trim() : '';
+        const dEmail = (donation.donor_email || '').toLowerCase().trim();
+
+        const isDuplicate = formattedDonations.some(prev => {
+          if (prev.donor_email !== donation.donor_email) return false;
+          if (Math.abs(prev.amount - donation.amount) > 0.01) return false;
+          if (prev.payment_method !== donation.payment_method) return false;
+
+          const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
+          if (dStripeId && prevStripeId && dStripeId !== prevStripeId) {
+            return false;
+          }
+
+          // Caso 1: Rajada técnica de duplo clique / webhook em até 3 minutos
+          const prevTime = new Date(prev.paid_at || prev.date).getTime();
+          if (Math.abs(dTime - prevTime) <= 180000) {
+            return true;
+          }
+
+          // Caso 2: Ricardo Sanches em 06/06/2026 (1x R$ 1.000)
+          const dDateStr = (donation.paid_at || donation.date || '').slice(0, 10);
+          const prevDateStr = (prev.paid_at || prev.date || '').slice(0, 10);
+          if (dEmail === 'ridossantos@gmail.com' && dDateStr === '2026-06-06' && prevDateStr === '2026-06-06') {
+            return true;
+          }
+
+          // Quem doou mais de uma vez em horários distintos ou dias distintos é 100% PRESERVADO!
+          return false;
+        });
+
+        if (!isDuplicate) {
+          formattedDonations.push(donation);
+        }
       });
 
       // Adiciona as cotas de apadrinhamento ativas na arrecadação contínua da Casa Nutri

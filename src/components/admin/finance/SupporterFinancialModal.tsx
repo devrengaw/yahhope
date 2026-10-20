@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   User, 
@@ -12,7 +12,9 @@ import {
   AlertCircle, 
   CreditCard, 
   FileText,
-  Download
+  Download,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -46,14 +48,34 @@ interface SupporterFinancialModalProps {
   isOpen: boolean;
   onClose: () => void;
   supporter: SupporterData | null;
+  onDeleteDonation?: (donationId: string) => Promise<void>;
 }
 
-export function SupporterFinancialModal({ isOpen, onClose, supporter }: SupporterFinancialModalProps) {
+export function SupporterFinancialModal({ isOpen, onClose, supporter, onDeleteDonation }: SupporterFinancialModalProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   if (!isOpen || !supporter) return null;
 
   const paidDonations = supporter.donations.filter(d => d.status === 'paid');
   const pendingDonations = supporter.donations.filter(d => d.status === 'pending');
   const avgDonation = paidDonations.length > 0 ? supporter.totalDonated / paidDonations.length : 0;
+
+  const handleDeleteDonation = async (id: string, amount: number, title?: string) => {
+    if (!onDeleteDonation) return;
+    const confirmDelete = window.confirm(
+      `Deseja realmente remover este lançamento de R$ ${amount.toFixed(2)} (${title || 'Doação'})?\nEsta ação atualizará o extrato do apoiador imediatamente.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setDeletingId(id);
+      await onDeleteDonation(id);
+    } catch (err) {
+      console.error('Falha ao remover doação:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleExportHistory = () => {
     const headers = ['Data', 'Campanha / Finalidade', 'Forma de Pagamento', 'Valor (R$)', 'Status'];
@@ -204,11 +226,12 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter }: Supporte
                     <th className="px-4 py-3">Forma</th>
                     <th className="px-4 py-3 text-right">Valor</th>
                     <th className="px-4 py-3 text-center">Status</th>
+                    {onDeleteDonation && <th className="px-4 py-3 text-center w-12">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {supporter.donations.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={d.id} className="hover:bg-slate-50/60 transition-colors group">
                       <td className="px-4 py-3 text-slate-600 font-bold">{d.date}</td>
                       <td className="px-4 py-3 text-slate-900 font-bold">{d.campaign_title || 'Doação Mensal / Apadrinhamento'}</td>
                       <td className="px-4 py-3 text-slate-500 uppercase font-bold text-[10px]">
@@ -232,11 +255,28 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter }: Supporte
                           {d.status === 'paid' ? 'Pago' : d.status === 'pending' ? 'Pendente' : 'Falhou'}
                         </span>
                       </td>
+                      {onDeleteDonation && (
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDonation(d.id, d.amount, d.campaign_title)}
+                            disabled={deletingId === d.id}
+                            title="Remover lançamento duplicado/indevido"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
+                          >
+                            {deletingId === d.id ? (
+                              <Loader2 size={13} className="animate-spin text-rose-500" />
+                            ) : (
+                              <Trash2 size={13} />
+                            )}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {supporter.donations.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
+                      <td colSpan={onDeleteDonation ? 6 : 5} className="p-8 text-center text-slate-400 font-medium">
                         Nenhuma doação registrada para este apoiador ainda.
                       </td>
                     </tr>
