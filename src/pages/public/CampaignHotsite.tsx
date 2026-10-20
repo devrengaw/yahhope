@@ -634,20 +634,32 @@ export function CampaignHotsite() {
         <section 
           id="participar" 
           aria-labelledby="participar-heading"
-          className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#070B12] to-[#0B111E] border-t border-white/10 scroll-mt-16"
+          className="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-[#070B12] border-t border-white/10 overflow-hidden scroll-mt-16"
         >
-          <div className="max-w-5xl mx-auto space-y-10">
+          {/* Fotografia de fundo da seção Vamos levar esperança juntos? */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img
+              src="/participar_bg.jpg"
+              alt="Crianças e voluntários de mãos dadas em Moçambique"
+              className="w-full h-full object-cover object-center"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-slate-950/65" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0B111E] via-transparent to-slate-900" />
+          </div>
+
+          <div className="relative z-10 max-w-5xl mx-auto space-y-10">
             <div className="max-w-2xl mx-auto text-left sm:text-center space-y-3">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block drop-shadow-sm">
                 Sua Participação Começa Aqui
               </span>
               <h2 
                 id="participar-heading"
-                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
+                className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md"
               >
                 Vamos levar esperança juntos?
               </h2>
-              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-200 leading-relaxed drop-shadow-sm">
                 Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.
               </p>
             </div>
@@ -661,7 +673,7 @@ export function CampaignHotsite() {
                     className="w-full shadow-2xl" 
                   />
 
-                  <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3 text-xs text-slate-300">
+                  <div className="p-4 rounded-2xl bg-slate-950/70 backdrop-blur-md border border-white/15 flex items-center gap-3 text-xs text-slate-200 shadow-xl">
                     <ShieldCheck size={18} className="text-[#92BF78] shrink-0" />
                     <span>
                       Ambiente criptografado. Você pode gerenciar sua assinatura a qualquer momento pelo Portal do Mantenedor.
