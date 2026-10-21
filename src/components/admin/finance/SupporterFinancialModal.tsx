@@ -38,6 +38,9 @@ export interface SupporterData {
   joinedAt: string;
   sponsoredChildName?: string;
   sponsoredChildVillage?: string;
+  sponsoredChildId?: string;
+  sponsorshipId?: string;
+  sponsorships?: any[];
   totalDonated: number;
   donationsCount: number;
   lastDonationDate?: string;

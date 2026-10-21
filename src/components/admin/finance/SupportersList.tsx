@@ -28,6 +28,7 @@ import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { isSpamOrMockUser, purgeSpamUsersFromDatabase } from '../../../utils/userCleanup';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
+import { sponsorshipService } from '../../../services/sponsorshipService';
 
 export function SupportersList() {
   const [supporters, setSupporters] = useState<SupporterData[]>([]);
@@ -331,19 +332,39 @@ export function SupportersList() {
         // Vinculação de criança apenas para Padrinho real:
         let childName: string | undefined = undefined;
         let childVillage: string | undefined = undefined;
-        if (isRealPadrinho) {
-          if (primaryValidSp?.children?.name) {
-            childName = primaryValidSp.children.name;
-            childVillage = primaryValidSp.children.address;
-          } else if (cleanEmail === 'lucas.wagneer@gmail.com') {
-            childName = 'Amina Juma';
-            childVillage = 'Comunidade de Namicopo, Nampula';
+        let sponsoredChildId: string | undefined = undefined;
+
+        // Procura vínculo real em primaryValidSp ou qualquer apadrinhamento que contenha child_id
+        const spWithChild = validChildSponsorships.find(sp => sp.child_id) || 
+                            uniqueSponsorships.find(sp => sp.child_id) || 
+                            primaryValidSp;
+
+        if (spWithChild?.child_id) {
+          sponsoredChildId = spWithChild.child_id;
+          const childObj = spWithChild.children || childrenMap.get(spWithChild.child_id);
+          if (childObj) {
+            childName = childObj.name;
+            childVillage = childObj.address || childObj.province;
+          }
+        }
+
+        // Se for um dos 3 padrinhos conhecidos e ainda não tiver child_id no banco, define sugestão inicial:
+        if (!childName && isRealPadrinho) {
+          if (cleanEmail === 'lucas.wagneer@gmail.com') {
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('amina')) || Array.from(childrenMap.values())[0];
+            childName = ch?.name || 'Amina Juma';
+            childVillage = ch?.address || 'Comunidade de Namicopo, Nampula';
+            sponsoredChildId = ch?.id;
           } else if (cleanEmail === 'jonata_xx@hotmail.com') {
-            childName = 'Mateus Manuel';
-            childVillage = 'Comunidade de Muhala, Nampula';
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('mateus')) || Array.from(childrenMap.values())[1];
+            childName = ch?.name || 'Mateus Manuel';
+            childVillage = ch?.address || 'Comunidade de Muhala, Nampula';
+            sponsoredChildId = ch?.id;
           } else if (cleanEmail === 'diegott@ymail.com') {
-            childName = 'Esperança Bernardo';
-            childVillage = 'Comunidade de Carrupeia, Nampula';
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('esperança')) || Array.from(childrenMap.values())[2];
+            childName = ch?.name || 'Esperança Bernardo';
+            childVillage = ch?.address || 'Comunidade de Carrupeia, Nampula';
+            sponsoredChildId = ch?.id;
           }
         }
 
@@ -358,6 +379,9 @@ export function SupportersList() {
           joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
           sponsoredChildName: childName,
           sponsoredChildVillage: childVillage,
+          sponsoredChildId: sponsoredChildId,
+          sponsorshipId: spWithChild?.id || primaryValidSp?.id || primarySponsorship?.id,
+          sponsorships: uniqueSponsorships,
           totalDonated,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
@@ -531,8 +555,17 @@ export function SupportersList() {
 
   const openChangeChildModal = (supporter: SupporterData) => {
     setChildModalSupporter(supporter);
-    const primarySp = supporter.sponsorships?.[0];
-    setSelectedChildId(primarySp?.child_id || '');
+    // Identifica o ID da criança atualmente vinculada
+    let currentId = supporter.sponsoredChildId || '';
+    if (!currentId && supporter.sponsorships && supporter.sponsorships.length > 0) {
+      const sp = supporter.sponsorships.find((s: any) => s.child_id);
+      if (sp) currentId = sp.child_id;
+    }
+    if (!currentId && supporter.sponsoredChildName) {
+      const matched = childrenList.find(c => c.name.toLowerCase().trim() === supporter.sponsoredChildName?.toLowerCase().trim());
+      if (matched) currentId = matched.id;
+    }
+    setSelectedChildId(currentId);
   };
 
   const handleSaveChildAssignment = async (e: React.FormEvent) => {
@@ -541,32 +574,27 @@ export function SupportersList() {
 
     setIsSavingChild(true);
     try {
-      const spId = childModalSupporter.sponsorships?.[0]?.id;
-      if (spId) {
-        await supabase
-          .from('sponsorships')
-          .update({ 
-            child_id: selectedChildId,
-            last_sponsored_at: new Date().toISOString()
-          })
-          .eq('id', spId);
-      } else {
-        await supabase
-          .from('sponsorships')
-          .update({ 
-            child_id: selectedChildId,
-            last_sponsored_at: new Date().toISOString()
-          })
-          .ilike('donor_email', childModalSupporter.email.toLowerCase().trim());
-      }
+      const result = await sponsorshipService.updateSponsorChild({
+        supporterId: childModalSupporter.id,
+        supporterEmail: childModalSupporter.email,
+        supporterName: childModalSupporter.name,
+        supporterPhone: childModalSupporter.phone,
+        sponsorshipId: childModalSupporter.sponsorshipId || childModalSupporter.sponsorships?.[0]?.id,
+        newChildId: selectedChildId
+      });
 
-      // Limpa cache local daquele padrinho para carregar no portal imediatamente
-      try {
-        localStorage.removeItem(`yah_sponsored_children_${childModalSupporter.email.toLowerCase().trim()}`);
-      } catch (e) {}
+      if (!result.success) {
+        throw new Error(result.error || result.message);
+      }
 
       setChildModalSupporter(null);
       await fetchSupporters();
+
+      setSyncFeedback({
+        type: 'success',
+        message: result.message
+      });
+      setTimeout(() => setSyncFeedback(null), 8000);
     } catch (err: any) {
       console.error('Erro ao vincular criança:', err);
       alert('Erro ao vincular criança ao padrinho: ' + err.message);

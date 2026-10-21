@@ -1136,5 +1136,182 @@ export const sponsorshipService = {
       c.id === childIdOrName || 
       c.name.toLowerCase().trim() === childIdOrName.toLowerCase().trim()
     );
+  },
+
+  /**
+   * Vincula ou troca manualmente a criança de um padrinho (via Painel de Gestão).
+   * 1. Salva a alteração na tabela 'sponsorships' no Supabase.
+   * 2. O algoritmo de distribuição automática (Least-Sponsored Round-Robin)
+   *    reconhece imediatamente a nova ocupação de vagas via getMetrics(),
+   *    liberando a vaga da criança anterior e ocupando a vaga da nova criança.
+   * 3. Sincroniza o papel do usuário (role = 'SPONSOR') e o cache local do Portal do Mantenedor.
+   */
+  async updateSponsorChild(params: {
+    supporterId?: string;
+    supporterEmail: string;
+    supporterName?: string;
+    supporterPhone?: string;
+    sponsorshipId?: string;
+    newChildId: string;
+  }): Promise<{ success: boolean; message: string; error?: string; updatedSponsorship?: any }> {
+    const cleanEmail = (params.supporterEmail || '').toLowerCase().trim();
+    if (!cleanEmail && !params.supporterId) {
+      return { success: false, message: 'Identificação do padrinho (e-mail ou ID) é obrigatória.' };
+    }
+    if (!params.newChildId) {
+      return { success: false, message: 'A criança selecionada é inválida.' };
+    }
+
+    try {
+      // 1. Busca dados da nova criança para validação e enriquecimento do cache
+      let newChildData: any = null;
+      try {
+        const { data: cData } = await supabase
+          .from('children')
+          .select('*')
+          .eq('id', params.newChildId)
+          .maybeSingle();
+        if (cData) newChildData = cData;
+      } catch (e) {
+        console.warn('Aviso ao consultar criança no banco:', e);
+      }
+
+      if (!newChildData) {
+        newChildData = FALLBACK_CHILDREN.find(c => c.id === params.newChildId);
+      }
+
+      // 2. Localiza o apadrinhamento existente
+      let existingSponsorship: any = null;
+
+      if (params.sponsorshipId) {
+        const { data: byId } = await supabase
+          .from('sponsorships')
+          .select('*')
+          .eq('id', params.sponsorshipId)
+          .maybeSingle();
+        if (byId) existingSponsorship = byId;
+      }
+
+      if (!existingSponsorship && cleanEmail) {
+        const { data: byEmail } = await supabase
+          .from('sponsorships')
+          .select('*')
+          .ilike('donor_email', cleanEmail)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (byEmail && byEmail.length > 0) existingSponsorship = byEmail[0];
+      }
+
+      if (!existingSponsorship && params.supporterId && !params.supporterId.startsWith('donor_')) {
+        const { data: bySponsorId } = await supabase
+          .from('sponsorships')
+          .select('*')
+          .eq('sponsor_id', params.supporterId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (bySponsorId && bySponsorId.length > 0) existingSponsorship = bySponsorId[0];
+      }
+
+      let savedRecord: any = null;
+
+      // 3. Se já existe o apadrinhamento, atualiza
+      if (existingSponsorship?.id) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('sponsorships')
+          .update({
+            child_id: params.newChildId,
+            status: 'active',
+            last_sponsored_at: new Date().toISOString()
+          })
+          .eq('id', existingSponsorship.id)
+          .select();
+
+        if (updateErr) {
+          console.error('Erro ao atualizar sponsorship:', updateErr);
+          throw new Error(updateErr.message || 'Erro ao atualizar vínculo no banco');
+        }
+        savedRecord = updated?.[0] || existingSponsorship;
+      } else {
+        // 4. Se não existe registro em sponsorships, insere um novo
+        const { data: inserted, error: insertErr } = await supabase
+          .from('sponsorships')
+          .insert([{
+            child_id: params.newChildId,
+            sponsor_id: params.supporterId && !params.supporterId.startsWith('donor_') ? params.supporterId : null,
+            donor_name: params.supporterName || cleanEmail.split('@')[0],
+            donor_email: cleanEmail,
+            donor_phone: params.supporterPhone || null,
+            monthly_amount: 90.00,
+            quotas_count: 1,
+            status: 'active',
+            payment_method: 'credit_card',
+            last_sponsored_at: new Date().toISOString()
+          }])
+          .select();
+
+        if (insertErr) {
+          console.error('Erro ao criar sponsorship:', insertErr);
+          throw new Error(insertErr.message || 'Erro ao registrar novo vínculo');
+        }
+        savedRecord = inserted?.[0];
+      }
+
+      // 5. Assegura que o perfil do usuário em public.users esteja como 'SPONSOR'
+      try {
+        if (params.supporterId && !params.supporterId.startsWith('donor_')) {
+          await supabase
+            .from('users')
+            .update({ role: 'SPONSOR' })
+            .eq('id', params.supporterId);
+        } else if (cleanEmail) {
+          await supabase
+            .from('users')
+            .update({ role: 'SPONSOR' })
+            .ilike('email', cleanEmail);
+        }
+      } catch (userRoleErr) {
+        console.warn('Aviso ao sincronizar papel do usuário:', userRoleErr);
+      }
+
+      // 6. Atualiza o cache local do padrinho imediatamente
+      if (cleanEmail && newChildData) {
+        try {
+          const cacheKey = `yah_sponsored_children_${cleanEmail}`;
+          const childDetail: ChildSponsorshipDetail = {
+            id: newChildData.id,
+            sponsorshipId: savedRecord?.id || existingSponsorship?.id,
+            name: newChildData.name,
+            dob: newChildData.dob,
+            ageText: calculateChildAge(newChildData.dob),
+            gender: newChildData.gender,
+            community: newChildData.address || newChildData.province || 'Casa Nutri - Nampula',
+            photo_url: newChildData.photo_url || '',
+            story: newChildData.story || '',
+            nutritional_status: newChildData.status || 'Adequado',
+            sponsorsCount: 1,
+            maxSponsors: 2,
+            isFull: false,
+            sponsors: []
+          };
+          localStorage.setItem(cacheKey, JSON.stringify([childDetail]));
+        } catch (cacheErr) {
+          console.warn('Aviso ao atualizar cache local do padrinho:', cacheErr);
+        }
+      }
+
+      const childDisplayName = newChildData?.name || 'a criança';
+      return {
+        success: true,
+        message: `Vínculo com ${childDisplayName} salvo com sucesso! O algoritmo de distribuição automática já reconheceu a nova ocupação de cotas.`,
+        updatedSponsorship: savedRecord
+      };
+    } catch (err: any) {
+      console.error('Erro ao atualizar criança do padrinho:', err);
+      return {
+        success: false,
+        message: err.message || 'Falha ao vincular criança',
+        error: err.message
+      };
+    }
   }
 };
