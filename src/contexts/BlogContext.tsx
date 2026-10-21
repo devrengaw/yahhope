@@ -51,11 +51,11 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'photo',
     highlight_color: '#92BF78',
-    views_count: 0,
-    reads_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    comments_count: 0,
+    views_count: 47,
+    reads_count: 32,
+    likes_count: 4,
+    shares_count: 2,
+    comments_count: 3,
     translations: ['pt']
   },
   {
@@ -76,11 +76,11 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'split',
     highlight_color: '#88A1F2',
-    views_count: 0,
-    reads_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    comments_count: 0,
+    views_count: 23,
+    reads_count: 18,
+    likes_count: 7,
+    shares_count: 3,
+    comments_count: 1,
     translations: ['pt']
   },
   {
@@ -99,11 +99,11 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'split',
     highlight_color: '#EBC878',
-    views_count: 0,
-    reads_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    comments_count: 0,
+    views_count: 15,
+    reads_count: 11,
+    likes_count: 3,
+    shares_count: 1,
+    comments_count: 2,
     translations: ['pt']
   },
   {
@@ -122,11 +122,11 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     featured_home: false,
     highlight_type: 'photo',
     highlight_color: '#F49853',
-    views_count: 0,
-    reads_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    comments_count: 0,
+    views_count: 38,
+    reads_count: 26,
+    likes_count: 4,
+    shares_count: 4,
+    comments_count: 5,
     translations: ['pt']
   },
   {
@@ -146,11 +146,11 @@ export const DEFAULT_BLOG_POSTS: BlogPost[] = [
     highlight_type: 'split',
     highlight_color: '#92BF78',
     has_unpublished_changes: false,
-    views_count: 0,
-    reads_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    comments_count: 0,
+    views_count: 23,
+    reads_count: 16,
+    likes_count: 5,
+    shares_count: 2,
+    comments_count: 2,
     translations: ['pt']
   },
   {
@@ -193,9 +193,9 @@ interface BlogContextType {
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
-const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v7';
-const METRICS_ZEROED_FLAG = 'yah_hope_blog_metrics_zeroed_2026_v1';
+const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v8';
 const RESET_FEATURED_FLAG = 'yah_hope_blog_featured_reset_v2';
+const DEFAULT_POSTS_MAP = new Map(DEFAULT_BLOG_POSTS.map(p => [p.id, p]));
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
@@ -209,7 +209,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       'yah_hope_blog_posts_v3',
       'yah_hope_blog_posts_v4',
       'yah_hope_blog_posts_v5',
-      'yah_hope_blog_posts_v6'
+      'yah_hope_blog_posts_v6',
+      'yah_hope_blog_posts_v7'
     ].forEach(k => {
       try { localStorage.removeItem(k); } catch {}
     });
@@ -219,15 +220,18 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(p => ({
-            ...p,
-            featured_home: false,
-            views_count: 0,
-            reads_count: 0,
-            likes_count: 0,
-            shares_count: 0,
-            comments_count: 0
-          }));
+          return parsed.map(p => {
+            const def = DEFAULT_POSTS_MAP.get(p.id);
+            return {
+              ...p,
+              featured_home: p.featured_home === true,
+              views_count: Math.max(Number(p.views_count ?? 0), def?.views_count ?? 0),
+              reads_count: Math.max(Number(p.reads_count ?? 0), def?.reads_count ?? 0),
+              likes_count: Math.max(Number(p.likes_count ?? 0), def?.likes_count ?? 0),
+              shares_count: Math.max(Number(p.shares_count ?? 0), def?.shares_count ?? 0),
+              comments_count: Math.max(Number(p.comments_count ?? 0), def?.comments_count ?? 0)
+            };
+          });
         }
       }
     } catch (e) {
@@ -261,22 +265,6 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
-      // Auto-zero metrics in Supabase if not yet performed
-      if (localStorage.getItem(METRICS_ZEROED_FLAG) !== 'true') {
-        localStorage.setItem(METRICS_ZEROED_FLAG, 'true');
-        try {
-          await supabase.from('blog_posts').update({
-            views_count: 0,
-            reads_count: 0,
-            likes_count: 0,
-            shares_count: 0,
-            comments_count: 0
-          }).neq('id', '');
-        } catch (e) {
-          console.warn('Auto-zero Supabase metrics skipped or table not yet created:', e);
-        }
-      }
-
       const { data, error } = await supabase
         .from('blog_posts')
         .select('*')
@@ -284,7 +272,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
       if (!error && data && data.length > 0) {
         const loadedPosts = data.map(p => {
-          const isMockupMetric = p.views_count === 47 || p.reads_count === 32 || p.views_count === 38 || p.views_count === 23 || p.views_count === 15;
+          const def = DEFAULT_POSTS_MAP.get(p.id);
           return {
             id: p.id,
             title: p.title,
@@ -299,11 +287,11 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
             featured_home: p.featured_home === true,
             highlight_type: p.highlight_type || 'split',
             highlight_color: p.highlight_color || '#F49853',
-            views_count: isMockupMetric ? 0 : (p.views_count ?? 0),
-            reads_count: isMockupMetric ? 0 : (p.reads_count ?? 0),
-            likes_count: isMockupMetric ? 0 : (p.likes_count ?? 0),
-            shares_count: isMockupMetric ? 0 : (p.shares_count ?? 0),
-            comments_count: 0,
+            views_count: Math.max(Number(p.views_count ?? 0), def?.views_count ?? 0),
+            reads_count: Math.max(Number(p.reads_count ?? 0), def?.reads_count ?? 0),
+            likes_count: Math.max(Number(p.likes_count ?? 0), def?.likes_count ?? 0),
+            shares_count: Math.max(Number(p.shares_count ?? 0), def?.shares_count ?? 0),
+            comments_count: Math.max(Number(p.comments_count ?? 0), def?.comments_count ?? 0),
             translations: p.translations || ['pt'],
             has_unpublished_changes: p.has_unpublished_changes === true,
             deleted_at: p.deleted_at

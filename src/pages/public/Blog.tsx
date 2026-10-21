@@ -28,6 +28,7 @@ export function Blog() {
   const [copied, setCopied] = useState(false);
   const [hasLiked, setHasLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const currentPostIdRef = useRef<string | null>(null);
 
   // Sync selectedPost with URL (?post=... or /blog/:id)
   useEffect(() => {
@@ -43,12 +44,20 @@ export function Blog() {
       if (found) {
         setSelectedPost(found);
         setHasLiked(localStorage.getItem(`yah_blog_liked_${found.id}`) === 'true');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // CRUCIAL: Só rola para o topo se mudou de post/artigo!
+        // NUNCA rola para o topo quando métricas de leitura/visualização atualizam os posts em segundo plano.
+        if (currentPostIdRef.current !== found.id) {
+          currentPostIdRef.current = found.id;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       } else {
         setSelectedPost(null);
+        currentPostIdRef.current = null;
       }
     } else {
       setSelectedPost(null);
+      currentPostIdRef.current = null;
     }
   }, [location.search, id, posts]);
 

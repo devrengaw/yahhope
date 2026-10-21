@@ -90,14 +90,23 @@ export function isSpamOrMockUser(user?: {
   return false;
 }
 
-export const KNOWN_SUPPORTER_EMAILS = new Set([
+export const KNOWN_PADRINHO_EMAILS = new Set([
+  'lucas.wagneer@gmail.com',
+  'jonata_xx@hotmail.com',
+  'diegott@ymail.com'
+]);
+
+export const KNOWN_MANTENEDOR_EMAILS = new Set([
   'messiasletic@gmail.com',
   'gerson.simionato@gmail.com',
   'fe.carmagnani@hotmail.com',
   'jesspenido@gmail.com',
-  'gabrielbertoline1202@yahoo.com',
-  'jonata_xx@hotmail.com',
-  'diegott@ymail.com',
+  'gabrielbertoline1202@yahoo.com'
+]);
+
+export const KNOWN_SUPPORTER_EMAILS = new Set([
+  ...KNOWN_PADRINHO_EMAILS,
+  ...KNOWN_MANTENEDOR_EMAILS
 ]);
 
 const INTERNAL_ROLES = new Set([
@@ -235,17 +244,29 @@ export async function purgeSpamUsersFromDatabase(): Promise<string[]> {
 
     removedIds.push(...ids);
 
-    // 3. Normaliza automaticamente para 'SPONSOR' mantenedores conhecidos que entraram com role 'USER'
-    const supportersNeedingFix = users.filter(u => {
+    // 3. Normaliza papéis: Padrinhos de crianças (SPONSOR) vs Mantenedores mensais (MANTENEDOR)
+    const padrinhosNeedingFix = users.filter(u => {
       const email = (u.email || '').trim().toLowerCase();
       const role = (u.role || '').trim().toUpperCase();
-      return KNOWN_SUPPORTER_EMAILS.has(email) && role !== 'SPONSOR';
+      return KNOWN_PADRINHO_EMAILS.has(email) && role !== 'SPONSOR';
     });
-    if (supportersNeedingFix.length > 0) {
+    if (padrinhosNeedingFix.length > 0) {
       await supabase
         .from('users')
         .update({ role: 'SPONSOR' })
-        .in('id', supportersNeedingFix.map(u => u.id));
+        .in('id', padrinhosNeedingFix.map(u => u.id));
+    }
+
+    const mantenedoresNeedingFix = users.filter(u => {
+      const email = (u.email || '').trim().toLowerCase();
+      const role = (u.role || '').trim().toUpperCase();
+      return KNOWN_MANTENEDOR_EMAILS.has(email) && role !== 'MANTENEDOR';
+    });
+    if (mantenedoresNeedingFix.length > 0) {
+      await supabase
+        .from('users')
+        .update({ role: 'MANTENEDOR' })
+        .in('id', mantenedoresNeedingFix.map(u => u.id));
     }
   } catch (err) {
     console.warn('Aviso ao limpar usuários inválidos:', err);
@@ -264,10 +285,12 @@ export function isSpamFinanceTransaction(tx: any): boolean {
   if (!tx || !tx.description) return false;
   const desc = String(tx.description).trim();
 
-  // 1. Strings aleatórias de bots (consoantes consecutivas ou maiúsculas longas no nome)
+  // 1. Strings aleatórias de bots (consoantes consecutivas ou hashes aleatórios sem espaços)
   if (/- [A-Za-z0-9\s]{8,}$/.test(desc)) {
     const namePart = desc.split('-').pop()?.trim() || '';
-    if (isGibberishBotName(namePart) || /^[A-Z]{7,}$/.test(namePart.replace(/\s+/g, ''))) {
+    // Só considera bot se for uma única palavra sem espaços contendo gibberish ou hash aleatório de >=10 letras maiúsculas
+    const isSingleWordRandomHash = !/\s/.test(namePart) && (/^[A-Z]{10,}$/.test(namePart) || /^[A-Za-z0-9]{12,}$/.test(namePart));
+    if (isGibberishBotName(namePart) || isSingleWordRandomHash) {
       return true;
     }
   }

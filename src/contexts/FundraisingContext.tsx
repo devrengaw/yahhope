@@ -312,19 +312,21 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           const spDateStr = (sp.last_sponsored_at || sp.created_at || '').slice(0, 10);
 
           // Procura match inteligente na tabela donations para NUNCA duplicar o valor da contribuição:
+          const spMonth = (sp.last_sponsored_at || sp.created_at || '').slice(0, 7);
           const existingMatch = formattedDonations.find(d => {
             if (d.id === sp.id || d.id === `sp_${sp.id}`) return true;
             if (sp.stripe_subscription_id && (d.stripe_subscription_id === sp.stripe_subscription_id || d.stripe_payment_id === sp.stripe_subscription_id)) return true;
             if (sp.stripe_payment_id && d.stripe_payment_id === sp.stripe_payment_id) return true;
             
-            // Match por mesmo email, mesmo valor e mesma data (ou stripe payment intent)
+            // Match por mesmo email
             const dDateStr = (d.paid_at || d.date || '').slice(0, 10);
-            const isSameEmail = d.donor_email === effectiveEmail;
+            const dMonth = (d.paid_at || d.date || '').slice(0, 7);
+            const isSameEmail = Boolean(d.donor_email && effectiveEmail && d.donor_email.toLowerCase().trim() === effectiveEmail.toLowerCase().trim());
             const isSameAmount = Math.abs(d.amount - spAmount) < 0.01;
             
-            if (isSameEmail && isSameAmount) {
+            if (isSameEmail) {
               if (d.is_sponsorship) return true;
-              if (dDateStr && spDateStr && dDateStr === spDateStr) return true;
+              if (isSameAmount && (!spMonth || !dMonth || dMonth === spMonth)) return true;
               if (d.stripe_payment_id && (sp.stripe_subscription_id || sp.stripe_customer_id)) return true;
             }
             return false;
@@ -370,11 +372,22 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           const ftAmount = Number(ft.amount || 0);
           if (ftAmount <= 0) return;
           const ftDateStr = (ft.date || '').slice(0, 10);
+          const ftMonth = ftDateStr.slice(0, 7);
 
           // Verifica se já existe em formattedDonations para evitar duplicar
           const alreadyExists = formattedDonations.some(d => {
             const dDateStr = (d.paid_at || d.date || '').slice(0, 10);
-            return Math.abs(d.amount - ftAmount) < 0.01 && dDateStr === ftDateStr;
+            const dMonth = (d.paid_at || d.date || '').slice(0, 7);
+            const isSameAmount = Math.abs(d.amount - ftAmount) < 0.01;
+
+            if (isSameAmount && dDateStr === ftDateStr) return true;
+            if (isSameAmount && dMonth && ftMonth && dMonth === ftMonth) {
+              if (d.donor_name && ft.description && ft.description.toLowerCase().includes(d.donor_name.toLowerCase())) {
+                return true;
+              }
+            }
+
+            return false;
           });
 
           if (!alreadyExists) {
