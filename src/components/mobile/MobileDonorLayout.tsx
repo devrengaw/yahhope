@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { isNative, initializeNativeApp } from '../../lib/capacitor';
+import { DonationModal } from '../common/DonationModal';
 
 export function MobileDonorLayout({ children }: { children?: React.ReactNode }) {
   const location = useLocation();
@@ -42,7 +43,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
     { label: 'Projetos', path: '/portal/projects', icon: Briefcase },
     { label: 'Fazer Doação', path: '/portal/donations', icon: DollarSign },
     { label: 'Minhas Doações', path: '/portal/my-donations', icon: Receipt },
-    { label: 'Blog', path: '/blog', icon: Newspaper },
+    { label: 'Blog', path: '/portal/blog', icon: Newspaper },
   ];
 
   const isActive = (path: string) => {
@@ -389,6 +390,8 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
           </div>
         </div>
       )}
+      {/* Modal Global de Doações para o Portal */}
+      <DonationModal />
     </div>
   );
 }

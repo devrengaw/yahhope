@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { isSpamFinanceTransaction } from '../utils/userCleanup';
 
 export interface CampaignMilestone {
   id: string;
@@ -356,6 +357,44 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         });
       }
 
+      // 5. Integração com o Módulo Financeiro: busca entradas de doações/mantenedores confirmadas
+      const { data: financeIncomeData } = await supabase
+        .from('finance_transactions')
+        .select('*')
+        .eq('type', 'income')
+        .eq('status', 'completed');
+
+      if (financeIncomeData && financeIncomeData.length > 0) {
+        financeIncomeData.forEach(ft => {
+          if (isSpamFinanceTransaction(ft)) return;
+          const ftAmount = Number(ft.amount || 0);
+          if (ftAmount <= 0) return;
+          const ftDateStr = (ft.date || '').slice(0, 10);
+
+          // Verifica se já existe em formattedDonations para evitar duplicar
+          const alreadyExists = formattedDonations.some(d => {
+            const dDateStr = (d.paid_at || d.date || '').slice(0, 10);
+            return Math.abs(d.amount - ftAmount) < 0.01 && dDateStr === ftDateStr;
+          });
+
+          if (!alreadyExists) {
+            formattedDonations.push({
+              id: `ft_${ft.id}`,
+              campaign_id: undefined, // Direciona para a fase ativa da régua (Casa Nutri)
+              campaign_title: ft.description || 'Doação / Entrada Financeira',
+              donor_name: ft.description?.replace(/^(Apadrinhamento Mensal|Doação Mensal|Recorrência Mensal)[^-\n]*-\s*/i, '') || 'Mantenedor YAH Hope',
+              donor_email: '',
+              amount: ftAmount,
+              status: 'paid',
+              payment_method: ft.account?.toLowerCase().includes('pix') ? 'pix' : 'credit_card',
+              date: ft.date || new Date().toISOString(),
+              paid_at: ft.date || new Date().toISOString(),
+              is_sponsorship: true
+            });
+          }
+        });
+      }
+
       setDonations(formattedDonations);
 
       if (campaignsData && campaignsData.length > 0) {
@@ -440,6 +479,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         fetchCampaignData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsorships' }, () => {
+        fetchCampaignData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_transactions' }, () => {
         fetchCampaignData();
       })
       .subscribe();

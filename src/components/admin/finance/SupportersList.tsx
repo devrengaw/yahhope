@@ -19,7 +19,10 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  Repeat
+  Repeat,
+  Edit2,
+  X,
+  Save
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -35,6 +38,12 @@ export function SupportersList() {
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterData | null>(null);
   const [isSyncingStripe, setIsSyncingStripe] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Modal para vincular/alterar a criança do padrinho
+  const [childrenList, setChildrenList] = useState<{ id: string; name: string; address?: string }[]>([]);
+  const [childModalSupporter, setChildModalSupporter] = useState<SupporterData | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState<string>('');
+  const [isSavingChild, setIsSavingChild] = useState(false);
 
   const fetchSupporters = async () => {
     setIsLoading(true);
@@ -52,6 +61,10 @@ export function SupportersList() {
       const rawSponsorships = sponsorshipsRes.data || [];
       const dbDonations = donationsRes.data || [];
       const childrenMap = new Map((childrenRes.data || []).map(c => [c.id, c]));
+
+      if (childrenRes.data) {
+        setChildrenList(childrenRes.data.map(c => ({ id: c.id, name: c.name, address: c.address })).sort((a, b) => a.name.localeCompare(b.name)));
+      }
 
       // Enriquece os apadrinhamentos com os dados da criança correspondente
       const dbSponsorships = rawSponsorships.map(sp => {
@@ -516,6 +529,52 @@ export function SupportersList() {
     }
   };
 
+  const openChangeChildModal = (supporter: SupporterData) => {
+    setChildModalSupporter(supporter);
+    const primarySp = supporter.sponsorships?.[0];
+    setSelectedChildId(primarySp?.child_id || '');
+  };
+
+  const handleSaveChildAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!childModalSupporter || !selectedChildId) return;
+
+    setIsSavingChild(true);
+    try {
+      const spId = childModalSupporter.sponsorships?.[0]?.id;
+      if (spId) {
+        await supabase
+          .from('sponsorships')
+          .update({ 
+            child_id: selectedChildId,
+            last_sponsored_at: new Date().toISOString()
+          })
+          .eq('id', spId);
+      } else {
+        await supabase
+          .from('sponsorships')
+          .update({ 
+            child_id: selectedChildId,
+            last_sponsored_at: new Date().toISOString()
+          })
+          .ilike('donor_email', childModalSupporter.email.toLowerCase().trim());
+      }
+
+      // Limpa cache local daquele padrinho para carregar no portal imediatamente
+      try {
+        localStorage.removeItem(`yah_sponsored_children_${childModalSupporter.email.toLowerCase().trim()}`);
+      } catch (e) {}
+
+      setChildModalSupporter(null);
+      await fetchSupporters();
+    } catch (err: any) {
+      console.error('Erro ao vincular criança:', err);
+      alert('Erro ao vincular criança ao padrinho: ' + err.message);
+    } finally {
+      setIsSavingChild(false);
+    }
+  };
+
   // Excluir doação duplicada ou registro indevido diretamente do banco
   const handleDeleteDonation = async (donationId: string) => {
     try {
@@ -835,15 +894,24 @@ export function SupportersList() {
 
                 {/* Criança Apadrinhada */}
                 <td className="px-6 py-5">
-                  {s.role === 'Padrinho' && s.sponsoredChildName ? (
-                    <div>
-                      <p className="text-xs font-black text-slate-900 flex items-center gap-1">
-                        <Heart size={12} className="text-rose-500" />
-                        {s.sponsoredChildName}
-                      </p>
-                      {s.sponsoredChildVillage && (
-                        <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>
-                      )}
+                  {s.role === 'Padrinho' ? (
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="text-xs font-black text-slate-900 flex items-center gap-1">
+                          <Heart size={12} className="text-rose-500 shrink-0" />
+                          <span className="truncate max-w-[140px]">{s.sponsoredChildName || 'Sem vínculo'}</span>
+                        </p>
+                        {s.sponsoredChildVillage && (
+                          <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => openChangeChildModal(s)}
+                        title="Vincular ou Trocar Criança deste Padrinho"
+                        className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-100/80 bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        <Edit2 size={12} />
+                      </button>
                     </div>
                   ) : s.role === 'Doador Mensal' ? (
                     <span className="inline-flex items-center gap-1 text-xs text-blue-700 font-bold bg-blue-50/70 px-2.5 py-1 rounded-lg">
@@ -919,6 +987,89 @@ export function SupportersList() {
         supporter={selectedSupporter}
         onDeleteDonation={handleDeleteDonation}
       />
+
+      {/* Modal de Vincular / Trocar Criança do Padrinho */}
+      {childModalSupporter && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 flex flex-col">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Heart size={20} fill="currentColor" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Distribuir Criança</h3>
+                  <p className="text-xs text-slate-500 font-medium">Vínculo de apadrinhamento</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setChildModalSupporter(null)} 
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/60 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveChildAssignment} className="p-6 space-y-5">
+              <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4">
+                <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider mb-1">Padrinho Selecionado</p>
+                <p className="text-sm font-bold text-slate-900">{childModalSupporter.name}</p>
+                <p className="text-xs text-slate-500">{childModalSupporter.email}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Selecione a Criança *</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{childrenList.length} cadastradas</span>
+                </label>
+                <select
+                  required
+                  value={selectedChildId}
+                  onChange={(e) => setSelectedChildId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                >
+                  <option value="">Selecione a criança para vincular...</option>
+                  {childrenList.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.address ? `(${c.address})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                  Ao salvar, esta criança ficará vinculada de forma definitiva à cota do padrinho e o sistema nunca mais fará alterações automáticas.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setChildModalSupporter(null)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingChild || !selectedChildId}
+                  className="px-5 py-2.5 text-xs font-black text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
+                >
+                  {isSavingChild ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} />
+                      <span>Confirmar Vínculo</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

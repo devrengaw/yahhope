@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export interface DonationModalOptions {
   title?: string;
@@ -21,6 +22,13 @@ const DonationModalContext = createContext<DonationModalContextType | undefined>
 export function DonationModalProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<DonationModalOptions | null>(null);
+  const location = useLocation();
+
+  // Fecha o modal automaticamente se o usuário navegar para outra página
+  useEffect(() => {
+    setIsOpen(false);
+    setOptions(null);
+  }, [location.pathname]);
 
   const openDonationModal = (opts?: DonationModalOptions) => {
     setOptions(opts || null);

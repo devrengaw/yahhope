@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { fetchAndSyncOrgSettings } from './organizationSettingsService';
+import { isGibberishBotName } from '../utils/userCleanup';
 
 export interface ChildSponsorshipDetail {
   id: string;
@@ -354,16 +355,18 @@ export const sponsorshipService = {
         }
       }
 
-      // 5. Registra no Módulo Financeiro Global
-      await supabase.from('finance_transactions').insert({
-        description: `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`,
-        amount: totalAmount,
-        type: 'income',
-        category_id: 'cat_sponsorship',
-        status: 'completed',
-        account: paymentMethod === 'pix' ? 'Pix Recorrente' : 'Cartão de Crédito',
-        date: new Date().toISOString().split('T')[0]
-      });
+      // 5. Registra no Módulo Financeiro Global (apenas para apoiadores legítimos)
+      if (!isGibberishBotName(donorName)) {
+        await supabase.from('finance_transactions').insert({
+          description: `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`,
+          amount: totalAmount,
+          type: 'income',
+          category_id: 'cat_sponsorship',
+          status: 'completed',
+          account: paymentMethod === 'pix' ? 'Pix Recorrente' : 'Cartão de Crédito',
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
 
       // 7. Persiste no cache local do padrinho de forma estrita (sem acumular cotas fantasmas)
       try {
@@ -609,10 +612,9 @@ export const sponsorshipService = {
 
   /**
    * Reconciliação e Auto-Atribuição de Criança para Padrinhos com Cota Pendente de Vínculo:
-   * 1. Verifica se há apadrinhamentos na tabela 'sponsorships' sem child_id atribuída.
-   * 2. Se houver, localiza a criança em maior prioridade da Casa Nutri (Least-Sponsored)
-   *    e ATUALIZA a linha existente no banco (sem duplicar registros nem criar falsas doações).
-   * 3. NUNCA utiliza doações avulsas da tabela 'donations' para inferir apadrinhamento.
+   * 1. Verifica se há apadrinhamentos na tabela 'sponsorships' de valor >= R$ 90 SEM child_id atribuída.
+   * 2. Se o padrinho JÁ POSSUI criança atribuída, NUNCA altera ou sobrescreve a criança existente.
+   * 3. Mantenedores de apoio geral (R$ 50) NUNCA recebem atribuição automática de criança.
    */
   async autoReconcilePaidSponsor(
     userId?: string, 
@@ -631,7 +633,7 @@ export const sponsorshipService = {
       if (userId) {
         queryBySponsorId = await supabase
           .from('sponsorships')
-          .select('*')
+          .select('*, children(*)')
           .eq('sponsor_id', userId)
           .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
       }
@@ -639,7 +641,7 @@ export const sponsorshipService = {
       if (cleanEmail) {
         queryByEmail = await supabase
           .from('sponsorships')
-          .select('*')
+          .select('*, children(*)')
           .ilike('donor_email', cleanEmail)
           .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
       }
@@ -653,31 +655,38 @@ export const sponsorshipService = {
         }
       });
 
-      // Identifica apadrinhamento pendente de vínculo com criança
-      const unassignedRow = combinedSp.find(r => !r.child_id);
+      // PROTEÇÃO CRÍTICA: Se o padrinho já possui criança atribuída no banco, NUNCA altera!
+      const alreadyAssignedRows = combinedSp.filter(r => r.child_id);
+      if (alreadyAssignedRows.length > 0 && !forceAssign) {
+        console.log(`[AutoReconcile] Padrinho já possui criança vinculada (${alreadyAssignedRows.length}). Mantendo atribuição intacta.`);
+        return [];
+      }
 
-      // Só executa a atribuição se houver cota de apadrinhamento pendente ou se for explicitamente forçado
-      if (unassignedRow || (forceAssign && combinedSp.length > 0)) {
-        const targetRow = unassignedRow || combinedSp[0];
-        console.log(`[AutoReconcile] Vinculando criança à cota existente do padrinho: ${cleanEmail}`);
+      // Identifica cota legítima de apadrinhamento pendente de vínculo (apenas cotas >= 90)
+      const unassignedRow = combinedSp.find(r => !r.child_id && Number(r.monthly_amount || 0) >= 90);
+
+      // Só executa a atribuição se for explicitamente cota de padrinho sem criança
+      if (unassignedRow) {
+        console.log(`[AutoReconcile] Vinculando criança à nova cota de padrinho: ${cleanEmail}`);
 
         const metrics = await this.getMetrics();
         const availableChildren = metrics.children.filter(c => !c.isFull);
         const targetChild = availableChildren.length > 0 ? availableChildren[0] : metrics.children[0];
 
         if (targetChild) {
-          // Atualiza a linha existente no Supabase - NUNCA insere duplicatas
+          // Atualiza a linha existente no Supabase - NUNCA altera se já tinha child_id
           await supabase
             .from('sponsorships')
             .update({ 
               child_id: targetChild.id,
               last_sponsored_at: new Date().toISOString()
             })
-            .eq('id', targetRow.id);
+            .eq('id', unassignedRow.id)
+            .is('child_id', null);
 
           const assignedDetail: ChildSponsorshipDetail = {
             ...targetChild,
-            sponsorshipId: targetRow.id
+            sponsorshipId: unassignedRow.id
           };
 
           if (cleanEmail) {
@@ -781,9 +790,9 @@ export const sponsorshipService = {
           };
         });
 
-        // Identifica se o usuário tem registro de apadrinhamento mas sem criança (child_id is null)
-        const unassigned = combinedData.filter(item => !item.child_id);
-        if (unassigned.length > 0) {
+        // Identifica se o usuário tem cota de apadrinhamento de criança (>= 90) sem criança vinculada
+        const unassigned = combinedData.filter(item => !item.child_id && Number(item.monthly_amount || 0) >= 90);
+        if (unassigned.length > 0 && dbChildren.length === 0) {
           hasUnassignedRow = true;
         }
       }
@@ -823,8 +832,8 @@ export const sponsorshipService = {
 
     let result = Array.from(mergedMap.values());
 
-    // Somente auto-atribui se o usuário tiver uma cota de apadrinhamento confirmada sem criança vinculada:
-    if (hasUnassignedRow) {
+    // Somente auto-atribui se o usuário tiver uma cota de apadrinhamento confirmada sem criança vinculada e sem nenhuma criança já no banco:
+    if (hasUnassignedRow && result.length === 0) {
       try {
         const reconciled = await this.autoReconcilePaidSponsor(userId, cleanEmail, userName, false);
         if (reconciled && reconciled.length > 0) {

@@ -371,7 +371,8 @@ export default function App() {
                                               <Route path="/apadrinhar" element={<MobileDonorSponsor />} />
                                               <Route path="/sponsor" element={<MobileDonorSponsor />} />
                                               <Route path="/projects" element={<MobileDonorProjects />} />
-                                              <Route path="/blog" element={<Navigate to="/blog" replace />} />
+                                              <Route path="/blog" element={<MobileDonorBlog />} />
+                                              <Route path="/blog/:id" element={<MobileDonorBlog />} />
                                               <Route path="/donations" element={<MobileDonorDonate />} />
                                               <Route path="/my-donations" element={<PortalMyDonations />} />
                                               <Route path="/shop" element={<SupporterStore />} />

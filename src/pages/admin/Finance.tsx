@@ -34,6 +34,7 @@ import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/Exp
 import { ProjectRepasseModal, RepassePayload } from '../../components/admin/finance/ProjectRepasseModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { cn } from '../../lib/utils';
+import { isSpamFinanceTransaction, purgeSpamFinanceTransactions } from '../../utils/userCleanup';
 
 export interface Transaction {
   id: string;
@@ -101,6 +102,21 @@ function parseDateParts(dateStr?: string) {
   return { year: 0, month: 0, key: 'unknown', label: 'Sem data' };
 }
 
+export function formatTransactionDate(dateStr?: string): string {
+  if (!dateStr) return 'Sem data';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('pt-BR');
+  }
+  return dateStr;
+}
+
 export function Finance() {
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'transactions' | 'expenses' | 'supporters' | 'sponsorship' | 'categories' | 'projects'>('transactions');
@@ -129,12 +145,16 @@ export function Finance() {
 
   const fetchData = async () => {
     try {
+      purgeSpamFinanceTransactions();
       const [txRes, syncedCategories, projRes] = await Promise.all([
         supabase.from('finance_transactions').select('*').order('date', { ascending: false }),
         fetchAndSyncCategories(),
         supabase.from('projects').select('*').order('created_at', { ascending: false })
       ]);
-      if (txRes.data) setTransactions(txRes.data);
+      if (txRes.data) {
+        const cleanTxs = txRes.data.filter(t => !isSpamFinanceTransaction(t));
+        setTransactions(cleanTxs);
+      }
       if (syncedCategories) setCategories(syncedCategories);
       if (projRes.data && projRes.data.length > 0) {
         setProjects(projRes.data);
@@ -1006,7 +1026,7 @@ export function Finance() {
                                       {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
                                     </div>
                                     <div>
-                                      <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{t.date}</p>
+                                      <p className="text-xs font-black text-slate-900 tracking-tight">{formatTransactionDate(t.date)}</p>
                                       <p className={cn(
                                         "text-[10px] font-bold uppercase",
                                         t.status === 'completed' ? "text-emerald-500" : "text-amber-500"

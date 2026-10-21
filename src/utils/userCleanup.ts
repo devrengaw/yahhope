@@ -90,24 +90,105 @@ export function isSpamOrMockUser(user?: {
   return false;
 }
 
+export const KNOWN_SUPPORTER_EMAILS = new Set([
+  'messiasletic@gmail.com',
+  'gerson.simionato@gmail.com',
+  'fe.carmagnani@hotmail.com',
+  'jesspenido@gmail.com',
+  'gabrielbertoline1202@yahoo.com',
+  'jonata_xx@hotmail.com',
+  'diegott@ymail.com',
+]);
+
+const INTERNAL_ROLES = new Set([
+  'ADMIN',
+  'MASTER',
+  'COORDINATOR',
+  'COORDENADOR',
+  'STAFF',
+  'EQUIPE',
+  'VOLUNTEER',
+  'VOLUNTARIO',
+  'SOCIAL_WORKER',
+  'ASSISTENTE_SOCIAL',
+  'NURSE',
+  'ENFERMEIRO',
+  'ENFERMEIRA',
+  'DOCTOR',
+  'MEDICO',
+  'MEDICA',
+  'ACS',
+  'AGENTE',
+  'OBSERVER',
+  'OBSERVADOR',
+  'NUTRITIONIST',
+  'NUTRICIONISTA',
+  'PSYCHOLOGIST',
+  'PSICOLOGO',
+  'FINANCIAL',
+  'FINANCEIRO',
+  'COMMUNICATION',
+  'COMUNICACAO'
+]);
+
 /**
  * Verifica se o usuário pertence ao Diretório Global de Usuários / Equipe Interna
- * (exclui bots/mockups e exclui perfis externos de mantenedor/padrinho 'SPONSOR')
+ * (exclui bots/mockups e exclui perfis externos de mantenedor/padrinho/doador 'SPONSOR', 'MANTENEDOR', 'USER')
  */
 export function isInternalTeamUser(user?: {
   name?: string | null;
   email?: string | null;
   role?: string | null;
+  permissions?: string[] | null;
+  department?: string | null;
 } | null): boolean {
   if (!user) return false;
   if (isSpamOrMockUser(user)) return false;
 
-  const role = (user.role || '').trim().toUpperCase();
-  if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR') {
+  const email = (user.email || '').trim().toLowerCase();
+  // Se for o e-mail de mantenedor/padrinho conhecido, é perfil externo de apoiador
+  if (KNOWN_SUPPORTER_EMAILS.has(email)) {
     return false;
   }
 
-  return true;
+  // Administrador master sempre é interno
+  if (email === 'contato@yahhope.com') {
+    return true;
+  }
+
+  const role = (user.role || '').trim().toUpperCase();
+
+  // Papéis especificamente internos
+  if (INTERNAL_ROLES.has(role)) {
+    return true;
+  }
+
+  // Papéis de apoiadores externos NUNCA são equipe interna do workspace
+  if (
+    role === 'SPONSOR' || 
+    role === 'PADRINHO' || 
+    role === 'MANTENEDOR' || 
+    role === 'DOADOR' || 
+    role === 'DONOR' || 
+    role === 'APOIADOR' || 
+    role === 'SUPPORTER'
+  ) {
+    return false;
+  }
+
+  // Usuários com role genérica 'USER' ou vazia só entram na equipe se tiverem departamento ou permissões internas explícitas
+  if (role === 'USER' || role === 'USUARIO' || !role) {
+    const hasDept = Boolean(user.department && user.department.trim() !== '-' && user.department.trim() !== '');
+    const hasPerms = Boolean(
+      user.permissions && 
+      Array.isArray(user.permissions) && 
+      user.permissions.some((p: string) => p && p !== 'dashboard' && p !== 'portal')
+    );
+
+    return hasDept || hasPerms;
+  }
+
+  return false;
 }
 
 let purgeInProgress = false;
@@ -153,6 +234,19 @@ export async function purgeSpamUsersFromDatabase(): Promise<string[]> {
     );
 
     removedIds.push(...ids);
+
+    // 3. Normaliza automaticamente para 'SPONSOR' mantenedores conhecidos que entraram com role 'USER'
+    const supportersNeedingFix = users.filter(u => {
+      const email = (u.email || '').trim().toLowerCase();
+      const role = (u.role || '').trim().toUpperCase();
+      return KNOWN_SUPPORTER_EMAILS.has(email) && role !== 'SPONSOR';
+    });
+    if (supportersNeedingFix.length > 0) {
+      await supabase
+        .from('users')
+        .update({ role: 'SPONSOR' })
+        .in('id', supportersNeedingFix.map(u => u.id));
+    }
   } catch (err) {
     console.warn('Aviso ao limpar usuários inválidos:', err);
   } finally {
@@ -160,4 +254,65 @@ export async function purgeSpamUsersFromDatabase(): Promise<string[]> {
   }
 
   return removedIds;
+}
+
+/**
+ * Detecta se uma transação financeira foi gerada por bot/script de spam
+ * (ex: "Apadrinhamento Mensal (1 cota) - VRGJRTZBVJHNLTUCIMRE")
+ */
+export function isSpamFinanceTransaction(tx: any): boolean {
+  if (!tx || !tx.description) return false;
+  const desc = String(tx.description).trim();
+
+  // 1. Strings aleatórias de bots (consoantes consecutivas ou maiúsculas longas no nome)
+  if (/- [A-Za-z0-9\s]{8,}$/.test(desc)) {
+    const namePart = desc.split('-').pop()?.trim() || '';
+    if (isGibberishBotName(namePart) || /^[A-Z]{7,}$/.test(namePart.replace(/\s+/g, ''))) {
+      return true;
+    }
+  }
+
+  // 2. Nomes de spam conhecidos
+  for (const spamName of KNOWN_SPAM_NAMES) {
+    if (desc.toLowerCase().includes(spamName)) return true;
+  }
+
+  // 3. Palavras-chave de teste/mock não autorizadas
+  if (desc.toLowerCase().includes('teste_') || desc.toLowerCase().includes('mock_') || desc.toLowerCase().includes('fake_')) {
+    return true;
+  }
+
+  return false;
+}
+
+let purgeTxInProgress = false;
+
+/**
+ * Remove do banco (public.finance_transactions) transações geradas por bots/scripts inválidos
+ */
+export async function purgeSpamFinanceTransactions(): Promise<string[]> {
+  if (purgeTxInProgress) return [];
+  purgeTxInProgress = true;
+
+  try {
+    const { data: txList, error } = await supabase
+      .from('finance_transactions')
+      .select('id, description, amount, type');
+
+    if (error || !txList) return [];
+
+    const spamTx = txList.filter(t => isSpamFinanceTransaction(t));
+    if (spamTx.length === 0) return [];
+
+    const ids = spamTx.map(t => t.id).filter(Boolean);
+    if (ids.length > 0) {
+      await supabase.from('finance_transactions').delete().in('id', ids);
+    }
+    return ids;
+  } catch (err) {
+    console.warn('Aviso ao purgar transações de spam:', err);
+    return [];
+  } finally {
+    purgeTxInProgress = false;
+  }
 }

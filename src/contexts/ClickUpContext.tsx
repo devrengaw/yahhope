@@ -340,7 +340,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
             role: u.role || 'USER',
             department: u.department || ''
           }));
-      } else if (user) {
+      } else if (user && isInternalTeamUser(user)) {
         loadedUsers = [{
           id: user.id,
           name: user.name || (user.email ? user.email.split('@')[0] : 'Você'),
@@ -350,7 +350,7 @@ export function ClickUpProvider({ children }: { children: ReactNode }) {
         }];
       }
 
-      if (user && !loadedUsers.some(u => u.id === user.id || (user.email && u.email === user.email))) {
+      if (user && isInternalTeamUser(user) && !loadedUsers.some(u => u.id === user.id || (user.email && u.email === user.email))) {
         loadedUsers.push({
           id: user.id,
           name: user.name || (user.email ? user.email.split('@')[0] : 'Você'),

@@ -118,7 +118,12 @@ export function MobileDonorProjects() {
                     <span>Detalhes</span>
                   </button>
                   <button
-                    onClick={() => openDonationModal()}
+                    onClick={() => openDonationModal({
+                      title: project.title,
+                      description: project.description,
+                      imageUrl: project.image_url,
+                      category: project.category
+                    })}
                     className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                   >
                     <Heart size={14} fill="currentColor" />
@@ -232,8 +237,14 @@ export function MobileDonorProjects() {
               </button>
               <button
                 onClick={() => {
+                  const proj = selectedProject;
                   setSelectedProject(null);
-                  openDonationModal();
+                  openDonationModal({
+                    title: proj.title,
+                    description: proj.description,
+                    imageUrl: proj.image_url,
+                    category: proj.category
+                  });
                 }}
                 className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all"
               >

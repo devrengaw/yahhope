@@ -761,7 +761,7 @@ export function MobileDonorHome() {
                   Novidades da Comunidade
                 </h3>
                 <Link
-                  to="/blog"
+                  to="/portal/blog"
                   className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-0.5 group"
                 >
                   <span>Ver todas</span>
@@ -770,7 +770,7 @@ export function MobileDonorHome() {
               </div>
 
               <div
-                onClick={() => navigate(`/blog?post=${latestPost.id}`)}
+                onClick={() => navigate(`/portal/blog?post=${latestPost.id}`)}
                 className="bg-white rounded-[1.75rem] border border-slate-200/80 overflow-hidden shadow-xs hover:border-orange-300 hover:shadow-md transition-all cursor-pointer group"
               >
                 <div className="h-44 w-full relative overflow-hidden">
