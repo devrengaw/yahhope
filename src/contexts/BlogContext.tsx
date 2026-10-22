@@ -197,6 +197,15 @@ const BLOG_STORAGE_KEY = 'yah_hope_blog_posts_v8';
 const RESET_FEATURED_FLAG = 'yah_hope_blog_featured_reset_v2';
 const DEFAULT_POSTS_MAP = new Map(DEFAULT_BLOG_POSTS.map(p => [p.id, p]));
 
+// Helper to look up baseline post data with or without 'post-' prefix
+function getPostBaseline(id: string | number | undefined): BlogPost | undefined {
+  if (!id) return undefined;
+  const strId = String(id).trim();
+  const withPrefix = strId.startsWith('post-') ? strId : `post-${strId}`;
+  const withoutPrefix = strId.replace(/^post-/, '');
+  return DEFAULT_POSTS_MAP.get(strId) || DEFAULT_POSTS_MAP.get(withPrefix) || DEFAULT_POSTS_MAP.get(withoutPrefix);
+}
+
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const { syncBlogPostHighlight, removeBlogPostHighlight, isBlogPostHighlighted } = useHomeHighlights();
 
@@ -221,15 +230,17 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(p => {
-            const def = DEFAULT_POSTS_MAP.get(p.id);
+            const def = getPostBaseline(p.id);
+            const reads = Math.max(Number(p.reads_count ?? 0), Number(def?.reads_count ?? 0));
+            const views = Math.max(Number(p.views_count ?? 0), Number(def?.views_count ?? 0), reads);
             return {
               ...p,
               featured_home: p.featured_home === true,
-              views_count: Math.max(Number(p.views_count ?? 0), def?.views_count ?? 0),
-              reads_count: Math.max(Number(p.reads_count ?? 0), def?.reads_count ?? 0),
-              likes_count: Math.max(Number(p.likes_count ?? 0), def?.likes_count ?? 0),
-              shares_count: Math.max(Number(p.shares_count ?? 0), def?.shares_count ?? 0),
-              comments_count: Math.max(Number(p.comments_count ?? 0), def?.comments_count ?? 0)
+              views_count: views,
+              reads_count: reads,
+              likes_count: Math.max(Number(p.likes_count ?? 0), Number(def?.likes_count ?? 0)),
+              shares_count: Math.max(Number(p.shares_count ?? 0), Number(def?.shares_count ?? 0)),
+              comments_count: Math.max(Number(p.comments_count ?? 0), Number(def?.comments_count ?? 0))
             };
           });
         }
@@ -272,7 +283,15 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
       if (!error && data && data.length > 0) {
         const loadedPosts = data.map(p => {
-          const def = DEFAULT_POSTS_MAP.get(p.id);
+          const def = getPostBaseline(p.id);
+          const rawViews = Number(p.views_count ?? 0);
+          const rawReads = Number(p.reads_count ?? 0);
+          const defViews = Number(def?.views_count ?? 0);
+          const defReads = Number(def?.reads_count ?? 0);
+          
+          const reads = Math.max(rawReads, defReads);
+          const views = Math.max(rawViews, defViews, reads);
+
           return {
             id: p.id,
             title: p.title,
@@ -287,17 +306,54 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
             featured_home: p.featured_home === true,
             highlight_type: p.highlight_type || 'split',
             highlight_color: p.highlight_color || '#F49853',
-            views_count: Math.max(Number(p.views_count ?? 0), def?.views_count ?? 0),
-            reads_count: Math.max(Number(p.reads_count ?? 0), def?.reads_count ?? 0),
-            likes_count: Math.max(Number(p.likes_count ?? 0), def?.likes_count ?? 0),
-            shares_count: Math.max(Number(p.shares_count ?? 0), def?.shares_count ?? 0),
-            comments_count: Math.max(Number(p.comments_count ?? 0), def?.comments_count ?? 0),
+            views_count: views,
+            reads_count: reads,
+            likes_count: Math.max(Number(p.likes_count ?? 0), Number(def?.likes_count ?? 0)),
+            shares_count: Math.max(Number(p.shares_count ?? 0), Number(def?.shares_count ?? 0)),
+            comments_count: Math.max(Number(p.comments_count ?? 0), Number(def?.comments_count ?? 0)),
             translations: p.translations || ['pt'],
             has_unpublished_changes: p.has_unpublished_changes === true,
             deleted_at: p.deleted_at
           };
         });
-        setPosts(loadedPosts);
+
+        // Ensure database rows that have values lower than baseline are healed to baseline in Supabase
+        for (const lp of loadedPosts) {
+          const def = getPostBaseline(lp.id);
+          const rawRow = data.find(d => String(d.id) === String(lp.id) || d.id === `post-${lp.id}` || `post-${d.id}` === String(lp.id));
+          if (def && rawRow) {
+            const rawV = Number(rawRow.views_count ?? 0);
+            const rawR = Number(rawRow.reads_count ?? 0);
+            if (rawV < def.views_count || rawR < def.reads_count) {
+              supabase.from('blog_posts').update({
+                views_count: Math.max(rawV, def.views_count),
+                reads_count: Math.max(rawR, def.reads_count)
+              }).eq('id', rawRow.id).then(() => {}).catch(() => {});
+            }
+          }
+        }
+
+        // Set state preserving any higher client-side counters (prevents jumping down)
+        setPosts(prev => {
+          const prevMap = new Map(prev.map(item => [String(item.id), item]));
+          return loadedPosts.map(lp => {
+            const cleanId = String(lp.id);
+            const prevItem = prevMap.get(cleanId) || 
+                             prevMap.get(`post-${cleanId}`) || 
+                             prevMap.get(cleanId.replace(/^post-/, ''));
+            if (!prevItem) return lp;
+            const finalReads = Math.max(Number(lp.reads_count ?? 0), Number(prevItem.reads_count ?? 0));
+            const finalViews = Math.max(Number(lp.views_count ?? 0), Number(prevItem.views_count ?? 0), finalReads);
+            return {
+              ...lp,
+              views_count: finalViews,
+              reads_count: finalReads,
+              likes_count: Math.max(Number(lp.likes_count ?? 0), Number(prevItem.likes_count ?? 0)),
+              shares_count: Math.max(Number(lp.shares_count ?? 0), Number(prevItem.shares_count ?? 0)),
+              comments_count: Math.max(Number(lp.comments_count ?? 0), Number(prevItem.comments_count ?? 0))
+            };
+          });
+        });
 
         // Auto-sync featured posts to Home Highlights seamlessly on initial load
         if (!initialSyncDone.current) {
@@ -343,16 +399,35 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'blog_posts' }, (payload) => {
         if (payload.eventType === 'UPDATE' && payload.new) {
           const updated = payload.new as any;
-          setPosts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
+          setPosts(prev => prev.map(p => {
+            const isMatch = String(p.id) === String(updated.id) || 
+                            p.id === `post-${updated.id}` || 
+                            `post-${p.id}` === String(updated.id);
+            if (!isMatch) return p;
+
+            const def = getPostBaseline(p.id);
+            const reads = Math.max(Number(updated.reads_count ?? 0), Number(p.reads_count ?? 0), Number(def?.reads_count ?? 0));
+            const views = Math.max(Number(updated.views_count ?? 0), Number(p.views_count ?? 0), Number(def?.views_count ?? 0), reads);
+
+            return {
+              ...p,
+              ...updated,
+              views_count: views,
+              reads_count: reads,
+              likes_count: Math.max(Number(updated.likes_count ?? 0), Number(p.likes_count ?? 0), Number(def?.likes_count ?? 0)),
+              shares_count: Math.max(Number(updated.shares_count ?? 0), Number(p.shares_count ?? 0), Number(def?.shares_count ?? 0)),
+              comments_count: Math.max(Number(updated.comments_count ?? 0), Number(p.comments_count ?? 0), Number(def?.comments_count ?? 0))
+            };
+          }));
         } else if (payload.eventType === 'INSERT' && payload.new) {
           const inserted = payload.new as any;
           setPosts(prev => {
-            if (prev.some(p => p.id === inserted.id)) return prev;
+            if (prev.some(p => String(p.id) === String(inserted.id) || p.id === `post-${inserted.id}`)) return prev;
             return [inserted, ...prev];
           });
         } else if (payload.eventType === 'DELETE' && payload.old) {
           const deleted = payload.old as any;
-          setPosts(prev => prev.filter(p => p.id !== deleted.id));
+          setPosts(prev => prev.filter(p => String(p.id) !== String(deleted.id) && p.id !== `post-${deleted.id}`));
         } else {
           loadFromSupabase();
         }
@@ -526,9 +601,15 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
 
   // Real atomic metrics tracking methods connected directly to Supabase
   const incrementViews = async (id: string) => {
+    let nextVal = 1;
+
     setPosts(prev => prev.map(p => {
-      if (p.id === id) {
-        return { ...p, views_count: (p.views_count || 0) + 1 };
+      const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+      if (isTarget) {
+        const def = getPostBaseline(p.id);
+        const current = Math.max(Number(p.views_count ?? 0), Number(def?.views_count ?? 0), Number(p.reads_count ?? 0));
+        nextVal = current + 1;
+        return { ...p, views_count: nextVal };
       }
       return p;
     }));
@@ -536,24 +617,44 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('blog_posts')
-        .select('views_count')
-        .eq('id', id)
+        .select('views_count, reads_count')
+        .or(`id.eq.${id},id.eq.post-${id}`)
         .maybeSingle();
 
-      const nextVal = (data?.views_count ?? 0) + 1;
+      const def = getPostBaseline(id);
+      const dbViews = Number(data?.views_count ?? 0);
+      const targetVal = Math.max(nextVal, dbViews + 1, Number(def?.views_count ?? 0) + 1);
+
       await supabase
         .from('blog_posts')
-        .update({ views_count: nextVal })
-        .eq('id', id);
+        .update({ views_count: targetVal })
+        .or(`id.eq.${id},id.eq.post-${id}`);
+
+      if (targetVal !== nextVal) {
+        setPosts(prev => prev.map(p => {
+          const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+          if (isTarget) {
+            return { ...p, views_count: targetVal };
+          }
+          return p;
+        }));
+      }
     } catch (err) {
       console.error('Error incrementing views in Supabase:', err);
     }
   };
 
   const incrementReads = async (id: string) => {
+    let nextReadsVal = 1;
+
     setPosts(prev => prev.map(p => {
-      if (p.id === id) {
-        return { ...p, reads_count: (p.reads_count || 0) + 1 };
+      const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+      if (isTarget) {
+        const def = getPostBaseline(p.id);
+        const current = Math.max(Number(p.reads_count ?? 0), Number(def?.reads_count ?? 0));
+        nextReadsVal = current + 1;
+        const updatedViews = Math.max(Number(p.views_count ?? 0), nextReadsVal);
+        return { ...p, reads_count: nextReadsVal, views_count: updatedViews };
       }
       return p;
     }));
@@ -561,15 +662,33 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('blog_posts')
-        .select('reads_count')
-        .eq('id', id)
+        .select('reads_count, views_count')
+        .or(`id.eq.${id},id.eq.post-${id}`)
         .maybeSingle();
 
-      const nextVal = (data?.reads_count ?? 0) + 1;
+      const def = getPostBaseline(id);
+      const dbReads = Number(data?.reads_count ?? 0);
+      const targetReads = Math.max(nextReadsVal, dbReads + 1, Number(def?.reads_count ?? 0) + 1);
+      const targetViews = Math.max(Number(data?.views_count ?? 0), targetReads);
+
       await supabase
         .from('blog_posts')
-        .update({ reads_count: nextVal })
-        .eq('id', id);
+        .update({ reads_count: targetReads, views_count: targetViews })
+        .or(`id.eq.${id},id.eq.post-${id}`);
+
+      if (targetReads !== nextReadsVal) {
+        setPosts(prev => prev.map(p => {
+          const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+          if (isTarget) {
+            return { 
+              ...p, 
+              reads_count: targetReads, 
+              views_count: Math.max(Number(p.views_count ?? 0), targetViews) 
+            };
+          }
+          return p;
+        }));
+      }
     } catch (err) {
       console.error('Error incrementing reads in Supabase:', err);
     }
@@ -586,11 +705,14 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(key);
     }
 
+    let nextLikesVal = 0;
     setPosts(prev => prev.map(p => {
-      if (p.id === id) {
-        const currentLikes = p.likes_count || 0;
-        const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
-        return { ...p, likes_count: newLikes };
+      const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+      if (isTarget) {
+        const def = getPostBaseline(p.id);
+        const currentLikes = Math.max(Number(p.likes_count ?? 0), Number(def?.likes_count ?? 0));
+        nextLikesVal = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+        return { ...p, likes_count: nextLikesVal };
       }
       return p;
     }));
@@ -599,15 +721,17 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase
         .from('blog_posts')
         .select('likes_count')
-        .eq('id', id)
+        .or(`id.eq.${id},id.eq.post-${id}`)
         .maybeSingle();
 
-      const currentLikes = data?.likes_count ?? 0;
-      const newLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+      const def = getPostBaseline(id);
+      const dbLikes = Math.max(Number(data?.likes_count ?? 0), Number(def?.likes_count ?? 0));
+      const targetLikes = nextLiked ? Math.max(nextLikesVal, dbLikes + 1) : Math.max(0, dbLikes - 1);
+
       await supabase
         .from('blog_posts')
-        .update({ likes_count: newLikes })
-        .eq('id', id);
+        .update({ likes_count: targetLikes })
+        .or(`id.eq.${id},id.eq.post-${id}`);
     } catch (err) {
       console.error('Error updating likes in Supabase:', err);
     }
@@ -616,9 +740,14 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   };
 
   const incrementShares = async (id: string) => {
+    let nextSharesVal = 1;
     setPosts(prev => prev.map(p => {
-      if (p.id === id) {
-        return { ...p, shares_count: (p.shares_count || 0) + 1 };
+      const isTarget = String(p.id) === String(id) || p.id === `post-${id}` || `post-${p.id}` === String(id);
+      if (isTarget) {
+        const def = getPostBaseline(p.id);
+        const current = Math.max(Number(p.shares_count ?? 0), Number(def?.shares_count ?? 0));
+        nextSharesVal = current + 1;
+        return { ...p, shares_count: nextSharesVal };
       }
       return p;
     }));
@@ -627,14 +756,17 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase
         .from('blog_posts')
         .select('shares_count')
-        .eq('id', id)
+        .or(`id.eq.${id},id.eq.post-${id}`)
         .maybeSingle();
 
-      const nextVal = (data?.shares_count ?? 0) + 1;
+      const def = getPostBaseline(id);
+      const dbVal = Number(data?.shares_count ?? 0);
+      const targetVal = Math.max(nextSharesVal, dbVal + 1, Number(def?.shares_count ?? 0) + 1);
+
       await supabase
         .from('blog_posts')
-        .update({ shares_count: nextVal })
-        .eq('id', id);
+        .update({ shares_count: targetVal })
+        .or(`id.eq.${id},id.eq.post-${id}`);
     } catch (err) {
       console.error('Error incrementing shares in Supabase:', err);
     }

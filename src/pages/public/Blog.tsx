@@ -66,22 +66,27 @@ export function Blog() {
     if (!selectedPost) return;
 
     const postId = selectedPost.id;
+    const cleanId = String(postId).replace(/^post-/, '');
     const viewKey = `yah_viewed_${postId}`;
+    const altViewKey = `yah_viewed_${cleanId}`;
     const readKey = `yah_read_${postId}`;
+    const altReadKey = `yah_read_${cleanId}`;
 
     // 1. Register View once per session
-    if (!sessionStorage.getItem(viewKey)) {
+    if (!sessionStorage.getItem(viewKey) && !sessionStorage.getItem(altViewKey)) {
       sessionStorage.setItem(viewKey, 'true');
+      sessionStorage.setItem(altViewKey, 'true');
       incrementViews(postId);
     }
 
     // 2. Register Read after 15 seconds or scroll past 60%
-    let readRegistered = !!sessionStorage.getItem(readKey);
+    let readRegistered = !!(sessionStorage.getItem(readKey) || sessionStorage.getItem(altReadKey));
 
     const markAsRead = () => {
       if (!readRegistered) {
         readRegistered = true;
         sessionStorage.setItem(readKey, 'true');
+        sessionStorage.setItem(altReadKey, 'true');
         incrementReads(postId);
       }
     };
