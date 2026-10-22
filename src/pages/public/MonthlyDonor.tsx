@@ -387,7 +387,7 @@ export function MonthlyDonor() {
       />
 
       {/* 1. SEÇÃO UNIFICADA: HERO & DOAÇÃO DO MANTENEDOR (LOGO APÓS O HEADER) */}
-      <section id="adesao-mantenedor" className="relative pt-10 pb-20 md:pt-14 md:pb-28 bg-[#0F172A] text-white overflow-hidden scroll-mt-20">
+      <section id="adesao-mantenedor" className="relative pt-12 pb-20 md:pt-18 md:pb-28 bg-[#0F172A] text-white overflow-hidden scroll-mt-20">
         {/* Background visual imersivo com as crianças */}
         <div className="absolute inset-0 z-0">
           <img 
@@ -418,16 +418,12 @@ export function MonthlyDonor() {
             </p>
 
             {/* Métricas Rápidas de Impacto e Confiança */}
-            <div className="pt-2.5 pb-2.5 grid grid-cols-2 sm:grid-cols-4 gap-4 border-y border-white/20 max-w-2xl mx-auto backdrop-blur-xs">
+            <div className="py-3 grid grid-cols-3 gap-3 sm:gap-6 border-y border-white/20 max-w-xl mx-auto backdrop-blur-sm">
               <div>
                 <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">
                   {uniqueSupportersCount !== null ? uniqueSupportersCount : '...'}
                 </p>
                 <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Apoiadores Mensais</p>
-              </div>
-              <div>
-                <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">500+</p>
-                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Vidas Resgatadas</p>
               </div>
               <div>
                 <p className="text-xl sm:text-3xl font-black text-[#92BF78] drop-shadow-md">100%</p>
@@ -440,12 +436,12 @@ export function MonthlyDonor() {
             </div>
 
             {/* Alternador de Modalidade: Apadrinhar Criança vs Mantenedor Geral */}
-            <div className="pt-2 inline-flex bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700 shadow-xl">
+            <div className="pt-2 inline-flex flex-wrap sm:flex-nowrap justify-center bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700 shadow-xl max-w-full">
               <button
                 type="button"
                 onClick={() => setDonationType('sponsorship')}
                 className={cn(
-                  "px-6 py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer",
+                  "px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer",
                   donationType === 'sponsorship'
                     ? "bg-[#F49853] text-white shadow-lg shadow-[#F49853]/25 scale-[1.02]"
                     : "text-slate-400 hover:text-white"
@@ -464,7 +460,7 @@ export function MonthlyDonor() {
                 type="button"
                 onClick={() => setDonationType('general')}
                 className={cn(
-                  "px-6 py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer",
+                  "px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-gotham-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer",
                   donationType === 'general'
                     ? "bg-white text-slate-900 shadow-lg scale-[1.02]"
                     : "text-slate-400 hover:text-white"
@@ -861,19 +857,115 @@ export function MonthlyDonor() {
 
               {/* Formulário de Identificação & Pagamento (Coluna Direita lg:col-span-5) */}
               <div className="lg:col-span-5 bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100">
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
+                {/* Seletor de Modalidade dentro da Caixa de Doação (como nos outros lugares) */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl mb-2 text-xs font-gotham-bold">
+                  <button
+                    type="button"
+                    onClick={() => setDonationType('sponsorship')}
+                    className={cn(
+                      "py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 text-center cursor-pointer",
+                      donationType === 'sponsorship'
+                        ? "bg-[#F49853] text-white shadow-md"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <Heart size={13} fill={donationType === 'sponsorship' ? "currentColor" : "none"} />
+                    <span>Apadrinhamento</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDonationType('general')}
+                    className={cn(
+                      "py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 text-center cursor-pointer",
+                      donationType === 'general'
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <Users size={13} />
+                    <span>Mantenedor</span>
+                  </button>
+                </div>
+
+                <p className="text-center text-[11px] text-slate-500 mb-3 font-gotham-regular min-h-[1.25rem] flex items-center justify-center">
+                  {donationType === 'sponsorship' ? (
+                    <span>Cotas de R$ {quotaCost}/mês • <strong className="font-gotham-bold text-[#F49853]">Alocação justa e perfil por e-mail</strong></span>
+                  ) : (
+                    <span>Recorrência mensal que sustenta o <strong className="font-gotham-bold text-slate-900">custo global do projeto</strong></span>
+                  )}
+                </p>
+
+                {/* QUANTIDADE DE CRIANÇAS DENTRO DA CAIXA DE DOAÇÃO (COMO NOS OUTROS LUGARES) */}
+                {donationType === 'sponsorship' && (
+                  <div className="space-y-2.5 mb-4 animate-fade-in">
+                    {sponsorshipMetrics?.isFullySponsored ? (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs text-emerald-800">
+                        🎉 Todas as crianças estão 100% apadrinhadas!
+                        <button
+                          type="button"
+                          onClick={() => setDonationType('general')}
+                          className="mt-1 block mx-auto text-[11px] font-gotham-bold underline text-emerald-950 cursor-pointer"
+                        >
+                          Seja um Mantenedor Geral do Projeto →
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                          <span>Quantas crianças apadrinhar:</span>
+                          <span className="text-[#F49853]">R$ {quotaCost}/mês por cota</span>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[1, 2, 3, 4].map((q) => {
+                            const isSelected = quotasCount === q;
+                            const total = q * quotaCost;
+                            return (
+                              <button
+                                key={q}
+                                type="button"
+                                onClick={() => setQuotasCount(q)}
+                                className={cn(
+                                  "py-2 px-1 rounded-xl border-2 transition-all flex flex-col items-center justify-center cursor-pointer",
+                                  isSelected
+                                    ? "border-[#F49853] bg-orange-50 text-[#F49853] ring-1 ring-[#F49853] shadow-xs"
+                                    : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                                )}
+                              >
+                                <span className="text-[10px] font-gotham-bold uppercase leading-tight">
+                                  {q} {q === 1 ? 'Criança' : 'Crianças'}
+                                </span>
+                                <span className="text-xs font-black text-slate-900 mt-0.5">
+                                  R$ {total}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-900 leading-snug flex items-center gap-2">
+                          <Sparkles size={14} className="text-[#F49853] shrink-0" />
+                          <span>Distribuição justa: o perfil do afilhado é enviado após a confirmação.</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-gotham-bold uppercase tracking-wider text-[#F49853]">Passo Final</span>
                     <span className="text-xs font-gotham-medium text-slate-400 flex items-center gap-1">
                       <Lock size={12} /> Seguro & Criptografado
                     </span>
                   </div>
-                  <h3 className="text-2xl font-heading font-black text-slate-900">
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-slate-900">
                     {donationType === 'sponsorship' ? 'Seus Dados de Padrinho' : 'Dados do Mantenedor'}
                   </h3>
                   <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-200/80 flex items-center justify-between">
                     <span className="text-xs font-gotham-bold text-amber-900">
-                      {donationType === 'sponsorship' ? `${quotasCount} ${quotasCount === 1 ? 'Criança' : 'Crianças'}` : 'Total Mensal:'}
+                      {donationType === 'sponsorship' ? `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'}` : 'Total Mensal:'}
                     </span>
                     <span className="text-xl font-heading font-black text-amber-900">
                       R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-normal text-amber-800">/ mês</span>

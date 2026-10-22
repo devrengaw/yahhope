@@ -152,7 +152,7 @@ export function PublicHeader() {
             </Link>
 
             {/* Desktop Navigation Links with Dropdown Menu Previews */}
-            <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs xl:text-sm font-gotham-bold text-slate-800">
+            <nav className="hidden lg:flex items-center gap-3.5 xl:gap-6 text-xs xl:text-sm font-gotham-bold text-slate-800 shrink-0">
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
                   <span>Sobre Nós</span>
@@ -307,7 +307,7 @@ export function PublicHeader() {
               {/* Portal do Doador / Entrar */}
               <Link 
                 to={user ? "/portal/dashboard" : "/login"}
-                className="hidden md:inline-flex items-center gap-1.5 text-xs lg:text-sm font-gotham-bold text-slate-700 hover:text-[#F49853] px-3 py-2 rounded-full hover:bg-orange-50/80 transition-colors whitespace-nowrap"
+                className="hidden md:inline-flex lg:hidden xl:inline-flex items-center gap-1.5 text-xs lg:text-sm font-gotham-bold text-slate-700 hover:text-[#F49853] px-3 py-2 rounded-full hover:bg-orange-50/80 transition-colors whitespace-nowrap"
               >
                 <span>{user ? 'Meu Portal' : 'Entrar / Mantenedor'}</span>
                 <ArrowRight size={13} className="text-[#F49853]" />
