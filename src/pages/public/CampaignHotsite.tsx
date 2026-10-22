@@ -224,7 +224,7 @@ export function CampaignHotsite() {
                 Um convite para levar esperança.
               </h1>
 
-              <p className="text-base sm:text-xl text-slate-200 leading-relaxed font-normal max-w-xl">
+              <p className="text-base sm:text-xl text-slate-200 leading-relaxed font-normal max-w-xl text-justify">
                 A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas.
               </p>
 
@@ -271,7 +271,7 @@ export function CampaignHotsite() {
               >
                 Cuidar hoje. Construir possibilidades para o amanhã.
               </h2>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
                 Acreditamos que cada vida carrega uma história e um futuro de possibilidades. Nosso compromisso é caminhar ao lado de pessoas e comunidades, oferecendo cuidado, fortalecendo vínculos e criando oportunidades de transformação.
               </p>
             </div>
@@ -292,7 +292,7 @@ export function CampaignHotsite() {
                       <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
                         {pillar.title}
                       </h3>
-                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
                         {pillar.description}
                       </p>
                     </div>
@@ -322,7 +322,7 @@ export function CampaignHotsite() {
               >
                 Esperança que se transforma em ação.
               </h2>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
                 Cada iniciativa da YAH Hope nasce para responder a necessidades reais com responsabilidade, acompanhamento próximo e compromisso com a dignidade humana.
               </p>
             </div>
@@ -366,7 +366,7 @@ export function CampaignHotsite() {
                         {project.name}
                       </h3>
 
-                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
                         {project.summary}
                       </p>
 
@@ -411,7 +411,7 @@ export function CampaignHotsite() {
                   <Sparkles size={16} className="text-[#F49853] shrink-0" />
                   <span>Visão de continuidade e novas iniciativas</span>
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl text-justify">
                   À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo o acolhimento a mais crianças, oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.
                 </p>
               </div>
@@ -450,7 +450,7 @@ export function CampaignHotsite() {
               >
                 Existem muitas formas de fazer parte dessa história.
               </h2>
-              <p className="text-base sm:text-lg text-slate-200 leading-relaxed drop-shadow-sm">
+              <p className="text-base sm:text-lg text-slate-200 leading-relaxed drop-shadow-sm text-justify">
                 Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Escolha como você prefere caminhar com a YAH Hope:
               </p>
             </div>
@@ -474,12 +474,12 @@ export function CampaignHotsite() {
                     <h3 className="text-xl sm:text-2xl font-black text-white">
                       Mantenedor YAH Hope
                     </h3>
-                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
                       Como mantenedor, você contribui mensalmente para a continuidade do trabalho da YAH Hope, apoiando suas ações e seu crescimento.
                     </p>
                   </div>
 
-                  <div className="pt-2 space-y-3 border-t border-white/10 text-xs sm:text-sm text-slate-300">
+                  <div className="pt-2 space-y-3 border-t border-white/10 text-xs sm:text-sm text-slate-300 text-justify">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
                       <span>Sua contribuição é destinada à sustentação global dos projetos ativos e à estruturação de novas iniciativas da organização.</span>
@@ -521,7 +521,7 @@ export function CampaignHotsite() {
                     <h3 className="text-xl sm:text-2xl font-black text-white">
                       Padrinho ou Madrinha
                     </h3>
-                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
                       Como padrinho ou madrinha, você participa do programa de apadrinhamento, contribuindo mensalmente para o cuidado das crianças acompanhadas.
                     </p>
                   </div>
@@ -556,7 +556,7 @@ export function CampaignHotsite() {
                     </div>
                   </div>
 
-                  <div className="pt-2 space-y-2.5 border-t border-white/10 text-xs sm:text-sm text-slate-300">
+                  <div className="pt-2 space-y-2.5 border-t border-white/10 text-xs sm:text-sm text-slate-300 text-justify">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
                       <span><strong>Distribuição justa e coletiva:</strong> As contribuições sustentam o cuidado integral de todas as crianças acompanhadas com equidade.</span>
@@ -601,7 +601,7 @@ export function CampaignHotsite() {
               >
                 Você faz parte e acompanha essa história.
               </h2>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
                 Queremos que você saiba como o trabalho está caminhando e o que seu apoio ajuda a construir. É uma forma de manter você por perto e cultivar uma relação de confiança ao longo do tempo.
               </p>
             </div>
@@ -621,7 +621,7 @@ export function CampaignHotsite() {
                     <h3 className="text-base sm:text-lg font-bold text-white">
                       {item.title}
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed text-justify">
                       {item.description}
                     </p>
                   </div>
@@ -662,7 +662,7 @@ export function CampaignHotsite() {
               >
                 Vamos levar esperança juntos?
               </h2>
-              <p className="text-sm sm:text-base text-slate-200 leading-relaxed drop-shadow-sm">
+              <p className="text-sm sm:text-base text-slate-200 leading-relaxed drop-shadow-sm text-justify">
                 Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.
               </p>
             </div>
