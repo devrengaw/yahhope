@@ -47,6 +47,7 @@ import {
   CampaignAnalyticsSummary, 
   CampaignLead 
 } from '../../services/campaignTrackingService';
+import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,15 +63,40 @@ export function CampaignHotsiteAdmin() {
     loadData(period);
   }, [period]);
 
-  const loadData = async (selectedPeriod: 'today' | '7d' | '30d' | '90d' | 'all') => {
-    setLoading(true);
+  // Atualização automática em tempo real (Supabase Realtime + abas locais + foco da janela)
+  useEffect(() => {
+    const handleStorageOrFocus = () => {
+      loadData(period, true);
+    };
+
+    window.addEventListener('storage', handleStorageOrFocus);
+    window.addEventListener('focus', handleStorageOrFocus);
+
+    const channel = supabase
+      .channel('hotsite_admin_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_leads' }, () => loadData(period, true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_events' }, () => loadData(period, true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_visits' }, () => loadData(period, true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsorships' }, () => loadData(period, true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'donations' }, () => loadData(period, true))
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('storage', handleStorageOrFocus);
+      window.removeEventListener('focus', handleStorageOrFocus);
+      supabase.removeChannel(channel);
+    };
+  }, [period]);
+
+  const loadData = async (selectedPeriod: 'today' | '7d' | '30d' | '90d' | 'all', silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const summary = await getCampaignAnalytics(selectedPeriod);
       setData(summary);
     } catch (err) {
       console.error('Erro ao carregar dados do hotsite:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -168,6 +194,30 @@ export function CampaignHotsiteAdmin() {
           </a>
         </div>
       </div>
+
+      {/* Alerta inteligente caso o filtro "Hoje" esteja sem movimento mas existam registros no histórico */}
+      {period === 'today' &&
+        data &&
+        data.totalVisits === 0 &&
+        data.totalLeads === 0 &&
+        (data.allTimeStats.visits > 0 || data.allTimeStats.leads > 0 || data.allTimeStats.clicks > 0) && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:px-6 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm">
+            <div className="flex items-center gap-2.5">
+              <Clock size={18} className="text-[#F49853] shrink-0" />
+              <span>
+                Ainda não houve novos registros nas últimas horas de <strong>Hoje</strong>, mas o hotsite possui{' '}
+                <strong>{data.allTimeStats.visits} acessos</strong>, <strong>{data.allTimeStats.clicks} cliques</strong> e{' '}
+                <strong>{data.allTimeStats.leads} retornos/inscrições</strong> acumulados.
+              </span>
+            </div>
+            <button
+              onClick={() => setPeriod('30d')}
+              className="px-3.5 py-1.5 rounded-xl bg-[#F49853] hover:bg-[#e38640] text-white font-bold text-xs shrink-0 transition-all cursor-pointer"
+            >
+              Ver últimos 30 dias
+            </button>
+          </div>
+        )}
 
       {/* Cards de Métricas Principais (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

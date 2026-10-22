@@ -31,6 +31,7 @@ import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail } from '
 import { cn } from '../../lib/utils';
 import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
 import { getUniqueMonthlySupportersCount } from '../../services/monthlySupportersService';
+import { submitCampaignLead } from '../../services/campaignTrackingService';
 
 interface PlanOption {
   id: string;
@@ -131,9 +132,11 @@ export function MonthlyDonor() {
   const [searchParams] = useSearchParams();
   const urlAmount = searchParams.get('amount');
   const urlMode = searchParams.get('mode');
+  const urlQuotas = searchParams.get('quotas');
   const isSuccessUrl = searchParams.get('status') === 'success';
   const urlName = searchParams.get('name') || '';
   const urlEmail = searchParams.get('email') || '';
+  const urlWhatsapp = searchParams.get('whatsapp') || '';
 
   const { user } = useAuth();
   const { activeCampaign, campaign: defaultCamp, createDonation } = useFundraising();
@@ -146,7 +149,9 @@ export function MonthlyDonor() {
 
   // Métricas e Estado do Apadrinhamento
   const [sponsorshipMetrics, setSponsorshipMetrics] = useState<SponsorshipMetrics | null>(null);
-  const [quotasCount, setQuotasCount] = useState<number>(1);
+  const [quotasCount, setQuotasCount] = useState<number>(
+    urlQuotas && !isNaN(parseInt(urlQuotas, 10)) ? Math.max(1, Math.min(4, parseInt(urlQuotas, 10))) : 1
+  );
   const [assignedChildren, setAssignedChildren] = useState<ChildSponsorshipDetail[]>([]);
 
   // Estado do Seletor de Mantenedor Geral
@@ -173,6 +178,17 @@ export function MonthlyDonor() {
 
   // Sincroniza plano ou valor vindo da URL
   useEffect(() => {
+    if (urlMode === 'sponsorship') {
+      setDonationType('sponsorship');
+      if (urlQuotas) {
+        const parsedQ = parseInt(urlQuotas, 10);
+        if (!isNaN(parsedQ) && parsedQ >= 1 && parsedQ <= 4) {
+          setQuotasCount(parsedQ);
+        }
+      }
+      return;
+    }
+
     if (urlAmount) {
       setDonationType('general');
       const parsed = parseFloat(urlAmount);
@@ -194,12 +210,12 @@ export function MonthlyDonor() {
         }, 150);
       }
     }
-  }, [urlAmount]);
+  }, [urlAmount, urlMode, urlQuotas]);
 
   // Formulário do Doador / Padrinho
-  const [donorName, setDonorName] = useState(user?.name || '');
-  const [donorEmail, setDonorEmail] = useState(user?.email || '');
-  const [donorPhone, setDonorPhone] = useState(user?.phone || '');
+  const [donorName, setDonorName] = useState(urlName || user?.name || '');
+  const [donorEmail, setDonorEmail] = useState(urlEmail || user?.email || '');
+  const [donorPhone, setDonorPhone] = useState(urlWhatsapp || user?.phone || '');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -262,6 +278,22 @@ export function MonthlyDonor() {
     setIsLoading(true);
 
     try {
+      // Salva/atualiza o lead na tabela de retornos da campanha
+      submitCampaignLead({
+        name: finalName || 'Mantenedor YAH Hope',
+        email: finalEmail,
+        phone: finalPhone,
+        age_range: '25-34',
+        city: 'São Paulo',
+        state: 'SP',
+        country: 'Brasil',
+        interest_type: 'sponsor',
+        status: 'joined',
+        message: donationType === 'sponsorship'
+          ? `Apadrinhamento: ${quotasCount} ${quotasCount === 1 ? 'criança' : 'crianças'} (R$ ${currentAmount}/mês)`
+          : `Mantenedor Mensal (R$ ${currentAmount}/mês)`
+      }).catch(() => {});
+
       // 1. Caso seja Apadrinhamento de Criança
       if (donationType === 'sponsorship') {
         const result = await sponsorshipService.assignChildrenToSponsor({

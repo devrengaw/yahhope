@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { trackPageView, trackSiteClick, isPublicWebsitePath } from '../../services/analyticsService';
+import { isHotsiteRoute, recordCampaignPageView, recordCampaignClick } from '../../services/campaignTrackingService';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function AnalyticsTracker() {
@@ -15,14 +16,20 @@ export function AnalyticsTracker() {
     if (lastPathRef.current === currentPath) return;
     lastPathRef.current = currentPath;
 
-    // Registrar o pageview de forma assíncrona
-    trackPageView(currentPath, document.title, user?.id);
+    if (isHotsiteRoute(currentPath)) {
+      recordCampaignPageView(document.title || 'Hotsite - Um convite para levar esperança | YAH Hope');
+    } else {
+      trackPageView(currentPath, document.title, user?.id);
+    }
   }, [location.pathname, user?.id]);
 
-  // Rastrear cliques em botões e CTAs nas páginas públicas do site
+  // Rastrear cliques em botões e CTAs nas páginas públicas do site e no Hotsite da Campanha
   useEffect(() => {
     const currentPath = location.pathname;
-    if (!isPublicWebsitePath(currentPath)) return;
+    const onHotsite = isHotsiteRoute(currentPath);
+    const onPublicSite = isPublicWebsitePath(currentPath);
+
+    if (!onHotsite && !onPublicSite) return;
 
     const handleDocumentClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
@@ -44,7 +51,11 @@ export function AnalyticsTracker() {
       // Ignora botões puramente de fechar modal/alerta sem valor analítico
       if (['fechar', 'fechar alerta', 'x', 'abrir menu'].includes(cleanLabel.toLowerCase())) return;
 
-      trackSiteClick(cleanLabel, currentPath);
+      if (onHotsite) {
+        recordCampaignClick(cleanLabel, 'click_cta', { auto_tracked: true });
+      } else {
+        trackSiteClick(cleanLabel, currentPath);
+      }
     };
 
     document.addEventListener('click', handleDocumentClick, { capture: true, passive: true });

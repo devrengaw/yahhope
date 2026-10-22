@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sponsorshipService, SponsorshipMetrics } from '../../services/sponsorshipService';
+import { submitCampaignLead, recordCampaignClick, getClientLocation, isHotsiteRoute } from '../../services/campaignTrackingService';
 import { cn } from '../../lib/utils';
 
 interface HomeDonationCardProps {
@@ -62,7 +63,20 @@ export function HomeDonationCard({
   const [donorName, setDonorName] = useState(user?.name || '');
   const [donorEmail, setDonorEmail] = useState(user?.email || '');
   const [donorWhatsapp, setDonorWhatsapp] = useState(user?.phone || '');
+  const [donorAgeRange, setDonorAgeRange] = useState<string>('25-34');
+  const [donorCity, setDonorCity] = useState<string>('');
+  const [donorState, setDonorState] = useState<string>('');
   const [donorFormError, setDonorFormError] = useState('');
+
+  // Pré-carrega localização aproximada para enriquecer o retorno do Hotsite
+  useEffect(() => {
+    getClientLocation()
+      .then(geo => {
+        if (geo.city) setDonorCity(prev => prev || geo.city);
+        if (geo.state) setDonorState(prev => prev || geo.state || 'SP');
+      })
+      .catch(() => {});
+  }, []);
 
   // Sincroniza dados do usuário autenticado
   useEffect(() => {
@@ -134,6 +148,32 @@ export function HomeDonationCard({
 
     try {
       const isMonthly = headerTab === 'sponsorship' ? true : !isSingleDonation;
+      const interestType = headerTab === 'sponsorship' || isMonthly ? 'sponsor' : 'donor';
+      const detailMessage = headerTab === 'sponsorship'
+        ? `Apadrinhamento: ${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'criança' : 'crianças'} (R$ ${finalVal}/mês)`
+        : isMonthly
+          ? `Mantenedor Mensal: R$ ${finalVal}/mês`
+          : `Doação Pontual: R$ ${finalVal}`;
+
+      // Registra imediatamente o lead/retorno do formulário na tabela campaign_leads e no cache local
+      if (finalDonorName || finalDonorEmail || finalDonorWhatsapp) {
+        await Promise.race([
+          submitCampaignLead({
+            name: finalDonorName || 'Apoiador YAH Hope',
+            email: finalDonorEmail,
+            phone: finalDonorWhatsapp,
+            age_range: donorAgeRange || '25-34',
+            city: donorCity || 'São Paulo',
+            state: donorState || 'SP',
+            country: 'Brasil',
+            interest_type: interestType,
+            message: detailMessage,
+            source: isHotsiteRoute() ? 'campanha.yahhope.com' : 'site_yahhope'
+          }),
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
+      }
+
       const redirectFallback = headerTab === 'sponsorship'
         ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
         : isMonthly
@@ -157,14 +197,16 @@ export function HomeDonationCard({
         body: JSON.stringify({
           amount: finalVal,
           isMonthly,
+          type: headerTab === 'sponsorship' ? 'sponsorship' : 'donation',
+          quotasCount: sponsorshipQuotas,
           donorName: finalDonorName,
           donorEmail: finalDonorEmail,
           donorPhone: finalDonorWhatsapp,
           donorWhatsapp: finalDonorWhatsapp,
           successUrl: isMonthly
-            ? `${window.location.origin}/mantenedor?status=success`
-            : `${window.location.origin}/campanha?status=success`,
-          cancelUrl: `${window.location.origin}/?status=cancel`
+            ? `${window.location.origin}/mantenedor?status=success&mode=${headerTab}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
+            : `${window.location.origin}/campanha?status=success&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`,
+          cancelUrl: `${window.location.origin}${window.location.pathname}?status=cancel`
         })
       });
 
@@ -550,6 +592,29 @@ export function HomeDonationCard({
                 }}
                 maxLength={15}
                 className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] focus:ring-1 focus:ring-[#F49853] text-xs font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <select
+                value={donorAgeRange}
+                onChange={(e) => setDonorAgeRange(e.target.value)}
+                aria-label="Faixa de idade"
+                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-[11px] font-gotham-regular text-slate-700 bg-slate-50/70 focus:bg-white transition-all"
+              >
+                <option value="18-24">Idade: 18 a 24 anos</option>
+                <option value="25-34">Idade: 25 a 34 anos</option>
+                <option value="35-44">Idade: 35 a 44 anos</option>
+                <option value="45-54">Idade: 45 a 54 anos</option>
+                <option value="55+">Idade: 55+ anos</option>
+              </select>
+
+              <input
+                type="text"
+                placeholder="Sua Cidade"
+                value={donorCity}
+                onChange={(e) => setDonorCity(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-[11px] font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
               />
             </div>
           </>

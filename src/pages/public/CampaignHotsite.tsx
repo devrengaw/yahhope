@@ -19,9 +19,8 @@ import { SEO } from '../../components/common/SEO';
 import { cn } from '../../lib/utils';
 import { 
   recordCampaignClick, 
-  detectTrafficSource 
+  recordCampaignPageView
 } from '../../services/campaignTrackingService';
-import { trackPageView } from '../../services/analyticsService';
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
 import { PublicFooter } from '../../components/PublicFooter';
 import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
@@ -142,11 +141,7 @@ export function CampaignHotsite() {
   const [selectedQuotas, setSelectedQuotas] = useState<number>(1);
 
   useEffect(() => {
-    trackPageView('/campanha-yahhope', 'Hotsite - Um convite para levar esperança | YAH Hope');
-    recordCampaignClick('Visualização do Hotsite de Mantenedores', 'page_view', {
-      source: detectTrafficSource(),
-      referrer: document.referrer
-    });
+    recordCampaignPageView('Hotsite - Um convite para levar esperança | YAH Hope');
   }, []);
 
   const scrollToSection = (sectionId: string, buttonLabel: string) => {

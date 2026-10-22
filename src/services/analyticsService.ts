@@ -132,6 +132,12 @@ const STORAGE_KEY_GEO = 'yah_hope_analytics_geo_cache';
 // Verifica se a rota pertence às páginas públicas do site principal (yahhope.com)
 export function isPublicWebsitePath(path: string): boolean {
   if (!path) return false;
+  if (typeof window !== 'undefined') {
+    const host = (window.location.hostname || '').toLowerCase();
+    if (host.startsWith('campanha.') || host === 'campanha.yahhope.com') {
+      return false;
+    }
+  }
   const clean = path.split('?')[0].toLowerCase();
   if (
     clean.startsWith('/admin') ||
