@@ -671,65 +671,6 @@ export function MonthlyDonor() {
                           💌 <strong>Surpresa Especial:</strong> Logo após a confirmação, você receberá por e-mail a <strong>foto, história e o perfil completo</strong> da criança que seu coração acaba de acolher!
                         </div>
                       </div>
-
-                      {/* Seletor de Quantidade de Crianças (Multi-Apadrinhamento) */}
-                      <div>
-                        <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 mb-3">
-                          1. Quantas crianças você deseja apadrinhar?
-                        </p>
-                        
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {[1, 2, 3, 4].map(q => {
-                            const isSelected = quotasCount === q;
-                            const total = q * quotaCost;
-                            return (
-                              <button
-                                key={q}
-                                type="button"
-                                onClick={() => setQuotasCount(q)}
-                                className={cn(
-                                  "p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center justify-between cursor-pointer",
-                                  isSelected
-                                    ? "bg-[#F49853] border-white text-white shadow-lg shadow-[#F49853]/30 scale-[1.03]"
-                                    : "bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-800"
-                                )}
-                              >
-                                <span className="text-xs font-gotham-bold uppercase tracking-wider mb-1">
-                                  {q} {q === 1 ? 'Criança' : 'Crianças'}
-                                </span>
-                                <span className="text-xl font-black">
-                                  R$ {total}
-                                </span>
-                                <span className="text-[10px] opacity-80 mt-1 font-gotham-light">
-                                  / mês
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Benefícios Inclusos na Cota */}
-                      <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 text-xs text-slate-300 space-y-2.5">
-                        <span className="font-gotham-bold text-white uppercase tracking-wider block flex items-center gap-1.5 text-[11px]">
-                          <ShieldCheck size={14} className="text-[#92BF78]" />
-                          O que sua cota mensal de R$ {sponsorshipTotal.toFixed(2)} garante:
-                        </span>
-                        <ul className="space-y-2 text-slate-300 font-gotham-light pl-1">
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-                            <span>Suplementos diários, leites terapêuticos e refeições nutricionais na Casa Nutri</span>
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-                            <span>Acompanhamento clínico periódico com medição de peso e altura</span>
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 size={14} className="text-[#92BF78] shrink-0" />
-                            <span><strong>Acesso Exclusivo:</strong> Notícias, cartas e atualizações apenas das crianças ligadas ao seu perfil</span>
-                          </li>
-                        </ul>
-                      </div>
                     </div>
                   )
                 ) : (
