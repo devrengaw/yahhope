@@ -149,9 +149,12 @@ export function isPublicWebsitePath(path: string): boolean {
     clean === '/campanha-display' ||
     clean === '/set-password' ||
     clean === '/campanha-yahhope' ||
+    clean.startsWith('/campanha-yahhope/') ||
     clean === '/hotsite' ||
+    clean.startsWith('/hotsite/') ||
     clean === '/participe' ||
-    clean === '/fazer-parte'
+    clean === '/fazer-parte' ||
+    clean.startsWith('/site-event/')
   ) {
     return false;
   }
@@ -422,9 +425,26 @@ export async function trackSiteClick(
     console.warn('Erro ao salvar clique do site no cache:', e);
   }
 
-  // 2. Persiste na tabela de eventos no Supabase
+  // 2. Persiste na tabela de eventos no Supabase (com fallback em site_visits caso campaign_events não exista)
   try {
-    await supabase.from('campaign_events').insert([clickEvent]);
+    const { error } = await supabase.from('campaign_events').insert([clickEvent]);
+    if (error) {
+      await supabase.from('site_visits').insert([
+        {
+          visitor_id: visitorId,
+          session_id: sessionId,
+          path: `/site-event/click::${path}`,
+          page_title: buttonLabel,
+          referrer,
+          device,
+          browser,
+          os,
+          country: geo.country,
+          city: geo.city,
+          created_at: clickEvent.created_at
+        }
+      ]);
+    }
   } catch {
     // Fail silently
   }
@@ -472,6 +492,7 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
 
   // 1. Carregar visitas reais do site público (Supabase + LocalStorage)
   let allVisits: VisitRecord[] = [];
+  let rawSupabaseSiteVisits: VisitRecord[] = [];
   try {
     const { data, error } = await supabase
       .from('site_visits')
@@ -480,7 +501,8 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
       .limit(5000);
       
     if (!error && data && data.length > 0) {
-      allVisits = data as VisitRecord[];
+      rawSupabaseSiteVisits = data as VisitRecord[];
+      allVisits = [...rawSupabaseSiteVisits];
     }
   } catch {
     // ignore
@@ -523,6 +545,28 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
   } catch {
     // ignore
   }
+
+  // Inclui eventos de clique salvos via fallback em site_visits
+  rawSupabaseSiteVisits.forEach(v => {
+    if (v.path && v.path.startsWith('/site-event/click::')) {
+      const realPath = v.path.replace('/site-event/click::', '') || '/';
+      allClickEvents.push({
+        id: v.id,
+        event_type: 'site_click_cta',
+        button_label: v.page_title || 'Clique no Site',
+        visitor_id: v.visitor_id,
+        session_id: v.session_id,
+        path: realPath,
+        referrer: v.referrer || 'Direto',
+        device: v.device || 'desktop',
+        browser: v.browser || 'Outro',
+        os: v.os || 'Outro',
+        city: v.city || 'São Paulo',
+        country: v.country || 'Brasil',
+        created_at: v.created_at
+      });
+    }
+  });
 
   try {
     const rawEvents = localStorage.getItem(STORAGE_KEY_SITE_EVENTS);

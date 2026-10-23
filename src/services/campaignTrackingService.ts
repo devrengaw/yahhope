@@ -111,6 +111,9 @@ const STORAGE_KEY_CAMPAIGN_LEADS = 'yah_hope_hotsite_leads_cache_v1';
 const STORAGE_KEY_CAMPAIGN_LEAD_STATUS = 'yah_hope_hotsite_lead_status_v1';
 const STORAGE_KEY_GEO = 'yah_hope_analytics_geo_cache';
 
+const HOTSITE_CLICK_FALLBACK_PATH = '/campanha-yahhope/event/click';
+const HOTSITE_LEAD_FALLBACK_PATH = '/campanha-yahhope/event/lead';
+
 const HOTSITE_KNOWN_BUTTON_LABELS = [
   'visualização do hotsite',
   'hero cta - quero fazer parte',
@@ -129,7 +132,10 @@ const HOTSITE_KNOWN_BUTTON_LABELS = [
   '3 crianças',
   '4 crianças',
   'formulário: quero fazer parte enviado',
-  'formulário hotsite'
+  'formulário hotsite',
+  'apadrinhar (',
+  'ser mantenedor mensal',
+  'doar r$'
 ];
 
 // Verifica se a URL/rota atual ou informada pertence ao Hotsite da Campanha (campanha.yahhope.com ou /campanha-yahhope)
@@ -391,7 +397,7 @@ export async function recordCampaignPageView(
     // ignore
   }
 
-  // 3. Persiste em ambas as tabelas do Supabase (site_visits e campaign_events) para redundância
+  // 3. Persiste em ambas as tabelas do Supabase (site_visits já existente + campaign_events se existir)
   try {
     await Promise.allSettled([
       supabase.from('site_visits').insert([visitPayload]),
@@ -430,6 +436,7 @@ export async function recordCampaignClick(
   const os = detectOS();
   const referrer = detectTrafficSource();
   const normalizedPath = getNormalizedHotsitePath();
+  const nowIso = new Date().toISOString();
 
   const clickEvent: CampaignEvent = {
     event_type: eventType,
@@ -448,7 +455,7 @@ export async function recordCampaignClick(
       hostname: typeof window !== 'undefined' ? window.location.hostname : 'campanha.yahhope.com',
       original_path: typeof window !== 'undefined' ? window.location.pathname : '/campanha-yahhope'
     },
-    created_at: new Date().toISOString()
+    created_at: nowIso
   };
 
   // Salva no cache local
@@ -462,9 +469,26 @@ export async function recordCampaignClick(
     console.warn('Erro ao salvar evento de clique no cache:', e);
   }
 
-  // Tenta salvar no Supabase
+  // Tenta salvar em campaign_events no Supabase; se a tabela não existir, usa fallback transparente em site_visits
   try {
-    await supabase.from('campaign_events').insert([clickEvent]);
+    const { error } = await supabase.from('campaign_events').insert([clickEvent]);
+    if (error) {
+      await supabase.from('site_visits').insert([
+        {
+          visitor_id: visitorId,
+          session_id: sessionId,
+          path: HOTSITE_CLICK_FALLBACK_PATH,
+          page_title: cleanLabel,
+          referrer,
+          device,
+          browser,
+          os,
+          country: geo.country,
+          city: geo.city,
+          created_at: nowIso
+        }
+      ]);
+    }
   } catch {
     // Fail silently
   }
@@ -475,11 +499,13 @@ export async function submitCampaignLead(
   lead: Omit<CampaignLead, 'id' | 'visitor_id' | 'created_at' | 'status'> & { status?: CampaignLead['status'] }
 ): Promise<{ success: boolean; leadId?: string; error?: string }> {
   const visitorId = getCampaignVisitorId();
+  const sessionId = getCampaignSessionId();
   const geo = await getClientLocation();
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
 
   const localId = 'lead_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
   const isFromHotsite = isHotsiteRoute();
+  const nowIso = new Date().toISOString();
 
   const fullLead: CampaignLead = {
     ...lead,
@@ -494,7 +520,7 @@ export async function submitCampaignLead(
     utm_source: lead.utm_source || params.get('utm_source') || detectTrafficSource(),
     utm_medium: lead.utm_medium || params.get('utm_medium') || undefined,
     utm_campaign: lead.utm_campaign || params.get('utm_campaign') || undefined,
-    created_at: new Date().toISOString()
+    created_at: nowIso
   };
 
   // 1. Salva no cache local imediatamente
@@ -514,7 +540,7 @@ export async function submitCampaignLead(
     age_range: fullLead.age_range
   });
 
-  // 2. Persiste no Supabase
+  // 2. Persiste em campaign_leads no Supabase; se a tabela não existir, usa fallback transparente em site_visits
   try {
     const { data, error } = await supabase.from('campaign_leads').insert([
       {
@@ -539,7 +565,6 @@ export async function submitCampaignLead(
     ]).select('id').single();
 
     if (!error && data && data.id) {
-      // Atualiza o ID local pelo ID oficial do banco para evitar duplicação
       try {
         const raw = localStorage.getItem(STORAGE_KEY_CAMPAIGN_LEADS);
         if (raw) {
@@ -549,6 +574,35 @@ export async function submitCampaignLead(
         }
       } catch {}
       return { success: true, leadId: data.id };
+    }
+
+    if (error) {
+      await supabase.from('site_visits').insert([
+        {
+          visitor_id: visitorId,
+          session_id: sessionId,
+          path: HOTSITE_LEAD_FALLBACK_PATH,
+          page_title: JSON.stringify({
+            id: fullLead.id,
+            name: fullLead.name,
+            email: fullLead.email,
+            phone: fullLead.phone,
+            age_range: fullLead.age_range,
+            state: fullLead.state,
+            interest_type: fullLead.interest_type,
+            message: fullLead.message,
+            status: fullLead.status,
+            source: fullLead.source
+          }),
+          referrer: fullLead.utm_source || detectTrafficSource(),
+          device: detectDevice(),
+          browser: detectBrowser(),
+          os: detectOS(),
+          country: fullLead.country,
+          city: fullLead.city,
+          created_at: nowIso
+        }
+      ]);
     }
   } catch (err) {
     console.warn('Supabase lead insert fallback:', err);
@@ -563,9 +617,10 @@ export async function updateLeadStatus(
   status: 'new' | 'contacted' | 'joined' | 'archived'
 ): Promise<boolean> {
   // 1. Salva no mapa de overrides de status local
+  let statusMap: Record<string, string> = {};
   try {
     const rawStatus = localStorage.getItem(STORAGE_KEY_CAMPAIGN_LEAD_STATUS);
-    const statusMap: Record<string, string> = rawStatus ? JSON.parse(rawStatus) : {};
+    statusMap = rawStatus ? JSON.parse(rawStatus) : {};
     statusMap[leadId] = status;
     localStorage.setItem(STORAGE_KEY_CAMPAIGN_LEAD_STATUS, JSON.stringify(statusMap));
   } catch {}
@@ -582,9 +637,19 @@ export async function updateLeadStatus(
     // ignore
   }
 
-  // 3. Atualiza no Supabase
+  // 3. Atualiza no Supabase (campaign_leads + fallback em site_settings)
   try {
-    await supabase.from('campaign_leads').update({ status }).eq('id', leadId);
+    await Promise.allSettled([
+      supabase.from('campaign_leads').update({ status }).eq('id', leadId),
+      supabase.from('site_settings').upsert(
+        {
+          key: 'hotsite_leads_status_v1',
+          value: statusMap,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'key' }
+      )
+    ]);
     return true;
   } catch {
     return true;
@@ -609,7 +674,7 @@ function isEventFromHotsite(e: CampaignEvent): boolean {
     return true;
   }
 
-  // 2. Eventos gerados exclusivamente pelas funções do Hotsite (inclusive quando path era "/" em campanha.yahhope.com)
+  // 2. Eventos gerados pelas funções do Hotsite (inclusive quando path era "/" em campanha.yahhope.com)
   if (
     eventType === 'page_view' ||
     eventType === 'cta_click' ||
@@ -642,12 +707,41 @@ export async function getCampaignAnalytics(
     if (rawStatus) statusOverrides = JSON.parse(rawStatus);
   } catch {}
 
+  try {
+    const { data: settingsStatus } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'hotsite_leads_status_v1')
+      .maybeSingle();
+    if (settingsStatus?.value && typeof settingsStatus.value === 'object') {
+      statusOverrides = { ...(settingsStatus.value as any), ...statusOverrides };
+    }
+  } catch {}
+
   // ============================================================================
-  // 1. CARREGAR RETORNOS / LEADS (campaign_leads + apadrinhamentos + doações)
+  // 1. CARREGAR VISITAS GERAIS DE site_visits (Fonte primária e fallback universal)
+  // ============================================================================
+  let allSiteVisitsRows: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('site_visits')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5000);
+
+    if (!error && data && data.length > 0) {
+      allSiteVisitsRows = data;
+    }
+  } catch {
+    // ignore
+  }
+
+  // ============================================================================
+  // 2. CARREGAR RETORNOS / LEADS (campaign_leads + fallback site_visits + doações/apadrinhamentos)
   // ============================================================================
   let allLeads: CampaignLead[] = [];
 
-  // 1a. Tabela oficial campaign_leads no Supabase
+  // 2a. Tabela oficial campaign_leads no Supabase
   try {
     const { data, error } = await supabase
       .from('campaign_leads')
@@ -665,7 +759,34 @@ export async function getCampaignAnalytics(
     // ignore
   }
 
-  // 1b. Cache local de campaign_leads
+  // 2b. Leads salvos no fallback de site_visits (quando a tabela campaign_leads não foi criada no banco)
+  allSiteVisitsRows.forEach(row => {
+    if (row.path === HOTSITE_LEAD_FALLBACK_PATH && row.page_title) {
+      try {
+        const parsed = JSON.parse(row.page_title);
+        const id = String(parsed.id || `lead_sv_${row.id}`);
+        allLeads.push({
+          id,
+          name: parsed.name || 'Interessado Hotsite',
+          email: parsed.email || '',
+          phone: parsed.phone || '',
+          age_range: parsed.age_range || '25-34',
+          city: row.city || parsed.city || 'São Paulo',
+          state: parsed.state || '',
+          country: row.country || 'Brasil',
+          interest_type: parsed.interest_type || 'sponsor',
+          message: parsed.message || '',
+          status: statusOverrides[id] || parsed.status || 'new',
+          source: parsed.source || 'campanha.yahhope.com',
+          visitor_id: row.visitor_id,
+          origin_table: 'campaign_leads',
+          created_at: row.created_at
+        });
+      } catch {}
+    }
+  });
+
+  // 2c. Cache local de campaign_leads
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CAMPAIGN_LEADS);
     if (raw) {
@@ -682,7 +803,7 @@ export async function getCampaignAnalytics(
     // ignore
   }
 
-  // 1c. Apadrinhamentos e Doações confirmados (retornos do formulário HomeDonationCard / Checkout)
+  // 2d. Apadrinhamentos e Doações confirmados (retornos do formulário HomeDonationCard / Checkout)
   try {
     const [spRes, donRes, volRes, partRes] = await Promise.allSettled([
       supabase.from('sponsorships').select('*').order('created_at', { ascending: false }),
@@ -820,7 +941,6 @@ export async function getCampaignAnalytics(
     if (!existing) {
       leadDedupMap.set(dedupKey, l);
     } else {
-      // Mescla campos faltantes (ex: telefone ou cidade do campaign_leads com status joined do sponsorship)
       leadDedupMap.set(dedupKey, {
         ...existing,
         phone: existing.phone || l.phone,
@@ -837,7 +957,7 @@ export async function getCampaignAnalytics(
   );
 
   // ============================================================================
-  // 2. CARREGAR EVENTOS E CLIQUES DO HOTSITE (Supabase + LocalStorage)
+  // 3. CARREGAR EVENTOS E CLIQUES DO HOTSITE (campaign_events + fallback site_visits + LocalStorage)
   // ============================================================================
   let rawEvents: CampaignEvent[] = [];
   try {
@@ -853,6 +973,27 @@ export async function getCampaignAnalytics(
   } catch {
     // ignore
   }
+
+  // Adiciona cliques salvos via fallback em site_visits
+  allSiteVisitsRows.forEach(row => {
+    if (row.path === HOTSITE_CLICK_FALLBACK_PATH) {
+      rawEvents.push({
+        id: row.id,
+        event_type: 'click_cta',
+        button_label: row.page_title || 'Clique no Hotsite',
+        visitor_id: row.visitor_id,
+        session_id: row.session_id,
+        path: '/campanha-yahhope',
+        referrer: row.referrer || 'Direto',
+        device: row.device || 'desktop',
+        browser: row.browser || 'Outro',
+        os: row.os || 'Outro',
+        city: row.city || 'São Paulo',
+        country: row.country || 'Brasil',
+        created_at: row.created_at
+      });
+    }
+  });
 
   try {
     const localRaw = localStorage.getItem(STORAGE_KEY_CAMPAIGN_EVENTS);
@@ -874,8 +1015,8 @@ export async function getCampaignAnalytics(
   rawEvents.forEach(e => {
     if (!isEventFromHotsite(e)) return;
 
-    const minuteBucket = (e.created_at || '').slice(0, 16);
-    const dedupKey = `${e.visitor_id}_${minuteBucket}_${e.event_type}_${e.button_label}`;
+    const secondBucket = (e.created_at || '').slice(0, 19);
+    const dedupKey = `${e.visitor_id}_${secondBucket}_${e.event_type}_${e.button_label}`;
     if (seenEventKeys.has(dedupKey)) return;
     seenEventKeys.add(dedupKey);
 
@@ -891,7 +1032,7 @@ export async function getCampaignAnalytics(
   });
 
   // ============================================================================
-  // 3. CARREGAR ACESSOS / VISITAS DO HOTSITE (site_visits + pageViewEvents + LocalStorage)
+  // 4. CARREGAR ACESSOS / VISITAS DO HOTSITE (site_visits + pageViewEvents + LocalStorage)
   // ============================================================================
   let hotsiteVisits: {
     visitor_id: string;
@@ -902,22 +1043,46 @@ export async function getCampaignAnalytics(
     device?: string;
   }[] = [];
 
-  try {
-    const { data } = await supabase
-      .from('site_visits')
-      .select('visitor_id, created_at, city, country, referrer, device, path, page_title')
-      .or('path.ilike.%hotsite%,path.ilike.%campanha-yahhope%,path.ilike.%participe%,path.ilike.%fazer-parte%,page_title.ilike.%Hotsite%,page_title.ilike.%convite para levar esperança%')
-      .order('created_at', { ascending: false })
-      .limit(5000);
+  // 4a. Filtra as visitas de site_visits (incluindo acessos à raiz "/" de campanha.yahhope.com e rotas da campanha)
+  allSiteVisitsRows.forEach(row => {
+    const p = (row.path || '').toLowerCase();
+    const title = (row.page_title || '').toLowerCase();
+    const vId = String(row.visitor_id || '');
 
-    if (data && data.length > 0) {
-      hotsiteVisits.push(...data);
+    // Ignora registros internos de eventos de clique/lead salvos na tabela site_visits
+    if (
+      p === HOTSITE_CLICK_FALLBACK_PATH ||
+      p === HOTSITE_LEAD_FALLBACK_PATH ||
+      p.startsWith('/site-event/')
+    ) {
+      return;
     }
-  } catch {
-    // ignore
-  }
 
-  // Mesclar com caches locais de visitas do Hotsite
+    const isHotsiteVisit =
+      p === '/' ||
+      p.includes('campanha-yahhope') ||
+      p.includes('hotsite') ||
+      p.includes('participe') ||
+      p.includes('fazer-parte') ||
+      p.includes('/campanha') ||
+      p.includes('/mantenedor') ||
+      title.includes('hotsite') ||
+      title.includes('convite para levar esperança') ||
+      vId.startsWith('v_hot_');
+
+    if (isHotsiteVisit) {
+      hotsiteVisits.push({
+        visitor_id: row.visitor_id,
+        created_at: row.created_at,
+        city: row.city,
+        country: row.country,
+        referrer: row.referrer,
+        device: row.device
+      });
+    }
+  });
+
+  // 4b. Mesclar com caches locais de visitas do Hotsite
   try {
     const rawHotsiteVisits = localStorage.getItem(STORAGE_KEY_CAMPAIGN_VISITS);
     if (rawHotsiteVisits) {
@@ -933,24 +1098,26 @@ export async function getCampaignAnalytics(
     if (rawGeneralVisits) {
       const localV: any[] = JSON.parse(rawGeneralVisits);
       if (Array.isArray(localV)) {
-        const filtered = localV.filter(v =>
-          (v.path && (
-            v.path.includes('campanha-yahhope') ||
-            v.path.includes('hotsite') ||
-            v.path.includes('participe') ||
-            v.path.includes('fazer-parte')
-          )) ||
-          (v.page_title && (
-            v.page_title.toLowerCase().includes('hotsite') ||
-            v.page_title.toLowerCase().includes('convite para levar esperança')
-          ))
-        );
+        const filtered = localV.filter(v => {
+          const p = (v.path || '').toLowerCase();
+          if (p === HOTSITE_CLICK_FALLBACK_PATH || p === HOTSITE_LEAD_FALLBACK_PATH || p.startsWith('/site-event/')) {
+            return false;
+          }
+          return (
+            p === '/' ||
+            p.includes('campanha-yahhope') ||
+            p.includes('hotsite') ||
+            p.includes('participe') ||
+            p.includes('fazer-parte') ||
+            p.includes('/campanha')
+          );
+        });
         hotsiteVisits.push(...filtered);
       }
     }
   } catch {}
 
-  // Adiciona os eventos page_view registrados em campaign_events
+  // 4c. Adiciona os eventos page_view registrados em campaign_events
   pageViewEvents.forEach(pv => {
     hotsiteVisits.push({
       visitor_id: pv.visitor_id,
@@ -962,12 +1129,12 @@ export async function getCampaignAnalytics(
     });
   });
 
-  // Deduplica visitas (mesmo visitante no mesmo minuto conta como 1 único acesso)
+  // Deduplica visitas (mesmo visitante no mesmo segundo não duplica entre site_visits e campaign_events)
   const visitDedupKeys = new Set<string>();
   hotsiteVisits = hotsiteVisits.filter(v => {
     if (!v.created_at) return false;
-    const minuteBucket = v.created_at.slice(0, 16);
-    const key = `${v.visitor_id || 'anon'}_${minuteBucket}`;
+    const secondBucket = v.created_at.slice(0, 19);
+    const key = `${v.visitor_id || 'anon'}_${secondBucket}`;
     if (visitDedupKeys.has(key)) return false;
     visitDedupKeys.add(key);
     return true;
@@ -994,7 +1161,7 @@ export async function getCampaignAnalytics(
   });
 
   // ============================================================================
-  // 4. FILTRAGEM POR PERÍODO SELECIONADO
+  // 5. FILTRAGEM POR PERÍODO SELECIONADO
   // ============================================================================
   const now = new Date();
   let startDate: Date;
@@ -1036,7 +1203,7 @@ export async function getCampaignAnalytics(
     : 0;
 
   // ============================================================================
-  // 5. EVOLUÇÃO TEMPORAL (Por Hora quando 'today', Por Dia nos demais períodos)
+  // 6. EVOLUÇÃO TEMPORAL (Por Hora quando 'today', Por Dia nos demais períodos)
   // ============================================================================
   let dailyTrend: {
     date: string;
@@ -1132,7 +1299,7 @@ export async function getCampaignAnalytics(
   }
 
   // ============================================================================
-  // 6. CLIQUES POR BOTÃO / CTA
+  // 7. CLIQUES POR BOTÃO / CTA
   // ============================================================================
   const buttonCounts = new Map<string, number>();
   filteredEvents.forEach(e => {
@@ -1149,7 +1316,7 @@ export async function getCampaignAnalytics(
     .sort((a, b) => b.count - a.count);
 
   // ============================================================================
-  // 7. DISTRIBUIÇÃO DE FAIXAS DE IDADE E INTERESSES
+  // 8. DISTRIBUIÇÃO DE FAIXAS DE IDADE E INTERESSES
   // ============================================================================
   const ageRanges: Record<string, { count: number; color: string }> = {
     '18-24': { count: 0, color: '#38BDF8' },
@@ -1187,7 +1354,6 @@ export async function getCampaignAnalytics(
       color: data.color
     }));
 
-  // Distribuição de Interesses
   const interestLabels: Record<string, { label: string; color: string }> = {
     sponsor: { label: 'Apadrinhamento / Mantenedor', color: '#92BF78' },
     donor: { label: 'Doação Financeira', color: '#3B82F6' },
@@ -1213,7 +1379,7 @@ export async function getCampaignAnalytics(
     .sort((a, b) => b.count - a.count);
 
   // ============================================================================
-  // 8. CIDADES, PAÍSES, ORIGEM DO TRÁFEGO E DISPOSITIVOS
+  // 9. CIDADES, PAÍSES, ORIGEM DO TRÁFEGO E DISPOSITIVOS
   // ============================================================================
   const cityCounts = new Map<string, number>();
   [...filteredVisits, ...filteredEvents, ...filteredLeads].forEach(item => {
