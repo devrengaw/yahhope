@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2, History } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2, History, RotateCcw, AlertTriangle, AlertCircle, UserCheck, UserX } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate, formatDisplayDate } from '../lib/utils';
@@ -95,7 +96,44 @@ export function PatientDetails() {
   const [observationNotes, setObservationNotes] = useState('');
   const [isSavingObservation, setIsSavingObservation] = useState(false);
   
+  // Return to Waiting List State (for absent/missing children)
+  const [isInWaitingList, setIsInWaitingList] = useState(false);
+  const [isReturnToWaitingModalOpen, setIsReturnToWaitingModalOpen] = useState(false);
+  const [returnToWaitingReason, setReturnToWaitingReason] = useState('Criança faltosa no programa nutricional. Já possui cadastro ativo e estava em atendimento ambulatorial.');
+  const [isSubmittingReturnToWaiting, setIsSubmittingReturnToWaiting] = useState(false);
+  const [showWaitingListSuccess, setShowWaitingListSuccess] = useState(false);
+
+  // Close Care (Encerrar Atendimento) State
+  const [isCloseCareModalOpen, setIsCloseCareModalOpen] = useState(false);
+  const [closeCareReason, setCloseCareReason] = useState('');
+  const [closeCareDate, setCloseCareDate] = useState(formatLocalDate(new Date()));
+  const [isSubmittingCloseCare, setIsSubmittingCloseCare] = useState(false);
+  const [showCloseCareSuccess, setShowCloseCareSuccess] = useState(false);
+  
   const patient = patients.find(p => p.id === id);
+  const isPatientClosed = patient?.status === 'Encerrado' || patient?.status === 'Encerrada';
+
+  // Check if patient is currently in the waiting list
+  useEffect(() => {
+    const checkWaitingStatus = async () => {
+      if (!patient?.name) return;
+      try {
+        const { data, error } = await supabase
+          .from('waiting_list')
+          .select('id, name')
+          .ilike('name', patient.name.trim())
+          .limit(1);
+        if (!error && data && data.length > 0) {
+          setIsInWaitingList(true);
+        } else {
+          setIsInWaitingList(false);
+        }
+      } catch (err) {
+        console.warn('Erro ao checar status na fila de espera:', err);
+      }
+    };
+    checkWaitingStatus();
+  }, [patient?.name]);
   const isPatientHospitalized = patient?.status === 'Internada' || patient?.status === 'Internado';
   const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
     id: v.id,
@@ -275,7 +313,17 @@ export function PatientDetails() {
     }
   };
 
-  const handleEditPastEvent = (event: any) => {
+  const handleEditPastEvent = async (event: any) => {
+    const isConfirmed = await confirm({
+      title: 'Confirmar Edição do Atendimento',
+      message: `Tem certeza que deseja alterar os dados do atendimento do dia ${parseLocalDate(event.date).toLocaleDateString('pt-BR')}? Alterações em dados clínicos devem ser feitas com responsabilidade.`,
+      confirmText: 'Prosseguir com Edição',
+      cancelText: 'Cancelar',
+      type: 'warning'
+    });
+
+    if (!isConfirmed) return;
+
     setActiveSessionAptId(null);
     setEditingEventId(event.id);
     setNewWeight(event.weight?.toString() || '');
@@ -304,9 +352,9 @@ export function PatientDetails() {
 
   const handleDeleteEvent = async (eventId: string, eventDate: string) => {
     const isConfirmed = await confirm({
-      title: 'Excluir Atendimento',
-      message: `Tem certeza que deseja excluir o atendimento do dia ${parseLocalDate(eventDate).toLocaleDateString()}? Esta ação não pode ser desfeita.`,
-      confirmText: 'Excluir',
+      title: 'Confirmar Exclusão de Atendimento',
+      message: `Tem certeza que deseja excluir o atendimento do dia ${parseLocalDate(eventDate).toLocaleDateString('pt-BR')}? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir Atendimento',
       cancelText: 'Cancelar',
       type: 'danger'
     });
@@ -584,6 +632,14 @@ export function PatientDetails() {
     }
 
     if (editingEventId) {
+      const confirmSave = await confirm({
+        title: 'Confirmar Alterações do Atendimento',
+        message: 'Tem certeza que deseja salvar as alterações realizadas neste atendimento?',
+        confirmText: 'Salvar Alterações',
+        cancelText: 'Voltar',
+        type: 'warning'
+      });
+      if (!confirmSave) return;
       updateEvent(editingEventId, newEvent);
     } else {
       addEvent(newEvent);
@@ -921,6 +977,194 @@ export function PatientDetails() {
     }
   };
 
+  const handleConfirmReturnToWaitingList = async () => {
+    if (!patient) return;
+    setIsSubmittingReturnToWaiting(true);
+    try {
+      // 1. Fetch caregiver phone if available
+      let contactPhone = '';
+      try {
+        const { data: cg } = await supabase
+          .from('caregivers')
+          .select('phone')
+          .eq('child_id', patient.id)
+          .maybeSingle();
+        if (cg?.phone) contactPhone = cg.phone;
+      } catch (e) {
+        console.warn('Erro ao buscar telefone do cuidador:', e);
+      }
+
+      const regInfo = patient.registration_number ? `ID: ${patient.registration_number}` : `ID: ${patient.id.slice(0, 8)}`;
+      const reasonText = returnToWaitingReason.trim() || 'Criança faltosa no programa nutricional.';
+      const formattedNotes = `[REINGRESSO - JÁ POSSUI CADASTRO | ${regInfo}] ${reasonText} (Estava passando por atendimento anteriormente).`;
+
+      const childData = {
+        name: patient.name,
+        dob: patient.dob,
+        guardian_name: patient.guardian_name || '',
+        address: patient.community || '',
+        contact: contactPhone,
+        weight: latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '',
+        height: latestHeightEvent?.height ? String(latestHeightEvent.height) : '',
+        muac: latestMuacEvent?.muac ? String(latestMuacEvent.muac) : '',
+        head_circumference: latestHeadEvent?.head_circumference ? String(latestHeadEvent.head_circumference) : '',
+        edema: 'Não',
+        notes: formattedNotes
+      };
+
+      const { error: insertErr } = await supabase.from('waiting_list').insert(childData);
+      if (insertErr) {
+        throw insertErr;
+      }
+
+      // 2. Add clinical event registering the movement to waiting list
+      const returnEvent: ClinicalEvent = {
+        id: `wait_${Date.now()}`,
+        patient_id: patient.id,
+        date: formatLocalDate(new Date()),
+        event_type: 'observation',
+        professional: user?.name || 'Profissional',
+        weight: latestWeightEvent?.weight,
+        height: latestHeightEvent?.height,
+        muac: latestMuacEvent?.muac,
+        notes: `[RETORNO À FILA DE ESPERA] Criança movida de volta para a fila de espera por faltas no programa nutricional. ${reasonText}`
+      };
+      addEvent(returnEvent);
+
+      // 3. Remove patient from today's active attendance queue if present
+      await removerAtendimentosPorPaciente(patient.id);
+
+      sendNotification(
+        'Fila de Espera',
+        `${patient.name} foi movida de volta para a fila de espera por faltas no programa.`,
+        'warning'
+      );
+
+      setIsInWaitingList(true);
+      setIsReturnToWaitingModalOpen(false);
+      setShowWaitingListSuccess(true);
+      setTimeout(() => setShowWaitingListSuccess(false), 4000);
+    } catch (err: any) {
+      console.error('Erro ao mover para fila de espera:', err);
+      alert('Erro ao mover criança para a fila de espera: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setIsSubmittingReturnToWaiting(false);
+    }
+  };
+
+  const handleConfirmCloseCare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patient) return;
+    if (!closeCareReason.trim()) {
+      alert('Por favor, informe a justificativa para o encerramento do atendimento.');
+      return;
+    }
+
+    const isConfirmed = await confirm({
+      title: 'Confirmar Encerramento de Atendimento',
+      message: `Tem certeza que deseja encerrar definitivamente o atendimento de ${patient.name}? A criança será movida para o Histórico (Altas & Encerrados).`,
+      confirmText: 'Encerrar Atendimento',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+    if (!isConfirmed) return;
+
+    setIsSubmittingCloseCare(true);
+    try {
+      // 1. Update patient status to Encerrado
+      await updatePatient(patient.id, { status: 'Encerrado' as any });
+
+      // 2. Add clinical event registering closure with justification
+      const closeEvent: ClinicalEvent = {
+        id: `close_${Date.now()}`,
+        patient_id: patient.id,
+        date: closeCareDate,
+        event_type: 'observation',
+        nutritional_status: 'Encerrado',
+        professional: user?.name || 'Profissional',
+        weight: latestWeightEvent?.weight,
+        height: latestHeightEvent?.height,
+        muac: latestMuacEvent?.muac,
+        notes: `[ATENDIMENTO ENCERRADO] Justificativa: ${closeCareReason.trim()}`,
+      };
+      await addEvent(closeEvent);
+
+      // 3. Remove patient from today's attendance queue
+      await removerAtendimentosPorPaciente(patient.id);
+
+      // 4. Remove from waiting list if present
+      try {
+        await supabase.from('waiting_list').delete().ilike('name', patient.name.trim());
+        setIsInWaitingList(false);
+      } catch (err) {
+        console.warn('Erro ao remover da fila de espera:', err);
+      }
+
+      sendNotification(
+        'Atendimento Encerrado',
+        `O atendimento de ${patient.name} foi encerrado com sucesso e transferido para o Histórico.`,
+        'info'
+      );
+
+      setIsCloseCareModalOpen(false);
+      setShowCloseCareSuccess(true);
+      setTimeout(() => setShowCloseCareSuccess(false), 4000);
+    } catch (err: any) {
+      console.error('Erro ao encerrar atendimento:', err);
+      alert('Erro ao encerrar atendimento: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setIsSubmittingCloseCare(false);
+    }
+  };
+
+  const handleReopenCare = async () => {
+    if (!patient) return;
+    const isConfirmed = await confirm({
+      title: 'Reabrir Atendimento',
+      message: `Deseja reabrir o atendimento de ${patient.name}? A criança retornará ao acompanhamento ativo regular.`,
+      confirmText: 'Reabrir Atendimento',
+      cancelText: 'Cancelar',
+      type: 'info'
+    });
+    if (!isConfirmed) return;
+
+    try {
+      const w = latestWeightEvent?.weight;
+      const h = latestHeightEvent?.height;
+      let newStatus: any = 'Adequado';
+      if (w && h) {
+        const evalRes = evaluateNutritionalStatus({
+          weight: Number(w),
+          height: Number(h),
+          gender: patient.gender,
+          ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
+        });
+        if (evalRes.status !== 'N/A') newStatus = evalRes.status;
+      }
+
+      await updatePatient(patient.id, { status: newStatus });
+
+      const reopenEvent: ClinicalEvent = {
+        id: `reopen_${Date.now()}`,
+        patient_id: patient.id,
+        date: formatLocalDate(new Date()),
+        event_type: 'observation',
+        nutritional_status: newStatus,
+        professional: user?.name || 'Profissional',
+        notes: '[ATENDIMENTO REABERTO] Criança reaberta para acompanhamento ativo no projeto.',
+      };
+      await addEvent(reopenEvent);
+
+      sendNotification(
+        'Atendimento Reaberto',
+        `${patient.name} foi reaberta para atendimento ativo no projeto.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Erro ao reabrir atendimento:', err);
+    }
+  };
+
   const handleSendImpactUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!impactMessage.trim()) return;
@@ -1157,6 +1401,58 @@ export function PatientDetails() {
                     Já está na Fila
                   </div>
                 )}
+
+                {!isInWaitingList ? (
+                  <button 
+                    onClick={() => {
+                      setReturnToWaitingReason('Criança faltosa no programa nutricional. Já possui cadastro ativo e estava em atendimento ambulatorial.');
+                      setIsReturnToWaitingModalOpen(true);
+                    }}
+                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm active:scale-95 cursor-pointer"
+                    title="Mover criança de volta para a fila de espera por faltas no programa"
+                  >
+                    <RotateCcw size={18} className="text-amber-600" />
+                    Voltar para a Fila de espera
+                  </button>
+                ) : (
+                  <Link
+                    to="/nutrition/waiting-list"
+                    className="bg-amber-50/80 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
+                    title="A criança já está registrada na fila de espera. Clique para abrir a Fila de Espera."
+                  >
+                    <CheckCircle2 size={18} className="text-amber-600" />
+                    Na Fila de Espera
+                  </Link>
+                )}
+
+                {!isPatientClosed ? (
+                  <button 
+                    onClick={() => {
+                      setCloseCareReason('');
+                      setCloseCareDate(formatLocalDate(new Date()));
+                      setIsCloseCareModalOpen(true);
+                    }}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm active:scale-95 cursor-pointer"
+                    title="Encerrar o atendimento da criança no projeto com justificativa"
+                  >
+                    <UserX size={18} className="text-rose-600" />
+                    Encerrar Atendimento
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-rose-50/70 text-rose-700 border border-rose-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm shadow-xs">
+                      <UserX size={18} className="text-rose-600" />
+                      Atendimento Encerrado
+                    </div>
+                    <button
+                      onClick={handleReopenCare}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                      title="Reabrir atendimento ativo desta criança"
+                    >
+                      Reabrir
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </>
@@ -1171,6 +1467,18 @@ export function PatientDetails() {
         {showQueueSuccess && (
           <div className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
             <Clock size={16} /> Adicionado à Fila!
+          </div>
+        )}
+
+        {showWaitingListSuccess && (
+          <div className="bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-amber-500/20">
+            <RotateCcw size={16} /> Enviada para a Fila de Espera!
+          </div>
+        )}
+
+        {showCloseCareSuccess && (
+          <div className="bg-rose-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-rose-500/20">
+            <UserX size={16} /> Atendimento Encerrado!
           </div>
         )}
       </div>
@@ -3135,6 +3443,221 @@ export function PatientDetails() {
                   className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                 >
                   {isSavingDischarge ? 'Salvando...' : 'Confirmar Alta'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Retorno para a Fila de Espera */}
+      {isReturnToWaitingModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Voltar para a Fila de Espera</h3>
+                  <p className="text-xs text-slate-500 font-medium">Reingresso por faltas no programa • {patient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsReturnToWaitingModalOpen(false)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-2">
+              <p className="font-bold flex items-center gap-1.5 text-amber-800 text-sm">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                Confirma a ida dessa criança para a fila de espera?
+              </p>
+              <p className="leading-relaxed text-amber-900/90">
+                A criança <strong>{patient.name}</strong> será movida para a fila de espera e posicionada <strong>por último na fila</strong>.
+              </p>
+              <p className="leading-relaxed text-amber-900/90">
+                Ela será acompanhada de um <strong>aviso destacado na fila de espera</strong> informando que já tem cadastro e estava passando por atendimento anteriormente no programa de nutrição.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-xs space-y-1">
+              <p className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Últimas Medidas a Anexar na Fila:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-700">
+                <div>
+                  <span className="text-slate-400 font-bold">Peso:</span> {latestWeightEvent?.weight ? `${latestWeightEvent.weight} kg` : '--'}
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">Estatura:</span> {latestHeightEvent?.height ? `${latestHeightEvent.height} cm` : '--'}
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">PB:</span> {latestMuacEvent?.muac ? `${latestMuacEvent.muac} cm` : '--'}
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold">PC:</span> {latestHeadEvent?.head_circumference ? `${latestHeadEvent.head_circumference} cm` : '--'}
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleConfirmReturnToWaitingList(); }} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Motivo / Observações da ida para a Fila de Espera
+                </label>
+                <textarea 
+                  value={returnToWaitingReason}
+                  onChange={(e) => setReturnToWaitingReason(e.target.value)}
+                  rows={3}
+                  required
+                  placeholder="Descreva o motivo (ex: faltou aos atendimentos consecutivos do programa)..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none font-medium text-slate-800 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsReturnToWaitingModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmittingReturnToWaiting}
+                  className="flex-1 bg-amber-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-amber-700 transition-all shadow-md shadow-amber-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSubmittingReturnToWaiting ? (
+                    'Movendo para a Fila...'
+                  ) : (
+                    <>
+                      <RotateCcw size={16} />
+                      Confirmar Ida para a Fila
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Encerrar Atendimento */}
+      {isCloseCareModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <UserX size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Encerrar Atendimento</h3>
+                  <p className="text-xs text-slate-500 font-medium">Registro de desligamento • {patient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsCloseCareModalOpen(false)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 space-y-2">
+              <p className="font-bold flex items-center gap-1.5 text-rose-800 text-sm">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                Deseja confirmar o encerramento do atendimento?
+              </p>
+              <p className="leading-relaxed text-rose-900/90">
+                A criança será marcada como <strong>Encerrado</strong> e transferida para a nova área de <strong>Histórico (Altas & Encerrados)</strong>.
+              </p>
+              <p className="leading-relaxed text-rose-900/90">
+                É obrigatório informar uma justificativa clara para registrar o desligamento da criança no prontuário.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmCloseCare} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Data do Encerramento *
+                </label>
+                <input 
+                  type="date"
+                  value={closeCareDate}
+                  onChange={(e) => setCloseCareDate(e.target.value)}
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Motivos Rápidos / Seleção Prévia
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    'Mudança de cidade / região',
+                    'Abandono de tratamento',
+                    'Ultrapassou faixa etária',
+                    'Solicitação do responsável',
+                    'Transferência para outra unidade',
+                    'Falecimento',
+                    'Outros'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCloseCareReason(prev => prev ? `${prev} - ${preset}` : preset)}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Justificativa do Encerramento *
+                </label>
+                <textarea 
+                  value={closeCareReason}
+                  onChange={(e) => setCloseCareReason(e.target.value)}
+                  rows={3}
+                  required
+                  placeholder="Descreva detalhadamente o motivo do encerramento do atendimento..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none font-medium text-slate-800 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsCloseCareModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmittingCloseCare}
+                  className="flex-1 bg-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-rose-700 transition-all shadow-md shadow-rose-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSubmittingCloseCare ? (
+                    'Encerrando...'
+                  ) : (
+                    <>
+                      <UserX size={16} />
+                      Confirmar Encerramento
+                    </>
+                  )}
                 </button>
               </div>
             </form>

@@ -11,6 +11,8 @@ export function StatusBadge({ status }: { status: string }) {
     'Internado': 'bg-purple-100 text-purple-700 border-purple-200',
     'Encaminhada': 'bg-blue-100 text-blue-700 border-blue-200',
     'Encaminhado': 'bg-blue-100 text-blue-700 border-blue-200',
+    'Encerrado': 'bg-rose-100 text-rose-700 border-rose-200 opacity-80',
+    'Encerrada': 'bg-rose-100 text-rose-700 border-rose-200 opacity-80',
   };
 
   return (

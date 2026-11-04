@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight, Trash2, Edit2 } from 'lucide-react';
+import { ClipboardList, Plus, Search, UserPlus, X, ArrowRight, Trash2, Edit2, RotateCcw, AlertTriangle, UserCheck } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
+import { usePatients } from '../contexts/PatientContext';
 
 interface WaitingChild {
   id: string;
@@ -21,6 +22,7 @@ interface WaitingChild {
 }
 
 export function WaitingList() {
+  const { patients } = usePatients();
   const [list, setList] = useState<WaitingChild[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,7 +34,7 @@ export function WaitingList() {
   }, []);
 
   const fetchWaitingList = async () => {
-    const { data, error } = await supabase.from('waiting_list').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('waiting_list').select('*').order('created_at', { ascending: true });
     if (data && !error) {
       setList(data);
     }
@@ -133,14 +135,57 @@ export function WaitingList() {
     }
     return { label: 'Pendente', color: 'bg-slate-100 text-slate-500 border-slate-200' };
   };
+
+  const isReturningChild = (child: WaitingChild) => {
+    const notesLower = (child.notes || '').toLowerCase();
+    return (
+      notesLower.includes('[reingresso') ||
+      notesLower.includes('já possui cadastro') ||
+      notesLower.includes('já tem cadastro') ||
+      notesLower.includes('passando por atendimento') ||
+      notesLower.includes('estava em atendimento') ||
+      notesLower.includes('faltosa') ||
+      notesLower.includes('faltas no programa')
+    );
+  };
+
+  const getExistingPatient = (child: WaitingChild) => {
+    if (!patients || patients.length === 0) return null;
+    const childNameNorm = child.name.trim().toLowerCase();
+    return patients.find(p => {
+      const pNameNorm = p.name.trim().toLowerCase();
+      if (pNameNorm === childNameNorm) return true;
+      if (p.registration_number && child.notes?.includes(p.registration_number)) return true;
+      return false;
+    });
+  };
+
+  // Sorting: Regular waiting children in queue order (FIFO: created_at ascending).
+  // Children returning to the queue due to absences go to the END of the queue ("por último").
+  const sortedList = [...list].sort((a, b) => {
+    const aReturning = isReturningChild(a);
+    const bReturning = isReturningChild(b);
+    if (!aReturning && bReturning) return -1;
+    if (aReturning && !bReturning) return 1;
+
+    const timeA = new Date(a.created_at).getTime() || 0;
+    const timeB = new Date(b.created_at).getTime() || 0;
+    return timeA - timeB;
+  });
+
   const stats = {
     grave: list.filter(c => getMalnutritionLevel(c).label === 'Grave').length,
     moderado: list.filter(c => getMalnutritionLevel(c).label === 'Moderado').length,
-    normal: list.filter(c => getMalnutritionLevel(c).label === 'Normal').length
+    normal: list.filter(c => getMalnutritionLevel(c).label === 'Normal').length,
+    reingressos: list.filter(isReturningChild).length
   };
 
-  const filteredList = list.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredList = sortedList.filter(c => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = c.name.toLowerCase().includes(term) || (c.notes || '').toLowerCase().includes(term) || (c.guardian_name || '').toLowerCase().includes(term);
+    if (filterLevel === 'Reingressos') {
+      return matchesSearch && isReturningChild(c);
+    }
     const matchesFilter = filterLevel ? getMalnutritionLevel(c).label === filterLevel : true;
     return matchesSearch && matchesFilter;
   });
@@ -157,7 +202,7 @@ export function WaitingList() {
         </div>
         <button 
           onClick={openNewModal}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
         >
           <UserPlus size={20} />
           Nova Criança
@@ -165,25 +210,33 @@ export function WaitingList() {
       </div>
 
       {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {[
           { id: 'grave', label: 'Grave', count: stats.grave, color: 'bg-red-50 text-red-700 border-red-200 ring-red-500' },
           { id: 'moderado', label: 'Moderado', count: stats.moderado, color: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-500' },
           { id: 'normal', label: 'Normal', count: stats.normal, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500' },
+          { id: 'reingressos', label: 'Reingressos (Faltosas)', count: stats.reingressos, color: 'bg-amber-100/70 text-amber-900 border-amber-300 ring-amber-500', isReingresso: true },
         ].map(stat => (
           <button
             key={stat.id}
-            onClick={() => setFilterLevel(filterLevel === stat.label ? null : stat.label)}
+            onClick={() => {
+              if (stat.isReingresso) {
+                setFilterLevel(filterLevel === 'Reingressos' ? null : 'Reingressos');
+              } else {
+                setFilterLevel(filterLevel === stat.label ? null : stat.label);
+              }
+            }}
             className={cn(
-              "p-4 rounded-2xl border transition-all text-left flex items-center justify-between",
+              "p-4 rounded-2xl border transition-all text-left flex items-center justify-between cursor-pointer",
               stat.color,
-              filterLevel === stat.label ? "ring-2 ring-offset-2" : "hover:brightness-95 opacity-80"
+              (stat.isReingresso && filterLevel === 'Reingressos') || (!stat.isReingresso && filterLevel === stat.label) ? "ring-2 ring-offset-2 shadow-sm" : "hover:brightness-95 opacity-90"
             )}
           >
             <div>
               <p className="text-xs font-bold opacity-80 uppercase tracking-wider">{stat.label}</p>
               <h3 className="text-3xl font-black mt-1">{stat.count}</h3>
             </div>
+            {stat.isReingresso && <RotateCcw size={24} className="opacity-40" />}
           </button>
         ))}
       </div>
@@ -220,14 +273,24 @@ export function WaitingList() {
             <tbody className="divide-y divide-slate-100">
               {filteredList.map((child, index) => {
                 const level = getMalnutritionLevel(child);
+                const isReturning = isReturningChild(child);
+                const existingPatient = getExistingPatient(child);
                 return (
-                  <tr key={child.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={child.id} className={cn("transition-colors", isReturning ? "bg-amber-50/30 hover:bg-amber-50/60" : "hover:bg-slate-50/50")}>
                     <td className="p-4 text-center font-bold text-slate-400 text-sm">
                       {index + 1}
                     </td>
                     <td className="p-4">
-                      <p className="font-medium text-slate-900">{child.name}</p>
-                      <p className="text-xs text-slate-500">{calculateAge(child.dob)} • Data de Cadastro: {new Date(child.created_at).toLocaleDateString()}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-slate-900">{child.name}</p>
+                        {isReturning && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
+                            <RotateCcw size={11} className="text-amber-700" />
+                            Já tem cadastro • Estava em atendimento
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{calculateAge(child.dob)} • Entrada na Fila: {new Date(child.created_at).toLocaleDateString('pt-BR')}</p>
                     </td>
                     <td className="p-4">
                       <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border", level.color)}>
@@ -246,27 +309,40 @@ export function WaitingList() {
                         <p><span className="font-bold text-slate-400">Edema:</span> {child.edema}</p>
                       </div>
                     </td>
-                    <td className="p-4 text-slate-600 max-w-xs truncate text-xs italic" title={child.notes}>{child.notes || '--'}</td>
+                    <td className="p-4 text-slate-600 max-w-xs text-xs italic" title={child.notes}>
+                      <p className="line-clamp-2">{child.notes || '--'}</p>
+                    </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link 
-                          to="/nutrition/patients/new" 
-                          state={{ waitingChild: child }}
-                          className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-bold text-xs transition-colors whitespace-nowrap"
-                          title="Cadastrar Criança Oficialmente"
-                        >
-                          Cadastrar
-                        </Link>
+                        {existingPatient ? (
+                          <Link 
+                            to={`/nutrition/patients/${existingPatient.id}`} 
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs transition-colors whitespace-nowrap shadow-sm active:scale-95"
+                            title="Abrir prontuário existente da criança e retomar atendimentos"
+                          >
+                            <UserCheck size={14} />
+                            Retomar Prontuário
+                          </Link>
+                        ) : (
+                          <Link 
+                            to="/nutrition/patients/new" 
+                            state={{ waitingChild: child }}
+                            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-bold text-xs transition-colors whitespace-nowrap active:scale-95"
+                            title="Cadastrar Criança Oficialmente"
+                          >
+                            Cadastrar
+                          </Link>
+                        )}
                         <button
                           onClick={() => handleEdit(child)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           title="Editar Fila de Espera"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(child.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Excluir"
                         >
                           <Trash2 size={16} />

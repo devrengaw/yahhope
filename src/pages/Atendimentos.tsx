@@ -3,6 +3,7 @@ import { Search, CheckCircle2, Clock, UserCheck, Activity, ArrowRight, PlayCircl
 import { Link, useNavigate } from 'react-router-dom';
 import { useAtendimento, Atendimento } from '../contexts/AtendimentoContext';
 import { usePatients } from '../contexts/PatientContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { Patient } from '../lib/mockData';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -12,6 +13,7 @@ export function Atendimentos() {
   const navigate = useNavigate();
   const { atendimentos, marcarPresenca, iniciarAtendimento, concluirAtendimento, removerDaFila } = useAtendimento();
   const { patients } = usePatients();
+  const { confirm } = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const today = new Date();
   const todayDate = formatLocalDate(today);
@@ -54,8 +56,15 @@ export function Atendimentos() {
   const inProgress = filteredAtendimentos.filter(a => a.status === 'in_progress');
   const completed = filteredAtendimentos.filter(a => a.status === 'completed');
 
-  const handleRemove = (id: string, name: string) => {
-    if (window.confirm(`Tem certeza que deseja marcar falta ou remover "${name}" da fila?`)) {
+  const handleRemove = async (id: string, name: string) => {
+    const isConfirmed = await confirm({
+      title: 'Confirmar Exclusão / Falta',
+      message: `Tem certeza que deseja marcar falta ou remover "${name}" da fila de atendimento?`,
+      confirmText: 'Remover da Fila',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+    if (isConfirmed) {
       removerDaFila(id);
     }
   };

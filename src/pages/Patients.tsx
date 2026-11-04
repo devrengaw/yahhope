@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity, Building2 } from 'lucide-react';
+import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity, Building2, History, UserX, CheckCircle2 } from 'lucide-react';
 import { calculateAge, cn } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +16,8 @@ export function Patients() {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterCommunity, setFilterCommunity] = useState<string>('All');
   const [filterGender, setFilterGender] = useState<string>('All');
+  const [viewMode, setViewMode] = useState<'ativas' | 'historico'>('ativas');
+  const [historySubFilter, setHistorySubFilter] = useState<'all' | 'alta' | 'encerrado'>('all');
 
   const communities = useMemo(() => {
     const list = new Set(patients.map(p => p.community));
@@ -24,9 +26,59 @@ export function Patients() {
 
   const statuses = ['All', 'Adequado', 'Risco', 'DAM', 'DAG', 'Internada', 'Alta'];
 
-  const filteredPatients = patients.filter(p => {
+  const isHistoryChild = (p: Patient) => {
+    const isStatusHistory = p.status === 'Alta' || p.status === 'Encerrado' || p.status === 'Encerrada';
+    if (isStatusHistory) return true;
+    const pEvents = events.filter(e => e.patient_id === p.id);
+    return pEvents.some(e => e.is_discharge || e.nutritional_status === 'Alta' || e.nutritional_status === 'Encerrado' || e.notes?.includes('[ATENDIMENTO ENCERRADO]'));
+  };
+
+  const getHistoryInfo = (p: Patient) => {
+    const pEvents = events
+      .filter(e => e.patient_id === p.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    const closeEvent = pEvents.find(e => e.notes?.includes('[ATENDIMENTO ENCERRADO]') || e.nutritional_status === 'Encerrado' || e.nutritional_status === 'Encerrada');
+    const dischargeEvent = pEvents.find(e => e.is_discharge || e.nutritional_status === 'Alta' || e.notes?.includes('[ALTA'));
+
+    const isClosed = p.status === 'Encerrado' || p.status === 'Encerrada' || Boolean(closeEvent);
+    const type: 'alta' | 'encerrado' = isClosed ? 'encerrado' : 'alta';
+    const event = isClosed ? closeEvent : dischargeEvent;
+    
+    let reason = '--';
+    if (closeEvent?.notes) {
+      reason = closeEvent.notes.replace('[ATENDIMENTO ENCERRADO]', '').replace('Justificativa:', '').trim();
+    } else if (dischargeEvent?.notes) {
+      reason = dischargeEvent.notes.replace('[ALTA HOSPITALAR]', '').replace('[ALTA]', '').trim() || 'Completou recuperação nutricional e atingiu peso ideal';
+    } else if (p.status === 'Alta') {
+      reason = 'Alta por recuperação nutricional concluída';
+    } else if (isClosed) {
+      reason = 'Atendimento encerrado';
+    }
+
+    return {
+      type,
+      date: event?.date ? new Date(event.date).toLocaleDateString('pt-BR') : '--',
+      reason: reason || '--'
+    };
+  };
+
+  const activePatientsList = useMemo(() => patients.filter(p => !isHistoryChild(p)), [patients, events]);
+  const historyPatientsList = useMemo(() => patients.filter(p => isHistoryChild(p)), [patients, events]);
+
+  const sourcePatients = viewMode === 'historico' ? historyPatientsList : activePatientsList;
+
+  const filteredPatients = sourcePatients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          p.registration_number.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (viewMode === 'historico') {
+      const hInfo = getHistoryInfo(p);
+      const matchesSubFilter = historySubFilter === 'all' || hInfo.type === historySubFilter;
+      const matchesCommunity = filterCommunity === 'All' || p.community === filterCommunity;
+      return matchesSearch && matchesSubFilter && matchesCommunity;
+    }
+
     const matchesStatus = filterStatus === 'All' 
       || p.status === filterStatus 
       || (filterStatus === 'Internada' && (p.status === 'Internada' || p.status === 'Internado'));
@@ -82,15 +134,42 @@ export function Patients() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Crianças</h1>
           <p className="text-slate-500 mt-1 font-medium">Gestão de prontuários e acompanhamentos</p>
         </div>
-        {user?.role !== 'OBSERVER' && (
-          <Link 
-            to="/nutrition/patients/new"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Botão Histórico ao lado de + Novo Cadastro */}
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode(viewMode === 'historico' ? 'ativas' : 'historico');
+              setHistorySubFilter('all');
+            }}
+            className={cn(
+              "px-5 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95 border cursor-pointer",
+              viewMode === 'historico'
+                ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-amber-200"
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+            )}
+            title="Visualizar histórico de crianças com alta do projeto ou atendimento encerrado"
           >
-            <Plus size={20} />
-            Novo Cadastro
-          </Link>
-        )}
+            <History size={20} className={viewMode === 'historico' ? 'text-white' : 'text-amber-600'} />
+            Histórico
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-xs font-black",
+              viewMode === 'historico' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
+            )}>
+              {historyPatientsList.length}
+            </span>
+          </button>
+
+          {user?.role !== 'OBSERVER' && (
+            <Link 
+              to="/nutrition/patients/new"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-200 active:scale-95"
+            >
+              <Plus size={20} />
+              Novo Cadastro
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -198,32 +277,123 @@ export function Patients() {
           )}
         </div>
 
+        {/* Historical Area Banner & Filters */}
+        {viewMode === 'historico' && (
+          <div className="p-4 sm:p-6 bg-gradient-to-r from-amber-50 to-orange-50/50 border-b border-amber-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
+                <History size={22} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  Histórico do Projeto
+                  <span className="text-xs font-bold text-amber-800 bg-amber-200/60 px-2.5 py-0.5 rounded-full">
+                    {historyPatientsList.length} {historyPatientsList.length === 1 ? 'criança' : 'crianças'}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Crianças que receberam alta do programa por recuperação ou tiveram o atendimento encerrado.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setHistorySubFilter('all')}
+                className={cn(
+                  "px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                  historySubFilter === 'all'
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                )}
+              >
+                Todos ({historyPatientsList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistorySubFilter('alta')}
+                className={cn(
+                  "px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                  historySubFilter === 'alta'
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50"
+                )}
+              >
+                <CheckCircle2 size={13} />
+                Altas do Projeto ({historyPatientsList.filter(p => getHistoryInfo(p).type === 'alta').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistorySubFilter('encerrado')}
+                className={cn(
+                  "px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                  historySubFilter === 'encerrado'
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50"
+                )}
+              >
+                <UserX size={13} />
+                Atendimentos Encerrados ({historyPatientsList.filter(p => getHistoryInfo(p).type === 'encerrado').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('ativas')}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 transition-all cursor-pointer"
+              >
+                ← Crianças Ativas
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Mobile View: Cards */}
         <div className="md:hidden divide-y divide-slate-100">
           {filteredPatients.map((patient) => {
             const ret = getNextReturnDate(patient);
+            const hInfo = getHistoryInfo(patient);
             return (
               <div
                 key={patient.id}
                 onClick={() => navigate(`/nutrition/patients/${patient.id}`)}
-                className="p-4 active:bg-emerald-50/50 transition-colors flex items-center justify-between gap-3 cursor-pointer"
+                className={cn(
+                  "p-4 transition-colors flex items-center justify-between gap-3 cursor-pointer",
+                  viewMode === 'historico' ? "active:bg-amber-50/50" : "active:bg-emerald-50/50"
+                )}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
                   {patient.photo_url ? (
                     <img 
                       src={patient.photo_url} 
                       alt={patient.name} 
-                      className="w-12 h-12 rounded-2xl object-cover border border-emerald-200/50 shadow-xs shrink-0" 
+                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200/50 shadow-xs shrink-0" 
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shadow-xs border border-emerald-200/50 shrink-0">
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-base shadow-xs border shrink-0",
+                      viewMode === 'historico'
+                        ? "bg-amber-50 text-amber-800 border-amber-200/50"
+                        : "bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 border-emerald-200/50"
+                    )}>
                       {patient.name.charAt(0)}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-slate-900 text-sm truncate">{patient.name}</p>
-                      <StatusBadge status={patient.status} />
+                      {viewMode === 'historico' ? (
+                        hInfo.type === 'alta' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Alta
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                            Encerrado
+                          </span>
+                        )
+                      ) : (
+                        <StatusBadge status={patient.status} />
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                       <span>{calculateAge(patient.dob)}</span>
@@ -233,10 +403,17 @@ export function Patients() {
                         {patient.community}
                       </span>
                     </div>
-                    {ret.date !== '--' && (
-                      <p className="text-[10px] font-bold text-slate-400 mt-1">
-                        Retorno: <span className={ret.isOverdue ? "text-red-500" : "text-emerald-600 font-black"}>{ret.date}</span>
+                    {viewMode === 'historico' ? (
+                      <p className="text-[10px] text-slate-600 mt-1 line-clamp-1 italic">
+                        <span className="font-bold text-slate-400 not-italic">Data: {hInfo.date} • </span>
+                        {hInfo.reason}
                       </p>
+                    ) : (
+                      ret.date !== '--' && (
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">
+                          Retorno: <span className={ret.isOverdue ? "text-red-500" : "text-emerald-600 font-black"}>{ret.date}</span>
+                        </p>
+                      )
                     )}
                   </div>
                 </div>
@@ -249,7 +426,9 @@ export function Patients() {
           {filteredPatients.length === 0 && (
             <div className="p-8 text-center text-slate-400">
               <Search size={32} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm font-medium">Nenhuma criança encontrada.</p>
+              <p className="text-sm font-medium">
+                {viewMode === 'historico' ? 'Nenhuma criança encontrada no histórico.' : 'Nenhuma criança encontrada.'}
+              </p>
             </div>
           )}
         </div>
@@ -262,86 +441,144 @@ export function Patients() {
                 <th className="p-6">ID / Nome da Criança</th>
                 <th className="p-6">Idade</th>
                 <th className="p-6">Comunidade</th>
-                <th className="p-6">Status Nutricional</th>
-                <th className="p-6 text-center">Data do Retorno</th>
+                {viewMode === 'historico' ? (
+                  <>
+                    <th className="p-6">Situação no Histórico</th>
+                    <th className="p-6 text-center">Data da Saída</th>
+                    <th className="p-6">Justificativa / Motivo</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="p-6">Status Nutricional</th>
+                    <th className="p-6 text-center">Data do Retorno</th>
+                  </>
+                )}
                 <th className="p-6 text-right">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredPatients.map((patient) => (
-                <tr 
-                  key={patient.id} 
-                  onClick={() => navigate(`/nutrition/patients/${patient.id}`)}
-                  className="hover:bg-emerald-50/30 transition-all group/row cursor-pointer"
-                >
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      {patient.photo_url ? (
-                        <img 
-                          src={patient.photo_url} 
-                          alt={patient.name} 
-                          className="w-12 h-12 rounded-2xl object-cover border border-emerald-200/50 shadow-sm shrink-0 group-hover/row:scale-110 transition-transform" 
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-sm border border-emerald-200/50 shrink-0 group-hover/row:scale-110 transition-transform">
-                          {patient.name.charAt(0)}
+              {filteredPatients.map((patient) => {
+                const hInfo = getHistoryInfo(patient);
+                return (
+                  <tr 
+                    key={patient.id} 
+                    onClick={() => navigate(`/nutrition/patients/${patient.id}`)}
+                    className={cn(
+                      "transition-all group/row cursor-pointer",
+                      viewMode === 'historico' ? "hover:bg-amber-50/30" : "hover:bg-emerald-50/30"
+                    )}
+                  >
+                    <td className="p-6">
+                      <div className="flex items-center gap-4">
+                        {patient.photo_url ? (
+                          <img 
+                            src={patient.photo_url} 
+                            alt={patient.name} 
+                            className="w-12 h-12 rounded-2xl object-cover border border-slate-200/50 shadow-sm shrink-0 group-hover/row:scale-110 transition-transform" 
+                          />
+                        ) : (
+                          <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm border shrink-0 group-hover/row:scale-110 transition-transform",
+                            viewMode === 'historico'
+                              ? "bg-amber-50 text-amber-800 border-amber-200/50"
+                              : "bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 border-emerald-200/50"
+                          )}>
+                            {patient.name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className={cn(
+                            "font-bold transition-colors",
+                            viewMode === 'historico' ? "text-slate-900 group-hover/row:text-amber-800" : "text-slate-900 group-hover/row:text-emerald-700"
+                          )}>
+                            {patient.name}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{patient.registration_number}</p>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-bold text-slate-900 group-hover/row:text-emerald-700 transition-colors">{patient.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{patient.registration_number}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-6 text-sm font-semibold text-slate-600">{calculateAge(patient.dob)}</td>
-                  <td className="p-6 text-sm font-semibold text-slate-600">
-                    <div className="flex items-center gap-2">
-                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                       {patient.community}
-                    </div>
-                  </td>
-                  <td className="p-6">
-                    <StatusBadge status={patient.status} />
-                  </td>
-                  <td className="p-6 text-center">
-                    {(() => {
-                      const ret = getNextReturnDate(patient);
-                      if (ret.date === '--') return <span className="text-slate-400 font-medium">--</span>;
-                      if (ret.isHospitalized) {
-                        return (
-                          <span className="px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200">
-                            <Building2 size={12} className="text-purple-600" />
-                            Internada
-                          </span>
-                        );
-                      }
-                      return (
-                        <span className={cn(
-                          "px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-block",
-                          ret.isOverdue 
-                            ? "bg-red-50 text-red-600 border border-red-100" 
-                            : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                        )}>
-                          {ret.date}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="p-6 text-right">
-                    <button 
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover/row:text-white group-hover/row:bg-emerald-600 transition-all"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="p-6 text-sm font-semibold text-slate-600">{calculateAge(patient.dob)}</td>
+                    <td className="p-6 text-sm font-semibold text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", viewMode === 'historico' ? "bg-amber-400" : "bg-emerald-400")}></div>
+                        {patient.community}
+                      </div>
+                    </td>
+
+                    {viewMode === 'historico' ? (
+                      <>
+                        <td className="p-6">
+                          {hInfo.type === 'alta' ? (
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs inline-flex items-center gap-1.5">
+                              <CheckCircle2 size={12} className="text-emerald-700" /> Alta do Projeto
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200 shadow-xs inline-flex items-center gap-1.5">
+                              <UserX size={12} className="text-rose-700" /> Atendimento Encerrado
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-6 text-center text-xs font-bold text-slate-700">
+                          {hInfo.date}
+                        </td>
+                        <td className="p-6 text-xs text-slate-600 italic max-w-xs" title={hInfo.reason}>
+                          <p className="line-clamp-2">{hInfo.reason}</p>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-6">
+                          <StatusBadge status={patient.status} />
+                        </td>
+                        <td className="p-6 text-center">
+                          {(() => {
+                            const ret = getNextReturnDate(patient);
+                            if (ret.date === '--') return <span className="text-slate-400 font-medium">--</span>;
+                            if (ret.isHospitalized) {
+                              return (
+                                <span className="px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200">
+                                  <Building2 size={12} className="text-purple-600" />
+                                  Internada
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className={cn(
+                                "px-3 py-1 rounded-xl text-[11px] font-bold shadow-sm inline-block",
+                                ret.isOverdue 
+                                  ? "bg-red-50 text-red-600 border border-red-100" 
+                                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                              )}>
+                                {ret.date}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                      </>
+                    )}
+
+                    <td className="p-6 text-right">
+                      <button 
+                        className={cn(
+                          "inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 transition-all cursor-pointer",
+                          viewMode === 'historico' ? "group-hover/row:text-white group-hover/row:bg-amber-600" : "group-hover/row:text-white group-hover/row:bg-emerald-600"
+                        )}
+                        title="Ver Prontuário"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredPatients.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center">
+                  <td colSpan={viewMode === 'historico' ? 7 : 6} className="p-12 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <Search size={40} className="text-slate-200" />
-                      <p className="text-slate-400 font-medium">Nenhuma criança encontrada.</p>
+                      <p className="text-slate-400 font-medium">
+                        {viewMode === 'historico' ? 'Nenhuma criança encontrada no histórico.' : 'Nenhuma criança encontrada.'}
+                      </p>
                     </div>
                   </td>
                 </tr>
