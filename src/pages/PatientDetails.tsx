@@ -16,6 +16,7 @@ import { useVisits } from '../contexts/VisitContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useImpact } from '../contexts/ImpactContext';
 import { matchDefaultKitByIdOrName, matchInventoryItem } from '../lib/defaultNutritionKits';
 import { evaluateNutritionalStatus, calculateWeightForHeightZScore } from '../lib/whoStandards';
 
@@ -59,6 +60,7 @@ export function PatientDetails() {
   const { sendNotification } = useNotification();
   const { confirm } = useConfirm();
   const { user } = useAuth();
+  const { addFeedItem } = useImpact();
   const isObserver = user?.role === 'OBSERVER';
   
   const searchParams = new URLSearchParams(location.search);
@@ -134,7 +136,6 @@ export function PatientDetails() {
     };
     checkWaitingStatus();
   }, [patient?.name]);
-  const isPatientHospitalized = patient?.status === 'Internada' || patient?.status === 'Internado';
   const patientVisits = (visits || []).filter(v => v.patient_id === id && v.status === 'completed').map(v => ({
     id: v.id,
     patient_id: v.patient_id,
@@ -143,7 +144,20 @@ export function PatientDetails() {
     notes: v.observations || 'Visita domiciliar realizada.',
     professional: 'ACS'
   }));
-  const patientEvents = [...events.filter(e => e.patient_id === id), ...patientVisits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const patientEvents = [...events.filter(e => e.patient_id === id), ...patientVisits].sort((a, b) => {
+    const diff = new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (diff !== 0) return diff;
+    return (b.id || '').localeCompare(a.id || '');
+  });
+
+  const isPatientHospitalized = useMemo(() => {
+    if (patient?.status === 'Internada' || patient?.status === 'Internado') return true;
+    const latestEvent = patientEvents.find(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation') || patientEvents[0];
+    if (latestEvent?.nutritional_status === 'Internada' || latestEvent?.nutritional_status === 'Internado') return true;
+    if (latestEvent?.notes?.includes('[INTERNAÇÃO HOSPITALAR]') && !latestEvent?.notes?.includes('[ALTA HOSPITALAR]')) return true;
+    if (latestEvent?.notes?.includes('Internada: Sim') && !latestEvent?.notes?.includes('[ALTA HOSPITALAR]')) return true;
+    return false;
+  }, [patient?.status, patientEvents]);
 
   // Helper to match a clinical consultation to its corresponding home visit (scheduled for the following week)
   const getVisitForEvent = (eventDate: string) => {
@@ -848,7 +862,10 @@ export function PatientDetails() {
     e.preventDefault();
     if (!patient) return;
     
-    const hospitalizationNotes = isHospitalized === 'Sim'
+    const isInternada = isHospitalized === 'Sim' || referralReason === 'Internamento para desnutrição grave';
+    const finalStatus = isInternada ? 'Internada' : refStatus;
+
+    const hospitalizationNotes = isInternada
       ? `Internada: Sim${hospitalName ? ` (${hospitalName})` : ''}`
       : 'Internada: Não';
 
@@ -858,11 +875,11 @@ export function PatientDetails() {
       patient_id: patient.id,
       event_type: 'referral',
       date: formatLocalDate(new Date()),
-      notes: `Encaminhamento: ${referralReason}${otherReason ? ' - ' + otherReason : ''}. Edema: ${edema}${edemaLocation ? ' (' + edemaLocation + ')' : ''}. ${hospitalizationNotes}. Status: ${refStatus}.`,
+      notes: `Encaminhamento: ${referralReason}${otherReason ? ' - ' + otherReason : ''}. Edema: ${edema}${edemaLocation ? ' (' + edemaLocation + ')' : ''}. ${hospitalizationNotes}. Status: ${finalStatus}.`,
       weight: refWeight ? parseFloat(refWeight) / 1000 : undefined,
       height: refHeight ? parseFloat(refHeight) : undefined,
       z_score_weight_height: refPE ? parseFloat(refPE) : undefined,
-      nutritional_status: refStatus,
+      nutritional_status: finalStatus,
       professional: refProfessional.trim() || user?.name || 'Profissional',
       hospital_referral: true,
     };
@@ -870,10 +887,10 @@ export function PatientDetails() {
     addEvent(newEvent);
 
     updatePatient(patient.id, {
-      status: refStatus as any
+      status: finalStatus as any
     });
 
-    if (refStatus === 'Internada' || isHospitalized === 'Sim') {
+    if (isInternada) {
       removerAtendimentosPorPaciente(patient.id);
     }
     
@@ -925,6 +942,29 @@ export function PatientDetails() {
     } finally {
       setIsSavingHospitalization(false);
     }
+  };
+
+  const openDischargeModal = () => {
+    if (!patient) return;
+    setHospDischargeDate(formatLocalDate(new Date()));
+    const w = latestWeightEvent?.weight;
+    const h = latestHeightEvent?.height;
+    let suggestedStatus = 'Adequado';
+    if (w && h) {
+      const evalRes = evaluateNutritionalStatus({
+        weight: Number(w),
+        height: Number(h),
+        gender: patient.gender,
+        ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
+      });
+      if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
+    }
+    setHospDischargeStatus(suggestedStatus);
+    setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
+    setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
+    setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
+    setHospDischargeNotes('');
+    setIsDischargeModalOpen(true);
   };
 
   const handleConfirmDischarge = async () => {
@@ -1165,12 +1205,31 @@ export function PatientDetails() {
     }
   };
 
-  const handleSendImpactUpdate = (e: React.FormEvent) => {
+  const handleSendImpactUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!impactMessage.trim()) return;
+    if (!impactMessage.trim() || !patient) return;
 
-    // Em um cenário real, isso salvaria no banco com status 'pending'
-    console.log('Enviando atualização de impacto:', impactMessage);
+    try {
+      await addFeedItem({
+        type: 'child',
+        source: 'Módulo Nutrição',
+        title: `Atualização: ${patient.name}`,
+        content: impactMessage.trim(),
+        author: user?.name || 'Equipe Nutrição',
+        child_id: patient.id,
+        child: patient.name,
+        img_url: patient.photo_url || undefined,
+        status: 'pending' // Requer aprovação do admin antes de ser publicada
+      });
+
+      sendNotification(
+        'Atualização de Impacto Enviada',
+        `A mensagem sobre ${patient.name} foi salva com sucesso e encaminhada para aprovação do Administrador.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Erro ao enviar atualização de impacto:', err);
+    }
     
     setIsImpactModalOpen(false);
     setImpactMessage('');
@@ -1265,28 +1324,8 @@ export function PatientDetails() {
             </div>
           </div>
           <button
-            onClick={() => {
-              setHospDischargeDate(formatLocalDate(new Date()));
-              const w = latestWeightEvent?.weight;
-              const h = latestHeightEvent?.height;
-              let suggestedStatus = 'Adequado';
-              if (w && h) {
-                const evalRes = evaluateNutritionalStatus({
-                  weight: Number(w),
-                  height: Number(h),
-                  gender: patient.gender,
-                  ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
-                });
-                if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
-              }
-              setHospDischargeStatus(suggestedStatus);
-              setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
-              setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
-              setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
-              setHospDischargeNotes('');
-              setIsDischargeModalOpen(true);
-            }}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-200 text-sm shrink-0 active:scale-95"
+            onClick={openDischargeModal}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-200 text-sm shrink-0 active:scale-95 cursor-pointer"
           >
             <CheckCircle2 size={18} />
             Registrar Alta Hospitalar
@@ -1304,74 +1343,48 @@ export function PatientDetails() {
               setObservationNotes('');
               setIsObservationModalOpen(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md shadow-indigo-100 text-sm active:scale-95"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md shadow-indigo-100 text-sm active:scale-95 cursor-pointer"
           >
             <MessageSquare size={18} />
             Adicionar Observação Clínica
           </button>
         ) : (
           <>
-            <button 
-              onClick={handleOpenNewFollowup}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-            >
-              <Plus size={18} />
-              Novo Acompanhamento
-            </button>
-            <button 
-              onClick={openReferralModal}
-              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-            >
-              <FileText size={18} />
-              Gerar Encaminhamento
-            </button>
-            <button 
-              onClick={() => setIsImpactModalOpen(true)}
-              className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
-            >
-              <Heart size={18} className="fill-amber-600" />
-              Enviar Atualização de Impacto
-            </button>
-            
             {isPatientHospitalized ? (
               <>
                 <button 
-                  onClick={() => {
-                    setHospDischargeDate(formatLocalDate(new Date()));
-                    const w = latestWeightEvent?.weight;
-                    const h = latestHeightEvent?.height;
-                    let suggestedStatus = 'Adequado';
-                    if (w && h) {
-                      const evalRes = evaluateNutritionalStatus({
-                        weight: Number(w),
-                        height: Number(h),
-                        gender: patient.gender,
-                        ageInMonths: differenceInMonths(new Date(), new Date(patient.dob))
-                      });
-                      if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
-                    }
-                    setHospDischargeStatus(suggestedStatus);
-                    setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
-                    setHospDischargeWeight(latestWeightEvent?.weight ? String(latestWeightEvent.weight) : '');
-                    setHospDischargeHeight(latestHeightEvent?.height ? String(latestHeightEvent.height) : '');
-                    setHospDischargeNotes('');
-                    setIsDischargeModalOpen(true);
-                  }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm active:scale-95"
+                  onClick={openDischargeModal}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md shadow-purple-200 text-sm active:scale-95 cursor-pointer"
+                  title="Registrar que a criança recebeu alta hospitalar e retorna ao acompanhamento ambulatorial"
                 >
                   <CheckCircle2 size={18} />
                   Registrar Alta Hospitalar
                 </button>
-                <div 
-                  className="bg-purple-50/70 text-purple-400 border border-purple-200/80 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm cursor-not-allowed select-none" 
-                  title="A criança está internada no hospital. As consultas ambulatoriais estão suspensas até a alta hospitalar."
+                <button 
+                  onClick={handleOpenNewFollowup}
+                  className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
+                  title="Abrir novo acompanhamento clínico"
                 >
-                  <Clock size={18} className="text-purple-400" />
-                  Fila Pausada (Internada)
+                  <Plus size={18} />
+                  Novo Acompanhamento
+                </button>
+                <div 
+                  className="bg-purple-50/70 text-purple-600 border border-purple-200/80 px-4 py-2 rounded-xl font-medium flex items-center gap-2 text-sm select-none" 
+                  title="A criança está internada no hospital. As consultas ambulatoriais regulares estão suspensas até a alta hospitalar."
+                >
+                  <Clock size={18} className="text-purple-500" />
+                  <span>Ambulatório Pausado (Internada)</span>
                 </div>
               </>
             ) : (
               <>
+                <button 
+                  onClick={handleOpenNewFollowup}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
+                >
+                  <Plus size={18} />
+                  Novo Acompanhamento
+                </button>
                 <button 
                   onClick={() => {
                     setHospDate(formatLocalDate(new Date()));
@@ -1380,7 +1393,7 @@ export function PatientDetails() {
                     setHospNotes('');
                     setIsHospitalizationModalOpen(true);
                   }}
-                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
                   title="Registrar que a criança foi internada no hospital"
                 >
                   <Building2 size={18} className="text-purple-600" />
@@ -1390,7 +1403,7 @@ export function PatientDetails() {
                 {!atendimentos.find(a => a.patient_id === patient.id && a.status !== 'completed' && a.date === formatLocalDate(new Date())) ? (
                   <button 
                     onClick={handleAddToQueue}
-                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
                   >
                     <Clock size={18} className="text-emerald-600" />
                     Colocar na Fila
@@ -1401,6 +1414,23 @@ export function PatientDetails() {
                     Já está na Fila
                   </div>
                 )}
+              </>
+            )}
+
+            <button 
+              onClick={openReferralModal}
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
+            >
+              <FileText size={18} />
+              Gerar Encaminhamento
+            </button>
+            <button 
+              onClick={() => setIsImpactModalOpen(true)}
+              className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer"
+            >
+              <Heart size={18} className="fill-amber-600" />
+              Enviar Atualização de Impacto
+            </button>
 
                 {!isInWaitingList ? (
                   <button 
@@ -1455,8 +1485,6 @@ export function PatientDetails() {
                 )}
               </>
             )}
-          </>
-        )}
 
         {showImpactSuccess && (
           <div className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
@@ -2011,33 +2039,51 @@ export function PatientDetails() {
                   Linha do Tempo Detalhada
                 </h3>
                 <div className="relative border-l-2 border-slate-100 ml-4 space-y-8 pb-4">
-                  {patientEvents.map((event, idx) => (
-                    <div key={event.id} className="relative pl-8 group">
-                      {/* Timeline Dot */}
-                      <div className={cn(
-                        "absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 transition-transform group-hover:scale-110",
-                        event.event_type === 'initial' ? 'bg-blue-500' :
-                        event.event_type === 'acompanhamento' ? 'bg-emerald-500' :
-                        event.event_type === 'acs_visit' ? 'bg-amber-500' : 
-                        event.event_type === 'observation' ? 'bg-indigo-500' : 'bg-slate-500'
-                      )}></div>
-                      
-                      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-slate-900 capitalize text-lg">
-                              {event.event_type === 'initial' ? 'Avaliação Inicial' : 
-                               event.event_type === 'acompanhamento' ? 'Acompanhamento Clínico' :
-                               event.event_type === 'acs_visit' ? 'Visita ACS' : 
-                               event.event_type === 'observation' ? 'Observação Clínica / Parecer' : 'Retorno'}
-                            </span>
-                            {event.event_type === 'observation' && (
-                              <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg">
-                                Observador
+                  {patientEvents.map((event, idx) => {
+                    const isDischargeHospEvent = event.notes?.includes('[ALTA HOSPITALAR]');
+                    const isHospEvent = event.notes?.includes('[INTERNAÇÃO HOSPITALAR]') || (event.notes?.includes('Internada: Sim') && event.event_type === 'referral');
+
+                    return (
+                      <div key={event.id} className="relative pl-8 group">
+                        {/* Timeline Dot */}
+                        <div className={cn(
+                          "absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 transition-transform group-hover:scale-110",
+                          isDischargeHospEvent ? 'bg-emerald-600' :
+                          isHospEvent ? 'bg-purple-600' :
+                          event.event_type === 'initial' ? 'bg-blue-500' :
+                          event.event_type === 'acompanhamento' ? 'bg-emerald-500' :
+                          event.event_type === 'acs_visit' ? 'bg-amber-500' : 
+                          event.event_type === 'observation' ? 'bg-indigo-500' : 'bg-slate-500'
+                        )}></div>
+                        
+                        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-slate-900 capitalize text-lg">
+                                {isDischargeHospEvent ? 'Alta Hospitalar' :
+                                 isHospEvent ? 'Internação Hospitalar' :
+                                 event.event_type === 'initial' ? 'Avaliação Inicial' : 
+                                 event.event_type === 'acompanhamento' ? 'Acompanhamento Clínico' :
+                                 event.event_type === 'acs_visit' ? 'Visita ACS' : 
+                                 event.event_type === 'observation' ? 'Observação Clínica / Parecer' : 'Retorno'}
                               </span>
-                            )}
-                            {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
-                          </div>
+                              {isDischargeHospEvent && (
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> Retorno do Hospital
+                                </span>
+                              )}
+                              {isHospEvent && (
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                  <Building2 size={12} /> Hospital
+                                </span>
+                              )}
+                              {event.event_type === 'observation' && (
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                                  Observador
+                                </span>
+                              )}
+                              {event.nutritional_status && <StatusBadge status={event.nutritional_status} />}
+                            </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><Clock size={12}/> {parseLocalDate(event.date).toLocaleDateString()}</span>
                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg"><User size={12}/> {formatProfessionalName(event.professional)}</span>
@@ -2241,7 +2287,8 @@ export function PatientDetails() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
               </div>
             </div>
@@ -2280,6 +2327,29 @@ export function PatientDetails() {
             <div className="p-6 overflow-y-auto flex-1">
               <form id="followup-form" onSubmit={handleSaveEvent} className="space-y-6">
                 
+                {/* Hospitalized Warning Banner */}
+                {isPatientHospitalized && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-purple-900 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-2.5">
+                      <Building2 size={20} className="text-purple-600 shrink-0" />
+                      <div>
+                        <p className="font-bold">A criança consta atualmente como internada no hospital.</p>
+                        <p className="text-[11px] text-purple-700 mt-0.5">Deseja apenas registrar que ela recebeu alta hospitalar sem preencher um acompanhamento ambulatorial completo?</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCancelFollowup();
+                        openDischargeModal();
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 rounded-lg text-xs shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      Registrar Alta Hospitalar
+                    </button>
+                  </div>
+                )}
+
                 {/* Queue Match Alert Banner */}
                 {queueAppointment && !editingEventId && !isCurrentEventRetroactive && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-emerald-800 animate-in fade-in duration-300">
@@ -2800,6 +2870,21 @@ export function PatientDetails() {
                   Cancelar
                 </button>
                 
+                {isPatientHospitalized && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCancelFollowup();
+                      openDischargeModal();
+                    }}
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 px-5 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] border border-purple-200 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                    title="Registrar alta do hospital sem precisar concluir um acompanhamento completo"
+                  >
+                    <CheckCircle2 size={13} className="text-purple-600" />
+                    Alta Hospitalar
+                  </button>
+                )}
+
                 <button 
                   type="button"
                   onClick={(e) => {

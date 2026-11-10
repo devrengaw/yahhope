@@ -670,11 +670,16 @@ export function MobileDonorHome() {
                         {item.type === 'child' ? 'Criança' : item.type === 'project' ? 'Projeto' : 'Relatório'}
                       </span>
                       <span className="text-xs text-slate-400 font-medium">
-                        {new Date(item.date).toLocaleDateString('pt-BR')}
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : (item.date || '')}
                       </span>
                     </div>
                     <h4 className="font-heading font-black text-slate-900 text-sm leading-snug">{item.title}</h4>
                     <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">{item.content}</p>
+                    {item.img_url && (
+                      <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
+                        <img src={item.img_url} alt={item.title} className="w-full h-36 object-cover" />
+                      </div>
+                    )}
                   </div>
                 ))
               )}

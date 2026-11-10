@@ -1,14 +1,22 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity, Building2, History, UserX, CheckCircle2 } from 'lucide-react';
-import { calculateAge, cn } from '../lib/utils';
+import { calculateAge, cn, formatLocalDate } from '../lib/utils';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAtendimento } from '../contexts/AtendimentoContext';
+import { useVisits } from '../contexts/VisitContext';
+import { useNotification } from '../contexts/NotificationContext';
+import { evaluateNutritionalStatus } from '../lib/whoStandards';
+import { differenceInMonths, addDays } from 'date-fns';
 import { StatusBadge } from '../components/StatusBadge';
-import { Patient } from '../lib/mockData';
+import { Patient, ClinicalEvent } from '../lib/mockData';
 
 export function Patients() {
-  const { patients, events } = usePatients();
+  const { patients, events, updatePatient, addEvent } = usePatients();
+  const { agendarAtendimento } = useAtendimento();
+  const { agendarVisita } = useVisits();
+  const { sendNotification } = useNotification();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,6 +26,16 @@ export function Patients() {
   const [filterGender, setFilterGender] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'ativas' | 'historico'>('ativas');
   const [historySubFilter, setHistorySubFilter] = useState<'all' | 'alta' | 'encerrado'>('all');
+
+  // Hospital Discharge Modal in Patients list
+  const [selectedHospitalizedPatient, setSelectedHospitalizedPatient] = useState<Patient | null>(null);
+  const [hospDischargeDate, setHospDischargeDate] = useState(formatLocalDate(new Date()));
+  const [hospDischargeStatus, setHospDischargeStatus] = useState<string>('Adequado');
+  const [hospDischargeReturnDate, setHospDischargeReturnDate] = useState<string>(formatLocalDate(addDays(new Date(), 7)));
+  const [hospDischargeWeight, setHospDischargeWeight] = useState<string>('');
+  const [hospDischargeHeight, setHospDischargeHeight] = useState<string>('');
+  const [hospDischargeNotes, setHospDischargeNotes] = useState('');
+  const [isSavingDischarge, setIsSavingDischarge] = useState(false);
 
   const communities = useMemo(() => {
     const list = new Set(patients.map(p => p.community));
@@ -102,7 +120,19 @@ export function Patients() {
   ].filter(Boolean).length;
 
   const getNextReturnDate = (patient: Patient) => {
-    if (patient.status === 'Internada' || patient.status === 'Internado') {
+    const pEvents = events
+      .filter(e => e.patient_id === patient.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestEvent = pEvents[0];
+
+    const isHospitalized = patient.status === 'Internada' || 
+      patient.status === 'Internado' ||
+      latestEvent?.nutritional_status === 'Internada' ||
+      latestEvent?.nutritional_status === 'Internado' ||
+      (latestEvent?.notes?.includes('[INTERNAÇÃO HOSPITALAR]') && !latestEvent?.notes?.includes('[ALTA HOSPITALAR]')) ||
+      (latestEvent?.notes?.includes('Internada: Sim') && !latestEvent?.notes?.includes('[ALTA HOSPITALAR]'));
+
+    if (isHospitalized) {
       return {
         date: 'Internada no Hospital',
         isHospitalized: true,
@@ -110,14 +140,11 @@ export function Patients() {
       };
     }
 
-    const patientEvents = events
-      .filter(e => e.patient_id === patient.id && e.return_date)
-      .sort((a, b) => new Date(b.return_date!).getTime() - new Date(a.return_date!).getTime());
-    
-    if (patientEvents.length === 0) return { date: '--', isHospitalized: false, isOverdue: false };
+    const patientEventsWithReturn = pEvents.filter(e => e.return_date);
+    if (patientEventsWithReturn.length === 0) return { date: '--', isHospitalized: false, isOverdue: false };
     
     // Check if the return date is in the past
-    const returnDate = new Date(patientEvents[0].return_date!);
+    const returnDate = new Date(patientEventsWithReturn[0].return_date!);
     const isOverdue = returnDate < new Date(new Date().setHours(0,0,0,0));
     
     return {
@@ -125,6 +152,82 @@ export function Patients() {
       isHospitalized: false,
       isOverdue
     };
+  };
+
+  const handleOpenDischarge = (p: Patient) => {
+    setSelectedHospitalizedPatient(p);
+    setHospDischargeDate(formatLocalDate(new Date()));
+    const pEvents = events.filter(e => e.patient_id === p.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestWeight = pEvents.find(e => e.weight !== undefined)?.weight;
+    const latestHeight = pEvents.find(e => e.height !== undefined)?.height;
+    let suggestedStatus = 'Adequado';
+    if (latestWeight && latestHeight) {
+      const evalRes = evaluateNutritionalStatus({
+        weight: Number(latestWeight),
+        height: Number(latestHeight),
+        gender: p.gender,
+        ageInMonths: differenceInMonths(new Date(), new Date(p.dob))
+      });
+      if (evalRes.status !== 'N/A') suggestedStatus = evalRes.status;
+    }
+    setHospDischargeStatus(suggestedStatus);
+    setHospDischargeReturnDate(formatLocalDate(addDays(new Date(), 7)));
+    setHospDischargeWeight(latestWeight ? String(latestWeight) : '');
+    setHospDischargeHeight(latestHeight ? String(latestHeight) : '');
+    setHospDischargeNotes('');
+  };
+
+  const handleConfirmDischarge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHospitalizedPatient) return;
+    setIsSavingDischarge(true);
+    try {
+      const pEvents = events.filter(e => e.patient_id === selectedHospitalizedPatient.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const latestClinical = pEvents.find(e => e.event_type !== 'acs_visit' && e.event_type !== 'observation') || pEvents[0];
+      const dischargeWeightNum = hospDischargeWeight ? parseFloat(hospDischargeWeight) : latestClinical?.weight;
+      const dischargeHeightNum = hospDischargeHeight ? parseFloat(hospDischargeHeight) : latestClinical?.height;
+
+      // 1. Update patient status
+      updatePatient(selectedHospitalizedPatient.id, { status: hospDischargeStatus as any });
+
+      // 2. Add clinical event registering hospital discharge
+      const newEvent: ClinicalEvent = {
+        id: `discharge_${Date.now()}`,
+        patient_id: selectedHospitalizedPatient.id,
+        date: hospDischargeDate,
+        weight: dischargeWeightNum,
+        height: dischargeHeightNum,
+        muac: latestClinical?.muac,
+        nutritional_status: hospDischargeStatus,
+        notes: `[ALTA HOSPITALAR] Criança recebeu alta hospitalar e retornou ao acompanhamento ambulatorial. ${hospDischargeNotes ? `Observações: ${hospDischargeNotes}` : ''}`.trim(),
+        event_type: 'acompanhamento',
+        return_date: hospDischargeReturnDate || undefined,
+        professional: user?.name || 'Profissional',
+      };
+
+      addEvent(newEvent);
+
+      // 3. Auto-schedule return consultation if return date provided
+      const todayStr = formatLocalDate(new Date());
+      if (hospDischargeReturnDate && hospDischargeReturnDate >= todayStr) {
+        agendarAtendimento(selectedHospitalizedPatient.id, selectedHospitalizedPatient.name, hospDischargeReturnDate);
+      }
+
+      // 4. Schedule ACS home visit
+      agendarVisita(selectedHospitalizedPatient.id, hospDischargeDate);
+
+      sendNotification(
+        'Alta Hospitalar Registrada',
+        `${selectedHospitalizedPatient.name} recebeu alta hospitalar e retornou ao acompanhamento ambulatorial regular.`,
+        'success'
+      );
+
+      setSelectedHospitalizedPatient(null);
+    } catch (err) {
+      console.error('Erro ao registrar alta hospitalar:', err);
+    } finally {
+      setIsSavingDischarge(false);
+    }
   };
 
   return (
@@ -558,15 +661,37 @@ export function Patients() {
                     )}
 
                     <td className="p-6 text-right">
-                      <button 
-                        className={cn(
-                          "inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 transition-all cursor-pointer",
-                          viewMode === 'historico' ? "group-hover/row:text-white group-hover/row:bg-amber-600" : "group-hover/row:text-white group-hover/row:bg-emerald-600"
-                        )}
-                        title="Ver Prontuário"
-                      >
-                        <ChevronRight size={20} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {(() => {
+                          const ret = getNextReturnDate(patient);
+                          if (ret.isHospitalized && viewMode !== 'historico') {
+                            return (
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenDischarge(patient);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm shadow-purple-200 transition-all active:scale-95 cursor-pointer shrink-0"
+                                title="Registrar Alta Hospitalar da criança sem precisar abrir acompanhamento"
+                              >
+                                <CheckCircle2 size={14} />
+                                <span>Registrar Alta</span>
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
+                        <button 
+                          className={cn(
+                            "inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-400 transition-all cursor-pointer",
+                            viewMode === 'historico' ? "group-hover/row:text-white group-hover/row:bg-amber-600" : "group-hover/row:text-white group-hover/row:bg-emerald-600"
+                          )}
+                          title="Ver Prontuário"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -587,6 +712,151 @@ export function Patients() {
           </table>
         </div>
       </div>
+      {/* Modal Registrar Alta Hospitalar */}
+      {selectedHospitalizedPatient && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Registrar Alta Hospitalar</h3>
+                  <p className="text-xs text-slate-500 font-medium">Retorno ao acompanhamento ambulatorial de {selectedHospitalizedPatient.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedHospitalizedPatient(null)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                <CheckCircle2 size={14} /> Retorno à Rotina de Consultas:
+              </p>
+              <p className="leading-relaxed">
+                A criança sairá da condição de internação hospitalar e retornará ao fluxo de consultas ambulatoriais e visitas domiciliares comunitárias, sem precisar preencher um acompanhamento completo agora.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmDischarge} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Data da Alta *
+                  </label>
+                  <input 
+                    type="date"
+                    value={hospDischargeDate}
+                    onChange={(e) => setHospDischargeDate(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Status Nutricional na Alta *
+                  </label>
+                  <select
+                    value={hospDischargeStatus}
+                    onChange={(e) => setHospDischargeStatus(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-slate-700"
+                  >
+                    <option value="DAG">DAG (Grave)</option>
+                    <option value="DAM">DAM (Moderada)</option>
+                    <option value="Risco">Risco Nutricional</option>
+                    <option value="Adequado">Adequado / Recuperado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Peso na Alta (kg)
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={hospDischargeWeight}
+                    onChange={(e) => setHospDischargeWeight(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    Estatura na Alta (cm)
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    value={hospDischargeHeight}
+                    onChange={(e) => setHospDischargeHeight(e.target.value)}
+                    placeholder="0.0"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Data da Próxima Consulta Ambulatorial
+                </label>
+                <input 
+                  type="date"
+                  value={hospDischargeReturnDate}
+                  onChange={(e) => setHospDischargeReturnDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  Orientações da Alta / Observações
+                </label>
+                <textarea 
+                  value={hospDischargeNotes}
+                  onChange={(e) => setHospDischargeNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Relatório de alta do hospital, orientações da equipe, medicamentos a manter..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium resize-none text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setSelectedHospitalizedPatient(null)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSavingDischarge}
+                  className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-purple-700 transition-all shadow-md shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  {isSavingDischarge ? (
+                    'Salvando...'
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} />
+                      Confirmar Alta Hospitalar
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

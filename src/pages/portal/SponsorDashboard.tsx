@@ -218,9 +218,9 @@ export function SponsorDashboard() {
                         
                         <p className="text-slate-500 text-sm font-medium leading-relaxed">{item.content}</p>
                         
-                        {item.img && (
-                          <div className="rounded-2xl overflow-hidden aspect-video relative max-w-sm">
-                            <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                        {(item.img_url || (item as any).img) && (
+                          <div className="rounded-2xl overflow-hidden aspect-video relative max-w-sm border border-slate-200">
+                            <img src={item.img_url || (item as any).img} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                           </div>
                         )}

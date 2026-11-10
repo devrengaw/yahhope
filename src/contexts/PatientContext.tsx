@@ -59,9 +59,29 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
           // Get latest nutritional status from events
           let status = 'Adequado';
           if (eventsData) {
-            const childEvents = eventsData.filter(e => e.child_id === c.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            if (childEvents.length > 0 && childEvents[0].nutritional_status) {
-              status = childEvents[0].nutritional_status;
+            const childEvents = eventsData
+              .filter(e => e.child_id === c.id)
+              .sort((a, b) => {
+                const diff = new Date(b.date).getTime() - new Date(a.date).getTime();
+                if (diff !== 0) return diff;
+                if (b.created_at && a.created_at) {
+                  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                }
+                return 0;
+              });
+
+            if (childEvents.length > 0) {
+              const latest = childEvents[0];
+              if (latest.nutritional_status === 'Internada' || latest.nutritional_status === 'Internado') {
+                status = 'Internada';
+              } else if (
+                (latest.notes?.includes('[INTERNAÇÃO HOSPITALAR]') || latest.notes?.includes('Internada: Sim')) &&
+                !latest.notes?.includes('[ALTA HOSPITALAR]')
+              ) {
+                status = 'Internada';
+              } else if (latest.nutritional_status) {
+                status = latest.nutritional_status;
+              }
             }
           }
 
