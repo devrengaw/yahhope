@@ -49,6 +49,8 @@ async function syncMaintainerProfile(data: {
 
   // REGRA DE OURO:
   // - Apenas doadores MENSAIS com valor >= R$ 90,00 podem apadrinhar crianças.
+  // - Crianças atribuídas a cada múltiplo inteiro de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
+  // - Excedentes (ex: 95) apadrinham 1 criança e o excedente apoia o projeto como um todo.
   // - Quem doa R$ 50,00 (ou qualquer valor < R$ 90) é Mantenedor Mensal de Apoio Geral (child_id = NULL).
   // - Doações avulsas/pontuais não entram na tabela 'sponsorships'.
   const canSponsorChild = isMonthly && monthlyAmount >= 90;
@@ -128,9 +130,10 @@ async function syncMaintainerProfile(data: {
           .eq('id', sp.id);
       }
     } else {
-      let assignedChildId: string | null = null;
+      let assignedChildIds: (string | null)[] = [null];
 
       // Só busca e atribui criança se o valor cobrir a cota mínima de R$ 90,00!
+      // Se valor > R$ 90,00, a pessoa DEVE receber mais de uma criança!
       if (canSponsorChild) {
         const { data: allChildren } = await supabase.from('children').select('id, name').order('name');
         const { data: activeSp } = await supabase.from('sponsorships').select('child_id').eq('status', 'active');
@@ -145,24 +148,30 @@ async function syncMaintainerProfile(data: {
         const available = (allChildren || []).filter((c: any) => (spCountByChild.get(c.id) || 0) < 2);
         available.sort((a: any, b: any) => ((spCountByChild.get(a.id) || 0) - (spCountByChild.get(b.id) || 0)));
 
-        assignedChildId = available.length > 0 ? available[0].id : null;
+        const needed = Math.max(quotasCount, 1);
+        assignedChildIds = available.slice(0, needed).map((c: any) => c.id);
+        if (assignedChildIds.length === 0 && allChildren && allChildren.length > 0) {
+          assignedChildIds = allChildren.slice(0, needed).map((c: any) => c.id);
+        }
       }
 
-      await supabase.from('sponsorships').insert({
-        child_id: assignedChildId, // NULL para doadores de R$ 50 (Apoio Geral)
-        sponsor_id: userId || null,
-        donor_name: donorName,
-        donor_email: cleanEmail,
-        donor_phone: donorPhone,
-        monthly_amount: monthlyAmount,
-        quotas_count: Math.max(quotasCount, 1),
-        status: 'active',
-        payment_method: paymentMethod,
-        created_at: timestamp,
-        last_sponsored_at: timestamp,
-        stripe_subscription_id: data.subscriptionId || null,
-        stripe_customer_id: data.customerId || null
-      });
+      for (const chId of assignedChildIds) {
+        await supabase.from('sponsorships').insert({
+          child_id: chId, // NULL para doadores de R$ 50 (Apoio Geral)
+          sponsor_id: userId || null,
+          donor_name: donorName,
+          donor_email: cleanEmail,
+          donor_phone: donorPhone,
+          monthly_amount: quotasCount > 1 ? monthlyAmount / quotasCount : monthlyAmount,
+          quotas_count: 1,
+          status: 'active',
+          payment_method: paymentMethod,
+          created_at: timestamp,
+          last_sponsored_at: timestamp,
+          stripe_subscription_id: data.subscriptionId || null,
+          stripe_customer_id: data.customerId || null
+        });
+      }
     }
   } else {
     // Se NÃO é mensal / não tem assinatura ativa, remove qualquer registro indevido em sponsorships!

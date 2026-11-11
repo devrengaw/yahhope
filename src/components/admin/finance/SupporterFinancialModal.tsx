@@ -27,6 +27,13 @@ export interface SupporterDonation {
   campaign_title?: string;
 }
 
+export interface SupporterChildItem {
+  id: string;
+  name: string;
+  village?: string;
+  photo_url?: string;
+}
+
 export interface SupporterData {
   id: string;
   name: string;
@@ -39,6 +46,7 @@ export interface SupporterData {
   sponsoredChildName?: string;
   sponsoredChildVillage?: string;
   sponsoredChildId?: string;
+  sponsoredChildren?: SupporterChildItem[];
   sponsorshipId?: string;
   sponsorships?: any[];
   totalDonated: number;
@@ -156,8 +164,55 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter, onDeleteDo
         {/* Modal Body */}
         <div className="p-8 overflow-y-auto space-y-6">
           
-          {/* Criança Apadrinhada se houver */}
-          {supporter.sponsoredChildName && (
+          {/* Criança(s) Apadrinhada(s) */}
+          {(supporter.sponsoredChildren && supporter.sponsoredChildren.length > 0) ? (
+            <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-500 text-white rounded-xl shadow-md shadow-amber-500/20">
+                    <Heart size={18} fill="currentColor" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                      {supporter.sponsoredChildren.length > 1 ? 'Crianças Apadrinhadas' : 'Criança Apadrinhada'}
+                    </p>
+                    <p className="text-[11px] text-amber-700 font-medium">
+                      {supporter.sponsoredChildren.length > 1 
+                        ? `${supporter.sponsoredChildren.length} crianças acolhidas com cotas ativas` 
+                        : '1 criança acolhida com cota ativa'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-xl text-xs font-black bg-white text-amber-800 shadow-sm border border-amber-200">
+                  {supporter.sponsoredChildren.length} {supporter.sponsoredChildren.length === 1 ? 'Cota' : 'Cotas'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {supporter.sponsoredChildren.map((child, idx) => (
+                  <div key={child.id || idx} className="bg-white p-3 rounded-xl border border-amber-200/60 shadow-xs flex items-center gap-3">
+                    {child.photo_url ? (
+                      <img 
+                        src={child.photo_url} 
+                        alt={child.name} 
+                        className="w-10 h-10 rounded-xl object-cover border border-amber-300 shrink-0" 
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black text-sm shrink-0">
+                        {child.name?.[0] || 'C'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-slate-900 truncate">{child.name}</p>
+                      {child.village && (
+                        <p className="text-[10px] text-slate-500 truncate">{child.village}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : supporter.sponsoredChildName ? (
             <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/60 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-md shadow-amber-500/20">
@@ -175,7 +230,7 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter, onDeleteDo
                 Apadrinhamento Ativo
               </span>
             </div>
-          )}
+          ) : null}
 
           {/* Cards de Resumo Financeiro do Apoiador */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

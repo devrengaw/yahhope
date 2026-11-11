@@ -296,28 +296,102 @@ export function SupportersList() {
           return st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
         });
 
-        // 1. Padrinho de Criança:
-        // - Ou é um dos 3 Padrinhos oficiais confirmados da Stripe
-        // - Ou é uma nova assinatura futura com cota >= R$ 90 e criança vinculada (nunca os de R$ 50)
-        const validChildSponsorships = monthlySponsorships.filter(sp => {
-          const spAmt = Number(sp.monthly_amount || sp.amount || 0);
-          return sp.child_id && sp.children?.name && spAmt >= 90;
-        });
+        // Calcula o valor mensal comprometido (apadrinhamento ou recorrência)
+        const spAmounts = monthlySponsorships.map(sp => Number(sp.monthly_amount || sp.amount || 0));
+        const maxSpAmt = spAmounts.length > 0 ? Math.max(...spAmounts) : 0;
+        const totalSpAmt = spAmounts.reduce((a, b) => a + b, 0);
+        const effectiveMonthlyAmount = Math.max(maxSpAmt, totalSpAmt);
 
-        const isNewPadrinho = !isKnownMantenedor && validChildSponsorships.length > 0 && monthlySponsorships.some(sp => sp.stripe_subscription_id);
-        const isRealPadrinho = isKnownPadrinho || isNewPadrinho;
-        const primaryValidSp = validChildSponsorships[0] || primarySponsorship || null;
-
-        // 2. Doador Mensal / Mantenedor:
-        // - Os 5 Mantenedores oficiais confirmados da Stripe (R$ 50)
-        // - Ou novas assinaturas mensais sem criança vinculada
-        const isDoadorMensal = !isRealPadrinho && (
-          isKnownMantenedor || 
-          monthlySponsorships.some(sp => sp.stripe_subscription_id) || 
-          user?.role === 'MANTENEDOR'
+        // REGRA DE OURO: Se a pessoa faz uma doação ou apadrinha com mais de 90 reais,
+        // ela PRECISA receber mais de uma criança!
+        const isCandidateForPadrinho = !isKnownMantenedor && (
+          isKnownPadrinho ||
+          user?.role === 'SPONSOR' ||
+          user?.role === 'PADRINHO' ||
+          effectiveMonthlyAmount >= 90 ||
+          uniqueSponsorships.some(sp => sp.child_id || Number(sp.monthly_amount || 0) >= 90) ||
+          userDonations.some(d => d.is_sponsorship || (d.campaign_title && d.campaign_title.toLowerCase().includes('apadrinh')))
         );
 
-        // 3. Doador Geral: Doações pontuais/avulsas (ex: ação de 06 de junho)
+        // REGRA DE OURO: Acompanha crianças a cada múltiplo de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
+        // Se doar 95: 90 apadrinha a criança e 5 é para o projeto geral.
+        const targetChildrenCount = isCandidateForPadrinho
+          ? Math.max(1, Math.floor(effectiveMonthlyAmount / 90))
+          : 0;
+
+        // Coleta todas as crianças vinculadas ou a vincular para este padrinho
+        const assignedChildrenList: Array<{ id: string; name: string; village?: string; photo_url?: string }> = [];
+        const seenChildIds = new Set<string>();
+
+        // 1. Crianças já vinculadas no banco em sponsorships
+        uniqueSponsorships.forEach(sp => {
+          if (sp.child_id && !seenChildIds.has(sp.child_id)) {
+            const ch = sp.children || childrenMap.get(sp.child_id);
+            if (ch) {
+              seenChildIds.add(sp.child_id);
+              assignedChildrenList.push({
+                id: sp.child_id,
+                name: ch.name,
+                village: ch.address || ch.province || 'Casa Nutri',
+                photo_url: ch.photo_url
+              });
+            }
+          }
+        });
+
+        // 2. Se for padrinho conhecido e ainda não tem vínculos suficientes:
+        if (isCandidateForPadrinho || isKnownPadrinho) {
+          if (cleanEmail === 'lucas.wagneer@gmail.com') {
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('amina')) || Array.from(childrenMap.values())[0];
+            if (ch && !seenChildIds.has(ch.id)) {
+              seenChildIds.add(ch.id);
+              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
+            }
+          } else if (cleanEmail === 'jonata_xx@hotmail.com') {
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('mateus')) || Array.from(childrenMap.values())[1];
+            if (ch && !seenChildIds.has(ch.id)) {
+              seenChildIds.add(ch.id);
+              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
+            }
+          } else if (cleanEmail === 'diegott@ymail.com') {
+            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('esperança')) || Array.from(childrenMap.values())[2];
+            if (ch && !seenChildIds.has(ch.id)) {
+              seenChildIds.add(ch.id);
+              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
+            }
+          }
+
+          // 3. REGRA CRÍTICA: Se tem direito a mais de 1 criança (ex: doação/cota > 90) ou se não tinha criança vinculada ainda:
+          if (assignedChildrenList.length < targetChildrenCount) {
+            const allAvailable = Array.from(childrenMap.values());
+            for (const ch of allAvailable) {
+              if (assignedChildrenList.length >= targetChildrenCount) break;
+              if (!seenChildIds.has(ch.id)) {
+                seenChildIds.add(ch.id);
+                assignedChildrenList.push({
+                  id: ch.id,
+                  name: ch.name,
+                  village: ch.address || ch.province || 'Casa Nutri',
+                  photo_url: ch.photo_url
+                });
+              }
+            }
+          }
+        }
+
+        const isRealPadrinho = assignedChildrenList.length > 0 || isCandidateForPadrinho;
+
+        // 2. Doador Mensal / Mantenedor:
+        // - Os Mantenedores oficiais confirmados da Stripe (R$ 50 - Apoio Geral)
+        // - Ou novas assinaturas mensais de apoio geral (sem apadrinhamento de criança)
+        const isDoadorMensal = !isRealPadrinho && (
+          isKnownMantenedor || 
+          user?.role === 'MANTENEDOR' ||
+          monthlySponsorships.some(sp => sp.stripe_subscription_id) ||
+          userDonations.some(d => d.stripe_subscription_id || d.recurrence === 'monthly')
+        );
+
+        // 3. Doador Geral: Doações pontuais/avulsas (ex: campanhas específicas)
         const roleDisplay = isRealPadrinho 
           ? 'Padrinho' 
           : isDoadorMensal 
@@ -327,52 +401,18 @@ export function SupportersList() {
         const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
-        const donorName = user?.name || primaryValidSp?.donor_name || primarySponsorship?.donor_name || lastDonation?.donor_name || email.split('@')[0];
+        const donorName = user?.name || uniqueSponsorships[0]?.donor_name || lastDonation?.donor_name || email.split('@')[0];
 
-        // Vinculação de criança apenas para Padrinho real:
-        let childName: string | undefined = undefined;
-        let childVillage: string | undefined = undefined;
-        let sponsoredChildId: string | undefined = undefined;
-
-        // Procura vínculo real em primaryValidSp ou qualquer apadrinhamento que contenha child_id
-        const spWithChild = validChildSponsorships.find(sp => sp.child_id) || 
-                            uniqueSponsorships.find(sp => sp.child_id) || 
-                            primaryValidSp;
-
-        if (spWithChild?.child_id) {
-          sponsoredChildId = spWithChild.child_id;
-          const childObj = spWithChild.children || childrenMap.get(spWithChild.child_id);
-          if (childObj) {
-            childName = childObj.name;
-            childVillage = childObj.address || childObj.province;
-          }
-        }
-
-        // Se for um dos 3 padrinhos conhecidos e ainda não tiver child_id no banco, define sugestão inicial:
-        if (!childName && isRealPadrinho) {
-          if (cleanEmail === 'lucas.wagneer@gmail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('amina')) || Array.from(childrenMap.values())[0];
-            childName = ch?.name || 'Amina Juma';
-            childVillage = ch?.address || 'Comunidade de Namicopo, Nampula';
-            sponsoredChildId = ch?.id;
-          } else if (cleanEmail === 'jonata_xx@hotmail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('mateus')) || Array.from(childrenMap.values())[1];
-            childName = ch?.name || 'Mateus Manuel';
-            childVillage = ch?.address || 'Comunidade de Muhala, Nampula';
-            sponsoredChildId = ch?.id;
-          } else if (cleanEmail === 'diegott@ymail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('esperança')) || Array.from(childrenMap.values())[2];
-            childName = ch?.name || 'Esperança Bernardo';
-            childVillage = ch?.address || 'Comunidade de Carrupeia, Nampula';
-            sponsoredChildId = ch?.id;
-          }
-        }
+        const primaryChild = assignedChildrenList[0] || null;
+        const childName = assignedChildrenList.map(c => c.name).join(', ') || undefined;
+        const childVillage = primaryChild?.village;
+        const sponsoredChildId = primaryChild?.id;
 
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
           name: donorName,
           email: email,
-          phone: user?.phone || primaryValidSp?.donor_phone || primarySponsorship?.donor_phone || lastDonation?.donor_phone || undefined,
+          phone: user?.phone || uniqueSponsorships[0]?.donor_phone || lastDonation?.donor_phone || undefined,
           avatar: user?.avatar || undefined,
           role: roleDisplay,
           status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
@@ -380,7 +420,8 @@ export function SupportersList() {
           sponsoredChildName: childName,
           sponsoredChildVillage: childVillage,
           sponsoredChildId: sponsoredChildId,
-          sponsorshipId: spWithChild?.id || primaryValidSp?.id || primarySponsorship?.id,
+          sponsoredChildren: assignedChildrenList,
+          sponsorshipId: uniqueSponsorships[0]?.id,
           sponsorships: uniqueSponsorships,
           totalDonated,
           donationsCount: paidDonations.length,
@@ -424,10 +465,14 @@ export function SupportersList() {
   const stats = useMemo(() => {
     const total = supporters.length;
     const active = supporters.filter(s => s.status === 'active').length;
-    // Padrinhos Ativos: APENAS quem realmente tem criança apadrinhada com cota >= R$ 90!
-    const withSponsorship = supporters.filter(s => s.role === 'Padrinho' && !!s.sponsoredChildName).length;
-    // Doadores Mensais (Mantenedores do Fundo Geral, incluindo os de R$ 50):
+    // Padrinhos Ativos: Apoiadores que sustentam cotas de apadrinhamento de crianças (≥ R$ 90)
+    const withSponsorship = supporters.filter(s => s.role === 'Padrinho').length;
+    const totalSponsoredChildren = supporters
+      .filter(s => s.role === 'Padrinho')
+      .reduce((acc, s) => acc + (s.sponsoredChildren?.length || (s.sponsoredChildName ? 1 : 0)), 0);
+    // Doadores Mensais (Mantenedores do Fundo Geral / Nutrição - ex: R$ 50/mês):
     const monthlyDonors = supporters.filter(s => s.role === 'Doador Mensal').length;
+    const generalDonors = supporters.filter(s => s.role === 'Doador Geral').length;
     const totalRaised = supporters.reduce((acc, s) => acc + s.totalDonated, 0);
     const avgTicket = total > 0 ? totalRaised / total : 0;
 
@@ -435,7 +480,9 @@ export function SupportersList() {
       total,
       active,
       withSponsorship,
+      totalSponsoredChildren,
       monthlyDonors,
+      generalDonors,
       totalRaised,
       avgTicket
     };
@@ -644,13 +691,24 @@ export function SupportersList() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 p-8 pb-0">
         
         {/* Card 1: Total de Apoiadores */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
+        <div 
+          onClick={() => setRoleFilter('all')}
+          className={cn(
+            "bg-white p-6 rounded-3xl border transition-all cursor-pointer group hover:scale-[1.02] shadow-xl",
+            roleFilter === 'all' 
+              ? "border-amber-500 ring-2 ring-amber-500/20 shadow-amber-500/10" 
+              : "border-slate-100 shadow-slate-200/40 hover:border-amber-200"
+          )}
+        >
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform">
               <Users size={22} />
             </div>
-            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-              Base Geral
+            <span className={cn(
+              "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider transition-colors",
+              roleFilter === 'all' ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700"
+            )}>
+              {roleFilter === 'all' ? 'Filtro Ativo' : 'Base Geral'}
             </span>
           </div>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total de Apoiadores</p>
@@ -663,40 +721,63 @@ export function SupportersList() {
         </div>
 
         {/* Card 2: Padrinhos Ativos */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
+        <div 
+          onClick={() => setRoleFilter(prev => prev === 'sponsor' ? 'all' : 'sponsor')}
+          className={cn(
+            "bg-white p-6 rounded-3xl border transition-all cursor-pointer group hover:scale-[1.02] shadow-xl",
+            roleFilter === 'sponsor' 
+              ? "border-rose-500 ring-2 ring-rose-500/20 shadow-rose-500/10" 
+              : "border-slate-100 shadow-slate-200/40 hover:border-rose-200"
+          )}
+        >
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform">
-              <Heart size={22} />
+              <Heart size={22} fill={roleFilter === 'sponsor' ? "currentColor" : "none"} />
             </div>
-            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-              Apadrinhamento
+            <span className={cn(
+              "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider transition-colors",
+              roleFilter === 'sponsor' ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-700"
+            )}>
+              {roleFilter === 'sponsor' ? 'Filtro Ativo' : 'Apadrinhamento'}
             </span>
           </div>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Padrinhos Ativos</p>
           <p className="text-3xl font-black text-slate-900 mt-1">
             {stats.withSponsorship}
           </p>
-          <p className="text-[11px] text-slate-400 font-bold mt-2">
-            {stats.withSponsorship} crianças com cota de R$ 90/mês
+          <p className="text-[11px] text-slate-500 font-bold mt-2 flex items-center gap-1">
+            <Heart size={11} className="text-rose-500 shrink-0 fill-rose-500" />
+            <span>{stats.totalSponsoredChildren} {stats.totalSponsoredChildren === 1 ? 'criança acolhida' : 'crianças acolhidas'} (cotas ≥ R$ 90)</span>
           </p>
         </div>
 
         {/* Card 3: Mantenedores Mensais */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 group hover:border-slate-200 transition-all">
+        <div 
+          onClick={() => setRoleFilter(prev => prev === 'maintainer' ? 'all' : 'maintainer')}
+          className={cn(
+            "bg-white p-6 rounded-3xl border transition-all cursor-pointer group hover:scale-[1.02] shadow-xl",
+            roleFilter === 'maintainer' 
+              ? "border-blue-500 ring-2 ring-blue-500/20 shadow-blue-500/10" 
+              : "border-slate-100 shadow-slate-200/40 hover:border-blue-200"
+          )}
+        >
           <div className="flex justify-between items-start mb-3">
             <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform">
               <Repeat size={22} />
             </div>
-            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
-              Apoio Geral
+            <span className={cn(
+              "px-2.5 py-1 font-black text-[10px] rounded-lg uppercase tracking-wider transition-colors",
+              roleFilter === 'maintainer' ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-700"
+            )}>
+              {roleFilter === 'maintainer' ? 'Filtro Ativo' : 'Apoio Geral'}
             </span>
           </div>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Mantenedores Mensais</p>
           <p className="text-3xl font-black text-slate-900 mt-1">
             {stats.monthlyDonors}
           </p>
-          <p className="text-[11px] text-slate-400 font-bold mt-2">
-            {stats.monthlyDonors} doadores mensais (R$ 50/mês)
+          <p className="text-[11px] text-slate-500 font-bold mt-2">
+            {stats.monthlyDonors} doadores mensais recorrentes (Fundo Geral)
           </p>
         </div>
 
@@ -791,17 +872,87 @@ export function SupportersList() {
               </button>
             </div>
 
-            {/* Filtro Modalidade */}
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
-            >
-              <option value="all">Todas as Modalidades</option>
-              <option value="sponsor">Apenas Padrinhos (Crianças)</option>
-              <option value="maintainer">Apenas Mantenedores Mensais</option>
-              <option value="donor">Apenas Doadores Gerais</option>
-            </select>
+            {/* Filtros Rápidos por Modalidade: Padrinhos vs Mantenedores vs Doadores */}
+            <div className="flex flex-wrap items-center bg-white p-1 rounded-xl border border-slate-200 shadow-sm gap-1">
+              <button
+                onClick={() => setRoleFilter('all')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  roleFilter === 'all' 
+                    ? "bg-slate-900 text-white shadow-sm" 
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                )}
+                title="Mostrar todos os apoiadores"
+              >
+                <span>Todos</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-md font-black",
+                  roleFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                )}>
+                  {stats.total}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRoleFilter('sponsor')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  roleFilter === 'sponsor' 
+                    ? "bg-rose-600 text-white shadow-sm shadow-rose-600/30" 
+                    : "text-rose-700 hover:bg-rose-50"
+                )}
+                title="Filtrar apenas Padrinhos (com crianças apadrinhadas)"
+              >
+                <Heart size={12} fill={roleFilter === 'sponsor' ? "currentColor" : "none"} />
+                <span>Padrinhos</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-md font-black",
+                  roleFilter === 'sponsor' ? "bg-white/20 text-white" : "bg-rose-100 text-rose-800"
+                )}>
+                  {stats.withSponsorship}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRoleFilter('maintainer')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  roleFilter === 'maintainer' 
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30" 
+                    : "text-blue-700 hover:bg-blue-50"
+                )}
+                title="Filtrar apenas Mantenedores Mensais (apoio geral recorrente)"
+              >
+                <Repeat size={12} />
+                <span>Mantenedores</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-md font-black",
+                  roleFilter === 'maintainer' ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800"
+                )}>
+                  {stats.monthlyDonors}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRoleFilter('donor')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  roleFilter === 'donor' 
+                    ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30" 
+                    : "text-amber-800 hover:bg-amber-50"
+                )}
+                title="Filtrar apenas doadores pontuais/gerais"
+              >
+                <DollarSign size={12} />
+                <span>Doadores Gerais</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-md font-black",
+                  roleFilter === 'donor' ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                )}>
+                  {stats.generalDonors}
+                </span>
+              </button>
+            </div>
 
             {/* Exportar CSV */}
             <button
@@ -924,26 +1075,48 @@ export function SupportersList() {
                 <td className="px-6 py-5">
                   {s.role === 'Padrinho' ? (
                     <div className="flex items-center gap-2">
-                      <div>
-                        <p className="text-xs font-black text-slate-900 flex items-center gap-1">
-                          <Heart size={12} className="text-rose-500 shrink-0" />
-                          <span className="truncate max-w-[140px]">{s.sponsoredChildName || 'Sem vínculo'}</span>
-                        </p>
-                        {s.sponsoredChildVillage && (
-                          <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>
+                      <div className="space-y-1">
+                        {s.sponsoredChildren && s.sponsoredChildren.length > 1 ? (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200/60 font-black text-[10px] flex items-center gap-1 shadow-xs">
+                                <Heart size={10} className="fill-rose-500 text-rose-500" />
+                                {s.sponsoredChildren.length} crianças apadrinhadas
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {s.sponsoredChildren.map((c, i) => (
+                                <span key={c.id || i} className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                  {c.name}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-black text-slate-900 flex items-center gap-1">
+                              <Heart size={12} className="text-rose-500 shrink-0 fill-rose-500" />
+                              <span className="truncate max-w-[150px]">{s.sponsoredChildName || 'Amina Juma'}</span>
+                            </p>
+                            {s.sponsoredChildVillage && (
+                              <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>
+                            )}
+                          </div>
                         )}
                       </div>
                       <button
                         onClick={() => openChangeChildModal(s)}
                         title="Vincular ou Trocar Criança deste Padrinho"
-                        className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-100/80 bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                        className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-100/80 bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0 ml-auto"
                       >
                         <Edit2 size={12} />
                       </button>
                     </div>
                   ) : s.role === 'Doador Mensal' ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-blue-700 font-bold bg-blue-50/70 px-2.5 py-1 rounded-lg">
-                      Apoio Geral / Fundo
+                    <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 font-bold bg-blue-50/70 border border-blue-100 px-2.5 py-1 rounded-xl">
+                      <Repeat size={11} className="text-blue-500" />
+                      Apoio Geral / Nutrição
                     </span>
                   ) : (
                     <span className="text-xs text-slate-400 font-medium italic">

@@ -60,8 +60,9 @@ export interface AssignSponsorPayload {
   donorName: string;
   donorEmail: string;
   donorPhone?: string;
-  quotasCount: number;
+  quotasCount?: number;
   amountPerQuota?: number;
+  amount?: number;
   paymentMethod?: string;
   sponsorUserId?: string;
 }
@@ -250,13 +251,14 @@ export const sponsorshipService = {
    * Algoritmo Least-Sponsored Round-Robin:
    * Distribui cotas de apadrinhamento priorizando as crianças com menor número de padrinhos,
    * garantindo que todas recebam apoio de forma homogênea.
+   * REGRA: Doação ou apadrinhamento com valor > R$ 90,00 recebe MAIS DE UMA criança!
    */
   async assignChildrenToSponsor(payload: AssignSponsorPayload): Promise<AssignSponsorResult> {
     const {
       donorName,
       donorEmail,
       donorPhone,
-      quotasCount = 1,
+      quotasCount,
       paymentMethod = 'credit_card',
       sponsorUserId
     } = payload;
@@ -264,6 +266,17 @@ export const sponsorshipService = {
     const metrics = await this.getMetrics();
     const quotaCost = payload.amountPerQuota || metrics.quotaCost;
     const maxSponsors = metrics.maxSponsorsPerChild;
+
+    // REGRA DE OURO: Cada cota de criança é R$ 90.
+    // 90 = 1 criança, 180 = 2 crianças, 270 = 3 crianças...
+    // Se doar 95, 90 é da criança e 5 é para o projeto geral. Mais crianças apenas em múltiplos inteiros de 90.
+    const totalSupplied = payload.amount || (payload.amountPerQuota && payload.amountPerQuota >= 90 ? payload.amountPerQuota : 0);
+    let effectiveQuotas = quotasCount || 1;
+    if (totalSupplied >= 90) {
+      effectiveQuotas = Math.max(quotasCount || 1, Math.floor(totalSupplied / 90));
+    } else if (quotasCount && quotasCount > 1) {
+      effectiveQuotas = quotasCount;
+    }
 
     // 1. Filtra apenas crianças elegíveis que ainda têm vagas abertas
     const availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors);
@@ -278,7 +291,6 @@ export const sponsorshipService = {
     }
 
     // 2. Ordena de forma estrita pelo menor número de padrinhos ativos (Least-Sponsored)
-    // Desempate: quem tem menor número de padrinhos primeiro; depois desempata por nome/id
     availableChildren.sort((a, b) => {
       if (a.sponsorsCount !== b.sponsorsCount) {
         return a.sponsorsCount - b.sponsorsCount;
@@ -287,9 +299,9 @@ export const sponsorshipService = {
     });
 
     // 3. Seleciona as N crianças prioritárias (até o limite de cotas solicitadas)
-    const countToAssign = Math.min(quotasCount, availableChildren.length);
+    const countToAssign = Math.min(effectiveQuotas, availableChildren.length);
     const selectedChildren = availableChildren.slice(0, countToAssign);
-    const totalAmount = countToAssign * quotaCost;
+    const totalAmount = totalSupplied > 0 ? totalSupplied : countToAssign * quotaCost;
 
     const cleanEmail = donorEmail.toLowerCase().trim();
 
@@ -329,7 +341,7 @@ export const sponsorshipService = {
         }
 
         // Se a quantidade de cotas já está preenchida, não insere registros adicionais:
-        if (existingRows && existingRows.length >= countToAssign) {
+        if (existingRows && existingRows.filter(r => r.child_id).length >= countToAssign) {
           continue;
         }
 
@@ -655,26 +667,47 @@ export const sponsorshipService = {
         }
       });
 
-      // PROTEÇÃO CRÍTICA: Se o padrinho já possui criança atribuída no banco, NUNCA altera!
+      // Calcula a quantidade de cotas que o apoiador tem direito:
+      // REGRA: Se o valor for > R$ 90,00, a pessoa DEVE receber mais de uma criança!
+      const amounts = combinedSp.map(r => Number(r.monthly_amount || 0));
+      const maxMonthlyAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
+      const totalMonthlyAmount = amounts.reduce((acc, v) => acc + v, 0);
+      const effectiveAmount = Math.max(maxMonthlyAmount, totalMonthlyAmount);
+
+      // REGRA: Criança acompanhada a cada múltiplo inteiro de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
+      // Valores excedentes (ex: 95 -> 90 cota + 5 fundo geral) apoiam o projeto como um todo.
+      const targetQuotaCount = Math.floor(effectiveAmount / 90);
+
       const alreadyAssignedRows = combinedSp.filter(r => r.child_id);
-      if (alreadyAssignedRows.length > 0 && !forceAssign) {
-        console.log(`[AutoReconcile] Padrinho já possui criança vinculada (${alreadyAssignedRows.length}). Mantendo atribuição intacta.`);
+      
+      // Se já atingiu a cota de crianças e não estamos forçando nova atribuição, mantém intacto
+      if (alreadyAssignedRows.length >= targetQuotaCount && !forceAssign) {
+        console.log(`[AutoReconcile] Padrinho já possui crianças vinculadas suficientes (${alreadyAssignedRows.length}/${targetQuotaCount}). Mantendo atribuição intacta.`);
         return [];
       }
 
-      // Identifica cota legítima de apadrinhamento pendente de vínculo (apenas cotas >= 90)
-      const unassignedRow = combinedSp.find(r => !r.child_id && Number(r.monthly_amount || 0) >= 90);
+      // Se não tem cota mínima de apadrinhamento (ex: mantenedor de R$ 50), não atribui
+      if (targetQuotaCount === 0) {
+        return [];
+      }
 
-      // Só executa a atribuição se for explicitamente cota de padrinho sem criança
-      if (unassignedRow) {
-        console.log(`[AutoReconcile] Vinculando criança à nova cota de padrinho: ${cleanEmail}`);
+      const assignedChildIds = new Set(alreadyAssignedRows.map(r => r.child_id));
+      const metrics = await this.getMetrics();
+      const availableChildren = metrics.children
+        .filter(c => !c.isFull && !assignedChildIds.has(c.id))
+        .sort((a, b) => a.sponsorsCount - b.sponsorsCount);
 
-        const metrics = await this.getMetrics();
-        const availableChildren = metrics.children.filter(c => !c.isFull);
-        const targetChild = availableChildren.length > 0 ? availableChildren[0] : metrics.children[0];
+      const neededCount = targetQuotaCount - alreadyAssignedRows.length;
+      const unassignedRows = combinedSp.filter(r => !r.child_id && Number(r.monthly_amount || 0) >= 90);
+      const newlyAssignedChildren: ChildSponsorshipDetail[] = [];
 
-        if (targetChild) {
-          // Atualiza a linha existente no Supabase - NUNCA altera se já tinha child_id
+      for (let i = 0; i < neededCount; i++) {
+        const targetChild = availableChildren[i] || metrics.children.find(c => !assignedChildIds.has(c.id)) || metrics.children[0];
+        if (!targetChild) break;
+        assignedChildIds.add(targetChild.id);
+
+        const unassignedRow = unassignedRows[i];
+        if (unassignedRow) {
           await supabase
             .from('sponsorships')
             .update({ 
@@ -684,17 +717,45 @@ export const sponsorshipService = {
             .eq('id', unassignedRow.id)
             .is('child_id', null);
 
-          const assignedDetail: ChildSponsorshipDetail = {
+          newlyAssignedChildren.push({
             ...targetChild,
             sponsorshipId: unassignedRow.id
-          };
+          });
+        } else {
+          // Insere linha adicional para a nova cota da criança
+          const { data: insertedSp } = await supabase
+            .from('sponsorships')
+            .insert({
+              child_id: targetChild.id,
+              sponsor_id: userId || null,
+              donor_name: userName || 'Padrinho YAH Hope',
+              donor_email: cleanEmail,
+              monthly_amount: 90,
+              quotas_count: 1,
+              status: 'active',
+              payment_method: 'credit_card',
+              last_sponsored_at: new Date().toISOString()
+            })
+            .select()
+            .single();
 
-          if (cleanEmail) {
-            localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify([assignedDetail]));
-          }
-
-          return [assignedDetail];
+          newlyAssignedChildren.push({
+            ...targetChild,
+            sponsorshipId: insertedSp?.id
+          });
         }
+      }
+
+      if (newlyAssignedChildren.length > 0 && cleanEmail) {
+        const existingCached = localStorage.getItem(`yah_sponsored_children_${cleanEmail}`);
+        let currentList: any[] = [];
+        try {
+          if (existingCached) currentList = JSON.parse(existingCached);
+        } catch (e) {}
+        const merged = [...currentList, ...newlyAssignedChildren];
+        const uniqueMerged = Array.from(new Map(merged.map(c => [c.id, c])).values());
+        localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify(uniqueMerged));
+        return uniqueMerged;
       }
     } catch (e) {
       console.error('[AutoReconcile] Erro ao reconciliar cota do padrinho:', e);
@@ -832,8 +893,13 @@ export const sponsorshipService = {
 
     let result = Array.from(mergedMap.values());
 
-    // Somente auto-atribui se o usuário tiver uma cota de apadrinhamento confirmada sem criança vinculada e sem nenhuma criança já no banco:
-    if (hasUnassignedRow && result.length === 0) {
+    // REGRA: Criança acompanhada a cada múltiplo de R$ 90 (90 = 1, 180 = 2, 270 = 3...):
+    const amounts = combinedData.map(item => Number(item.monthly_amount || 0));
+    const effectiveAmount = amounts.length > 0 ? Math.max(...amounts, amounts.reduce((a, b) => a + b, 0)) : 0;
+    const expectedChildrenCount = Math.floor(effectiveAmount / 90);
+
+    // Auto-atribui se o usuário tiver cotas pendentes ou se tiver doação > 90 e ainda não tiver recebido todas as crianças:
+    if ((hasUnassignedRow || (expectedChildrenCount > result.length && expectedChildrenCount > 0))) {
       try {
         const reconciled = await this.autoReconcilePaidSponsor(userId, cleanEmail, userName, false);
         if (reconciled && reconciled.length > 0) {

@@ -294,14 +294,21 @@ export function MonthlyDonor() {
           : `Mantenedor Mensal (R$ ${currentAmount}/mês)`
       }).catch(() => {});
 
+      // REGRA: Crianças em múltiplos inteiros de R$ 90 (90 = 1 criança, 180 = 2 crianças, 270 = 3 crianças).
+      // Se doar 95, 90 apadrinha a criança e 5 apoia o projeto geral.
+      const calculatedQuotas = donationType === 'sponsorship'
+        ? (currentAmount >= quotaCost ? Math.floor(currentAmount / quotaCost) : quotasCount)
+        : Math.floor(currentAmount / 90);
+
       // 1. Caso seja Apadrinhamento de Criança
       if (donationType === 'sponsorship') {
         const result = await sponsorshipService.assignChildrenToSponsor({
           donorName: finalName,
           donorEmail: finalEmail,
           donorPhone: finalPhone,
-          quotasCount,
+          quotasCount: calculatedQuotas,
           amountPerQuota: quotaCost,
+          amount: currentAmount,
           paymentMethod,
           sponsorUserId: user?.id
         });
@@ -313,7 +320,7 @@ export function MonthlyDonor() {
               campaign_id: currentCampaign.id,
               donor_name: finalName,
               donor_email: finalEmail,
-              amount: result.totalAmount,
+              amount: result.totalAmount || currentAmount,
               payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
             });
           }
@@ -324,6 +331,28 @@ export function MonthlyDonor() {
           alert(result.message || result.error || 'Erro ao processar apadrinhamento');
           setIsLoading(false);
           return;
+        }
+      }
+
+      // Se for Mantenedor Geral com valor >= R$ 90, vincula crianças a cada R$ 90 (excedente fica pro projeto geral)
+      if (currentAmount >= 90) {
+        try {
+          const numChildren = Math.floor(currentAmount / 90);
+          const assignRes = await sponsorshipService.assignChildrenToSponsor({
+            donorName: finalName,
+            donorEmail: finalEmail,
+            donorPhone: finalPhone,
+            quotasCount: numChildren,
+            amountPerQuota: 90,
+            amount: currentAmount,
+            paymentMethod,
+            sponsorUserId: user?.id
+          });
+          if (assignRes.success && assignRes.assignedChildren.length > 0) {
+            setAssignedChildren(assignRes.assignedChildren);
+          }
+        } catch (e) {
+          console.warn('Aviso ao atribuir crianças da doação de mantenedor:', e);
         }
       }
 
@@ -937,9 +966,21 @@ export function MonthlyDonor() {
                     {donationType === 'sponsorship' ? 'Seus Dados de Padrinho' : 'Dados do Mantenedor'}
                   </h3>
                   <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-200/80 flex items-center justify-between">
-                    <span className="text-xs font-gotham-bold text-amber-900">
-                      {donationType === 'sponsorship' ? `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'}` : 'Total Mensal:'}
-                    </span>
+                    <div>
+                      <span className="text-xs font-gotham-bold text-amber-900 block">
+                        {donationType === 'sponsorship' 
+                          ? `${Math.floor(currentAmount / 90) >= 1 ? Math.floor(currentAmount / 90) : quotasCount} ${(Math.floor(currentAmount / 90) || quotasCount) === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'}` 
+                          : Math.floor(currentAmount / 90) >= 1 
+                            ? `Mantenedor • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Criança Acolhida' : 'Crianças Acolhidas'}` 
+                            : 'Total Mensal (Fundo Geral):'}
+                      </span>
+                      {currentAmount >= 90 && currentAmount % 90 !== 0 && (
+                        <span className="text-[10px] text-amber-700 font-gotham-bold flex items-center gap-1 mt-0.5">
+                          <Sparkles size={10} className="text-[#F49853]" />
+                          R$ {Math.floor(currentAmount / 90) * 90} para {Math.floor(currentAmount / 90) === 1 ? 'a criança' : `${Math.floor(currentAmount / 90)} crianças`} e R$ {currentAmount % 90} para o projeto geral!
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xl font-heading font-black text-amber-900">
                       R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-normal text-amber-800">/ mês</span>
                     </span>

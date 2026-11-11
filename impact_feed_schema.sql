@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- SCHEMA DO FEED DE IMPACTO DA YAH HOPE
--- Atualizações de Impacto (Pendentes de aprovação pelo Admin antes da publicação)
+-- Atualizações de Impacto (Edição e Programação com Moderação)
 -- Compatível com a tabela existente do tipo UUID
 -- Execute este script no SQL Editor do seu Supabase Dashboard
 -- ==============================================================================
@@ -13,15 +13,17 @@ CREATE TABLE IF NOT EXISTS impact_feed (
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   author TEXT NOT NULL DEFAULT 'Equipe Nutrição',
-  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'published', 'rejected'
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'published', 'rejected', 'scheduled'
   child_id UUID, -- ID do paciente/criança associada (UUID)
   child_name TEXT, -- Nome da criança para visualização rápida
   img_url TEXT, -- URL de foto/evidência
+  scheduled_for TIMESTAMP WITH TIME ZONE, -- Data e hora agendada para publicação automática
+  published_at TIMESTAMP WITH TIME ZONE, -- Data e hora efetiva de publicação
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Migração segura: Adicionar colunas caso a tabela já exista
+-- 2. Migração segura: Adicionar novas colunas se a tabela já existir
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'impact_feed' AND column_name = 'child_name') THEN
@@ -32,6 +34,14 @@ BEGIN
     ALTER TABLE impact_feed ADD COLUMN img_url TEXT;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'impact_feed' AND column_name = 'scheduled_for') THEN
+    ALTER TABLE impact_feed ADD COLUMN scheduled_for TIMESTAMP WITH TIME ZONE;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'impact_feed' AND column_name = 'published_at') THEN
+    ALTER TABLE impact_feed ADD COLUMN published_at TIMESTAMP WITH TIME ZONE;
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'impact_feed' AND column_name = 'updated_at') THEN
     ALTER TABLE impact_feed ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
   END IF;
@@ -40,6 +50,7 @@ END $$;
 -- 3. Índices para performance
 CREATE INDEX IF NOT EXISTS idx_impact_feed_status ON impact_feed(status);
 CREATE INDEX IF NOT EXISTS idx_impact_feed_created_at ON impact_feed(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_impact_feed_scheduled_for ON impact_feed(scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_impact_feed_child_id ON impact_feed(child_id);
 
 -- 4. Habilitar RLS (Row Level Security)
@@ -50,18 +61,19 @@ DROP POLICY IF EXISTS "Public and sponsors can view published impact updates" ON
 DROP POLICY IF EXISTS "Anyone can insert impact updates as pending" ON impact_feed;
 DROP POLICY IF EXISTS "Admins can manage all impact updates" ON impact_feed;
 DROP POLICY IF EXISTS "Allow all for authenticated and anon" ON impact_feed;
+DROP POLICY IF EXISTS "Admins can delete impact updates" ON impact_feed;
 
 -- Leitura de itens
 CREATE POLICY "Public and sponsors can view published impact updates"
 ON impact_feed FOR SELECT
 USING (true);
 
--- Inserção de novos itens (gerados como pending pela nutrição/atendimentos)
+-- Inserção de novos itens
 CREATE POLICY "Anyone can insert impact updates as pending"
 ON impact_feed FOR INSERT
 WITH CHECK (true);
 
--- Atualização e Moderação (Aprovar, Rejeitar, Editar texto)
+-- Atualização e Moderação (Aprovar, Rejeitar, Editar texto, Programar)
 CREATE POLICY "Admins can manage all impact updates"
 ON impact_feed FOR UPDATE
 USING (true)

@@ -140,6 +140,7 @@ export function Finance() {
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterExpenseType, setFilterExpenseType] = useState<'all' | 'fixed' | 'variable'>('all');
+  const [filterOrigin, setFilterOrigin] = useState<'all' | 'padrinhos' | 'mantenedores' | 'doacoes' | 'expenses'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
@@ -345,14 +346,27 @@ export function Finance() {
                              t.account.toLowerCase().includes(searchTerm.toLowerCase());
         const { key } = parseDateParts(t.date);
         const matchesMonth = selectedMonth === 'all' || key === selectedMonth;
-        return matchesType && matchesExpenseType && matchesSearch && matchesMonth;
+
+        const desc = t.description.toLowerCase();
+        const isSponsorTx = desc.includes('apadrinh') || desc.includes('padrinho') || t.category_id === 'cat_sponsorship' || desc.includes('cota');
+        const isMaintainerTx = !isSponsorTx && (desc.includes('mantenedor') || desc.includes('recorrência') || desc.includes('recorrencia') || desc.includes('mensal') || t.recurrence === 'monthly');
+        const isGeneralDonation = t.type === 'income' && !isSponsorTx && !isMaintainerTx;
+
+        const matchesOrigin = 
+          filterOrigin === 'all' ||
+          (filterOrigin === 'padrinhos' && isSponsorTx) ||
+          (filterOrigin === 'mantenedores' && isMaintainerTx) ||
+          (filterOrigin === 'doacoes' && isGeneralDonation) ||
+          (filterOrigin === 'expenses' && t.type === 'expense');
+
+        return matchesType && matchesExpenseType && matchesSearch && matchesMonth && matchesOrigin;
       })
       .sort((a, b) => {
         const timeA = new Date(a.date).getTime() || 0;
         const timeB = new Date(b.date).getTime() || 0;
         return timeB - timeA;
       });
-  }, [transactions, filterType, filterExpenseType, searchTerm, selectedMonth]);
+  }, [transactions, filterType, filterExpenseType, filterOrigin, searchTerm, selectedMonth]);
 
   const transactionsByMonth = useMemo(() => {
     const groups: {
@@ -941,6 +955,77 @@ export function Finance() {
                     <Filter size={20} />
                   </button>
                 </div>
+              </div>
+
+              {/* Filtros Rápidos Diretos: Padrinhos vs Mantenedores vs Doações */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+                  <Filter size={12} /> Filtro Rápido:
+                </span>
+                
+                <button
+                  onClick={() => setFilterOrigin('all')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'all'
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                  )}
+                >
+                  Todos os Lançamentos
+                </button>
+
+                <button
+                  onClick={() => setFilterOrigin('padrinhos')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'padrinhos'
+                      ? "bg-rose-600 text-white shadow-sm shadow-rose-600/30"
+                      : "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-100"
+                  )}
+                >
+                  <Heart size={12} fill={filterOrigin === 'padrinhos' ? "currentColor" : "none"} />
+                  Padrinhos (Apadrinhamento)
+                </button>
+
+                <button
+                  onClick={() => setFilterOrigin('mantenedores')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'mantenedores'
+                      ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                      : "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100"
+                  )}
+                >
+                  <Repeat size={12} />
+                  Mantenedores (Recorrência Mensal)
+                </button>
+
+                <button
+                  onClick={() => setFilterOrigin('doacoes')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'doacoes'
+                      ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
+                      : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-100"
+                  )}
+                >
+                  <DollarSign size={12} />
+                  Doações Gerais
+                </button>
+
+                <button
+                  onClick={() => setFilterOrigin('expenses')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'expenses'
+                      ? "bg-rose-700 text-white shadow-sm shadow-rose-700/30"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  )}
+                >
+                  <ArrowDownRight size={12} />
+                  Despesas / Saídas
+                </button>
               </div>
             </div>
 

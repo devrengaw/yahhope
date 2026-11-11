@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
-export type ImpactFeedStatus = 'pending' | 'published' | 'rejected';
+export type ImpactFeedStatus = 'pending' | 'published' | 'rejected' | 'scheduled';
 export type ImpactFeedType = 'child' | 'news' | 'project' | 'geral';
 
 export interface ImpactFeedItem {
@@ -17,6 +17,8 @@ export interface ImpactFeedItem {
   child?: string;
   img_url?: string;
   created_at?: string;
+  scheduled_for?: string; // ISO datetime
+  published_at?: string;  // ISO datetime
 }
 
 export type NewImpactFeedItem = {
@@ -30,6 +32,8 @@ export type NewImpactFeedItem = {
   child_id?: string;
   child?: string;
   img_url?: string;
+  scheduled_for?: string;
+  published_at?: string;
 };
 
 interface ImpactContextData {
@@ -39,14 +43,16 @@ interface ImpactContextData {
   updateFeedItem: (id: string, updates: Partial<ImpactFeedItem>) => Promise<void>;
   approveFeedItem: (id: string) => Promise<void>;
   rejectFeedItem: (id: string) => Promise<void>;
+  scheduleFeedItem: (id: string, scheduledFor: string) => Promise<void>;
   deleteFeedItem: (id: string) => Promise<void>;
   getPublishedItems: () => ImpactFeedItem[];
   getPendingItems: () => ImpactFeedItem[];
+  getScheduledItems: () => ImpactFeedItem[];
 }
 
 const STORAGE_KEY = 'yah_hope_impact_feed_v2';
 
-// Gerador robusto de UUID v4 para compatibilidade perfeita com a coluna UUID do PostgreSQL
+// Gerador robusto de UUID v4 para compatibilidade com a coluna UUID do PostgreSQL
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -131,23 +137,34 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       }
 
       if (data && Array.isArray(data)) {
-        const dbItems: ImpactFeedItem[] = data.map(item => ({
-          id: String(item.id),
-          type: (item.type as ImpactFeedType) || 'geral',
-          source: item.source || 'Módulo Nutrição',
-          title: item.title || 'Atualização de Impacto',
-          content: item.content || '',
-          author: item.author || 'Equipe Nutrição',
-          status: (item.status as ImpactFeedStatus) || 'pending',
-          date: item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
-          child_id: item.child_id ? String(item.child_id) : undefined,
-          child: item.child_name || item.child || undefined,
-          img_url: item.img_url || undefined,
-          created_at: item.created_at || new Date().toISOString()
-        }));
+        const now = Date.now();
+        const dbItems: ImpactFeedItem[] = data.map(item => {
+          let status = (item.status as ImpactFeedStatus) || 'pending';
+          
+          // Se estava programado e a data/hora já chegou, auto-promove para publicado
+          if (status === 'scheduled' && item.scheduled_for && new Date(item.scheduled_for).getTime() <= now) {
+            status = 'published';
+          }
+
+          return {
+            id: String(item.id),
+            type: (item.type as ImpactFeedType) || 'geral',
+            source: item.source || 'Módulo Nutrição',
+            title: item.title || 'Atualização de Impacto',
+            content: item.content || '',
+            author: item.author || 'Equipe Nutrição',
+            status,
+            date: item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
+            child_id: item.child_id ? String(item.child_id) : undefined,
+            child: item.child_name || item.child || undefined,
+            img_url: item.img_url || undefined,
+            created_at: item.created_at || new Date().toISOString(),
+            scheduled_for: item.scheduled_for || undefined,
+            published_at: item.published_at || undefined
+          };
+        });
 
         setFeedItems(prev => {
-          // Merge mantendo itens locais que possam ainda não estar no banco
           const dbIds = new Set(dbItems.map(i => i.id));
           const localOnly = prev.filter(i => !dbIds.has(i.id) && !i.id.startsWith('a1000000-') && !i.id.startsWith('a2000000-') && !i.id.startsWith('impact-seed-'));
           const merged = [...dbItems, ...localOnly];
@@ -165,6 +182,29 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  // Intervalo de verificação a cada 60s para publicar itens cujo horário agendado chegou
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFeedItems(prev => {
+        let changed = false;
+        const now = Date.now();
+        const updated = prev.map(item => {
+          if (item.status === 'scheduled' && item.scheduled_for && new Date(item.scheduled_for).getTime() <= now) {
+            changed = true;
+            return { ...item, status: 'published' as ImpactFeedStatus, published_at: new Date().toISOString() };
+          }
+          return item;
+        });
+        if (changed) {
+          saveToStorage(updated);
+        }
+        return changed ? updated : prev;
+      });
+    }, 60000);
+
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -190,7 +230,12 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
     const nowIso = new Date().toISOString();
     const formattedDate = new Date().toLocaleDateString('pt-BR');
 
-    // Por regra de negócio, toda atualização gerada começa como 'pending'
+    // Determina status inicial: se foi programado com data futura, 'scheduled'
+    let initialStatus: ImpactFeedStatus = item.status || 'pending';
+    if (item.scheduled_for && new Date(item.scheduled_for).getTime() > Date.now()) {
+      initialStatus = 'scheduled';
+    }
+
     const newItem: ImpactFeedItem = {
       id: newId,
       type: item.type || (item.child_id ? 'child' : 'geral'),
@@ -198,15 +243,17 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       title: item.title,
       content: item.content,
       author: item.author || 'Equipe Nutrição',
-      status: item.status || 'pending',
+      status: initialStatus,
       date: item.date || formattedDate,
       child_id: item.child_id,
       child: item.child,
       img_url: item.img_url,
-      created_at: nowIso
+      created_at: nowIso,
+      scheduled_for: item.scheduled_for,
+      published_at: initialStatus === 'published' ? nowIso : undefined
     };
 
-    // 1. Atualiza o estado React e localStorage imediatamente (garantia de nunca perder os dados)
+    // 1. Atualiza o estado React e localStorage imediatamente
     setFeedItems(prev => {
       const updated = [newItem, ...prev.filter(i => i.id !== newItem.id)];
       saveToStorage(updated);
@@ -225,10 +272,11 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
         status: newItem.status,
         child_name: newItem.child || null,
         img_url: newItem.img_url || null,
-        created_at: newItem.created_at
+        created_at: newItem.created_at,
+        scheduled_for: newItem.scheduled_for || null,
+        published_at: newItem.published_at || null
       };
 
-      // Só envia child_id se for um UUID válido para não quebrar no PostgreSQL
       if (isValidUUID(newItem.child_id)) {
         payload.child_id = newItem.child_id;
       } else {
@@ -248,9 +296,21 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
   };
 
   const updateFeedItem = async (id: string, updates: Partial<ImpactFeedItem>) => {
+    // Se o scheduled_for for alterado para futuro, ajusta status para 'scheduled' se não for explicitamente rejected
+    const computedUpdates = { ...updates };
+    if (computedUpdates.scheduled_for) {
+      const schedTime = new Date(computedUpdates.scheduled_for).getTime();
+      if (schedTime > Date.now() && computedUpdates.status !== 'rejected') {
+        computedUpdates.status = 'scheduled';
+      }
+    }
+    if (computedUpdates.status === 'published' && !computedUpdates.published_at) {
+      computedUpdates.published_at = new Date().toISOString();
+    }
+
     // 1. Atualização imediata no estado local e localStorage
     setFeedItems(prev => {
-      const updated = prev.map(item => item.id === id ? { ...item, ...updates } : item);
+      const updated = prev.map(item => item.id === id ? { ...item, ...computedUpdates } : item);
       saveToStorage(updated);
       return updated;
     });
@@ -258,17 +318,19 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
     // 2. Tenta sincronizar com Supabase
     try {
       const dbUpdates: any = {};
-      if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.content !== undefined) dbUpdates.content = updates.content;
-      if (updates.title !== undefined) dbUpdates.title = updates.title;
-      if (updates.type !== undefined) dbUpdates.type = updates.type;
-      if (updates.source !== undefined) dbUpdates.source = updates.source;
-      if (updates.author !== undefined) dbUpdates.author = updates.author;
-      if (updates.img_url !== undefined) dbUpdates.img_url = updates.img_url;
-      if (updates.child !== undefined) dbUpdates.child_name = updates.child;
+      if (computedUpdates.status !== undefined) dbUpdates.status = computedUpdates.status;
+      if (computedUpdates.content !== undefined) dbUpdates.content = computedUpdates.content;
+      if (computedUpdates.title !== undefined) dbUpdates.title = computedUpdates.title;
+      if (computedUpdates.type !== undefined) dbUpdates.type = computedUpdates.type;
+      if (computedUpdates.source !== undefined) dbUpdates.source = computedUpdates.source;
+      if (computedUpdates.author !== undefined) dbUpdates.author = computedUpdates.author;
+      if (computedUpdates.img_url !== undefined) dbUpdates.img_url = computedUpdates.img_url;
+      if (computedUpdates.child !== undefined) dbUpdates.child_name = computedUpdates.child;
+      if (computedUpdates.scheduled_for !== undefined) dbUpdates.scheduled_for = computedUpdates.scheduled_for;
+      if (computedUpdates.published_at !== undefined) dbUpdates.published_at = computedUpdates.published_at;
 
-      if (updates.child_id !== undefined) {
-        dbUpdates.child_id = isValidUUID(updates.child_id) ? updates.child_id : null;
+      if (computedUpdates.child_id !== undefined) {
+        dbUpdates.child_id = isValidUUID(computedUpdates.child_id) ? computedUpdates.child_id : null;
       }
 
       const { error } = await supabase.from('impact_feed').update(dbUpdates).eq('id', id);
@@ -281,11 +343,22 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
   };
 
   const approveFeedItem = async (id: string) => {
-    await updateFeedItem(id, { status: 'published' });
+    await updateFeedItem(id, { 
+      status: 'published', 
+      published_at: new Date().toISOString(),
+      scheduled_for: undefined 
+    });
   };
 
   const rejectFeedItem = async (id: string) => {
     await updateFeedItem(id, { status: 'rejected' });
+  };
+
+  const scheduleFeedItem = async (id: string, scheduledFor: string) => {
+    await updateFeedItem(id, { 
+      status: 'scheduled', 
+      scheduled_for: scheduledFor 
+    });
   };
 
   const deleteFeedItem = async (id: string) => {
@@ -308,11 +381,27 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
   };
 
   const getPublishedItems = () => {
-    return feedItems.filter(item => item.status === 'published');
+    const now = Date.now();
+    return feedItems.filter(item => {
+      if (item.status === 'published') return true;
+      if (item.status === 'scheduled' && item.scheduled_for && new Date(item.scheduled_for).getTime() <= now) {
+        return true;
+      }
+      return false;
+    });
   };
 
   const getPendingItems = () => {
     return feedItems.filter(item => item.status === 'pending');
+  };
+
+  const getScheduledItems = () => {
+    const now = Date.now();
+    return feedItems.filter(item => 
+      item.status === 'scheduled' && 
+      item.scheduled_for && 
+      new Date(item.scheduled_for).getTime() > now
+    );
   };
 
   return (
@@ -323,9 +412,11 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       updateFeedItem, 
       approveFeedItem,
       rejectFeedItem,
+      scheduleFeedItem,
       deleteFeedItem, 
       getPublishedItems,
-      getPendingItems
+      getPendingItems,
+      getScheduledItems
     }}>
       {children}
     </ImpactContext.Provider>

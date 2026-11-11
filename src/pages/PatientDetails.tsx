@@ -3147,12 +3147,6 @@ export function PatientDetails() {
             </div>
             
             <form onSubmit={handleSendImpactUpdate} className="p-8 space-y-6">
-              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-                <p className="text-sm text-amber-900 font-medium leading-relaxed">
-                  Esta mensagem será enviada para o <strong>Gestor</strong> aprovar antes de aparecer no feed de notícias dos apoiadores.
-                </p>
-              </div>
-
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
                   <Sparkles size={12} className="text-amber-500" /> Sugestões Inteligentes

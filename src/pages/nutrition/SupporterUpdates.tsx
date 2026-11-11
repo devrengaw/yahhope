@@ -1,30 +1,64 @@
 import React, { useState, useRef } from 'react';
-import { MessageSquare, Send, Image as ImageIcon, Heart, Search, Filter, Trash2, CheckCircle2, AlertCircle, Clock, Globe, X, UploadCloud, ShieldAlert } from 'lucide-react';
+import { 
+  MessageSquare, 
+  Send, 
+  Image as ImageIcon, 
+  Heart, 
+  Search, 
+  Filter, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  Globe, 
+  X, 
+  UploadCloud, 
+  Calendar, 
+  Edit3, 
+  Save 
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useImpact } from '../../contexts/ImpactContext';
+import { useImpact, ImpactFeedItem } from '../../contexts/ImpactContext';
 import { usePatients } from '../../contexts/PatientContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { optimizeImageFile } from '../../lib/imageUpload';
 
-type UpdateStatus = 'all' | 'pending' | 'published';
+type UpdateFilterStatus = 'all' | 'pending' | 'scheduled' | 'published';
 
 export function NutritionSupporterUpdates() {
-  const { feedItems, addFeedItem, deleteFeedItem } = useImpact();
+  const { feedItems, addFeedItem, updateFeedItem, deleteFeedItem } = useImpact();
   const { patients } = usePatients();
   const { user } = useAuth();
 
+  // Formulário de Criação
+  const [title, setTitle] = useState('');
   const [news, setNews] = useState('');
   const [selectedChild, setSelectedChild] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<UpdateStatus>('all');
+  const [activeTab, setActiveTab] = useState<UpdateFilterStatus>('all');
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Imagem
+  // Programação na Criação
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDateTime, setScheduledDateTime] = useState('');
+
+  // Imagem na Criação
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Estado do Modal de Edição
+  const [editingItem, setEditingItem] = useState<ImpactFeedItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editChildId, setEditChildId] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
+  const [editIsScheduled, setEditIsScheduled] = useState(false);
+  const [editScheduledDateTime, setEditScheduledDateTime] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,6 +80,26 @@ export function NutritionSupporterUpdates() {
     }
   };
 
+  const handleEditImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsProcessingImage(true);
+      const optimizedUrl = await optimizeImageFile(file, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.85
+      });
+      setEditImageUrl(optimizedUrl);
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+    } finally {
+      setIsProcessingImage(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
+
   const handleSendUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!news.trim() || isSubmitting) return;
@@ -55,27 +109,98 @@ export function NutritionSupporterUpdates() {
 
     try {
       setIsSubmitting(true);
+
+      const scheduledIso = isScheduled && scheduledDateTime 
+        ? new Date(scheduledDateTime).toISOString() 
+        : undefined;
+
       await addFeedItem({
+        title: title.trim() || (childName ? `Atualização: ${childName}` : 'Comunicado Geral da Nutrição'),
         content: news.trim(),
-        title: childName ? `Atualização: ${childName}` : 'Comunicado Geral da Nutrição',
         author: user?.name || 'Módulo Nutrição',
         source: 'Módulo Nutrição',
         type: childName ? 'child' : 'geral',
         child_id: selectedChild || undefined,
         child: childName,
         img_url: imageUrl || undefined,
-        status: 'pending' // Regra: gerada como pendente, aprovada pelo admin antes de ser publicada
+        scheduled_for: scheduledIso,
+        status: scheduledIso ? 'scheduled' : 'pending'
       });
 
+      setTitle('');
       setNews('');
       setSelectedChild('');
       setImageUrl(null);
+      setIsScheduled(false);
+      setScheduledDateTime('');
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 4000);
+      setTimeout(() => setShowSuccess(false), 3500);
     } catch (err) {
       console.error('Erro ao salvar atualização de impacto:', err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Abrir Modal de Edição
+  const startEditing = (item: ImpactFeedItem) => {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    setEditContent(item.content);
+    setEditChildId(item.child_id || '');
+    setEditImageUrl(item.img_url || null);
+    if (item.scheduled_for) {
+      setEditIsScheduled(true);
+      // Converte ISO para formato datetime-local (YYYY-MM-DDTHH:mm)
+      const d = new Date(item.scheduled_for);
+      const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setEditScheduledDateTime(localIso);
+    } else {
+      setEditIsScheduled(false);
+      setEditScheduledDateTime('');
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !editContent.trim() || isSavingEdit) return;
+
+    const patient = patients.find(p => p.id === editChildId);
+    const childName = patient ? patient.name : undefined;
+
+    try {
+      setIsSavingEdit(true);
+
+      const scheduledIso = editIsScheduled && editScheduledDateTime 
+        ? new Date(editScheduledDateTime).toISOString() 
+        : undefined;
+
+      const updates: Partial<ImpactFeedItem> = {
+        title: editTitle.trim() || (childName ? `Atualização: ${childName}` : 'Comunicado da Nutrição'),
+        content: editContent.trim(),
+        child_id: editChildId || undefined,
+        child: childName,
+        img_url: editImageUrl || undefined,
+        type: childName ? 'child' : 'geral'
+      };
+
+      if (scheduledIso) {
+        updates.scheduled_for = scheduledIso;
+        updates.status = 'scheduled';
+      } else {
+        updates.scheduled_for = undefined;
+        // Se desativou agendamento de um item que estava agendado, volta para pendente
+        if (editingItem.status === 'scheduled') {
+          updates.status = 'pending';
+        }
+      }
+
+      await updateFeedItem(editingItem.id, updates);
+      setEditingItem(null);
+    } catch (err) {
+      console.error('Erro ao editar atualização:', err);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -95,14 +220,35 @@ export function NutritionSupporterUpdates() {
     const titleMatch = u.title ? u.title.toLowerCase().includes(searchTerm.toLowerCase()) : false;
     const contentMatch = u.content ? u.content.toLowerCase().includes(searchTerm.toLowerCase()) : false;
     const matchesSearch = contentMatch || childMatch || titleMatch;
-    const matchesTab = activeTab === 'all' || u.status === activeTab;
-    return matchesSearch && matchesTab;
+
+    if (activeTab === 'all') return matchesSearch;
+    if (activeTab === 'scheduled') return matchesSearch && u.status === 'scheduled';
+    if (activeTab === 'pending') return matchesSearch && u.status === 'pending';
+    if (activeTab === 'published') return matchesSearch && u.status === 'published';
+    return matchesSearch;
   });
 
   const counts = {
     all: feedItems.length,
     pending: feedItems.filter(u => u.status === 'pending').length,
+    scheduled: feedItems.filter(u => u.status === 'scheduled').length,
     published: feedItems.filter(u => u.status === 'published').length,
+  };
+
+  const formatDateTimeDisplay = (isoStr?: string) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return isoStr;
+    }
   };
 
   return (
@@ -119,7 +265,7 @@ export function NutritionSupporterUpdates() {
         </div>
         {showSuccess && (
           <div className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
-            <CheckCircle2 size={20} /> Enviado com sucesso para Aprovação do Administrador!
+            <CheckCircle2 size={20} /> Atualização salva com sucesso!
           </div>
         )}
       </div>
@@ -130,16 +276,20 @@ export function NutritionSupporterUpdates() {
           <form onSubmit={handleSendUpdate} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6 sticky top-8">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-black text-slate-900">Nova Atualização</h2>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                Requer Aprovação
-              </span>
-            </div>
-
-            <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-900 leading-relaxed font-medium">
-              💡 <strong>Regra de Publicação:</strong> As atualizações geradas são salvas no sistema e ficam <strong>em revisão</strong> até que o <strong>Administrador</strong> as aprove no painel de moderação.
             </div>
             
             <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Título (Opcional)</label>
+                <input 
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Entrega de cestas e pesagem semanal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700"
+                />
+              </div>
+
               <div>
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Vincular Criança (Opcional)</label>
                 <select 
@@ -155,11 +305,11 @@ export function NutritionSupporterUpdates() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">O que aconteceu?</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">O que aconteceu? *</label>
                 <textarea 
                   value={news}
                   onChange={(e) => setNews(e.target.value)}
-                  rows={5}
+                  rows={4}
                   required
                   placeholder="Ex: Novos suprimentos chegaram em Boane e o acompanhamento nutricional semanal iniciou..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-medium text-slate-700"
@@ -201,12 +351,43 @@ export function NutritionSupporterUpdates() {
                 </button>
               )}
 
+              {/* Seção Programar Atualização */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={isScheduled}
+                    onChange={(e) => setIsScheduled(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Calendar size={14} className="text-emerald-600" />
+                    Programar Publicação
+                  </span>
+                </label>
+
+                {isScheduled && (
+                  <div className="pt-1 animate-in fade-in duration-200">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                      Data e Hora da Publicação
+                    </label>
+                    <input 
+                      type="datetime-local"
+                      required={isScheduled}
+                      value={scheduledDateTime}
+                      onChange={(e) => setScheduledDateTime(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+
               <button 
                 type="submit"
                 disabled={!news.trim() || isSubmitting}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:bg-slate-200 text-white py-4 rounded-2xl font-black shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
               >
-                <Send size={18} /> {isSubmitting ? 'Salvando...' : 'Salvar e Enviar para Aprovação'}
+                <Send size={18} /> {isSubmitting ? 'Salvando...' : (isScheduled ? 'Programar Atualização' : 'Salvar Atualização')}
               </button>
             </div>
           </form>
@@ -217,11 +398,11 @@ export function NutritionSupporterUpdates() {
           {/* Filters & Search */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="bg-slate-100 p-1 rounded-xl flex w-full md:w-auto">
+              <div className="bg-slate-100 p-1 rounded-xl flex w-full md:w-auto overflow-x-auto">
                 <button 
                   onClick={() => setActiveTab('all')}
                   className={cn(
-                    "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer",
+                    "px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0",
                     activeTab === 'all' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   )}
                 >
@@ -230,16 +411,25 @@ export function NutritionSupporterUpdates() {
                 <button 
                   onClick={() => setActiveTab('pending')}
                   className={cn(
-                    "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer",
+                    "px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0",
                     activeTab === 'pending' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   )}
                 >
                   Pendentes <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">{counts.pending}</span>
                 </button>
                 <button 
+                  onClick={() => setActiveTab('scheduled')}
+                  className={cn(
+                    "px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0",
+                    activeTab === 'scheduled' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Programadas <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md">{counts.scheduled}</span>
+                </button>
+                <button 
                   onClick={() => setActiveTab('published')}
                   className={cn(
-                    "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer",
+                    "px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0",
                     activeTab === 'published' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   )}
                 >
@@ -270,9 +460,11 @@ export function NutritionSupporterUpdates() {
                       <div className="flex items-center gap-4">
                         <div className={cn(
                           "w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0",
+                          update.status === 'scheduled' ? "bg-indigo-100 text-indigo-600" :
                           update.type === 'child' ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
                         )}>
-                          {update.type === 'child' ? <Heart size={22} fill="currentColor" /> : <MessageSquare size={22} />}
+                          {update.status === 'scheduled' ? <Calendar size={22} /> :
+                           update.type === 'child' ? <Heart size={22} fill="currentColor" /> : <MessageSquare size={22} />}
                         </div>
                         <div>
                           <div className="flex items-center gap-3 flex-wrap">
@@ -281,12 +473,15 @@ export function NutritionSupporterUpdates() {
                             </h4>
                             <span className={cn(
                               "text-[8px] font-black uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5",
+                              update.status === 'scheduled' ? "bg-indigo-100 text-indigo-700 border border-indigo-200" :
                               update.status === 'pending' ? "bg-amber-100 text-amber-700 border border-amber-200" : 
                               update.status === 'published' ? "bg-emerald-100 text-emerald-700 border border-emerald-200" :
                               "bg-red-100 text-red-700 border border-red-200"
                             )}>
-                              {update.status === 'pending' ? <Clock size={10} /> : <CheckCircle2 size={10} />}
-                              {update.status === 'pending' ? 'Em Revisão (Aguardando Admin)' : 
+                              {update.status === 'scheduled' ? <Calendar size={10} /> :
+                               update.status === 'pending' ? <Clock size={10} /> : <CheckCircle2 size={10} />}
+                              {update.status === 'scheduled' ? `Programado (${formatDateTimeDisplay(update.scheduled_for)})` :
+                               update.status === 'pending' ? 'Em Revisão' : 
                                update.status === 'published' ? 'Publicado' : 'Rejeitado'}
                             </span>
                           </div>
@@ -299,10 +494,19 @@ export function NutritionSupporterUpdates() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                      {/* Botões de Ação: Editar e Excluir */}
+                      <div className="flex gap-1.5 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => startEditing(update)}
+                          className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer"
+                          title="Editar Atualização"
+                        >
+                          <Edit3 size={18} />
+                        </button>
                         <button 
                           onClick={() => handleDelete(update.id)}
-                          className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                          className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                           title="Excluir"
                         >
                           <Trash2 size={18} />
@@ -326,9 +530,13 @@ export function NutritionSupporterUpdates() {
                           <span className="flex items-center gap-1.5 text-emerald-600">
                             <Globe size={12} /> Visível para apoiadores no portal
                           </span>
+                        ) : update.status === 'scheduled' ? (
+                          <span className="flex items-center gap-1.5 text-indigo-600">
+                            <Calendar size={12} /> Publicação programada para: {formatDateTimeDisplay(update.scheduled_for)}
+                          </span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-amber-600">
-                            <Clock size={12} /> Salvo no sistema • Pendente de aprovação do Gestor/Admin
+                            <Clock size={12} /> Salvo no sistema • Em revisão
                           </span>
                         )}
                       </div>
@@ -347,6 +555,146 @@ export function NutritionSupporterUpdates() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Edição Completa */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Editar Atualização</h3>
+                  <p className="text-xs text-slate-400 font-medium">Altere o texto, foto ou reprograme a data</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingItem(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 sm:p-8 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Título</label>
+                <input 
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Vincular Criança</label>
+                <select 
+                  value={editChildId}
+                  onChange={(e) => setEditChildId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
+                >
+                  <option value="">Geral (Todos os Apoiadores)</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Conteúdo *</label>
+                <textarea 
+                  rows={4}
+                  required
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700 resize-none"
+                />
+              </div>
+
+              {/* Foto na Edição */}
+              <input 
+                type="file" 
+                ref={editFileInputRef} 
+                onChange={handleEditImageSelect} 
+                accept="image/*" 
+                className="hidden" 
+              />
+
+              {editImageUrl ? (
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200">
+                  <img src={editImageUrl} alt="Foto" className="w-full h-36 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setEditImageUrl(null)}
+                    className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-md cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={() => editFileInputRef.current?.click()}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ImageIcon size={16} /> Alterar/Adicionar Foto
+                </button>
+              )}
+
+              {/* Programação na Edição */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={editIsScheduled}
+                    onChange={(e) => setEditIsScheduled(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Calendar size={14} className="text-emerald-600" />
+                    Programar Publicação
+                  </span>
+                </label>
+
+                {editIsScheduled && (
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                      Data e Hora da Publicação
+                    </label>
+                    <input 
+                      type="datetime-local"
+                      required={editIsScheduled}
+                      value={editScheduledDateTime}
+                      onChange={(e) => setEditScheduledDateTime(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-700"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all cursor-pointer text-xs"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!editContent.trim() || isSavingEdit}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/20 cursor-pointer text-xs flex items-center justify-center gap-2"
+                >
+                  <Save size={16} /> {isSavingEdit ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {itemToDelete !== null && (
