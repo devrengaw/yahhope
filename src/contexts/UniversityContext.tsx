@@ -203,8 +203,11 @@ export interface UniversityModuleConfig {
   short_description: string;
   full_description: string;
   full_scholarship_amount: number;
+  full_scholarship_amount_mzn: number;
   partial_quota_amount: number;
+  partial_quota_amount_mzn: number;
   default_general_amount: number;
+  default_general_amount_mzn: number;
   currency: 'BRL' | 'MZN';
   counterpart_hours_required: number;
   portal_enabled: boolean;
@@ -219,8 +222,11 @@ const DEFAULT_CONFIG: UniversityModuleConfig = {
   full_description:
     'O Futuro Universitário rompe o ciclo da pobreza através da educação superior de excelência. Jovens de comunidades vulneráveis que demonstram dedicação extraordinária nos estudos recebem cobertura de mensalidades, material didático, auxílio transporte e mentoria individual com profissionais voluntários, comprometendo-se com horas semanais de reforço escolar gratuito na comunidade.',
   full_scholarship_amount: 600,
+  full_scholarship_amount_mzn: 7500,
   partial_quota_amount: 150,
+  partial_quota_amount_mzn: 1875,
   default_general_amount: 100,
+  default_general_amount_mzn: 1250,
   currency: 'BRL',
   counterpart_hours_required: 20,
   portal_enabled: true,

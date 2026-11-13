@@ -116,14 +116,21 @@ CREATE TABLE IF NOT EXISTS public.university_config (
   short_description TEXT NOT NULL DEFAULT 'Programa de bolsas de ensino superior, mentoria vocacional e desenvolvimento de lideranças jovens em Moçambique.',
   full_description TEXT NOT NULL DEFAULT 'O Futuro Universitário rompe o ciclo da vulnerabilidade através da educação superior de excelência. Jovens com alto potencial acadêmico recebem cobertura de mensalidades, material didático, auxílio transporte e mentoria individual com profissionais voluntários, comprometendo-se com horas de retribuição comunitária.',
   full_scholarship_amount NUMERIC(10, 2) NOT NULL DEFAULT 600.00,
+  full_scholarship_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 7500.00,
   partial_quota_amount NUMERIC(10, 2) NOT NULL DEFAULT 150.00,
+  partial_quota_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 1875.00,
   default_general_amount NUMERIC(10, 2) NOT NULL DEFAULT 100.00,
+  default_general_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 1250.00,
   currency TEXT NOT NULL DEFAULT 'BRL',
   counterpart_hours_required INTEGER NOT NULL DEFAULT 20,
   portal_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   enforce_strict_privacy BOOLEAN NOT NULL DEFAULT TRUE,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE public.university_config ADD COLUMN IF NOT EXISTS full_scholarship_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 7500.00;
+ALTER TABLE public.university_config ADD COLUMN IF NOT EXISTS partial_quota_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 1875.00;
+ALTER TABLE public.university_config ADD COLUMN IF NOT EXISTS default_general_amount_mzn NUMERIC(10, 2) NOT NULL DEFAULT 1250.00;
 
 INSERT INTO public.university_config (id) VALUES ('default') ON CONFLICT (id) DO NOTHING;
 
