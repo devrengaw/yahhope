@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useImpact } from '../../contexts/ImpactContext';
+import { useImpact, canSupporterViewImpactItem, isChildSpecificImpactItem } from '../../contexts/ImpactContext';
 import { sponsorshipService, ChildSponsorshipDetail } from '../../services/sponsorshipService';
 import { Heart, Calendar, ArrowRight, Gift, Activity, Star, MessageCircle, BarChart3, TrendingUp, ShoppingBag, Newspaper, ShieldCheck, Briefcase, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -37,26 +37,20 @@ export function SponsorDashboard() {
     const published = getPublishedItems();
 
     return published.filter(item => {
-      // 1. Notícias de criança específica: APENAS padrinhos daquela criança veem
-      if (item.type === 'child') {
-        const isAdmin = user?.role === 'ADMIN' || user?.role === 'USER';
-        if (isAdmin) return true;
-
-        const targetText = (item.child || item.title).toLowerCase();
-        const isMyChild = myChildren.some(c => 
-          targetText.includes(c.name.toLowerCase()) || 
-          (c.id && targetText.includes(c.id.toLowerCase()))
-        );
-
-        if (!isMyChild) return false;
+      // 1. Atualizações de criança específica: APENAS padrinhos da respectiva criança veem.
+      // Atualizações gerais (Todos os Apoiadores) aparecem para todos.
+      if (!canSupporterViewImpactItem(item, myChildren)) {
+        return false;
       }
 
+      const isChildItem = isChildSpecificImpactItem(item);
+
       // 2. Filtro de abas
-      if (feedFilter === 'news') return item.type !== 'child';
-      if (feedFilter === 'my_children') return item.type === 'child';
+      if (feedFilter === 'news') return !isChildItem;
+      if (feedFilter === 'my_children') return isChildItem;
       return true;
     });
-  }, [getPublishedItems, myChildren, feedFilter, user?.role]);
+  }, [getPublishedItems, myChildren, feedFilter]);
 
   return (
     <div className="space-y-10 pb-20">

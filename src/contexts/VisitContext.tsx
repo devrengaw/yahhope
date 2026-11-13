@@ -19,7 +19,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role === 'SPONSOR' || user.role === 'OBSERVER') return;
 
     fetchVisits().then(() => {
       syncCompletedAtendimentosToVisits();
@@ -32,9 +32,10 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => { supabase.removeChannel(sub); };
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   const syncCompletedAtendimentosToVisits = async () => {
+    if (!user || user.role === 'SPONSOR' || user.role === 'OBSERVER') return;
     try {
       // 1. Clinical events are the clinical source of truth
       const { data: clinicalEvents } = await supabase

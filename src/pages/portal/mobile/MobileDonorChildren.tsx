@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
+import { useImpact, isChildSpecificImpactItem, isImpactItemForSponsoredChild } from '../../../contexts/ImpactContext';
 import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -245,6 +246,7 @@ function WeightEvolutionChart({ history }: { history: WeightPoint[] }) {
 export function MobileDonorChildren() {
   const { user } = useAuth();
   const { patients, events } = usePatients();
+  const { getPublishedItems } = useImpact();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -855,6 +857,11 @@ export function MobileDonorChildren() {
         const weights = getChildWeights(child);
         const childStory = getChildStory(child);
         const isRecovered = child.status === 'Adequado' || child.status === 'Alta';
+        const childUpdates = myChildIds.has(child.id)
+          ? getPublishedItems().filter(
+              item => isChildSpecificImpactItem(item) && isImpactItemForSponsoredChild(item, [{ id: child.id, name: child.name }])
+            )
+          : [];
 
         return (
           <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -957,6 +964,37 @@ export function MobileDonorChildren() {
                     {childStory}
                   </p>
                 </div>
+
+                {/* Atualizações de Impacto Exclusivas dos Padrinhos desta Criança */}
+                {myChildIds.has(child.id) && childUpdates.length > 0 && (
+                  <div className="bg-white rounded-2xl p-4 border border-orange-200/80 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-slate-900 font-gotham-bold text-xs uppercase tracking-wider">
+                        <Sparkles size={15} className="text-[#F49853]" />
+                        <span>Atualizações de Impacto • {child.name}</span>
+                      </div>
+                      <span className="text-[9px] font-gotham-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        Exclusivo do Padrinho
+                      </span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {childUpdates.map(upd => (
+                        <div key={upd.id} className="p-3 bg-orange-50/40 border border-orange-100 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-gotham-medium">
+                            <span className="font-gotham-bold text-slate-800">{upd.title}</span>
+                            <span>{upd.created_at ? new Date(upd.created_at).toLocaleDateString('pt-BR') : upd.date}</span>
+                          </div>
+                          <p className="text-xs text-slate-700 font-gotham-light leading-relaxed">{upd.content}</p>
+                          {upd.img_url && (
+                            <div className="pt-1">
+                              <img src={upd.img_url} alt={upd.title} className="w-full h-32 object-cover rounded-lg border border-orange-100" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Ficha Cadastral e Localidade com Data de Nascimento */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2.5 text-xs text-slate-600 font-gotham-light">

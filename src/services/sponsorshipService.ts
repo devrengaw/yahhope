@@ -779,6 +779,7 @@ export const sponsorshipService = {
 
     let dbChildren: ChildSponsorshipDetail[] = [];
     let hasUnassignedRow = false;
+    const combinedData: any[] = [];
 
     try {
       // Fazemos busca por sponsor_id e por donor_email de forma segura
@@ -801,7 +802,6 @@ export const sponsorshipService = {
           .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
       }
 
-      const combinedData: any[] = [];
       const seenSpIds = new Set<string>();
 
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {

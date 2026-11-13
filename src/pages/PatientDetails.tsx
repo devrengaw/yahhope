@@ -3137,10 +3137,15 @@ export function PatientDetails() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <Heart size={24} className="text-amber-600 fill-amber-600" />
-                Atualização de Impacto
-              </h3>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <Heart size={24} className="text-amber-600 fill-amber-600" />
+                  Atualização de Impacto • {patient.name}
+                </h3>
+                <p className="text-[11px] font-bold text-amber-700 mt-1 flex items-center gap-1">
+                  🔒 Visível exclusivamente para os padrinhos de {patient.name}
+                </p>
+              </div>
               <button onClick={() => setIsImpactModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-full transition-all">
                 <X size={20} />
               </button>

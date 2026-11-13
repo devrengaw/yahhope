@@ -24,7 +24,7 @@ export function ProjectTaskModal({ isOpen, onClose, onSave, initialTask }: Proje
 
   useEffect(() => {
     if (isOpen) {
-      supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
+      supabase.from('users').select('*').then(({ data }) => {
         if (data) setAvailableMembers(data.filter(u => isInternalTeamUser(u)));
       });
     }

@@ -85,7 +85,8 @@ export function ImpactFeedManager() {
     setEditingItem(item);
     setEditTitle(item.title);
     setEditFullContent(item.content);
-    setEditChildId(item.child_id || '');
+    const matchedChildId = item.child_id || (item.child ? patients.find(p => p.name.toLowerCase() === item.child?.toLowerCase())?.id : '') || '';
+    setEditChildId(matchedChildId);
     setEditImageUrl(item.img_url || null);
     if (item.scheduled_for) {
       setEditIsScheduled(true);
@@ -386,11 +387,18 @@ export function ImpactFeedManager() {
                       <span className="text-slate-300 text-xs">•</span>
                       <span className="text-[10px] font-bold text-slate-400">{item.date}</span>
                       
-                      {item.type === 'child' && (
+                      {(item.type === 'child' || item.child_id || item.child) ? (
                         <>
                           <span className="text-slate-300 text-xs">•</span>
                           <span className="text-[9px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            🔒 Visível aos padrinhos de {item.child || 'criança'}
+                            🔒 Visível apenas aos padrinhos de {item.child || 'criança'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-slate-300 text-xs">•</span>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            🌐 Atualização Geral (Todos os Apoiadores)
                           </span>
                         </>
                       )}
@@ -538,9 +546,15 @@ export function ImpactFeedManager() {
                 <div className="pt-2 flex items-center justify-between text-[11px] font-bold text-slate-400 border-t border-slate-50">
                   <div className="flex items-center gap-2">
                     {item.status === 'published' ? (
-                      <span className="flex items-center gap-1 text-emerald-600">
-                        <Globe size={13} /> Publicado e visível para apoiadores
-                      </span>
+                      (item.type === 'child' || item.child_id || item.child) ? (
+                        <span className="flex items-center gap-1 text-amber-700">
+                          <Heart size={13} fill="currentColor" /> Publicado • Visível apenas para os padrinhos de {item.child || 'criança'}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-emerald-600">
+                          <Globe size={13} /> Publicado • Atualização Geral (Todos os Apoiadores)
+                        </span>
+                      )
                     ) : item.status === 'scheduled' ? (
                       <span className="flex items-center gap-1 text-indigo-600">
                         <Calendar size={13} /> Programado para {formatDateTimeDisplay(item.scheduled_for)}
@@ -615,15 +629,15 @@ export function ImpactFeedManager() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Vincular Criança (Opcional)</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Público / Criança Vinculada</label>
                 <select 
                   value={newChildId}
                   onChange={(e) => setNewChildId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all font-bold text-slate-700"
                 >
-                  <option value="">Geral (Todos os Apoiadores)</option>
+                  <option value="">Atualização Geral (Todos os Apoiadores)</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.name} (Apenas Padrinhos)</option>
                   ))}
                 </select>
               </div>
@@ -786,15 +800,15 @@ export function ImpactFeedManager() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Vincular Criança</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Público / Criança Vinculada</label>
                 <select 
                   value={editChildId}
                   onChange={(e) => setEditChildId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
                 >
-                  <option value="">Geral (Todos os Apoiadores)</option>
+                  <option value="">Atualização Geral (Todos os Apoiadores)</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.name} (Apenas Padrinhos)</option>
                   ))}
                 </select>
               </div>

@@ -22,7 +22,7 @@ export function ProjectDetails({ project, onClose, onUpdateProject }: ProjectDet
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
-    supabase.from('users').select('id, name, email, role, department').then(({ data }) => {
+    supabase.from('users').select('*').then(({ data }) => {
       if (data) setTeamMembers(data.filter(u => isInternalTeamUser(u)));
     });
   }, []);

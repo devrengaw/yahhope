@@ -112,8 +112,28 @@ import { MobileDonorBlog } from './pages/portal/mobile/MobileDonorBlog';
 import { MobileDonorDonate } from './pages/portal/mobile/MobileDonorDonate';
 import { MobileDonorSponsor } from './pages/portal/mobile/MobileDonorSponsor';
 import { PortalMyDonations } from './pages/portal/PortalMyDonations';
+import { PortalUniversityProgram } from './pages/portal/PortalUniversityProgram';
+import { UniversityProvider } from './contexts/UniversityContext';
+import { getUserAuthorizedModules, getDefaultAuthorizedRouteForUser } from './lib/universityPermissions';
+import { UniversityPermissionGuard } from './pages/university/UniversityPermissionGuard';
+import { UniversityDashboard } from './pages/university/UniversityDashboard';
+import { UniversityStudents } from './pages/university/UniversityStudents';
+import { UniversityScholarships } from './pages/university/UniversityScholarships';
+import { UniversityMentors } from './pages/university/UniversityMentors';
+import { UniversityAcademic } from './pages/university/UniversityAcademic';
+import { UniversitySupporters } from './pages/university/UniversitySupporters';
+import { UniversityReports } from './pages/university/UniversityReports';
+import { UniversitySettings } from './pages/university/UniversitySettings';
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) {
+function ProtectedRoute({
+  children,
+  allowedRoles,
+  requiredModule
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[];
+  requiredModule?: 'admin' | 'workspace' | 'communication' | 'nutrition' | 'university';
+}) {
   const { user, loading } = useAuth();
   const location = useLocation();
   
@@ -134,7 +154,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
   // Check if role is allowed
   if (!allowedRoles.includes(user.role)) {
-    const fallback = user.role === 'SPONSOR' ? '/portal' : user.role === 'OBSERVER' ? '/nutrition/patients' : '/workspace';
+    const fallback = getDefaultAuthorizedRouteForUser(user);
     
     // Prevent infinite loop if already at fallback
     if (location.pathname.startsWith(fallback)) {
@@ -150,6 +170,33 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
     }
     
     return <Navigate to={fallback} />;
+  }
+
+  // Validação de permissão por módulo administrativo (sem alterar o modelo existente)
+  if (requiredModule) {
+    const modules = getUserAuthorizedModules(user);
+    const isAuthorizedForModule =
+      (requiredModule === 'admin' && modules.hasAdmin) ||
+      (requiredModule === 'workspace' && modules.hasWorkspace) ||
+      (requiredModule === 'communication' && modules.hasCommunication) ||
+      (requiredModule === 'nutrition' && (modules.hasNutrition || user.role === 'OBSERVER')) ||
+      (requiredModule === 'university' && modules.hasUniversity);
+
+    if (!isAuthorizedForModule) {
+      const fallback = getDefaultAuthorizedRouteForUser(user);
+      if (location.pathname.startsWith(fallback)) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="p-8 text-center bg-white rounded-2xl shadow-sm border border-slate-100 max-w-md">
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Módulo Não Autorizado</h2>
+              <p className="text-slate-500 mb-6">Você não possui permissão atribuída para acessar este módulo.</p>
+              <button onClick={() => window.location.href = fallback} className="text-blue-600 hover:underline">Voltar</button>
+            </div>
+          </div>
+        );
+      }
+      return <Navigate to={fallback} replace />;
+    }
   }
   
   return <>{children}</>;
@@ -190,7 +237,7 @@ function RootRedirect() {
   if (user.role === 'SPONSOR') return <Navigate to="/portal/dashboard" />;
   if (user.role === 'ADMIN') return <Navigate to="/admin" />;
   if (user.role === 'OBSERVER') return <Navigate to="/nutrition/patients" />;
-  return <Navigate to="/workspace" />;
+  return <Navigate to={getDefaultAuthorizedRouteForUser(user)} />;
 }
 
 export default function App() {
@@ -220,180 +267,233 @@ export default function App() {
                                         <BlogProvider>
                                           <WebsiteProjectsProvider>
                                             <NewsletterProvider>
-                                        <Router>
-                                          <AnalyticsTracker />
-                                          <DonationModalProvider>
-                                      <Routes>
-                                        {/* Dedicated full-screen Display Route */}
-                                        <Route path="/campanha-display" element={<CampaignDisplay />} />
+                                              <UniversityProvider>
+                                          <Router>
+                                            <AnalyticsTracker />
+                                            <DonationModalProvider>
+                                        <Routes>
+                                          {/* Dedicated full-screen Display Route */}
+                                          <Route path="/campanha-display" element={<CampaignDisplay />} />
 
-                                        {/* Rotas Dedicadas do Hotsite da Campanha (Completamente isolado: Sem barra urgente, sem menus do site) */}
-                                        <Route path="/campanha-yahhope" element={<CampaignHotsite />} />
-                                        <Route path="/hotsite" element={<CampaignHotsite />} />
-                                        <Route path="/participe" element={<CampaignHotsite />} />
-                                        <Route path="/fazer-parte" element={<CampaignHotsite />} />
+                                          {/* Rotas Dedicadas do Hotsite da Campanha (Completamente isolado: Sem barra urgente, sem menus do site) */}
+                                          <Route path="/campanha-yahhope" element={<CampaignHotsite />} />
+                                          <Route path="/hotsite" element={<CampaignHotsite />} />
+                                          <Route path="/participe" element={<CampaignHotsite />} />
+                                          <Route path="/fazer-parte" element={<CampaignHotsite />} />
 
-                                        {/* Se for o subdomínio campanha.yahhope.com, a rota raiz carrega o Hotsite isolado */}
-                                        {typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com') && (
-                                          <Route path="/" element={<CampaignHotsite />} />
-                                        )}
+                                          {/* Se for o subdomínio campanha.yahhope.com, a rota raiz carrega o Hotsite isolado */}
+                                          {typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com') && (
+                                            <Route path="/" element={<CampaignHotsite />} />
+                                          )}
 
-                                        <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
-                                          <Route path="/portal/login" element={<Navigate to="/login" replace />} />
-                                          <Route path="/app/login" element={<Navigate to="/login" replace />} />
-                                          <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
-                                          <Route path="/sobre-nos" element={<AboutUs />} />
-                                          <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />
-                                          <Route path="/missao-visao-valores" element={<MissionVisionValues />} />
-                                          <Route path="/blog" element={<Blog />} />
-                                          <Route path="/blog/:id" element={<Blog />} />
-                                          <Route path="/loja" element={<Ecommerce />} />
-                                          <Route path="/projetos" element={<LocalProjects />} />
-                                          <Route path="/login" element={<Login />} />
-                                          <Route path="/admin/login" element={<Navigate to="/login?mode=admin" replace />} />
-                                          <Route path="/set-password" element={<SetPassword />} />
-                                          <Route path="/finalizar-cadastro" element={<SponsorSetup />} />
-                                          <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
-                                          <Route path="/apoiador" element={<SupporterLanding />} />
-                                          <Route path="/mantenedor" element={<MonthlyDonor />} />
-                                          <Route path="/seja-mantenedor" element={<Navigate to="/mantenedor" replace />} />
-                                          <Route path="/como-ajudar/mantenedor" element={<Navigate to="/mantenedor" replace />} />
-                                          <Route path="/voluntariado-e-parcerias" element={<VolunteerAndPartnerships />} />
-                                          <Route path="/voluntariado" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
-                                          <Route path="/parcerias" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
-                                          <Route path="/como-ajudar/voluntariado" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
-                                          <Route path="/campanha" element={<Campaign />} />
-                                          <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
-                                          <Route path="/termos-de-servico" element={<TermsOfService />} />
+                                          <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>
+                                            <Route path="/portal/login" element={<Navigate to="/login" replace />} />
+                                            <Route path="/app/login" element={<Navigate to="/login" replace />} />
+                                            <Route path="/" element={isNative ? <Navigate to="/portal/dashboard" replace /> : <Home />} />
+                                            <Route path="/sobre-nos" element={<AboutUs />} />
+                                            <Route path="/sobre" element={<Navigate to="/sobre-nos" replace />} />
+                                            <Route path="/missao-visao-valores" element={<MissionVisionValues />} />
+                                            <Route path="/blog" element={<Blog />} />
+                                            <Route path="/blog/:id" element={<Blog />} />
+                                            <Route path="/loja" element={<Ecommerce />} />
+                                            <Route path="/projetos" element={<LocalProjects />} />
+                                            <Route path="/login" element={<Login />} />
+                                            <Route path="/admin/login" element={<Navigate to="/login?mode=admin" replace />} />
+                                            <Route path="/set-password" element={<SetPassword />} />
+                                            <Route path="/finalizar-cadastro" element={<SponsorSetup />} />
+                                            <Route path="/cadastro-apadrinhador" element={<SponsorSetup />} />
+                                            <Route path="/apoiador" element={<SupporterLanding />} />
+                                            <Route path="/mantenedor" element={<MonthlyDonor />} />
+                                            <Route path="/seja-mantenedor" element={<Navigate to="/mantenedor" replace />} />
+                                            <Route path="/como-ajudar/mantenedor" element={<Navigate to="/mantenedor" replace />} />
+                                            <Route path="/voluntariado-e-parcerias" element={<VolunteerAndPartnerships />} />
+                                            <Route path="/voluntariado" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
+                                            <Route path="/parcerias" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
+                                            <Route path="/como-ajudar/voluntariado" element={<Navigate to="/voluntariado-e-parcerias" replace />} />
+                                            <Route path="/campanha" element={<Campaign />} />
+                                            <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+                                            <Route path="/termos-de-servico" element={<TermsOfService />} />
+                                          </Route>
+
+                                          <Route path="/admin/*" element={
+                                            <ProtectedRoute allowedRoles={['ADMIN', 'USER']} requiredModule="admin">
+                                              <Layout module="admin">
+                                                <Routes>
+                                                  <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
+                                                  <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
+                                                  <Route path="/hotsite" element={<CampaignHotsiteAdmin />} />
+                                                  <Route path="/home-highlights" element={<Navigate to="/communication/home-highlights" replace />} />
+                                                  <Route path="/impact-metrics" element={<Navigate to="/communication/impact-metrics" replace />} />
+                                                  <Route path="/top-banner" element={<Navigate to="/communication/top-banner" replace />} />
+                                                  <Route path="/impact-feed" element={<ImpactFeedManager />} />
+                                                  <Route path="/messages" element={<SupporterMessages />} />
+                                                  <Route path="/gifts" element={<GiftManager />} />
+                                                  <Route path="/fundraising" element={<FundraisingManager />} />
+                                                  <Route path="/projects" element={<Projects />} />
+                                                <Route path="/local-projects" element={<Settings />} />
+                                                <Route path="/users" element={<Settings />} />
+                                                <Route path="/finance" element={<AdminFinance />} />
+                                                <Route path="/store" element={<AdminStoreManager />} />
+                                                <Route path="/settings" element={<Settings />} />
+                                                <Route path="/profile" element={<Profile />} />
+                                                <Route path="*" element={<Navigate to="/admin/settings" replace />} />
+                                              </Routes>
+                                            </Layout>
+                                          </ProtectedRoute>
+                                        } />
+
+                                        {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
+                                        <Route path="/workspace" element={
+                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']} requiredModule="workspace">
+                                            <Layout module="workspace">
+                                              <WorkspaceLayout />
+                                            </Layout>
+                                          </ProtectedRoute>
+                                        }>
+                                          <Route index element={<WorkspaceViewContainer />} />
+                                          <Route path="inicio" element={<WorkspaceHome />} />
+                                          <Route path="inbox" element={<WorkspaceInbox />} />
+                                          <Route path="projects" element={<WorkspaceProjects />} />
+                                          <Route path="calendar" element={<WorkspaceCalendarPage />} />
+                                          <Route path="equipes/*" element={<TeamsContainer />} />
+                                          <Route path="my-tasks" element={<MyTasksView />} />
+                                          <Route path="search" element={<GlobalSearchView />} />
+                                          <Route path="chat/:id" element={<WorkspaceChat />} />
+                                          <Route path="dm/:id" element={<WorkspaceChat />} />
+                                          <Route path="*" element={<WorkspaceViewContainer />} />
                                         </Route>
 
-                                        <Route path="/admin/*" element={
-                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER']}>
-                                            <Layout module="admin">
+                                        {/* Communication Module */}
+                                        <Route path="/communication/*" element={
+                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']} requiredModule="communication">
+                                            <Layout module="communication">
                                               <Routes>
-                                                <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
-                                                <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
-                                                <Route path="/hotsite" element={<CampaignHotsiteAdmin />} />
-                                                <Route path="/home-highlights" element={<Navigate to="/communication/home-highlights" replace />} />
-                                                <Route path="/impact-metrics" element={<Navigate to="/communication/impact-metrics" replace />} />
-                                                <Route path="/top-banner" element={<Navigate to="/communication/top-banner" replace />} />
-                                                <Route path="/impact-feed" element={<ImpactFeedManager />} />
-                                                <Route path="/messages" element={<SupporterMessages />} />
-                                                <Route path="/gifts" element={<GiftManager />} />
-                                                <Route path="/fundraising" element={<FundraisingManager />} />
-                                                <Route path="/projects" element={<Projects />} />
-                                              <Route path="/local-projects" element={<Settings />} />
-                                              <Route path="/users" element={<Settings />} />
-                                              <Route path="/finance" element={<AdminFinance />} />
-                                              <Route path="/store" element={<AdminStoreManager />} />
-                                              <Route path="/settings" element={<Settings />} />
-                                              <Route path="/profile" element={<Profile />} />
-                                              <Route path="*" element={<Navigate to="/admin/settings" replace />} />
-                                            </Routes>
-                                          </Layout>
-                                        </ProtectedRoute>
-                                      } />
+                                                <Route path="/" element={<CommDashboard />} />
+                                                <Route path="/top-banner" element={<TopBannerManager />} />
+                                                <Route path="/home-highlights" element={<HomeHighlightsManager />} />
+                                                <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
+                                                <Route path="/projects" element={<CommProjects />} />
+                                                <Route path="/chat" element={<CommChat />} />
+                                                <Route path="/blog" element={<CommBlogAdmin />} />
+                                                <Route path="/campaigns" element={<CommEmailCampaigns />} />
+                                                 <Route path="/email-templates" element={<CommEmailTemplates />} />
+                                                 <Route path="/newsletter" element={<CommNewsletter />} />
+                                                 <Route path="/costs" element={<CommCosts />} />
+                                                <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
+                                              </Routes>
+                                            </Layout>
+                                          </ProtectedRoute>
+                                        } />
 
-                                      {/* Workspace (Personal Workspace) - Novo ClickUp Style */}
-                                      <Route path="/workspace" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                                          <Layout module="workspace">
-                                            <WorkspaceLayout />
-                                          </Layout>
-                                        </ProtectedRoute>
-                                      }>
-                                        <Route index element={<WorkspaceViewContainer />} />
-                                        <Route path="inicio" element={<WorkspaceHome />} />
-                                        <Route path="inbox" element={<WorkspaceInbox />} />
-                                        <Route path="projects" element={<WorkspaceProjects />} />
-                                        <Route path="calendar" element={<WorkspaceCalendarPage />} />
-                                        <Route path="equipes/*" element={<TeamsContainer />} />
-                                        <Route path="my-tasks" element={<MyTasksView />} />
-                                        <Route path="search" element={<GlobalSearchView />} />
-                                        <Route path="chat/:id" element={<WorkspaceChat />} />
-                                        <Route path="dm/:id" element={<WorkspaceChat />} />
-                                        <Route path="*" element={<WorkspaceViewContainer />} />
-                                      </Route>
+                                        {/* Nutrition Module */}
+                                        <Route path="/nutrition/*" element={
+                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER']} requiredModule="nutrition">
+                                            <Layout module="nutrition">
+                                              <Routes>
+                                                <Route path="/" element={<ObserverRestricted><Dashboard /></ObserverRestricted>} />
+                                                <Route path="/patients" element={<Patients />} />
+                                                <Route path="/patients/new" element={<ObserverRestricted><NewPatient /></ObserverRestricted>} />
+                                                <Route path="/patients/:id" element={<PatientDetails />} />
+                                                <Route path="/waiting-list" element={<ObserverRestricted><WaitingList /></ObserverRestricted>} />
+                                                <Route path="/updates" element={<ObserverRestricted><NutritionSupporterUpdates /></ObserverRestricted>} />
+                                                <Route path="/inventory" element={<ObserverRestricted><Inventory /></ObserverRestricted>} />
+                                                <Route path="/management" element={<ObserverRestricted><Management /></ObserverRestricted>} />
+                                                <Route path="/finance" element={<ObserverRestricted><ErrorBoundary fallbackTitle="Falha ao carregar Finanças da Nutrição"><NutritionFinance /></ErrorBoundary></ObserverRestricted>} />
+                                                <Route path="/atendimento" element={<ObserverRestricted><Atendimentos /></ObserverRestricted>} />
+                                                <Route path="/visits" element={<ObserverRestricted><HomeVisits /></ObserverRestricted>} />
+                                                <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
+                                              </Routes>
+                                            </Layout>
+                                          </ProtectedRoute>
+                                        } />
 
-                                      {/* Communication Module */}
-                                      <Route path="/communication/*" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}>
-                                          <Layout module="communication">
-                                            <Routes>
-                                              <Route path="/" element={<CommDashboard />} />
-                                              <Route path="/top-banner" element={<TopBannerManager />} />
-                                              <Route path="/home-highlights" element={<HomeHighlightsManager />} />
-                                              <Route path="/impact-metrics" element={<ImpactMetricsManager />} />
-                                              <Route path="/projects" element={<CommProjects />} />
-                                              <Route path="/chat" element={<CommChat />} />
-                                              <Route path="/blog" element={<CommBlogAdmin />} />
-                                              <Route path="/campaigns" element={<CommEmailCampaigns />} />
-                                               <Route path="/email-templates" element={<CommEmailTemplates />} />
-                                               <Route path="/newsletter" element={<CommNewsletter />} />
-                                               <Route path="/costs" element={<CommCosts />} />
-                                              <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
-                                            </Routes>
-                                          </Layout>
-                                        </ProtectedRoute>
-                                      } />
+                                        {/* Futuro Universitário Module */}
+                                        <Route path="/futuro-universitario/*" element={
+                                          <ProtectedRoute
+                                            allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']}
+                                            requiredModule="university"
+                                          >
+                                            <Layout module="university">
+                                              <Routes>
+                                                <Route path="/" element={<UniversityDashboard />} />
+                                                <Route path="/students" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:students:view', 'fu:students:create', 'fu:students:edit', 'fu:applications:approve']}>
+                                                    <UniversityStudents />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/scholarships" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:scholarships:view', 'fu:scholarships:manage', 'fu:payments:approve', 'fu:payments:register']}>
+                                                    <UniversityScholarships />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/mentors" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:mentors:view', 'fu:mentors:manage', 'fu:mentorships:manage']}>
+                                                    <UniversityMentors />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/academic" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:academic:view', 'fu:academic:edit']}>
+                                                    <UniversityAcademic />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/supporters" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:supporters:view', 'fu:supporters:manage']}>
+                                                    <UniversitySupporters />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/reports" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:reports:view', 'fu:reports:export']}>
+                                                    <UniversityReports />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="/settings" element={
+                                                  <UniversityPermissionGuard requiredPermissions={['fu:settings:manage']}>
+                                                    <UniversitySettings />
+                                                  </UniversityPermissionGuard>
+                                                } />
+                                                <Route path="*" element={<Navigate to="/futuro-universitario" replace />} />
+                                              </Routes>
+                                            </Layout>
+                                          </ProtectedRoute>
+                                        } />
 
-                                      {/* Nutrition Module */}
-                                      <Route path="/nutrition/*" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER']}>
-                                          <Layout module="nutrition">
-                                            <Routes>
-                                              <Route path="/" element={<ObserverRestricted><Dashboard /></ObserverRestricted>} />
-                                              <Route path="/patients" element={<Patients />} />
-                                              <Route path="/patients/new" element={<ObserverRestricted><NewPatient /></ObserverRestricted>} />
-                                              <Route path="/patients/:id" element={<PatientDetails />} />
-                                              <Route path="/waiting-list" element={<ObserverRestricted><WaitingList /></ObserverRestricted>} />
-                                              <Route path="/updates" element={<ObserverRestricted><NutritionSupporterUpdates /></ObserverRestricted>} />
-                                              <Route path="/inventory" element={<ObserverRestricted><Inventory /></ObserverRestricted>} />
-                                              <Route path="/management" element={<ObserverRestricted><Management /></ObserverRestricted>} />
-                                              <Route path="/finance" element={<ObserverRestricted><ErrorBoundary fallbackTitle="Falha ao carregar Finanças da Nutrição"><NutritionFinance /></ErrorBoundary></ObserverRestricted>} />
-                                              <Route path="/atendimento" element={<ObserverRestricted><Atendimentos /></ObserverRestricted>} />
-                                              <Route path="/visits" element={<ObserverRestricted><HomeVisits /></ObserverRestricted>} />
-                                              <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
-                                            </Routes>
-                                          </Layout>
-                                        </ProtectedRoute>
-                                      } />
+                                        {/* Supporter Module / Portal (Mobile Donor Experience) */}
+                                        <Route path="/portal/*" element={
+                                          <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'SPONSOR']}>
+                                            <MobileDonorLayout>
+                                              <Routes>
+                                                <Route path="/" element={<Navigate to="/portal/dashboard" replace />} />
+                                                <Route path="/dashboard" element={<MobileDonorHome />} />
+                                                <Route path="/sponsorship" element={<MobileDonorChildren />} />
+                                                <Route path="/sponsorship/novo" element={<MobileDonorSponsor />} />
+                                                <Route path="/apadrinhar" element={<MobileDonorSponsor />} />
+                                                <Route path="/sponsor" element={<MobileDonorSponsor />} />
+                                                <Route path="/projects" element={<MobileDonorProjects />} />
+                                                <Route path="/futuro-universitario" element={<PortalUniversityProgram />} />
+                                                <Route path="/blog" element={<MobileDonorBlog />} />
+                                                <Route path="/blog/:id" element={<MobileDonorBlog />} />
+                                                <Route path="/donations" element={<MobileDonorDonate />} />
+                                                <Route path="/my-donations" element={<PortalMyDonations />} />
+                                                <Route path="/shop" element={<SupporterStore />} />
+                                                <Route path="/messages" element={<PortalMessages />} />
+                                                <Route path="/gifts" element={<PortalGifts />} />
+                                                <Route path="/impact" element={<MobileDonorHome />} />
+                                                <Route path="*" element={<Navigate to="/portal/dashboard" replace />} />
+                                              </Routes>
+                                            </MobileDonorLayout>
+                                          </ProtectedRoute>
+                                        } />
 
-                                      {/* Supporter Module / Portal (Mobile Donor Experience) */}
-                                      <Route path="/portal/*" element={
-                                        <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'SPONSOR']}>
-                                          <MobileDonorLayout>
-                                            <Routes>
-                                              <Route path="/" element={<Navigate to="/portal/dashboard" replace />} />
-                                              <Route path="/dashboard" element={<MobileDonorHome />} />
-                                              <Route path="/sponsorship" element={<MobileDonorChildren />} />
-                                              <Route path="/sponsorship/novo" element={<MobileDonorSponsor />} />
-                                              <Route path="/apadrinhar" element={<MobileDonorSponsor />} />
-                                              <Route path="/sponsor" element={<MobileDonorSponsor />} />
-                                              <Route path="/projects" element={<MobileDonorProjects />} />
-                                              <Route path="/blog" element={<MobileDonorBlog />} />
-                                              <Route path="/blog/:id" element={<MobileDonorBlog />} />
-                                              <Route path="/donations" element={<MobileDonorDonate />} />
-                                              <Route path="/my-donations" element={<PortalMyDonations />} />
-                                              <Route path="/shop" element={<SupporterStore />} />
-                                              <Route path="/messages" element={<PortalMessages />} />
-                                              <Route path="/gifts" element={<PortalGifts />} />
-                                              <Route path="/impact" element={<MobileDonorHome />} />
-                                              <Route path="*" element={<Navigate to="/portal/dashboard" replace />} />
-                                            </Routes>
-                                          </MobileDonorLayout>
-                                        </ProtectedRoute>
-                                      } />
-
-                                      {/* Alias /app routes */}
-                                      <Route path="/app/*" element={<Navigate to="/portal/dashboard" replace />} />
-                                      
-                                      <Route path="*" element={<Navigate to="/" replace />} />
-                                    </Routes>
-                                          </DonationModalProvider>
-                                  </Router>
-                                  </NewsletterProvider>
-                                </WebsiteProjectsProvider>
+                                        {/* Alias /app routes */}
+                                        <Route path="/app/*" element={<Navigate to="/portal/dashboard" replace />} />
+                                        
+                                        <Route path="*" element={<Navigate to="/" replace />} />
+                                      </Routes>
+                                            </DonationModalProvider>
+                                    </Router>
+                                    </UniversityProvider>
+                                    </NewsletterProvider>
+                                  </WebsiteProjectsProvider>
                                 </BlogProvider>
                                 </TopBannerProvider>
                                 </ImpactMetricsProvider>

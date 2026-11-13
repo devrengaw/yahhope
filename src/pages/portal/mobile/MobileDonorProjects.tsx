@@ -8,8 +8,10 @@ import {
   UserCheck, 
   X, 
   Sparkles,
-  Info
+  Info,
+  GraduationCap
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useWebsiteProjects } from '../../../contexts/WebsiteProjectsContext';
 import { useDonationModal } from '../../../contexts/DonationModalContext';
 import { YAHHopeProject } from '../../../lib/mockData';
@@ -35,6 +37,15 @@ export function MobileDonorProjects() {
             Conheça as frentes missionárias e como suas doações impactam vidas na prática.
           </p>
         </div>
+
+        <Link
+          to="/portal/futuro-universitario"
+          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black shadow-md shadow-indigo-500/20 transition-all"
+        >
+          <GraduationCap size={16} />
+          <span>Painel Futuro Universitário</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
 
       {/* Projects Grid */}

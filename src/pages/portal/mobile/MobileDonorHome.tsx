@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useImpact } from '../../../contexts/ImpactContext';
+import { useImpact, canSupporterViewImpactItem, isChildSpecificImpactItem } from '../../../contexts/ImpactContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
 import { useBlog } from '../../../contexts/BlogContext';
 import { usePatients } from '../../../contexts/PatientContext';
@@ -46,6 +46,7 @@ export function MobileDonorHome() {
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
   const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [impactFilter, setImpactFilter] = useState<'all' | 'general' | 'children'>('all');
 
   const fetchCommitments = () => {
     sponsorshipService.getSupporterCommitments(user?.id, user?.email, user?.name)
@@ -241,7 +242,21 @@ export function MobileDonorHome() {
     return patients.slice(0, 4);
   }, [isDonorOrSponsor, patients, myChildIds, myChildren]);
 
-  const publishedImpact = getPublishedItems().slice(0, 3);
+  // Segregação estrita: Atualizações de crianças aparecem APENAS para os padrinhos das respectivas crianças.
+  // Atualizações gerais (Todos os Apoiadores) aparecem para todos.
+  const allVisibleImpact = useMemo(() => {
+    return getPublishedItems().filter(item => canSupporterViewImpactItem(item, myChildren));
+  }, [getPublishedItems, myChildren]);
+
+  const publishedImpact = useMemo(() => {
+    const filtered = allVisibleImpact.filter(item => {
+      if (impactFilter === 'general') return !isChildSpecificImpactItem(item);
+      if (impactFilter === 'children') return isChildSpecificImpactItem(item);
+      return true;
+    });
+    return filtered.slice(0, 6);
+  }, [allVisibleImpact, impactFilter]);
+
   const latestPost = posts.find(p => p.status === 'published') || posts[0];
 
   return (
@@ -635,53 +650,99 @@ export function MobileDonorHome() {
 
           {/* Seção Atualizações de Campo & Transparência */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-heading font-black text-slate-900 flex items-center gap-2">
                   <TrendingUp className="text-emerald-500" size={22} />
-                  Atualizações de Campo
+                  Atualizações de Impacto
                 </h3>
                 <p className="text-xs text-slate-500 font-gotham-light">
-                  Transparência de cada ação desenvolvida com os mantenedores.
+                  {myChildren.length > 0
+                    ? 'Atualizações gerais dos apoiadores e notícias exclusivas das suas crianças apadrinhadas.'
+                    : 'Atualizações gerais de impacto compartilhadas com todos os apoiadores.'}
                 </p>
               </div>
-              <Link
-                to="/portal/projects"
-                className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
-              >
-                <span>Ver projetos</span>
-                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-              </Link>
+              {myChildren.length > 0 ? (
+                <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-gotham-bold uppercase transition-all cursor-pointer ${
+                      impactFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter('general')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-gotham-bold uppercase transition-all cursor-pointer ${
+                      impactFilter === 'general' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Geral
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter('children')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-gotham-bold uppercase transition-all cursor-pointer ${
+                      impactFilter === 'children' ? 'bg-[#F49853] text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Minhas Crianças
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/portal/projects"
+                  className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
+                >
+                  <span>Ver projetos</span>
+                  <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+              )}
             </div>
 
             <div className="space-y-3">
               {publishedImpact.length === 0 ? (
                 <div className="bg-white p-6 rounded-[1.75rem] border border-slate-200/80 text-center text-xs text-slate-400">
-                  Novos relatórios fotográficos e médicos serão publicados em breve pela coordenação.
+                  {impactFilter === 'children'
+                    ? 'Nenhuma atualização exclusiva publicada ainda para suas crianças apadrinhadas.'
+                    : 'Novas atualizações e relatórios serão publicados em breve pela coordenação.'}
                 </div>
               ) : (
-                publishedImpact.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-white p-5 rounded-[1.75rem] border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                        {item.type === 'child' ? 'Criança' : item.type === 'project' ? 'Projeto' : 'Relatório'}
-                      </span>
-                      <span className="text-xs text-slate-400 font-medium">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : (item.date || '')}
-                      </span>
-                    </div>
-                    <h4 className="font-heading font-black text-slate-900 text-sm leading-snug">{item.title}</h4>
-                    <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">{item.content}</p>
-                    {item.img_url && (
-                      <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
-                        <img src={item.img_url} alt={item.title} className="w-full h-36 object-cover" />
+                publishedImpact.map((item) => {
+                  const isChildUpdate = isChildSpecificImpactItem(item);
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white p-5 rounded-[1.75rem] border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        {isChildUpdate ? (
+                          <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                            <Heart size={10} fill="currentColor" className="text-[#F49853]" />
+                            Exclusivo do Padrinho{item.child ? ` • ${item.child}` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                            {item.type === 'project' ? 'Projeto' : 'Atualização Geral • Todos Apoiadores'}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400 font-medium">
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : (item.date || '')}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))
+                      <h4 className="font-heading font-black text-slate-900 text-sm leading-snug">{item.title}</h4>
+                      <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">{item.content}</p>
+                      {item.img_url && (
+                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
+                          <img src={item.img_url} alt={item.title} className="w-full h-36 object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

@@ -40,7 +40,7 @@ export async function getUniqueMonthlySupportersCount(): Promise<number> {
     // Filtra apenas as que são assinaturas ou recorrentes mensais, NUNCA avulsas
     const { data: donations } = await supabase
       .from('donations')
-      .select('donor_email, email, user_id, stripe_subscription_id, is_sponsorship, recurrence, type, status');
+      .select('*');
 
     if (donations && donations.length > 0) {
       donations.forEach(d => {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox, Flame } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox, Flame, GraduationCap, Award, UserCheck, BookOpen, FileBarChart } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserAuthorizedModules, hasUniversityPermission, UniversityPermissionKey } from '../lib/universityPermissions';
 import { ChatWidget } from './ChatWidget';
 import { NotificationBell } from './NotificationBell';
 
@@ -66,7 +67,23 @@ const supporterNavItems = [
   { name: 'Meu Impacto', path: '/portal/impact', icon: BarChart3 },
 ];
 
-export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'workspace' | 'admin' | 'communication' | 'supporter' }) {
+const universityNavItems: Array<{
+  name: string;
+  path: string;
+  icon: any;
+  requiredPerm?: UniversityPermissionKey;
+}> = [
+  { name: 'Visão Geral', path: '/futuro-universitario', icon: LayoutDashboard },
+  { name: 'Estudantes', path: '/futuro-universitario/students', icon: Users, requiredPerm: 'fu:students:view' },
+  { name: 'Bolsas & Pagamentos', path: '/futuro-universitario/scholarships', icon: Award, requiredPerm: 'fu:scholarships:view' },
+  { name: 'Mentores & Mentorias', path: '/futuro-universitario/mentors', icon: UserCheck, requiredPerm: 'fu:mentors:view' },
+  { name: 'Acadêmico', path: '/futuro-universitario/academic', icon: BookOpen, requiredPerm: 'fu:academic:view' },
+  { name: 'Apoiadores', path: '/futuro-universitario/supporters', icon: Heart, requiredPerm: 'fu:supporters:view' },
+  { name: 'Relatórios', path: '/futuro-universitario/reports', icon: FileBarChart, requiredPerm: 'fu:reports:view' },
+  { name: 'Configurações', path: '/futuro-universitario/settings', icon: Settings, requiredPerm: 'fu:settings:manage' },
+];
+
+export function Layout({ children, module }: { children: React.ReactNode, module: 'nutrition' | 'workspace' | 'admin' | 'communication' | 'supporter' | 'university' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -97,40 +114,20 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
   const isAdmin = user?.role === 'ADMIN';
 
-  // Workspace: Admin e membros com perfil de equipe/projeto (exceto Apoiador e Observador)
-  const hasWorkspace = 
-    isAdmin || 
-    (user?.role !== 'OBSERVER' && user?.role !== 'SPONSOR' && (
-      !user?.permissions || 
-      user.permissions.length === 0 || 
-      user.permissions.some(p => ['workspace', 'projects', 'team', 'calendar', 'tasks', 'my-tasks', 'inicio', 'inbox', 'dashboard', 'all'].includes(p))
-    ));
-
-  // Nutrição Infantil: Admin, Observador, funções clínicas ou permissões de nutrição
-  const nutritionPermissions = ['patients', 'attendance', 'waiting-list', 'inventory', 'visits', 'atendimento', 'nutrition', 'nutrition-finance', 'updates'];
-  const hasNutrition = 
-    isAdmin || 
-    user?.role === 'OBSERVER' ||
-    ['STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR'].includes(user?.role || '') ||
-    Boolean(user?.permissions && user.permissions.some(p => nutritionPermissions.includes(p)));
-
-  // Comunicação: Admin ou quem possui permissões de comunicação
-  const communicationPermissions = ['projects', 'chat', 'blog', 'campaigns', 'email-templates', 'communication', 'top-banner', 'home-highlights', 'impact-metrics', 'newsletter'];
-  const hasCommunication = 
-    isAdmin || 
-    Boolean(user?.permissions && user.permissions.some(p => communicationPermissions.includes(p)));
-
-  // Administração: Admin ou usuário com permissões administrativas explícitas
-  const adminPermissions = ['settings', 'hotsite', 'impact-feed', 'fundraising', 'store', 'local-projects', 'users', 'finance', 'analytics', 'top-banner', 'home-highlights', 'impact-metrics', 'gifts', 'admin'];
-  const hasAdmin = 
-    isAdmin || 
-    Boolean(user?.permissions && user.permissions.some(p => adminPermissions.includes(p)));
+  const {
+    hasWorkspace,
+    hasNutrition,
+    hasCommunication,
+    hasAdmin,
+    hasUniversity,
+  } = getUserAuthorizedModules(user);
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
     module === 'workspace' ? workspaceNavItems : 
     module === 'communication' ? communicationNavItems :
     module === 'supporter' ? supporterNavItems :
+    module === 'university' ? universityNavItems :
     adminNavItems;
   
   // Filter items by permission
@@ -140,6 +137,13 @@ export function Layout({ children, module }: { children: React.ReactNode, module
 
     // Supporter and Workspace items are available to all authorized users
     if (module === 'supporter' || module === 'workspace') return true;
+
+    // Futuro Universitário: filtra pelas permissões internas do módulo
+    if (module === 'university') {
+      const reqPerm = (item as any).requiredPerm as UniversityPermissionKey | undefined;
+      if (!reqPerm) return true;
+      return hasUniversityPermission(user, reqPerm);
+    }
 
     // If permissions array is empty or includes 'all', allow all items for this module
     if (!user?.permissions || user.permissions.length === 0 || user.permissions.includes('all')) return true;
@@ -171,6 +175,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     module === 'workspace' ? 'Meu Workspace' : 
     module === 'communication' ? 'Comunicação' :
     module === 'supporter' ? 'Portal do Apoiador' :
+    module === 'university' ? 'Futuro Universitário' :
     'YAH Hope Admin';
     
   
@@ -239,6 +244,21 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           roleText: "text-white/80",
           logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
         };
+      case 'university':
+        return {
+          mobileHeader: "bg-indigo-900 text-white",
+          sidebarBg: "bg-indigo-950 border-transparent text-indigo-50",
+          moduleName: "text-indigo-300",
+          itemActiveBg: "bg-indigo-800/60 text-white shadow-inner",
+          itemInactiveBg: "text-indigo-200 hover:bg-indigo-800/40 hover:text-white",
+          iconActive: "text-indigo-100",
+          iconInactive: "text-indigo-300",
+          borderTop: "border-indigo-800/60",
+          backLink: "text-indigo-200 hover:text-white",
+          avatarBg: "bg-indigo-800 border-indigo-700 group-hover:border-white",
+          roleText: "text-indigo-300",
+          logoutBtn: "text-indigo-300 hover:text-white hover:bg-indigo-800/50"
+        };
       case 'admin':
       default:
         return {
@@ -280,6 +300,13 @@ export function Layout({ children, module }: { children: React.ReactNode, module
           { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
           { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
           { name: 'Disparos', path: '/communication/campaigns', icon: Send },
+        ];
+      case 'university':
+        return [
+          { name: 'Início', path: '/futuro-universitario', icon: LayoutDashboard },
+          { name: 'Estudantes', path: '/futuro-universitario/students', icon: Users },
+          { name: 'Bolsas', path: '/futuro-universitario/scholarships', icon: Award },
+          { name: 'Mentoria', path: '/futuro-universitario/mentors', icon: UserCheck },
         ];
       case 'admin':
       default:
@@ -327,6 +354,16 @@ export function Layout({ children, module }: { children: React.ReactNode, module
                 className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'nutrition' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
               >
                 <Activity size={22} className={module === 'nutrition' ? '' : 'group-hover:scale-110 transition-transform'} />
+              </Link>
+            )}
+
+            {hasUniversity && (
+              <Link 
+                to="/futuro-universitario" 
+                title="Futuro Universitário"
+                className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all group relative", module === 'university' ? 'bg-black/15 text-white shadow-lg shadow-black/5' : 'text-white/70 hover:bg-white/10 hover:text-white')}
+              >
+                <GraduationCap size={22} className={module === 'university' ? '' : 'group-hover:scale-110 transition-transform'} />
               </Link>
             )}
             
@@ -501,6 +538,22 @@ export function Layout({ children, module }: { children: React.ReactNode, module
                   </Link>
                 )}
 
+                {hasUniversity && (
+                  <Link
+                    to="/futuro-universitario"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      module === 'university'
+                        ? "bg-white text-slate-900 shadow-sm ring-2 ring-white/50"
+                        : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
+                    )}
+                  >
+                    <GraduationCap size={16} className={module === 'university' ? "text-indigo-600" : "text-white/80"} />
+                    <span className="truncate">Universitário</span>
+                  </Link>
+                )}
+
                 {hasCommunication && (
                   <Link
                     to="/communication"
@@ -603,7 +656,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               <div>
                 <ul className="space-y-1">
                   {navItems.map((item) => {
-                    const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : '/admin') && location.pathname.startsWith(item.path));
+                    const isActive = location.pathname === item.path || (item.path !== (module === 'nutrition' ? '/nutrition' : (module as string) === 'workspace' ? '/workspace' : module === 'communication' ? '/communication' : module === 'university' ? '/futuro-universitario' : '/admin') && location.pathname.startsWith(item.path));
                     return (
                       <li key={item.path}>
                         <Link
@@ -718,7 +771,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/80 pb-safe md:hidden shadow-lg shadow-slate-900/10">
           <div className="flex items-center justify-around h-16 px-1">
             {getMobileBottomNavItems().map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/nutrition' && (item.path as string) !== '/workspace' && item.path !== '/communication' && item.path !== '/admin' && location.pathname.startsWith(item.path));
+              const isActive = location.pathname === item.path || (item.path !== '/nutrition' && (item.path as string) !== '/workspace' && item.path !== '/communication' && item.path !== '/futuro-universitario' && item.path !== '/admin' && location.pathname.startsWith(item.path));
               const Icon = item.icon;
               return (
                 <button

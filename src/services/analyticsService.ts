@@ -746,7 +746,7 @@ export async function getAnalyticsData(period: 'today' | '7d' | '30d' | '90d' | 
   try {
     const { data: rawUsersData } = await supabase
       .from('users')
-      .select('id, name, email, phone, role, department, created_at')
+      .select('*')
       .order('created_at', { ascending: false });
 
     const usersData = (rawUsersData || []).filter((u: any) => !isSpamOrMockUser(u));

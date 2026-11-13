@@ -97,6 +97,30 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
       ]
     },
     {
+      name: 'Futuro Universitário',
+      modules: [
+        { id: 'futuro-universitario', label: 'Acesso Completo ao Módulo' },
+        { id: 'fu:students:view', label: 'Visualizar estudantes' },
+        { id: 'fu:students:create', label: 'Cadastrar estudantes' },
+        { id: 'fu:students:edit', label: 'Editar estudantes' },
+        { id: 'fu:applications:approve', label: 'Aprovar inscrições' },
+        { id: 'fu:scholarships:view', label: 'Visualizar bolsas' },
+        { id: 'fu:scholarships:manage', label: 'Gerenciar bolsas' },
+        { id: 'fu:payments:approve', label: 'Aprovar pagamentos' },
+        { id: 'fu:payments:register', label: 'Registrar pagamentos' },
+        { id: 'fu:mentors:view', label: 'Visualizar mentores' },
+        { id: 'fu:mentors:manage', label: 'Gerenciar mentores' },
+        { id: 'fu:mentorships:manage', label: 'Gerenciar mentorias' },
+        { id: 'fu:academic:view', label: 'Visualizar informações acadêmicas' },
+        { id: 'fu:academic:edit', label: 'Editar informações acadêmicas' },
+        { id: 'fu:supporters:view', label: 'Visualizar apoiadores' },
+        { id: 'fu:supporters:manage', label: 'Gerenciar apoiadores' },
+        { id: 'fu:reports:view', label: 'Visualizar relatórios' },
+        { id: 'fu:reports:export', label: 'Exportar relatórios' },
+        { id: 'fu:settings:manage', label: 'Configurar o módulo' },
+      ]
+    },
+    {
       name: 'Gestão de Projetos (ERP)',
       modules: [
         { id: 'dashboard', label: 'Dashboard' },

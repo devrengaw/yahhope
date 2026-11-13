@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Heart, Lock, Mail, UserPlus, LogIn, CheckSquare, Square, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
+import { getDefaultAuthorizedRouteForUser } from '../../lib/universityPermissions';
 
 export function Login() {
   const { loginWithEmail, registerWithEmail, sendPasswordResetEmail, user, loading } = useAuth();
@@ -67,22 +68,8 @@ export function Login() {
           return;
         }
 
-        if (user.role === 'USER') {
-          const hasNutrition = user.permissions?.some(p => ['patients', 'attendance', 'inventory', 'management', 'waiting-list', 'atendimento', 'updates', 'visits'].includes(p));
-          const hasCommunication = user.permissions?.some(p => ['projects', 'chat', 'blog'].includes(p));
-          const hasSettings = user.permissions?.includes('settings');
-
-          const accessibleCount = [hasNutrition, hasCommunication, hasSettings].filter(Boolean).length;
-
-          if (accessibleCount > 1 || accessibleCount === 0) {
-            navigate('/workspace');
-          } else if (hasNutrition) {
-            navigate('/nutrition/patients');
-          } else if (hasCommunication) {
-            navigate('/communication/projects');
-          } else if (hasSettings) {
-            navigate('/admin/settings');
-          }
+        if (user.role !== 'SPONSOR') {
+          navigate(getDefaultAuthorizedRouteForUser(user));
           return;
         }
 

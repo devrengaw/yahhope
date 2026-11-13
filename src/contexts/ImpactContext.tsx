@@ -36,6 +36,53 @@ export type NewImpactFeedItem = {
   published_at?: string;
 };
 
+export function isChildSpecificImpactItem(item: ImpactFeedItem): boolean {
+  return Boolean(item.type === 'child' || item.child_id || (item.child && item.child.trim().length > 0));
+}
+
+export function isImpactItemForSponsoredChild(
+  item: ImpactFeedItem,
+  sponsoredChildren: Array<{ id?: string; name?: string }>
+): boolean {
+  if (!sponsoredChildren || sponsoredChildren.length === 0) return false;
+
+  const itemChildId = item.child_id?.trim().toLowerCase();
+  const itemChildName = (
+    item.child ||
+    (item.title ? item.title.replace(/^atualiza[çc][ãa]o:\s*/i, '') : '')
+  )
+    .trim()
+    .toLowerCase();
+
+  return sponsoredChildren.some(c => {
+    const cId = c.id?.trim().toLowerCase();
+    const cName = c.name?.trim().toLowerCase();
+
+    if (itemChildId && cId && itemChildId === cId) {
+      return true;
+    }
+    if (itemChildName && cName && (itemChildName === cName || (!itemChildId && itemChildName.includes(cName)))) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Regra estrita de visibilidade para o Portal dos Apoiadores:
+ * - Atualizações vinculadas a uma criança (Nutrição Infantil) aparecem APENAS para os padrinhos daquela respectiva criança.
+ * - Atualizações Gerais (Todos os Apoiadores) aparecem para todos os apoiadores.
+ */
+export function canSupporterViewImpactItem(
+  item: ImpactFeedItem,
+  sponsoredChildren: Array<{ id?: string; name?: string }>
+): boolean {
+  if (isChildSpecificImpactItem(item)) {
+    return isImpactItemForSponsoredChild(item, sponsoredChildren);
+  }
+  return true;
+}
+
 interface ImpactContextData {
   feedItems: ImpactFeedItem[];
   isLoading: boolean;
@@ -146,17 +193,23 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
             status = 'published';
           }
 
+          const childId = item.child_id ? String(item.child_id) : undefined;
+          const childName = item.child_name || item.child || undefined;
+          const resolvedType: ImpactFeedType = (childId || childName || item.type === 'child')
+            ? 'child'
+            : ((item.type as ImpactFeedType) || 'geral');
+
           return {
             id: String(item.id),
-            type: (item.type as ImpactFeedType) || 'geral',
+            type: resolvedType,
             source: item.source || 'Módulo Nutrição',
             title: item.title || 'Atualização de Impacto',
             content: item.content || '',
             author: item.author || 'Equipe Nutrição',
             status,
             date: item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
-            child_id: item.child_id ? String(item.child_id) : undefined,
-            child: item.child_name || item.child || undefined,
+            child_id: childId,
+            child: childName,
             img_url: item.img_url || undefined,
             created_at: item.created_at || new Date().toISOString(),
             scheduled_for: item.scheduled_for || undefined,
@@ -236,17 +289,20 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       initialStatus = 'scheduled';
     }
 
+    const hasChild = Boolean(item.child_id || (item.child && item.child.trim().length > 0));
+    const resolvedType: ImpactFeedType = hasChild ? 'child' : (item.type || 'geral');
+
     const newItem: ImpactFeedItem = {
       id: newId,
-      type: item.type || (item.child_id ? 'child' : 'geral'),
+      type: resolvedType,
       source: item.source || 'Módulo Nutrição',
       title: item.title,
       content: item.content,
       author: item.author || 'Equipe Nutrição',
       status: initialStatus,
       date: item.date || formattedDate,
-      child_id: item.child_id,
-      child: item.child,
+      child_id: hasChild ? item.child_id : undefined,
+      child: hasChild ? item.child : undefined,
       img_url: item.img_url,
       created_at: nowIso,
       scheduled_for: item.scheduled_for,
@@ -286,7 +342,22 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from('impact_feed').insert(payload);
 
       if (error) {
-        console.warn('Não foi possível gravar impact_feed no Supabase (salvo localmente):', error.message);
+        // Fallback caso o schema ainda não tenha colunas estendidas
+        const fallbackPayload: any = {
+          id: newItem.id,
+          type: newItem.type,
+          source: newItem.source,
+          title: newItem.title,
+          content: newItem.content,
+          author: newItem.author,
+          status: newItem.status,
+          child_id: payload.child_id,
+          created_at: newItem.created_at
+        };
+        const { error: retryErr } = await supabase.from('impact_feed').insert(fallbackPayload);
+        if (retryErr) {
+          console.warn('Não foi possível gravar impact_feed no Supabase (salvo localmente):', retryErr.message);
+        }
       }
     } catch (e) {
       console.warn('Exceção ao inserir no Supabase (salvo localmente):', e);
@@ -307,6 +378,12 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
     if (computedUpdates.status === 'published' && !computedUpdates.published_at) {
       computedUpdates.published_at = new Date().toISOString();
     }
+    if (computedUpdates.type === 'geral') {
+      computedUpdates.child_id = undefined;
+      computedUpdates.child = undefined;
+    } else if (computedUpdates.child_id || (computedUpdates.child && computedUpdates.child.trim().length > 0)) {
+      computedUpdates.type = 'child';
+    }
 
     // 1. Atualização imediata no estado local e localStorage
     setFeedItems(prev => {
@@ -324,12 +401,12 @@ export function ImpactProvider({ children }: { children: ReactNode }) {
       if (computedUpdates.type !== undefined) dbUpdates.type = computedUpdates.type;
       if (computedUpdates.source !== undefined) dbUpdates.source = computedUpdates.source;
       if (computedUpdates.author !== undefined) dbUpdates.author = computedUpdates.author;
-      if (computedUpdates.img_url !== undefined) dbUpdates.img_url = computedUpdates.img_url;
-      if (computedUpdates.child !== undefined) dbUpdates.child_name = computedUpdates.child;
-      if (computedUpdates.scheduled_for !== undefined) dbUpdates.scheduled_for = computedUpdates.scheduled_for;
+      if ('img_url' in updates) dbUpdates.img_url = computedUpdates.img_url || null;
+      if ('child' in updates || computedUpdates.type === 'geral') dbUpdates.child_name = computedUpdates.child || null;
+      if ('scheduled_for' in updates) dbUpdates.scheduled_for = computedUpdates.scheduled_for || null;
       if (computedUpdates.published_at !== undefined) dbUpdates.published_at = computedUpdates.published_at;
 
-      if (computedUpdates.child_id !== undefined) {
+      if ('child_id' in updates || computedUpdates.type === 'geral') {
         dbUpdates.child_id = isValidUUID(computedUpdates.child_id) ? computedUpdates.child_id : null;
       }
 

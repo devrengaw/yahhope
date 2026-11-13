@@ -66,9 +66,9 @@ export function isSpamOrMockUser(user?: {
 } | null): boolean {
   if (!user) return false;
 
-  // Apoiadores, padrinhos e mantenedores reais NUNCA são considerados spam
+  // Apoiadores, padrinhos, mantenedores e mentores voluntários NUNCA são considerados spam
   const role = (user.role || '').trim().toUpperCase();
-  if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR') {
+  if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR' || role === 'MENTOR') {
     return false;
   }
 
@@ -172,7 +172,7 @@ export function isInternalTeamUser(user?: {
     return true;
   }
 
-  // Papéis de apoiadores externos NUNCA são equipe interna do workspace
+  // Papéis de apoiadores externos e mentores voluntários NUNCA são equipe interna do painel administrativo
   if (
     role === 'SPONSOR' || 
     role === 'PADRINHO' || 
@@ -180,7 +180,8 @@ export function isInternalTeamUser(user?: {
     role === 'DOADOR' || 
     role === 'DONOR' || 
     role === 'APOIADOR' || 
-    role === 'SUPPORTER'
+    role === 'SUPPORTER' ||
+    role === 'MENTOR'
   ) {
     return false;
   }

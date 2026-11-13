@@ -147,7 +147,8 @@ export function NutritionSupporterUpdates() {
     setEditingItem(item);
     setEditTitle(item.title);
     setEditContent(item.content);
-    setEditChildId(item.child_id || '');
+    const matchedChildId = item.child_id || (item.child ? patients.find(p => p.name.toLowerCase() === item.child?.toLowerCase())?.id : '') || '';
+    setEditChildId(matchedChildId);
     setEditImageUrl(item.img_url || null);
     if (item.scheduled_for) {
       setEditIsScheduled(true);
@@ -291,7 +292,7 @@ export function NutritionSupporterUpdates() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Vincular Criança (Opcional)</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Público / Criança Vinculada</label>
                 <select 
                   value={selectedChild}
                   onChange={(e) => setSelectedChild(e.target.value)}
@@ -299,9 +300,21 @@ export function NutritionSupporterUpdates() {
                 >
                   <option value="">Atualização Geral (Todos os Apoiadores)</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.name} (Apenas Padrinhos)</option>
                   ))}
                 </select>
+                <p className={cn(
+                  "text-[11px] font-bold mt-2 px-3 py-2 rounded-xl border flex items-center gap-1.5",
+                  selectedChild
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                )}>
+                  {selectedChild ? (
+                    <>🔒 Visível exclusivamente para os padrinhos desta criança.</>
+                  ) : (
+                    <>🌐 Atualização Geral: aparecerá para todos os apoiadores.</>
+                  )}
+                </p>
               </div>
 
               <div>
@@ -484,6 +497,15 @@ export function NutritionSupporterUpdates() {
                                update.status === 'pending' ? 'Em Revisão' : 
                                update.status === 'published' ? 'Publicado' : 'Rejeitado'}
                             </span>
+                            {(update.type === 'child' || update.child_id || update.child) ? (
+                              <span className="text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                🔒 Exclusivo: Padrinhos de {update.child || 'Criança'}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                🌐 Atualização Geral (Todos os Apoiadores)
+                              </span>
+                            )}
                           </div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-2">
                             {update.date}
@@ -527,9 +549,15 @@ export function NutritionSupporterUpdates() {
 
                       <div className="flex items-center gap-4 text-[10px] font-bold">
                         {update.status === 'published' ? (
-                          <span className="flex items-center gap-1.5 text-emerald-600">
-                            <Globe size={12} /> Visível para apoiadores no portal
-                          </span>
+                          (update.type === 'child' || update.child_id || update.child) ? (
+                            <span className="flex items-center gap-1.5 text-amber-700">
+                              <Heart size={12} fill="currentColor" /> Visível apenas para os padrinhos de {update.child || 'criança'} no portal
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-emerald-600">
+                              <Globe size={12} /> Atualização Geral • Visível para todos os apoiadores no portal
+                            </span>
+                          )
                         ) : update.status === 'scheduled' ? (
                           <span className="flex items-center gap-1.5 text-indigo-600">
                             <Calendar size={12} /> Publicação programada para: {formatDateTimeDisplay(update.scheduled_for)}
@@ -590,15 +618,15 @@ export function NutritionSupporterUpdates() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Vincular Criança</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Público / Criança Vinculada</label>
                 <select 
                   value={editChildId}
                   onChange={(e) => setEditChildId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-700"
                 >
-                  <option value="">Geral (Todos os Apoiadores)</option>
+                  <option value="">Atualização Geral (Todos os Apoiadores)</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.name} (Apenas Padrinhos)</option>
                   ))}
                 </select>
               </div>

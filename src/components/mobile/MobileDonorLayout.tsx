@@ -14,7 +14,8 @@ import {
   CheckCircle,
   ExternalLink,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -40,6 +41,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
   const navItems = [
     { label: 'Visão Geral', path: '/portal/dashboard', icon: Home },
     { label: 'Crianças', path: '/portal/sponsorship', icon: Heart },
+    { label: 'Futuro Univ.', path: '/portal/futuro-universitario', icon: GraduationCap },
     { label: 'Projetos', path: '/portal/projects', icon: Briefcase },
     { label: 'Fazer Doação', path: '/portal/donations', icon: DollarSign },
     { label: 'Minhas Doações', path: '/portal/my-donations', icon: Receipt },
@@ -348,6 +350,18 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                 <div className="flex items-center gap-3">
                   <Heart size={18} className="text-rose-500" />
                   <span>Minhas Crianças Apadrinhadas</span>
+                </div>
+                <ChevronRight size={16} className="text-slate-400" />
+              </Link>
+
+              <Link
+                to="/portal/futuro-universitario"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center justify-between p-3.5 rounded-2xl text-slate-700 hover:bg-slate-100 transition-all text-xs font-bold"
+              >
+                <div className="flex items-center gap-3">
+                  <GraduationCap size={18} className="text-indigo-600" />
+                  <span>Programa Futuro Universitário</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
