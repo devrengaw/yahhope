@@ -227,478 +227,27 @@ const DEFAULT_CONFIG: UniversityModuleConfig = {
   enforce_strict_privacy: true,
 };
 
-const INITIAL_STUDENTS: UniversityStudent[] = [
-  {
-    id: 'fu-stu-001',
-    registration_code: 'FU-2025-001',
-    name: 'Samora Macamo',
-    email: 'samora.macamo@estudante.mz',
-    phone: '+258 84 123 4501',
-    dob: '2004-03-14',
-    gender: 'M',
-    city: 'Nampula',
-    province: 'Nampula',
-    photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600',
-    institution: 'Universidade Lúrio (UniLúrio)',
-    course: 'Medicina Geral',
-    current_semester: 5,
-    total_semesters: 12,
-    expected_graduation: '2029.2',
-    application_status: 'approved',
-    enrollment_status: 'active',
-    public_bio:
-      'Estudante dedicado do curso de Medicina na UniLúrio em Nampula. Atua como voluntário nas ações educativas de saúde preventiva na comunidade local.',
-    career_goal: 'Tornar-se médico pediatra para atuar no combate à desnutrição infantil em Nampula.',
-    portal_visible: true,
-    created_at: '2025-02-10T10:00:00Z',
-    sensitive: {
-      student_id: 'fu-stu-001',
-      document_id_number: '030102938471B',
-      nuit: '109283746',
-      family_sensitive_notes: 'Órfão de pai; mãe atua na agricultura de subsistência com 4 irmãos menores.',
-      socioeconomic_details: 'Moradia compartilhada em bairro periférico de Nampula, renda familiar inferior a 1 salário mínimo.',
-      monthly_family_income: 280,
-      household_members: 6,
-      bank_name: 'Millennium BIM',
-      bank_account: '450019283-0',
-      mobile_wallet: 'M-Pesa +258 84 123 4501',
-      spiritual_followup_notes: 'Participa quinzenalmente dos encontros de jovens e demonstra maturidade emocional.',
-    },
-  },
-  {
-    id: 'fu-stu-002',
-    registration_code: 'FU-2025-002',
-    name: 'Graça Chissano',
-    email: 'graca.chissano@estudante.mz',
-    phone: '+258 84 234 5602',
-    dob: '2005-07-22',
-    gender: 'F',
-    city: 'Nampula',
-    province: 'Nampula',
-    photo_url: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&q=80&w=600',
-    institution: 'Universidade Católica de Moçambique (UCM)',
-    course: 'Enfermagem em Saúde Materno-Infantil',
-    current_semester: 4,
-    total_semesters: 8,
-    expected_graduation: '2028.2',
-    application_status: 'approved',
-    enrollment_status: 'active',
-    public_bio:
-      'Bolsista do curso de Enfermagem em Nampula, apaixonada pelo cuidado materno-infantil e orientação nutricional para gestantes.',
-    career_goal: 'Liderar programas comunitários de saúde materna e nutrição infantil.',
-    portal_visible: true,
-    created_at: '2025-02-15T10:00:00Z',
-    sensitive: {
-      student_id: 'fu-stu-002',
-      document_id_number: '030199283746C',
-      nuit: '104938271',
-      family_sensitive_notes: 'Primeira pessoa da família a ingressar no ensino superior. Sustentada pela avó.',
-      socioeconomic_details: 'Vulnerabilidade socioeconômica severa; bolsa cobre 100% das taxas e transporte.',
-      monthly_family_income: 210,
-      household_members: 5,
-      bank_name: 'BCI Moçambique',
-      bank_account: '99182736-1',
-      mobile_wallet: 'e-Mola +258 86 234 5602',
-      spiritual_followup_notes: 'Solicitou oração pela saúde da avó no último acompanhamento.',
-    },
-  },
-  {
-    id: 'fu-stu-003',
-    registration_code: 'FU-2025-003',
-    name: 'Tomás Mondlane',
-    email: 'tomas.mondlane@estudante.mz',
-    phone: '+258 84 345 6703',
-    dob: '2003-11-05',
-    gender: 'M',
-    city: 'Maputo',
-    province: 'Maputo',
-    photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600',
-    institution: 'Universidade São Tomás de Moçambique (USTM)',
-    course: 'Engenharia Agronômica',
-    current_semester: 6,
-    total_semesters: 10,
-    expected_graduation: '2028.1',
-    application_status: 'approved',
-    enrollment_status: 'active',
-    public_bio:
-      'Estudante de Engenharia Agronômica focado em técnicas de cultivo resiliente e hortas comunitárias para segurança alimentar.',
-    career_goal: 'Desenvolver sistemas de irrigação sustentável e hortas comunitárias em zonas rurais.',
-    portal_visible: true,
-    created_at: '2025-03-01T10:00:00Z',
-    sensitive: {
-      student_id: 'fu-stu-003',
-      document_id_number: '110182736455A',
-      nuit: '103847562',
-      family_sensitive_notes: 'Família deslocada por eventos climáticos; reside em alojamento estudantil apoiado.',
-      socioeconomic_details: 'Depende integralmente do auxílio manutenção e bolsa universitária.',
-      monthly_family_income: 190,
-      household_members: 4,
-      bank_name: 'Millennium BIM',
-      bank_account: '77182930-4',
-      mobile_wallet: 'M-Pesa +258 84 345 6703',
-      spiritual_followup_notes: 'Líder de grupo de estudos bíblicos entre universitários.',
-    },
-  },
-  {
-    id: 'fu-stu-004',
-    registration_code: 'FU-2026-004',
-    name: 'Celina Mucavel',
-    email: 'celina.mucavel@estudante.mz',
-    phone: '+258 84 456 7804',
-    dob: '2006-01-19',
-    gender: 'F',
-    city: 'Nampula',
-    province: 'Nampula',
-    photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=600',
-    institution: 'Universidade Rovuma (UniRovuma)',
-    course: 'Pedagogia e Educação Infantil',
-    current_semester: 1,
-    total_semesters: 8,
-    expected_graduation: '2030.1',
-    application_status: 'pending',
-    enrollment_status: 'candidate',
-    public_bio:
-      'Jovem educadora voluntária em Nampula, aprovada no vestibular da UniRovuma e aguardando aprovação final da bolsa.',
-    career_goal: 'Alfabetização infantil e coordenação pedagógica em escolas comunitárias.',
-    portal_visible: false,
-    created_at: '2026-10-12T10:00:00Z',
-    sensitive: {
-      student_id: 'fu-stu-004',
-      document_id_number: '030177665544D',
-      nuit: '108877665',
-      family_sensitive_notes: 'Triagem social realizada em outubro/2026. Documentação familiar validada pela assistente social.',
-      socioeconomic_details: 'Sem renda formal na residência; excelente histórico escolar no ensino médio (média 17/20).',
-      monthly_family_income: 150,
-      household_members: 7,
-      bank_name: 'Em abertura',
-      bank_account: '-',
-      mobile_wallet: 'M-Pesa +258 84 456 7804',
-      spiritual_followup_notes: 'Acompanhada pela equipe local de Nampula.',
-    },
-  },
+const LEGACY_MOCK_STORAGE_KEYS = [
+  'yah_fu_config_v1',
+  'yah_fu_students_v1',
+  'yah_fu_scholarships_v1',
+  'yah_fu_payments_v1',
+  'yah_fu_mentors_v1',
+  'yah_fu_mentorships_v1',
+  'yah_fu_academic_v1',
+  'yah_fu_sponsorships_v1',
+  'yah_fu_updates_v1',
 ];
 
-const INITIAL_SCHOLARSHIPS: UniversityScholarship[] = [
-  {
-    id: 'fu-sch-001',
-    student_id: 'fu-stu-001',
-    scholarship_type: 'integral',
-    monthly_amount: 600,
-    currency: 'BRL',
-    coverage_items: ['Mensalidade Integral', 'Material Didático & Atlas Clínico', 'Transporte Urbano'],
-    start_date: '2025-02-15',
-    end_date: '2029-12-15',
-    status: 'active',
-    notes: 'Bolsa integral renovada mediante média semestral >= 8.5.',
-    created_at: '2025-02-15T10:00:00Z',
-  },
-  {
-    id: 'fu-sch-002',
-    student_id: 'fu-stu-002',
-    scholarship_type: 'integral',
-    monthly_amount: 600,
-    currency: 'BRL',
-    coverage_items: ['Mensalidade Integral', 'Insumos de Estágio', 'Transporte'],
-    start_date: '2025-02-20',
-    end_date: '2028-12-15',
-    status: 'active',
-    notes: 'Parceria institucional UCM Nampula.',
-    created_at: '2025-02-20T10:00:00Z',
-  },
-  {
-    id: 'fu-sch-003',
-    student_id: 'fu-stu-003',
-    scholarship_type: 'parcial',
-    monthly_amount: 450,
-    currency: 'BRL',
-    coverage_items: ['Mensalidade Parcial (75%)', 'Material Técnico Agrícola'],
-    start_date: '2025-03-01',
-    end_date: '2028-07-15',
-    status: 'active',
-    notes: 'Contrato de parceria com a Universidade São Tomás renovado.',
-    created_at: '2025-03-01T10:00:00Z',
-  },
-];
-
-const INITIAL_PAYMENTS: UniversityScholarshipPayment[] = [
-  {
-    id: 'fu-pay-001',
-    scholarship_id: 'fu-sch-001',
-    student_id: 'fu-stu-001',
-    reference_month: '2026-10',
-    category: 'mensalidade',
-    amount: 600,
-    currency: 'BRL',
-    status: 'paid',
-    due_date: '2026-10-10',
-    approved_at: '2026-10-05T14:00:00Z',
-    paid_at: '2026-10-08T09:30:00Z',
-    notes: 'Transferência confirmada para conta universitária.',
-    created_at: '2026-10-01T10:00:00Z',
-  },
-  {
-    id: 'fu-pay-002',
-    scholarship_id: 'fu-sch-002',
-    student_id: 'fu-stu-002',
-    reference_month: '2026-10',
-    category: 'mensalidade',
-    amount: 600,
-    currency: 'BRL',
-    status: 'paid',
-    due_date: '2026-10-10',
-    approved_at: '2026-10-05T14:00:00Z',
-    paid_at: '2026-10-09T11:00:00Z',
-    notes: 'Mensalidade outubro quitada.',
-    created_at: '2026-10-01T10:00:00Z',
-  },
-  {
-    id: 'fu-pay-003',
-    scholarship_id: 'fu-sch-001',
-    student_id: 'fu-stu-001',
-    reference_month: '2026-11',
-    category: 'mensalidade',
-    amount: 600,
-    currency: 'BRL',
-    status: 'approved',
-    due_date: '2026-11-15',
-    approved_at: '2026-11-08T10:00:00Z',
-    notes: 'Aprovado pela coordenação, aguardando baixa financeira.',
-    created_at: '2026-11-01T10:00:00Z',
-  },
-  {
-    id: 'fu-pay-004',
-    scholarship_id: 'fu-sch-003',
-    student_id: 'fu-stu-003',
-    reference_month: '2026-11',
-    category: 'mensalidade',
-    amount: 450,
-    currency: 'BRL',
-    status: 'pending_approval',
-    due_date: '2026-11-15',
-    notes: 'Boleto semestral emitido pela secretaria acadêmica.',
-    created_at: '2026-11-02T10:00:00Z',
-  },
-];
-
-const INITIAL_MENTORS: UniversityMentor[] = [
-  {
-    id: 'fu-men-001',
-    name: 'Prof. Marcos Silva',
-    email: 'marcos.silva@mentoria.org',
-    phone: '+55 11 98877-6655',
-    profession: 'Médico Pediatra & Docente Universitário',
-    company_or_institution: 'Hospital Universitário / Voluntário YAH Hope',
-    specialty_area: 'Medicina, Pesquisa Clínica & Liderança Cristã',
-    bio: 'Acompanha estudantes da área de saúde em gestão de carreira, ética médica e preparação para residência.',
-    max_students: 3,
-    linked_student_ids: ['fu-stu-001', 'fu-stu-002'],
-    status: 'active',
-    created_at: '2025-02-10T10:00:00Z',
-  },
-  {
-    id: 'fu-men-002',
-    name: 'Eng. Ricardo Almeida',
-    email: 'ricardo.almeida@mentoria.org',
-    phone: '+55 19 97766-5544',
-    profession: 'Engenheiro Agrônomo Sênior',
-    company_or_institution: 'Instituto Agro Sustentável',
-    specialty_area: 'Agronomia Tropical, Segurança Alimentar & Gestão de Projetos',
-    bio: 'Mentor técnico e vocacional para estudantes de engenharias e ciências agrárias.',
-    max_students: 2,
-    linked_student_ids: ['fu-stu-003'],
-    status: 'active',
-    created_at: '2025-03-05T10:00:00Z',
-  },
-];
-
-const INITIAL_MENTORSHIPS: UniversityMentorshipSession[] = [
-  {
-    id: 'fu-ms-001',
-    student_id: 'fu-stu-001',
-    mentor_id: 'fu-men-001',
-    session_date: '2026-10-25',
-    modality: 'online',
-    topic: 'Organização de Rotina de Internato e Estágio em Pediatria',
-    status: 'completed',
-    public_summary:
-      'Revisão do cronograma de estudos para as disciplinas clínicas do 5º semestre e planejamento das oficinas comunitárias de nutrição.',
-    confidential_notes:
-      'Estudante relatou cansaço pelo deslocamento até o hospital regional; ajustamos grade de horários para preservar horas de sono.',
-    spiritual_notes:
-      'Momento de oração pela família em Nampula e fortalecimento da vocação missionária na medicina.',
-    next_steps: 'Entregar resumo do caso clínico pediátrico até 20/11.',
-    created_at: '2026-10-25T16:00:00Z',
-  },
-  {
-    id: 'fu-ms-002',
-    student_id: 'fu-stu-002',
-    mentor_id: 'fu-men-001',
-    session_date: '2026-11-04',
-    modality: 'online',
-    topic: 'Práticas de Triagem Nutricional e Acolhimento Materno',
-    status: 'completed',
-    public_summary:
-      'Alinhamento sobre o projeto de extensão universitária em acompanhamento pré-natal e prevenção da desnutrição infantil.',
-    confidential_notes:
-      'Acompanhamento psicossocial positivo; excelente adaptação às aulas práticas de laboratório.',
-    spiritual_notes: 'Aconselhamento sobre equilíbrio entre responsabilidades familiares e vida acadêmica.',
-    next_steps: 'Preparar apresentação para o seminário semestral da UCM.',
-    created_at: '2026-11-04T15:00:00Z',
-  },
-];
-
-const INITIAL_ACADEMIC_RECORDS: UniversityAcademicRecord[] = [
-  {
-    id: 'fu-acad-001',
-    student_id: 'fu-stu-001',
-    period: '2026.1',
-    semester_number: 5,
-    gpa: 8.9,
-    attendance_rate: 98,
-    approved_subjects: 7,
-    total_subjects: 7,
-    community_hours_completed: 28,
-    academic_status: 'excelente',
-    public_highlight: 'Aprovado com distinção em Semiologia Pediátrica e 28h de reforço escolar comunitário cumpridas.',
-    internal_observations: 'Histórico oficial validado junto à secretaria da UniLúrio.',
-    updated_at: '2026-08-10T10:00:00Z',
-  },
-  {
-    id: 'fu-acad-002',
-    student_id: 'fu-stu-002',
-    period: '2026.1',
-    semester_number: 4,
-    gpa: 8.7,
-    attendance_rate: 96,
-    approved_subjects: 6,
-    total_subjects: 6,
-    community_hours_completed: 24,
-    academic_status: 'excelente',
-    public_highlight: 'Destaque na disciplina de Saúde Materno-Infantil e monitoria voluntária na Casa Nutri.',
-    internal_observations: 'Sem pendências acadêmicas.',
-    updated_at: '2026-08-12T10:00:00Z',
-  },
-  {
-    id: 'fu-acad-003',
-    student_id: 'fu-stu-003',
-    period: '2026.1',
-    semester_number: 6,
-    gpa: 8.4,
-    attendance_rate: 94,
-    approved_subjects: 6,
-    total_subjects: 6,
-    community_hours_completed: 32,
-    academic_status: 'regular',
-    public_highlight: 'Implantou 2 hortas pedagógicas comunitárias como contrapartida social da bolsa.',
-    internal_observations: 'Acompanhamento próximo na disciplina de Hidráulica Agrícola.',
-    updated_at: '2026-08-14T10:00:00Z',
-  },
-];
-
-const INITIAL_SPONSORSHIPS: UniversitySponsorship[] = [
-  {
-    id: 'fu-sp-001',
-    student_id: 'fu-stu-001',
-    donor_name: 'Lucas Wagner',
-    donor_email: 'lucas.wagneer@gmail.com',
-    modality: 'individual',
-    monthly_amount: 600,
-    quota_percentage: 100,
-    currency: 'BRL',
-    payment_method: 'credit_card',
-    status: 'active',
-    allow_student_updates: true,
-    started_at: '2025-03-01T10:00:00Z',
-  },
-  {
-    id: 'fu-sp-002',
-    student_id: 'fu-stu-002',
-    donor_name: 'Fernanda Carmagnani',
-    donor_email: 'fe.carmagnani@hotmail.com',
-    modality: 'partial',
-    monthly_amount: 150,
-    quota_percentage: 25,
-    currency: 'BRL',
-    payment_method: 'pix',
-    status: 'active',
-    allow_student_updates: true,
-    started_at: '2025-04-10T10:00:00Z',
-  },
-  {
-    id: 'fu-sp-003',
-    student_id: null,
-    donor_name: 'Gerson Simionato',
-    donor_email: 'gerson.simionato@gmail.com',
-    modality: 'general',
-    monthly_amount: 100,
-    quota_percentage: 100,
-    currency: 'BRL',
-    payment_method: 'credit_card',
-    status: 'active',
-    allow_student_updates: true,
-    started_at: '2025-05-01T10:00:00Z',
-  },
-];
-
-const INITIAL_UPDATES: UniversityProgramUpdate[] = [
-  {
-    id: 'fu-upd-001',
-    student_id: null,
-    title: 'Balanço Semestral Futuro Universitário: 100% de Aprovação Acadêmica',
-    summary:
-      'Todos os bolsistas ativos concluíram o semestre com média global de 8.7 e mais de 80 horas de retribuição comunitária.',
-    content:
-      'Encerramos mais um ciclo letivo do programa Futuro Universitário com resultados extraordinários. Nossos jovens bolsistas em Medicina, Enfermagem e Engenharia Agronômica mantiveram 100% de aprovação nas disciplinas cursadas, média ponderada geral de 8.7 e dedicaram 84 horas de reforço escolar e apoio direto às famílias atendidas pela YAH Hope em Moçambique.',
-    update_type: 'impact_report',
-    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/IMG5.avif',
-    published_to_portal: true,
-    published_at: '2026-09-15T10:00:00Z',
-  },
-  {
-    id: 'fu-upd-002',
-    student_id: 'fu-stu-001',
-    title: 'Início do Estágio Clínico em Pediatria Comunitária',
-    summary:
-      'Samora iniciou o ciclo de prática clínica supervisionada, integrando conhecimentos médicos ao combate à desnutrição infantil.',
-    content:
-      'Com o suporte contínuo da bolsa universitária e acompanhamento de mentoria médica, o estudante iniciou as rotações práticas em pediatria, auxiliando em triagens nutricionais comunitárias.',
-    update_type: 'student_milestone',
-    image_url: 'https://hope.yahchurch.com/wp-content/uploads/2025/09/PARTICIPE-DESTA-MISSAO-1.png',
-    published_to_portal: true,
-    published_at: '2026-10-20T10:00:00Z',
-  },
-];
-
-const STORAGE_KEYS = {
-  config: 'yah_fu_config_v1',
-  students: 'yah_fu_students_v1',
-  scholarships: 'yah_fu_scholarships_v1',
-  payments: 'yah_fu_payments_v1',
-  mentors: 'yah_fu_mentors_v1',
-  mentorships: 'yah_fu_mentorships_v1',
-  academic: 'yah_fu_academic_v1',
-  sponsorships: 'yah_fu_sponsorships_v1',
-  updates: 'yah_fu_updates_v1',
-};
-
-function loadLocal<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      return JSON.parse(raw) as T;
-    }
-  } catch (e) {
-    console.warn(`Aviso ao ler ${key} do localStorage:`, e);
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
   }
-  return fallback;
-}
-
-function saveLocal<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.warn(`Aviso ao salvar ${key} no localStorage:`, e);
-  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 interface UniversityContextType {
@@ -820,50 +369,28 @@ const UniversityContext = createContext<UniversityContextType | undefined>(undef
 export function UniversityProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
-  const [config, setConfig] = useState<UniversityModuleConfig>(() =>
-    loadLocal(STORAGE_KEYS.config, DEFAULT_CONFIG)
-  );
-  const [students, setStudents] = useState<UniversityStudent[]>(() =>
-    loadLocal(STORAGE_KEYS.students, INITIAL_STUDENTS)
-  );
-  const [scholarships, setScholarships] = useState<UniversityScholarship[]>(() =>
-    loadLocal(STORAGE_KEYS.scholarships, INITIAL_SCHOLARSHIPS)
-  );
-  const [payments, setPayments] = useState<UniversityScholarshipPayment[]>(() =>
-    loadLocal(STORAGE_KEYS.payments, INITIAL_PAYMENTS)
-  );
-  const [mentors, setMentors] = useState<UniversityMentor[]>(() =>
-    loadLocal(STORAGE_KEYS.mentors, INITIAL_MENTORS)
-  );
-  const [mentorships, setMentorships] = useState<UniversityMentorshipSession[]>(() =>
-    loadLocal(STORAGE_KEYS.mentorships, INITIAL_MENTORSHIPS)
-  );
-  const [academicRecords, setAcademicRecords] = useState<UniversityAcademicRecord[]>(() =>
-    loadLocal(STORAGE_KEYS.academic, INITIAL_ACADEMIC_RECORDS)
-  );
-  const [sponsorships, setSponsorships] = useState<UniversitySponsorship[]>(() =>
-    loadLocal(STORAGE_KEYS.sponsorships, INITIAL_SPONSORSHIPS)
-  );
-  const [updates, setUpdates] = useState<UniversityProgramUpdate[]>(() =>
-    loadLocal(STORAGE_KEYS.updates, INITIAL_UPDATES)
-  );
+  const [config, setConfig] = useState<UniversityModuleConfig>(DEFAULT_CONFIG);
+  const [students, setStudents] = useState<UniversityStudent[]>([]);
+  const [scholarships, setScholarships] = useState<UniversityScholarship[]>([]);
+  const [payments, setPayments] = useState<UniversityScholarshipPayment[]>([]);
+  const [mentors, setMentors] = useState<UniversityMentor[]>([]);
+  const [mentorships, setMentorships] = useState<UniversityMentorshipSession[]>([]);
+  const [academicRecords, setAcademicRecords] = useState<UniversityAcademicRecord[]>([]);
+  const [sponsorships, setSponsorships] = useState<UniversitySponsorship[]>([]);
+  const [updates, setUpdates] = useState<UniversityProgramUpdate[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   const canAccessModule = useMemo(() => hasUniversityModuleAccess(user), [user]);
   const can = (permission: UniversityPermissionKey) => hasUniversityPermission(user, permission);
 
-  // Persistência local automática
-  useEffect(() => saveLocal(STORAGE_KEYS.config, config), [config]);
-  useEffect(() => saveLocal(STORAGE_KEYS.students, students), [students]);
-  useEffect(() => saveLocal(STORAGE_KEYS.scholarships, scholarships), [scholarships]);
-  useEffect(() => saveLocal(STORAGE_KEYS.payments, payments), [payments]);
-  useEffect(() => saveLocal(STORAGE_KEYS.mentors, mentors), [mentors]);
-  useEffect(() => saveLocal(STORAGE_KEYS.mentorships, mentorships), [mentorships]);
-  useEffect(() => saveLocal(STORAGE_KEYS.academic, academicRecords), [academicRecords]);
-  useEffect(() => saveLocal(STORAGE_KEYS.sponsorships, sponsorships), [sponsorships]);
-  useEffect(() => saveLocal(STORAGE_KEYS.updates, updates), [updates]);
+  // Remove qualquer cache antigo de dados mockup do localStorage
+  useEffect(() => {
+    try {
+      LEGACY_MOCK_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));
+    } catch {}
+  }, []);
 
-  // Sincronização assíncrona com Supabase caso as tabelas já estejam criadas no banco
+  // Sincronização com Supabase
   useEffect(() => {
     let isMounted = true;
     async function syncFromSupabase() {
@@ -900,7 +427,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
           setConfig(prev => ({ ...prev, ...cfgRes.value.data }));
         }
 
-        if (stuRes.status === 'fulfilled' && Array.isArray(stuRes.value.data) && stuRes.value.data.length > 0) {
+        if (stuRes.status === 'fulfilled' && Array.isArray(stuRes.value.data)) {
           const sensMap = new Map<string, UniversityStudentSensitiveData>();
           if (sensRes.status === 'fulfilled' && Array.isArray((sensRes.value as any)?.data)) {
             ((sensRes.value as any).data as UniversityStudentSensitiveData[]).forEach(s => {
@@ -915,29 +442,29 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
           );
         }
 
-        if (schRes.status === 'fulfilled' && Array.isArray((schRes.value as any)?.data) && (schRes.value as any).data.length > 0) {
+        if (schRes.status === 'fulfilled' && Array.isArray((schRes.value as any)?.data)) {
           setScholarships((schRes.value as any).data);
         }
-        if (payRes.status === 'fulfilled' && Array.isArray((payRes.value as any)?.data) && (payRes.value as any).data.length > 0) {
+        if (payRes.status === 'fulfilled' && Array.isArray((payRes.value as any)?.data)) {
           setPayments((payRes.value as any).data);
         }
-        if (menRes.status === 'fulfilled' && Array.isArray((menRes.value as any)?.data) && (menRes.value as any).data.length > 0) {
+        if (menRes.status === 'fulfilled' && Array.isArray((menRes.value as any)?.data)) {
           setMentors((menRes.value as any).data);
         }
-        if (msRes.status === 'fulfilled' && Array.isArray((msRes.value as any)?.data) && (msRes.value as any).data.length > 0) {
+        if (msRes.status === 'fulfilled' && Array.isArray((msRes.value as any)?.data)) {
           setMentorships((msRes.value as any).data);
         }
-        if (acadRes.status === 'fulfilled' && Array.isArray(acadRes.value.data) && acadRes.value.data.length > 0) {
+        if (acadRes.status === 'fulfilled' && Array.isArray(acadRes.value.data)) {
           setAcademicRecords(acadRes.value.data);
         }
-        if (spRes.status === 'fulfilled' && Array.isArray(spRes.value.data) && spRes.value.data.length > 0) {
+        if (spRes.status === 'fulfilled' && Array.isArray(spRes.value.data)) {
           setSponsorships(spRes.value.data);
         }
-        if (updRes.status === 'fulfilled' && Array.isArray(updRes.value.data) && updRes.value.data.length > 0) {
+        if (updRes.status === 'fulfilled' && Array.isArray(updRes.value.data)) {
           setUpdates(updRes.value.data);
         }
       } catch {
-        // Mantém estado local resiliente
+        // Mantém estado vazio caso ainda não existam registros
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -954,7 +481,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
       return { success: false, error: 'Permissão negada: você não possui autorização para cadastrar estudantes (fu:students:create).' };
     }
 
-    const newId = `fu-stu-${Date.now().toString(36)}`;
+    const newId = generateUuid();
     const newStudent: UniversityStudent = {
       ...studentData,
       id: newId,
@@ -1052,7 +579,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
 
     const newScholarship: UniversityScholarship = {
       ...scholarshipData,
-      id: `fu-sch-${Date.now().toString(36)}`,
+      id: generateUuid(),
       created_at: new Date().toISOString(),
     };
 
@@ -1086,7 +613,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
 
     const newPayment: UniversityScholarshipPayment = {
       ...paymentData,
-      id: `fu-pay-${Date.now().toString(36)}`,
+      id: generateUuid(),
       created_at: new Date().toISOString(),
     };
 
@@ -1179,7 +706,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
     // sem criar usuário administrativo nem conceder permissões no painel administrativo.
     const newMentor: UniversityMentor = {
       ...mentorData,
-      id: `fu-men-${Date.now().toString(36)}`,
+      id: generateUuid(),
       created_at: new Date().toISOString(),
     };
 
@@ -1213,7 +740,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
 
     const newSession: UniversityMentorshipSession = {
       ...sessionData,
-      id: `fu-ms-${Date.now().toString(36)}`,
+      id: generateUuid(),
       recorded_by: user?.id,
       created_at: new Date().toISOString(),
     };
@@ -1246,7 +773,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
     } else {
       const newRecord: UniversityAcademicRecord = {
         ...recordData,
-        id: `fu-acad-${Date.now().toString(36)}`,
+        id: generateUuid(),
         updated_at: now,
       };
       setAcademicRecords(prev => [newRecord, ...prev]);
@@ -1271,7 +798,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
 
     const newSp: UniversitySponsorship = {
       ...sponsorshipData,
-      id: `fu-sp-${Date.now().toString(36)}`,
+      id: generateUuid(),
       started_at: new Date().toISOString(),
     };
 
@@ -1305,7 +832,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
 
     const newUpdate: UniversityProgramUpdate = {
       ...updateData,
-      id: `fu-upd-${Date.now().toString(36)}`,
+      id: generateUuid(),
       published_at: new Date().toISOString(),
     };
 
@@ -1353,7 +880,7 @@ export function UniversityProvider({ children }: { children: React.ReactNode }) 
     const avgGpa =
       academicRecords.length > 0
         ? (academicRecords.reduce((acc, r) => acc + Number(r.gpa || 0), 0) / academicRecords.length).toFixed(1)
-        : '8.7';
+        : '0.0';
     const totalCommunityHours = academicRecords.reduce(
       (acc, r) => acc + Number(r.community_hours_completed || 0),
       0
