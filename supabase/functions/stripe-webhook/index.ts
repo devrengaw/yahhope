@@ -325,6 +325,10 @@ async function handleStripeSync(filterEmail?: string) {
       if (amount <= 0) continue;
 
       const paymentId = (inv.payment_intent as string) || inv.id;
+      const invDateIso = new Date(inv.created * 1000).toISOString();
+      const donorName = inv.customer_name || email.split('@')[0];
+      const isPadrinhoInv = !CONFIRMED_STRIPE_MANTENEDORES.has(email) && (CONFIRMED_STRIPE_PADRINHOS.has(email) || amount >= 90);
+
       const { data: existingDonation } = await supabase
         .from('donations')
         .select('id')
@@ -334,31 +338,56 @@ async function handleStripeSync(filterEmail?: string) {
       if (!existingDonation) {
         await supabase.from('donations').insert({
           campaign_id: null,
-          donor_name: inv.customer_name || email.split('@')[0],
+          donor_name: donorName,
           donor_email: email,
           donor_phone: inv.customer_phone || null,
           amount,
           status: 'paid',
           payment_method: 'credit_card',
-          created_at: new Date(inv.created * 1000).toISOString(),
-          paid_at: new Date(inv.created * 1000).toISOString(),
+          created_at: invDateIso,
+          paid_at: invDateIso,
           stripe_payment_id: paymentId,
           stripe_subscription_id: (inv.subscription as string) || null,
-          is_sponsorship: Boolean(inv.subscription)
+          is_sponsorship: isPadrinhoInv
         });
         results.synced_donations++;
         results.total_amount += amount;
       }
+
+      // Garante que a entrada também exista em finance_transactions (ex: faturas de Novembro)
+      const invDayPrefix = invDateIso.slice(0, 10);
+      const { data: existingFinTx } = await supabase
+        .from('finance_transactions')
+        .select('id')
+        .eq('type', 'income')
+        .eq('amount', amount)
+        .gte('date', `${invDayPrefix}T00:00:00`)
+        .lte('date', `${invDayPrefix}T23:59:59`)
+        .ilike('description', `%${donorName}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingFinTx) {
+        await supabase.from('finance_transactions').insert({
+          description: `${isPadrinhoInv ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${donorName}`,
+          amount,
+          type: 'income',
+          category_id: isPadrinhoInv ? 'cat_sponsorship' : 'cat_donations',
+          status: 'completed',
+          account: 'Stripe',
+          date: invDateIso
+        });
+      }
     }
 
-    // 5. Busca cobranças avulsas aprovadas na Stripe (inclui doações da ação do dia 06 de junho)
+    // 5. Busca cobranças avulsas aprovadas na Stripe (exclui faturas de assinatura já processadas acima)
     const charges = await stripe.charges.list({
       limit: 100
     });
 
     for (const charge of charges.data) {
       if (charge.status !== 'succeeded') continue;
-      // Se já foi processada via fatura de assinatura com mesmo payment_intent, evita duplicar
+      if (charge.invoice) continue;
       const email = (charge.billing_details?.email || charge.receipt_email || '').toLowerCase().trim();
       if (!email) continue;
       if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
@@ -367,6 +396,7 @@ async function handleStripeSync(filterEmail?: string) {
       const paymentDate = new Date(charge.created * 1000).toISOString();
       const paymentMethod = charge.payment_method_details?.type === 'pix' ? 'pix' : 'credit_card';
       const paymentId = charge.id;
+      const donorName = charge.billing_details?.name || email.split('@')[0];
 
       const { data: existingDonation } = await supabase
         .from('donations')
@@ -376,8 +406,8 @@ async function handleStripeSync(filterEmail?: string) {
 
       if (!existingDonation) {
         await supabase.from('donations').insert({
-          campaign_id: charge.invoice ? null : (firstCamp?.id || null),
-          donor_name: charge.billing_details?.name || email.split('@')[0],
+          campaign_id: firstCamp?.id || null,
+          donor_name: donorName,
           donor_email: email,
           donor_phone: charge.billing_details?.phone || null,
           amount,
@@ -386,10 +416,34 @@ async function handleStripeSync(filterEmail?: string) {
           created_at: paymentDate,
           paid_at: paymentDate,
           stripe_payment_id: paymentId,
-          is_sponsorship: Boolean(charge.invoice)
+          is_sponsorship: false
         });
         results.synced_donations++;
         results.total_amount += amount;
+      }
+
+      const dayPrefix = paymentDate.slice(0, 10);
+      const { data: existingFinTx } = await supabase
+        .from('finance_transactions')
+        .select('id')
+        .eq('type', 'income')
+        .eq('amount', amount)
+        .gte('date', `${dayPrefix}T00:00:00`)
+        .lte('date', `${dayPrefix}T23:59:59`)
+        .ilike('description', `%${donorName}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingFinTx) {
+        await supabase.from('finance_transactions').insert({
+          description: `Doação via Stripe (${paymentMethod === 'pix' ? 'PIX' : 'Cartão'}) - ${donorName}`,
+          amount,
+          type: 'income',
+          category_id: 'cat_donation',
+          status: 'completed',
+          account: 'Stripe',
+          date: paymentDate
+        });
       }
     }
 
