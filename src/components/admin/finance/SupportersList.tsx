@@ -349,45 +349,8 @@ export function SupportersList() {
           }
         });
 
-        // 2. Fallback para padrinhos conhecidos APENAS se ainda não houver nenhuma criança vinculada no banco:
-        if (assignedChildrenList.length === 0 && (isCandidateForPadrinho || isKnownPadrinho)) {
-          if (cleanEmail === 'lucas.wagneer@gmail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('amina')) || Array.from(childrenMap.values())[0];
-            if (ch && !seenChildIds.has(ch.id)) {
-              seenChildIds.add(ch.id);
-              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
-            }
-          } else if (cleanEmail === 'jonata_xx@hotmail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('mateus')) || Array.from(childrenMap.values())[1];
-            if (ch && !seenChildIds.has(ch.id)) {
-              seenChildIds.add(ch.id);
-              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
-            }
-          } else if (cleanEmail === 'diegott@ymail.com') {
-            const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('esperança')) || Array.from(childrenMap.values())[2];
-            if (ch && !seenChildIds.has(ch.id)) {
-              seenChildIds.add(ch.id);
-              assignedChildrenList.push({ id: ch.id, name: ch.name, village: ch.address || ch.province, photo_url: ch.photo_url });
-            }
-          }
-
-          // 3. Se ainda não tinha nenhuma criança vinculada, atribui conforme cotas ativas:
-          if (assignedChildrenList.length < targetChildrenCount) {
-            const allAvailable = Array.from(childrenMap.values());
-            for (const ch of allAvailable) {
-              if (assignedChildrenList.length >= targetChildrenCount) break;
-              if (!seenChildIds.has(ch.id)) {
-                seenChildIds.add(ch.id);
-                assignedChildrenList.push({
-                  id: ch.id,
-                  name: ch.name,
-                  village: ch.address || ch.province || 'Casa Nutri',
-                  photo_url: ch.photo_url
-                });
-              }
-            }
-          }
-        }
+        // Fonte da verdade: apenas as crianças realmente vinculadas na tabela 'sponsorships' do banco.
+        // Não injeta crianças fictícias ou hardcoded em memória.
 
         const isRealPadrinho = assignedChildrenList.length > 0 || isCandidateForPadrinho;
 
@@ -1118,7 +1081,7 @@ export function SupportersList() {
                           <div>
                             <p className="text-xs font-black text-slate-900 flex items-center gap-1">
                               <Heart size={12} className="text-rose-500 shrink-0 fill-rose-500" />
-                              <span className="truncate max-w-[150px]">{s.sponsoredChildName || 'Amina Juma'}</span>
+                              <span className="truncate max-w-[150px]">{s.sponsoredChildName || 'Aguardando vínculo'}</span>
                             </p>
                             {s.sponsoredChildVillage && (
                               <p className="text-[10px] text-slate-400">{s.sponsoredChildVillage}</p>

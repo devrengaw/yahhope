@@ -779,6 +779,7 @@ export const sponsorshipService = {
 
     let dbChildren: ChildSponsorshipDetail[] = [];
     let hasUnassignedRow = false;
+    let dbFetchSucceeded = false;
     const combinedData: any[] = [];
 
     try {
@@ -851,44 +852,48 @@ export const sponsorshipService = {
           };
         });
 
+        // Auto-vincula sponsor_id se existir userId mas o registro estava sem sponsor_id (blinda RLS)
+        if (userId) {
+          const missingSponsorIds = combinedData.filter(item => !item.sponsor_id).map(item => item.id);
+          if (missingSponsorIds.length > 0) {
+            supabase.from('sponsorships').update({ sponsor_id: userId }).in('id', missingSponsorIds).then(() => {});
+          }
+        }
+
         // Identifica se o usuário tem cota de apadrinhamento de criança (>= 90) sem criança vinculada
         const unassigned = combinedData.filter(item => !item.child_id && Number(item.monthly_amount || 0) >= 90);
         if (unassigned.length > 0 && dbChildren.length === 0) {
           hasUnassignedRow = true;
         }
       }
+      dbFetchSucceeded = true;
     } catch (err) {
       console.warn('Aviso ao consultar apadrinhamentos no Supabase:', err);
     }
 
-    // Leitura do cache local resiliente
-    let cachedChildren: ChildSponsorshipDetail[] = [];
-    if (cleanEmail) {
-      try {
-        const raw = localStorage.getItem(`yah_sponsored_children_${cleanEmail}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) cachedChildren = parsed;
-        }
-      } catch (e) {
-        console.warn('Aviso ao ler cache local de crianças:', e);
-      }
-    }
-
     // A base de dados do Supabase é a fonte da verdade:
-    // Desduplica por id da criança
+    // Só usa cache local se a consulta ao banco falhou (offline/erro de rede).
     const mergedMap = new Map<string, ChildSponsorshipDetail>();
     dbChildren.forEach(c => {
       if (c && c.id) mergedMap.set(c.id, c);
     });
 
-    // Se o banco retornou a criança, ela prevalece sem inflar com cache antigo
-    if (mergedMap.size === 0 && cachedChildren.length > 0) {
-      cachedChildren.forEach(c => {
-        if (c && c.id && !mergedMap.has(c.id)) {
-          mergedMap.set(c.id, c);
+    if (!dbFetchSucceeded && mergedMap.size === 0 && cleanEmail) {
+      try {
+        const raw = localStorage.getItem(`yah_sponsored_children_${cleanEmail}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(c => {
+              if (c && c.id && !mergedMap.has(c.id)) {
+                mergedMap.set(c.id, c);
+              }
+            });
+          }
         }
-      });
+      } catch (e) {
+        console.warn('Aviso ao ler cache local de crianças:', e);
+      }
     }
 
     let result = Array.from(mergedMap.values());
@@ -910,9 +915,13 @@ export const sponsorshipService = {
       }
     }
 
-    if (cleanEmail && result.length > 0) {
+    if (cleanEmail) {
       try {
-        localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify(result));
+        if (result.length > 0) {
+          localStorage.setItem(`yah_sponsored_children_${cleanEmail}`, JSON.stringify(result));
+        } else if (dbFetchSucceeded) {
+          localStorage.removeItem(`yah_sponsored_children_${cleanEmail}`);
+        }
       } catch (e) {}
     }
 
@@ -1280,13 +1289,26 @@ export const sponsorshipService = {
 
       let savedRecord: any = null;
 
-      // 3. Se já existe o apadrinhamento, atualiza apenas o child_id (preservando status atual se inativo/cortado)
+      // Garante o sponsor_id real de public.users pelo e-mail para blindar RLS no portal do padrinho
+      let realSponsorId: string | null =
+        params.supporterId && !params.supporterId.startsWith('donor_') ? params.supporterId : null;
+      if (!realSponsorId && cleanEmail) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+        if (userRow?.id) realSponsorId = userRow.id;
+      }
+
+      // 3. Se já existe o apadrinhamento, atualiza child_id e garante sponsor_id (preservando status atual)
       if (existingSponsorship?.id) {
+        const updatePayload: any = { child_id: params.newChildId };
+        if (realSponsorId) updatePayload.sponsor_id = realSponsorId;
+
         const { data: updated, error: updateErr } = await supabase
           .from('sponsorships')
-          .update({
-            child_id: params.newChildId
-          })
+          .update(updatePayload)
           .eq('id', existingSponsorship.id)
           .select();
 
