@@ -109,14 +109,47 @@ async function syncMaintainerProfile(data: {
     const { data: existingSp } = await spQuery;
 
     if (existingSp && existingSp.length > 0) {
-      // Atualiza apadrinhamento existente sem sobrescrever cotas múltiplas com o valor total
-      const perQuotaAmount = existingSp.length > 1
-        ? Number((monthlyAmount / existingSp.length).toFixed(2))
+      const targetQuotas = canSponsorChild ? Math.max(quotasCount, existingSp.length) : existingSp.length;
+      // Atualiza apadrinhamento existente dividindo o valor total pelas cotas reais
+      const perQuotaAmount = targetQuotas > 1
+        ? Number((monthlyAmount / targetQuotas).toFixed(2))
         : monthlyAmount;
+
+      const existingChildIds = new Set(existingSp.map((sp: any) => sp.child_id).filter(Boolean));
+      const missingCount = canSponsorChild ? Math.max(0, quotasCount - existingSp.length) : 0;
+      const unassignedExisting = canSponsorChild ? existingSp.filter((sp: any) => !sp.child_id) : [];
+
+      let extraChildIds: string[] = [];
+      if (canSponsorChild && (missingCount > 0 || unassignedExisting.length > 0)) {
+        const { data: allChildren } = await supabase.from('children').select('id, name').order('name');
+        const { data: activeSp } = await supabase.from('sponsorships').select('child_id').eq('status', 'active');
+
+        const spCountByChild = new Map<string, number>();
+        (activeSp || []).forEach((s: any) => {
+          if (s.child_id) {
+            spCountByChild.set(s.child_id, (spCountByChild.get(s.child_id) || 0) + 1);
+          }
+        });
+
+        const available = (allChildren || []).filter(
+          (c: any) => !existingChildIds.has(c.id) && (spCountByChild.get(c.id) || 0) < 2
+        );
+        available.sort((a: any, b: any) => ((spCountByChild.get(a.id) || 0) - (spCountByChild.get(b.id) || 0)));
+
+        const totalNeeded = missingCount + unassignedExisting.length;
+        extraChildIds = available.slice(0, totalNeeded).map((c: any) => c.id);
+        if (extraChildIds.length < totalNeeded && allChildren && allChildren.length > 0) {
+          const fallbackPool = allChildren.filter((c: any) => !existingChildIds.has(c.id) && !extraChildIds.includes(c.id));
+          extraChildIds = [...extraChildIds, ...fallbackPool.slice(0, totalNeeded - extraChildIds.length).map((c: any) => c.id)];
+        }
+      }
 
       for (const sp of existingSp) {
         // Se o valor for menor que R$ 90 (ex: R$ 50) ou for Mantenedor Geral explícito, desvincula qualquer criança indevida
-        const finalChildId = canSponsorChild ? sp.child_id : null;
+        let finalChildId = canSponsorChild ? sp.child_id : null;
+        if (canSponsorChild && !finalChildId && extraChildIds.length > 0) {
+          finalChildId = extraChildIds.shift() || null;
+        }
 
         await supabase
           .from('sponsorships')
@@ -132,6 +165,27 @@ async function syncMaintainerProfile(data: {
             sponsor_id: userId || null
           })
           .eq('id', sp.id);
+      }
+
+      // Se o valor mensal dá direito a mais cotas do que os registros existentes (ex: R$ 300 = 3 crianças, tinha só 1), cria as faltantes
+      for (let i = 0; i < missingCount && extraChildIds.length > 0; i++) {
+        const chId = extraChildIds.shift();
+        if (!chId) break;
+        await supabase.from('sponsorships').insert({
+          child_id: chId,
+          sponsor_id: userId || null,
+          donor_name: donorName,
+          donor_email: cleanEmail,
+          donor_phone: donorPhone,
+          monthly_amount: perQuotaAmount,
+          quotas_count: 1,
+          status: 'active',
+          payment_method: paymentMethod,
+          created_at: timestamp,
+          last_sponsored_at: timestamp,
+          stripe_subscription_id: data.subscriptionId || null,
+          stripe_customer_id: data.customerId || null
+        });
       }
     } else {
       let assignedChildIds: (string | null)[] = [null];
