@@ -12,22 +12,26 @@ export interface NewsletterSubscriber {
 
 const STORAGE_KEY = 'yah_hope_newsletter_subscribers_v1';
 
-export const INITIAL_SUBSCRIBERS: NewsletterSubscriber[] = [
-  {
-    id: 'sub-1',
-    email: 'carolina.simionato@yahchurch.com',
-    created_at: '2026-09-15T14:32:00.000Z',
-    status: 'active',
-    source: 'Landing Page'
-  },
-  {
-    id: 'sub-2',
-    email: 'contato.apoiador@missaomocambique.org',
-    created_at: '2026-09-28T10:15:00.000Z',
-    status: 'active',
-    source: 'Landing Page'
+export const INITIAL_SUBSCRIBERS: NewsletterSubscriber[] = [];
+
+function isTestOrMockNewsletterEmail(email: string): boolean {
+  const em = (email || '').toLowerCase().trim();
+  if (!em || !em.includes('@')) return true;
+  if (
+    em === 'carolina.simionato@yahchurch.com' ||
+    em === 'contato.apoiador@missaomocambique.org' ||
+    em.includes('teste') ||
+    em.includes('test@') ||
+    em.includes('@test.') ||
+    em.includes('mock') ||
+    em.includes('fake') ||
+    em.endsWith('@example.com') ||
+    em.endsWith('@teste.com')
+  ) {
+    return true;
   }
-];
+  return isSpamOrMockUser({ email: em, name: '' });
+}
 
 interface NewsletterContextType {
   subscribers: NewsletterSubscriber[];
@@ -36,6 +40,7 @@ interface NewsletterContextType {
   removeSubscriber: (id: string) => Promise<void>;
   toggleStatus: (id: string) => Promise<void>;
   syncAllSiteEmails: () => Promise<{ added: number; total: number }>;
+  purgeTestSubscribers: () => Promise<number>;
   exportToCSV: () => void;
   copyAllEmails: () => Promise<boolean>;
 }
@@ -49,7 +54,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.filter((s: any) => !isTestOrMockNewsletterEmail(s?.email));
         }
       }
     } catch (e) {
@@ -82,13 +87,16 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
           .order('created_at', { ascending: false });
 
         if (!error && data && data.length > 0 && isMounted) {
-          setSubscribers(data.map((item: any) => ({
-            id: String(item.id),
-            email: item.email,
-            created_at: item.created_at || new Date().toISOString(),
-            status: item.status || 'active',
-            source: item.source || 'Landing Page'
-          })));
+          const cleanRows = data
+            .filter((item: any) => !isTestOrMockNewsletterEmail(item.email))
+            .map((item: any) => ({
+              id: String(item.id),
+              email: item.email,
+              created_at: item.created_at || new Date().toISOString(),
+              status: item.status || 'active',
+              source: item.source || 'Landing Page'
+            }));
+          setSubscribers(cleanRows);
         }
       } catch (err) {
         // Fallback to local storage
@@ -312,6 +320,27 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const purgeTestSubscribers = async (): Promise<number> => {
+    try {
+      const { data: dbSubs } = await supabase.from('newsletter_subscribers').select('id, email');
+      const idsToDelete = (dbSubs || [])
+        .filter((s: any) => isTestOrMockNewsletterEmail(s.email))
+        .map((s: any) => s.id);
+
+      const localRemovedCount = subscribers.filter(s => isTestOrMockNewsletterEmail(s.email)).length;
+
+      if (idsToDelete.length > 0) {
+        await supabase.from('newsletter_subscribers').delete().in('id', idsToDelete);
+      }
+
+      setSubscribers(prev => prev.filter(s => !isTestOrMockNewsletterEmail(s.email)));
+      return Math.max(idsToDelete.length, localRemovedCount);
+    } catch (e) {
+      console.error('Erro ao limpar e-mails de teste da newsletter:', e);
+      return 0;
+    }
+  };
+
   return (
     <NewsletterContext.Provider value={{
       subscribers,
@@ -320,6 +349,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       removeSubscriber,
       toggleStatus,
       syncAllSiteEmails,
+      purgeTestSubscribers,
       exportToCSV,
       copyAllEmails
     }}>

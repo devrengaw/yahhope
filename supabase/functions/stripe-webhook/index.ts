@@ -208,8 +208,9 @@ async function syncMaintainerProfile(data: {
 
         const needed = Math.max(quotasCount, 1);
         assignedChildIds = available.slice(0, needed).map((c: any) => c.id);
-        if (assignedChildIds.length === 0 && allChildren && allChildren.length > 0) {
-          assignedChildIds = allChildren.slice(0, needed).map((c: any) => c.id);
+        if (assignedChildIds.length === 0) {
+          // Não há mais crianças disponíveis para apadrinhamento; segue como Mantenedor sem criança vinculada
+          assignedChildIds = [null];
         }
       }
 
@@ -875,30 +876,29 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
       if (settings.primary_color) primaryColor = settings.primary_color
     }
 
-    const isSponsorFlow = Boolean(
-      meta?.isSponsorship ||
-      (meta?.isMonthly && (meta?.amount || 0) >= 90) ||
-      (meta?.children && meta.children.length > 0)
-    )
+    const childrenList = meta?.children || []
+    const isSponsorWithChild = childrenList.length > 0
+    const isMaintainer = !isSponsorWithChild && Boolean(meta?.isMonthly)
+    const targetTemplateName = isSponsorWithChild
+      ? 'new_sponsor'
+      : isMaintainer
+        ? 'new_maintainer'
+        : 'donation_thank_you'
 
-    // Para apadrinhamento, prioriza o template 'new_sponsor' configurado em Comunicação > E-mails
-    let templateData: any = null
-    if (isSponsorFlow) {
-      const { data: sponsorTpl } = await supabase
-        .from('email_templates')
-        .select('*')
-        .eq('name', 'new_sponsor')
-        .maybeSingle()
-      templateData = sponsorTpl
-    }
+    // Carrega o template correspondente configurado em Comunicação > E-mails
+    let { data: templateData } = await supabase
+      .from('email_templates')
+      .select('*')
+      .eq('name', targetTemplateName)
+      .maybeSingle()
 
-    if (!templateData) {
-      const { data: thankYouTpl } = await supabase
+    if (!templateData && targetTemplateName === 'new_sponsor') {
+      const { data: fallbackTpl } = await supabase
         .from('email_templates')
         .select('*')
         .eq('name', 'donation_thank_you')
         .maybeSingle()
-      templateData = thankYouTpl
+      templateData = fallbackTpl
     }
 
     // Trava de segurança: Se o template estiver explicitamente desativado, não envia
@@ -907,21 +907,32 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
       return
     }
 
-    const defaultSubject = isSponsorFlow
+    const defaultSubject = isSponsorWithChild
       ? 'Bem-vindo à família YAH Hope! 🧡 Finalize seu cadastro'
-      : 'Obrigado pelo seu apoio! 🧡 Finalize seu cadastro'
-    const defaultPreheader = isSponsorFlow
+      : isMaintainer
+        ? 'Obrigado por se tornar um mantenedor da YAH Hope! 🧡'
+        : 'Obrigado pelo seu apoio! 🧡 Finalize seu cadastro'
+    const defaultPreheader = isSponsorWithChild
       ? 'Seu apoio mensal como padrinho e mantenedor transforma vidas.'
-      : 'Crie sua senha de acesso para acompanhar o impacto da sua doação no portal.'
-    const defaultHeading = isSponsorFlow
+      : isMaintainer
+        ? 'Seu apoio mensal transforma vidas na Casa Nutri.'
+        : 'Crie sua senha de acesso para acompanhar o impacto da sua doação no portal.'
+    const defaultHeading = isSponsorWithChild
       ? 'Obrigado por se tornar um padrinho!'
-      : 'Obrigado por transformar vidas!'
-    const defaultBody = isSponsorFlow
+      : isMaintainer
+        ? 'Obrigado por se tornar um mantenedor!'
+        : 'Obrigado por transformar vidas!'
+    const defaultBody = isSponsorWithChild
       ? `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio mensal será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
-      : `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua contribuição! Seja através de uma doação pontual, apoio mensal recorrente ou apadrinhamento, o seu gesto garante nutrição, educação e dignidade para as nossas crianças.</p><p><br></p><p>Para acompanhar os relatórios de impacto, ver fotos das nossas crianças e acessar sua área exclusiva, finalize o seu cadastro no portal criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
-    const defaultCtaText = isSponsorFlow ? 'Finalizar Cadastro de Padrinho' : 'Finalizar Meu Cadastro'
+      : isMaintainer
+        ? `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor mensal da YAH Hope! A sua contribuição contínua garante alimentação, nutrição terapêutica e cuidado diário para as crianças atendidas pela nossa missão.</p><p><br></p><p>Para acompanhar os relatórios de impacto, novidades e acessar sua área exclusiva no site, finalize o seu cadastro criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+        : `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua contribuição! Seja através de uma doação pontual, apoio mensal recorrente ou apadrinhamento, o seu gesto garante nutrição, educação e dignidade para as nossas crianças.</p><p><br></p><p>Para acompanhar os relatórios de impacto, ver fotos das nossas crianças e acessar sua área exclusiva, finalize o seu cadastro no portal criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+    const defaultCtaText = isSponsorWithChild
+      ? 'Finalizar Cadastro de Padrinho'
+      : isMaintainer
+        ? 'Acessar Portal do Mantenedor'
+        : 'Finalizar Meu Cadastro'
 
-    const childrenList = meta?.children || []
     const childrenNames = childrenList.map((c: any) => c.name).filter(Boolean).join(', ')
 
     let subject = (templateData?.subject || defaultSubject)
@@ -1094,7 +1105,7 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
                       Você está recebendo este e-mail por apoiar os projetos oficiais da Associação YAH Hope.
                     </p>
                     <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
-                      Não deseja mais receber nossos e-mails? <a href="${supabaseUrl}/functions/v1/track-campaign?t=u&email=${encodeURIComponent(donorEmail)}&cid=${isSponsorFlow ? 'new_sponsor' : 'donation_thank_you'}" target="_blank" style="color: #64748b; text-decoration: underline;">Cancelar recebimento</a>
+                      Não deseja mais receber nossos e-mails? <a href="${supabaseUrl}/functions/v1/track-campaign?t=u&email=${encodeURIComponent(donorEmail)}&cid=${targetTemplateName}" target="_blank" style="color: #64748b; text-decoration: underline;">Cancelar recebimento</a>
                     </p>
                     <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
                       © ${new Date().getFullYear()} Associação YAH Hope. Todos os direitos reservados.

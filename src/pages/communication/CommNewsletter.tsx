@@ -32,6 +32,7 @@ export function CommNewsletter() {
     removeSubscriber, 
     toggleStatus, 
     syncAllSiteEmails,
+    purgeTestSubscribers,
     exportToCSV,
     copyAllEmails 
   } = useNewsletter();
@@ -112,6 +113,15 @@ export function CommNewsletter() {
       }
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handlePurgeTestEmails = async () => {
+    const removed = await purgeTestSubscribers();
+    if (removed > 0) {
+      showToast(`${removed} e-mail(s) de teste removido(s) da newsletter!`);
+    } else {
+      showToast('Nenhum e-mail de teste encontrado na lista.');
     }
   };
 
@@ -219,6 +229,16 @@ export function CommNewsletter() {
           >
             <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
             <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Base do Site'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePurgeTestEmails}
+            className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+            title="Excluir e-mails de teste/mockup que o sistema gerou"
+          >
+            <Trash2 size={15} />
+            <span>Limpar Testes</span>
           </button>
 
           <button
