@@ -68,10 +68,19 @@ serve(async (req) => {
       supabase.from('sponsorships').select('donor_name, donor_email').not('donor_email', 'is', null)
     ]);
     
+    // Carrega e-mails descadastrados para não enviar prestação de contas a quem cancelou recebimento
+    const { data: unsubRows } = await supabase
+      .from('newsletter_subscribers')
+      .select('email')
+      .eq('status', 'unsubscribed');
+    const unsubscribedSet = new Set(
+      (unsubRows || []).map((r: any) => (r.email || '').toLowerCase().trim()).filter(Boolean)
+    );
+
     const uniqueDonors = new Map<string, string>(); // email -> name
     (donationsRes.data || []).forEach((d: any) => {
       const email = (d.donor_email || '').toLowerCase().trim();
-      if (email && email.includes('@')) {
+      if (email && email.includes('@') && !unsubscribedSet.has(email)) {
         if (!uniqueDonors.has(email) || !uniqueDonors.get(email)) {
           uniqueDonors.set(email, d.donor_name || '');
         }
@@ -80,7 +89,7 @@ serve(async (req) => {
 
     (sponsorshipsRes.data || []).forEach((s: any) => {
       const email = (s.donor_email || '').toLowerCase().trim();
-      if (email && email.includes('@')) {
+      if (email && email.includes('@') && !unsubscribedSet.has(email)) {
         if (!uniqueDonors.has(email) || !uniqueDonors.get(email)) {
           uniqueDonors.set(email, s.donor_name || '');
         }
@@ -133,7 +142,10 @@ serve(async (req) => {
                   <tr>
                     <td style="background-color: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9; font-family: ${SANS_STACK}; font-size: 12px; line-height: 1.6; color: #64748b;">
                       <p style="margin: 0 0 6px 0; font-weight: 700; color: #334155;">YAH Hope</p>
-                      <p style="margin: 0;">Você está recebendo este e-mail porque é um apoiador ativo da YAH Hope.</p>
+                      <p style="margin: 0 0 8px 0;">Você está recebendo este e-mail porque é um apoiador ativo da YAH Hope.</p>
+                      <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                        Não deseja mais receber nossos e-mails? <a href="${supabaseUrl}/functions/v1/track-campaign?t=u&email=${encodeURIComponent(email)}&cid=accountability" target="_blank" style="color: #64748b; text-decoration: underline;">Cancelar recebimento</a>
+                      </p>
                     </td>
                   </tr>
                 </table>

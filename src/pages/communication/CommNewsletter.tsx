@@ -16,7 +16,9 @@ import {
   X,
   ExternalLink,
   Sparkles,
-  Inbox
+  Inbox,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { useNewsletter, NewsletterSubscriber } from '../../contexts/NewsletterContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -29,6 +31,7 @@ export function CommNewsletter() {
     addSubscriber, 
     removeSubscriber, 
     toggleStatus, 
+    syncAllSiteEmails,
     exportToCSV,
     copyAllEmails 
   } = useNewsletter();
@@ -40,6 +43,7 @@ export function CommNewsletter() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Modal to add new subscriber manually
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -94,6 +98,20 @@ export function CommNewsletter() {
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       showToast('Não foi possível copiar o e-mail.');
+    }
+  };
+
+  const handleSyncSiteEmails = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await syncAllSiteEmails();
+      if (res.added > 0) {
+        showToast(`${res.added} novo(s) e-mail(s) sincronizado(s) da base do site!`);
+      } else {
+        showToast('Todos os e-mails cadastrados no site já estão na lista.');
+      }
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -194,6 +212,17 @@ export function CommNewsletter() {
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             type="button"
+            onClick={handleSyncSiteEmails}
+            disabled={isSyncing}
+            className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            title="Importar todos os e-mails de cadastros, doadores e padrinhos para esta lista"
+          >
+            <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Base do Site'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleCopyAll}
             disabled={stats.active === 0}
             className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
@@ -223,6 +252,32 @@ export function CommNewsletter() {
           </button>
         </div>
       </div>
+
+      {/* Alerta de Descadastramentos para Ajuste */}
+      {stats.unsubscribed > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-black text-amber-900">
+                {stats.unsubscribed} {stats.unsubscribed === 1 ? 'contato cancelou' : 'contatos cancelaram'} o recebimento de e-mails
+              </p>
+              <p className="text-xs text-amber-800/90">
+                Esses contatos recebem automaticamente a tag <strong>[DESCADASTRADO]</strong> no cadastro para ajuste da equipe e não recebem novos disparos.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('unsubscribed')}
+            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer"
+          >
+            Ver Descadastrados ({stats.unsubscribed})
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

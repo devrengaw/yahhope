@@ -43,6 +43,8 @@ export function SupportersList() {
   // Modal para vincular/alterar a criança do padrinho
   const [childrenList, setChildrenList] = useState<{ id: string; name: string; address?: string }[]>([]);
   const [childModalSupporter, setChildModalSupporter] = useState<SupporterData | null>(null);
+  const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+  const [unsubscribedEmails, setUnsubscribedEmails] = useState<Set<string>>(new Set());
   const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [isSavingChild, setIsSavingChild] = useState(false);
 
@@ -74,6 +76,15 @@ export function SupportersList() {
         }
         return sp;
       });
+
+      // Carrega e-mails que cancelaram recebimento para exibir tag de ajuste
+      const { data: unsubData } = await supabase
+        .from('newsletter_subscribers')
+        .select('email')
+        .eq('status', 'unsubscribed');
+      setUnsubscribedEmails(new Set(
+        (unsubData || []).map((u: any) => (u.email || '').toLowerCase().trim()).filter(Boolean)
+      ));
 
       // Mapear usuários por email e id
       const usersByEmail = new Map<string, any>();
@@ -634,6 +645,37 @@ export function SupportersList() {
     }
   };
 
+  const handleSendManualSponsorEmail = async (supporter: SupporterData) => {
+    if (!supporter.email) return;
+    const childLabel = supporter.sponsoredChildName || 'a criança vinculada';
+    const confirmed = window.confirm(
+      `Enviar manualmente o e-mail de boas-vindas de Padrinho para:\n\n` +
+      `• Padrinho: ${supporter.name} (${supporter.email})\n` +
+      `• Criança(s): ${childLabel}\n\n` +
+      `O texto configurado em Comunicação > E-mails ("Apadrinhador") será utilizado.`
+    );
+    if (!confirmed) return;
+
+    setSendingEmailFor(supporter.email);
+    try {
+      const res = await sponsorshipService.sendManualSponsorshipEmail(supporter.email, supporter.name);
+      if (!res.success) {
+        setSyncFeedback({
+          type: 'error',
+          message: res.error || 'Não foi possível enviar o e-mail.'
+        });
+      } else {
+        setSyncFeedback({
+          type: 'success',
+          message: `E-mail de apadrinhamento enviado com sucesso para ${supporter.email} (${res.childrenCount} ${res.childrenCount === 1 ? 'criança' : 'crianças'}).`
+        });
+      }
+      setTimeout(() => setSyncFeedback(null), 8000);
+    } finally {
+      setSendingEmailFor(null);
+    }
+  };
+
   // Excluir doação duplicada ou registro indevido diretamente do banco
   const handleDeleteDonation = async (donationId: string) => {
     try {
@@ -1013,7 +1055,17 @@ export function SupportersList() {
                       {s.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900 text-sm">{s.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-900 text-sm">{s.name}</p>
+                        {(unsubscribedEmails.has((s.email || '').toLowerCase().trim()) || s.name.includes('[DESCADASTRADO]')) && (
+                          <span
+                            title="Este contato cancelou o recebimento de e-mails — ajuste necessário"
+                            className="inline-flex items-center px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black uppercase tracking-wider"
+                          >
+                            DESCADASTRADO
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
                         <Mail size={11} /> {s.email}
                       </p>
@@ -1138,13 +1190,26 @@ export function SupportersList() {
 
                 {/* Ações */}
                 <td className="px-6 py-5 text-center">
-                  <button
-                    onClick={() => setSelectedSupporter(s)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 group/btn"
-                  >
-                    <FileText size={13} className="text-slate-400 group-hover/btn:text-white" />
-                    Ver Extrato
-                  </button>
+                  <div className="inline-flex items-center justify-center gap-2">
+                    {s.role === 'Padrinho' && s.email && (
+                      <button
+                        onClick={() => handleSendManualSponsorEmail(s)}
+                        disabled={sendingEmailFor === s.email}
+                        title="Enviar manualmente o e-mail de padrinho com a(s) criança(s) vinculada(s)"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-700 border border-amber-200/80 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        <Mail size={13} className={sendingEmailFor === s.email ? 'animate-pulse' : ''} />
+                        {sendingEmailFor === s.email ? 'Enviando...' : 'Enviar E-mail'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedSupporter(s)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 group/btn cursor-pointer"
+                    >
+                      <FileText size={13} className="text-slate-400 group-hover/btn:text-white" />
+                      Ver Extrato
+                    </button>
+                  </div>
                 </td>
 
               </tr>

@@ -23,7 +23,10 @@ serve(async (req) => {
     const { 
       campaignId, 
       isTest, 
+      isTransactional,
       testEmail,
+      to,
+      recipientName,
       subject: directSubject,
       body_html: directBodyHtml,
       heading: directHeading,
@@ -35,7 +38,7 @@ serve(async (req) => {
       cta_url: directCtaUrl
     } = bodyJson
 
-    if (!campaignId && !isTest) {
+    if (!campaignId && !isTest && !isTransactional) {
       throw new Error("campaignId é obrigatório para disparo em massa")
     }
 
@@ -59,7 +62,7 @@ serve(async (req) => {
       campaign = camp
     }
 
-    if (!campaign && !isTest) {
+    if (!campaign && !isTest && !isTransactional) {
       throw new Error("Campanha não encontrada no banco de dados.")
     }
 
@@ -303,6 +306,10 @@ serve(async (req) => {
                       <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 12px; color: #64748b;">
                         Você está recebendo este e-mail através das comunicações oficiais da YAH Hope.
                       </p>
+                      ${recipientEmail && recipientId !== 'test-preview' ? `
+                      <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
+                        Não deseja mais receber nossos e-mails? <a href="${supabaseUrl}/functions/v1/track-campaign?t=u&email=${encodeURIComponent(recipientEmail)}&rid=${encodeURIComponent(recipientId)}&cid=${encodeURIComponent(campaignId || 'transactional')}" target="_blank" style="color: #64748b; text-decoration: underline;">Cancelar recebimento</a>
+                      </p>` : ''}
                       <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
                         © ${new Date().getFullYear()} Associação YAH Hope. Todos os direitos reservados.
                       </p>
@@ -323,10 +330,14 @@ serve(async (req) => {
       `
     }
 
-    // 3. SE FOR DISPARO DE TESTE
-    if (isTest) {
-      const recipientTarget = testEmail || 'contato@yahhope.com'
-      const testHtml = buildEmailHtml(activeBodyHtml, 'test-preview', 'Destinatário Teste', recipientTarget)
+    // 3. SE FOR DISPARO DE TESTE OU TRANSACIONAL DIRETO
+    if (isTest || isTransactional) {
+      const recipientTarget = to || testEmail || 'contato@yahhope.com'
+      const targetName = isTransactional ? (recipientName || 'Mantenedor(a)') : 'Destinatário Teste'
+      const singleHtml = buildEmailHtml(activeBodyHtml, isTransactional ? 'transactional' : 'test-preview', targetName, recipientTarget)
+      const finalSubject = isTransactional
+        ? activeSubject
+        : (activeSubject.startsWith('[TESTE]') ? activeSubject : `[TESTE] ${activeSubject}`)
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -337,8 +348,8 @@ serve(async (req) => {
         body: JSON.stringify({
           from: fromAddress,
           to: recipientTarget,
-          subject: activeSubject.startsWith('[TESTE]') ? activeSubject : `[TESTE] ${activeSubject}`,
-          html: testHtml,
+          subject: finalSubject,
+          html: singleHtml,
           reply_to: campaign?.reply_to || activeSenderEmail || undefined
         })
       })
@@ -351,7 +362,8 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ 
         success: true, 
-        isTest: true, 
+        isTest: Boolean(isTest),
+        isTransactional: Boolean(isTransactional),
         target: recipientTarget, 
         resendId: resData.id 
       }), {
@@ -389,8 +401,28 @@ serve(async (req) => {
     let successCount = 0
     let failedCount = 0
 
+    // Carrega e-mails descadastrados para nunca enviar campanhas a quem cancelou recebimento
+    const { data: unsubRows } = await supabase
+      .from('newsletter_subscribers')
+      .select('email')
+      .eq('status', 'unsubscribed')
+    const unsubscribedSet = new Set(
+      (unsubRows || []).map((r: any) => (r.email || '').toLowerCase().trim()).filter(Boolean)
+    )
+
     // Envio individual em batches para respeitar rate limits
     for (const recipient of recipients) {
+      const cleanRecipientEmail = (recipient.email || '').toLowerCase().trim()
+      if (unsubscribedSet.has(cleanRecipientEmail)) {
+        await supabase
+          .from('email_campaign_recipients')
+          .update({
+            status: 'failed',
+            error_message: 'Contato descadastrado (cancelou recebimento de e-mails)'
+          })
+          .eq('id', recipient.id)
+        continue
+      }
       const emailHtml = buildEmailHtml(campaign.body_html, recipient.id, recipient.name || '', recipient.email)
 
       try {

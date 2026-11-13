@@ -17,12 +17,155 @@ const TRANSPARENT_GIF_BYTES = new Uint8Array([
 
 serve(async (req) => {
   const url = new URL(req.url)
-  const trackType = url.searchParams.get('t') // 'o' (open) ou 'c' (click)
+  const trackType = url.searchParams.get('t') // 'o' (open), 'c' (click) ou 'u' (unsubscribe)
   const campaignId = url.searchParams.get('cid')
   const recipientId = url.searchParams.get('rid')
   const targetUrl = url.searchParams.get('url')
+  const directEmail = url.searchParams.get('email')
 
   const userAgent = req.headers.get('user-agent') || ''
+
+  // 0. DESCADASTRAMENTO (UNSUBSCRIBE)
+  if (trackType === 'u') {
+    let targetEmail = (directEmail || '').toLowerCase().trim()
+
+    if (!targetEmail && recipientId && recipientId !== 'test-preview') {
+      const { data: rec } = await supabase
+        .from('email_campaign_recipients')
+        .select('email')
+        .eq('id', recipientId)
+        .maybeSingle()
+      if (rec?.email) targetEmail = rec.email.toLowerCase().trim()
+    }
+
+    if (targetEmail && targetEmail.includes('@')) {
+      try {
+        // 1. Atualiza ou insere na base unificada (newsletter_subscribers) como 'unsubscribed'
+        const { data: existingSub } = await supabase
+          .from('newsletter_subscribers')
+          .select('id, source')
+          .ilike('email', targetEmail)
+          .maybeSingle()
+
+        if (existingSub) {
+          await supabase
+            .from('newsletter_subscribers')
+            .update({ status: 'unsubscribed' })
+            .eq('id', existingSub.id)
+        } else {
+          await supabase
+            .from('newsletter_subscribers')
+            .insert({
+              id: `sub_${crypto.randomUUID()}`,
+              email: targetEmail,
+              status: 'unsubscribed',
+              source: campaignId ? `Cancelamento (${campaignId})` : 'Cancelamento via E-mail'
+            })
+        }
+
+        // 2. Adiciona a tag [DESCADASTRADO] no nome de cadastro do usuário (tabela users) para ajuste
+        let userName = targetEmail
+        const { data: matchedUsers } = await supabase
+          .from('users')
+          .select('id, name, email')
+          .ilike('email', targetEmail)
+
+        for (const u of matchedUsers || []) {
+          const currentName = (u.name || '').trim()
+          if (currentName) userName = currentName
+          if (!currentName.includes('[DESCADASTRADO]')) {
+            const taggedName = currentName ? `[DESCADASTRADO] ${currentName}` : `[DESCADASTRADO] ${targetEmail}`
+            await supabase
+              .from('users')
+              .update({ name: taggedName })
+              .eq('id', u.id)
+          }
+        }
+
+        // 3. Registra notificação in-app para administradores/coordenadores
+        try {
+          const { data: admins } = await supabase
+            .from('users')
+            .select('id')
+            .in('role', ['ADMIN', 'COORDINATOR', 'admin', 'coordinator'])
+            .limit(10)
+
+          if (admins && admins.length > 0) {
+            await supabase.from('notifications').insert(
+              admins.map((adm: any) => ({
+                user_id: adm.id,
+                title: 'Cancelamento de E-mail (Ajuste Necessário)',
+                message: `${userName} (${targetEmail}) cancelou o recebimento de e-mails. Tag [DESCADASTRADO] aplicada no cadastro.`,
+                type: 'warning',
+                read: false
+              }))
+            )
+          }
+        } catch (notifErr) {
+          console.warn('Aviso ao gravar notificação in-app:', notifErr)
+        }
+
+        // 4. Notifica a equipe por e-mail via Resend
+        const resendApiKey = Deno.env.get('RESEND_API_KEY')
+        if (resendApiKey) {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: 'YAH Hope <contato@yahhope.com>',
+              to: 'contato@yahhope.com',
+              subject: `[DESCADASTRADO] ${userName} cancelou o recebimento de e-mails`,
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #f8fafc;">
+                  <div style="background: #ffffff; border-radius: 16px; padding: 24px; border: 1px solid #e2e8f0;">
+                    <h2 style="margin: 0 0 12px 0; color: #b91c1c; font-size: 18px;">Aviso de Cancelamento de E-mail</h2>
+                    <p style="margin: 0 0 12px 0; color: #334155; font-size: 14px; line-height: 1.6;">
+                      Um contato solicitou o cancelamento do recebimento de e-mails. A tag <strong>[DESCADASTRADO]</strong> foi adicionada automaticamente ao nome de cadastro para ajuste.
+                    </p>
+                    <ul style="margin: 0 0 16px 0; padding-left: 18px; color: #334155; font-size: 14px; line-height: 1.6;">
+                      <li><strong>Nome:</strong> ${userName}</li>
+                      <li><strong>E-mail:</strong> ${targetEmail}</li>
+                      <li><strong>Origem:</strong> ${campaignId || 'E-mail automático'}</li>
+                      <li><strong>Data/Hora:</strong> ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            })
+          }).catch(err => console.warn('Aviso ao notificar equipe por e-mail:', err))
+        }
+      } catch (unsubErr) {
+        console.error('Erro ao processar descadastramento:', unsubErr)
+      }
+    }
+
+    const htmlConfirm = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Descadastramento Confirmado • YAH Hope</title>
+</head>
+<body style="margin:0;padding:24px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div style="max-width:480px;width:100%;background:#ffffff;border-radius:20px;padding:32px;text-align:center;border:1px solid #e2e8f0;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05);">
+    <img src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" alt="YAH Hope" style="max-height:44px;margin-bottom:20px;" />
+    <h1 style="margin:0 0 10px 0;font-size:20px;color:#0f172a;">Recebimento cancelado</h1>
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#475569;">
+      O e-mail <strong>${targetEmail || 'informado'}</strong> foi removido da nossa lista de envios e nossa equipe já foi notificada.
+    </p>
+    <a href="https://hope.yahchurch.com" style="display:inline-block;padding:12px 24px;background:#F49853;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Voltar para a YAH Hope</a>
+  </div>
+</body>
+</html>`
+
+    return new Response(htmlConfirm, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      status: 200
+    })
+  }
 
   try {
     if (recipientId && campaignId && recipientId !== 'test-preview') {

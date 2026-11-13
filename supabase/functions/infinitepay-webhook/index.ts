@@ -99,6 +99,13 @@ serve(async (req) => {
       
       // Envia e-mail de agradecimento da primeira doação com botão de finalização de cadastro
       if (donorEmail) {
+        await supabase.from('newsletter_subscribers').upsert({
+          id: `sub_${crypto.randomUUID()}`,
+          email: donorEmail.toLowerCase().trim(),
+          status: 'active',
+          source: 'Doação InfinitePay'
+        }, { onConflict: 'email', ignoreDuplicates: true })
+
         await sendThankYouEmail(donorEmail, donorName)
       }
 

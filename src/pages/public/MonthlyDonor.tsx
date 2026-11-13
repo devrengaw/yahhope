@@ -300,8 +300,10 @@ export function MonthlyDonor() {
         ? (currentAmount >= quotaCost ? Math.floor(currentAmount / quotaCost) : quotasCount)
         : Math.floor(currentAmount / 90);
 
-      // 1. Caso seja Apadrinhamento de Criança
-      if (donationType === 'sponsorship') {
+      const isStripeCheckout = paymentMethod !== 'pix' && Boolean(import.meta.env.VITE_SUPABASE_URL);
+
+      // 1. Caso seja Apadrinhamento de Criança via PIX ou ambiente sem Stripe (no Stripe, o stripe-webhook efetiva após o pagamento)
+      if (donationType === 'sponsorship' && !isStripeCheckout) {
         const result = await sponsorshipService.assignChildrenToSponsor({
           donorName: finalName,
           donorEmail: finalEmail,
@@ -315,22 +317,18 @@ export function MonthlyDonor() {
 
         if (result.success) {
           setAssignedChildren(result.assignedChildren);
-          // Se for PIX ou ambiente sem backend Stripe configurado, finaliza direto
-          if (paymentMethod === 'pix' || !import.meta.env.VITE_SUPABASE_URL) {
-            if (createDonation && currentCampaign) {
-              createDonation({
-                campaign_id: currentCampaign.id,
-                donor_name: finalName,
-                donor_email: finalEmail,
-                amount: result.totalAmount || currentAmount,
-                payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-              });
-            }
-            setIsLoading(false);
-            setIsSuccess(true);
-            return;
+          if (createDonation && currentCampaign) {
+            createDonation({
+              campaign_id: currentCampaign.id,
+              donor_name: finalName,
+              donor_email: finalEmail,
+              amount: result.totalAmount || currentAmount,
+              payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
+            });
           }
-          // Caso contrário (Cartão de Crédito com Stripe), continua para create-checkout
+          setIsLoading(false);
+          setIsSuccess(true);
+          return;
         } else {
           alert(result.message || result.error || 'Erro ao processar apadrinhamento');
           setIsLoading(false);
@@ -338,8 +336,8 @@ export function MonthlyDonor() {
         }
       }
 
-      // Se for Mantenedor Geral com valor >= R$ 90, vincula crianças a cada R$ 90 (excedente fica pro projeto geral)
-      if (donationType !== 'sponsorship' && currentAmount >= 90) {
+      // Se for Mantenedor Geral com valor >= R$ 90 sem Stripe, vincula crianças a cada R$ 90 (excedente fica pro projeto geral)
+      if (donationType !== 'sponsorship' && currentAmount >= 90 && !isStripeCheckout) {
         try {
           const numChildren = Math.floor(currentAmount / 90);
           const assignRes = await sponsorshipService.assignChildrenToSponsor({

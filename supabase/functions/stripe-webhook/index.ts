@@ -632,6 +632,16 @@ serve(async (req) => {
       })
       const resolvedUserId = syncResult?.userId || null
 
+      // Registra automaticamente na base unificada de e-mails (sem reativar quem já cancelou recebimento)
+      if (donorEmail && donorEmail.includes('@')) {
+        await supabase.from('newsletter_subscribers').upsert({
+          id: `sub_${crypto.randomUUID()}`,
+          email: donorEmail,
+          status: 'active',
+          source: isSponsorship ? 'Apadrinhamento Stripe' : isMonthly ? 'Mantenedor Stripe' : 'Doação Stripe'
+        }, { onConflict: 'email', ignoreDuplicates: true })
+      }
+
       // Busca a campanha para associar à doação
       const { data: campaigns } = await supabase
         .from('campaigns')
@@ -677,11 +687,38 @@ serve(async (req) => {
         }
       }
 
+      // Busca as crianças reais vinculadas ao padrinho após a sincronização
+      let assignedChildren: any[] = []
+      if (isSponsorship || (isMonthly && amount >= 90)) {
+        let chQuery = supabase
+          .from('sponsorships')
+          .select('child_id, children(id, name, dob, gender, address, province, photo_url, story)')
+          .eq('status', 'active')
+          .not('child_id', 'is', null)
+
+        if (resolvedUserId) {
+          chQuery = chQuery.or(`donor_email.ilike.${donorEmail},sponsor_id.eq.${resolvedUserId}`)
+        } else {
+          chQuery = chQuery.ilike('donor_email', donorEmail)
+        }
+
+        const { data: spWithChildren } = await chQuery
+        const seenIds = new Set<string>()
+        assignedChildren = (spWithChildren || [])
+          .map((row: any) => row.children)
+          .filter((c: any) => {
+            if (!c || !c.id || seenIds.has(c.id)) return false
+            seenIds.add(c.id)
+            return true
+          })
+      }
+
       // Envia e-mail de agradecimento da primeira doação com botão de finalização de cadastro
       await sendThankYouEmail(donorEmail, donorName, {
         isSponsorship,
         isMonthly,
-        amount
+        amount,
+        children: assignedChildren
       })
     }
 
@@ -716,6 +753,16 @@ serve(async (req) => {
           lastSponsoredAt: new Date().toISOString()
         })
         const resolvedUserId = syncResult?.userId || null
+
+        // Registra automaticamente na base unificada de e-mails (sem reativar quem já cancelou recebimento)
+        if (email && email.includes('@')) {
+          await supabase.from('newsletter_subscribers').upsert({
+            id: `sub_${crypto.randomUUID()}`,
+            email: email,
+            status: 'active',
+            source: isPadrinho ? 'Apadrinhamento Stripe' : 'Mantenedor Stripe'
+          }, { onConflict: 'email', ignoreDuplicates: true })
+        }
 
         // Evita duplicar se for o primeiro pagamento do checkout que acabou de criar o invoice
         const paymentIdentifier = invoice.payment_intent || invoice.id
@@ -796,7 +843,22 @@ serve(async (req) => {
   }
 })
 
-async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: { isSponsorship?: boolean; isMonthly?: boolean; amount?: number }) {
+function formatChildAgeForEmail(dobString?: string): string {
+  if (!dobString) return 'Idade em acompanhamento'
+  const dob = new Date(dobString)
+  if (isNaN(dob.getTime())) return 'Idade em acompanhamento'
+  const now = new Date()
+  let years = now.getFullYear() - dob.getFullYear()
+  let months = now.getMonth() - dob.getMonth()
+  if (months < 0) {
+    years--
+    months += 12
+  }
+  if (years > 0) return `${years} ${years === 1 ? 'ano' : 'anos'}`
+  return `${months} ${months === 1 ? 'mês' : 'meses'}`
+}
+
+async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: { isSponsorship?: boolean; isMonthly?: boolean; amount?: number; children?: any[] }) {
   if (!donorEmail) return
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   if (!resendApiKey) return
@@ -813,25 +875,67 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
       if (settings.primary_color) primaryColor = settings.primary_color
     }
 
-    // Busca template donation_thank_you
-    const { data: templateData } = await supabase
-      .from('email_templates')
-      .select('*')
-      .eq('name', 'donation_thank_you')
-      .maybeSingle()
+    const isSponsorFlow = Boolean(
+      meta?.isSponsorship ||
+      (meta?.isMonthly && (meta?.amount || 0) >= 90) ||
+      (meta?.children && meta.children.length > 0)
+    )
+
+    // Para apadrinhamento, prioriza o template 'new_sponsor' configurado em Comunicação > E-mails
+    let templateData: any = null
+    if (isSponsorFlow) {
+      const { data: sponsorTpl } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('name', 'new_sponsor')
+        .maybeSingle()
+      templateData = sponsorTpl
+    }
+
+    if (!templateData) {
+      const { data: thankYouTpl } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('name', 'donation_thank_you')
+        .maybeSingle()
+      templateData = thankYouTpl
+    }
 
     // Trava de segurança: Se o template estiver explicitamente desativado, não envia
     if (templateData && templateData.is_active === false) {
-      console.log('Disparo de agradecimento ignorado: template donation_thank_you está desativado.')
+      console.log(`Disparo de agradecimento ignorado: template ${templateData.name} está desativado.`)
       return
     }
 
-    let subject = templateData?.subject || 'Obrigado pelo seu apoio! 🧡 Finalize seu cadastro'
-    let preheader = templateData?.preheader || 'Crie sua senha de acesso para acompanhar o impacto da sua doação no portal.'
-    let heading = templateData?.heading || 'Obrigado por transformar vidas!'
-    let body = templateData?.body || `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua contribuição! Seja através de uma doação pontual, apoio mensal recorrente ou apadrinhamento, o seu gesto garante nutrição, educação e dignidade para as nossas crianças.</p><p><br></p><p>Para acompanhar os relatórios de impacto, ver fotos das nossas crianças e acessar sua área exclusiva, finalize o seu cadastro no portal criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+    const defaultSubject = isSponsorFlow
+      ? 'Bem-vindo à família YAH Hope! 🧡 Finalize seu cadastro'
+      : 'Obrigado pelo seu apoio! 🧡 Finalize seu cadastro'
+    const defaultPreheader = isSponsorFlow
+      ? 'Seu apoio mensal como padrinho e mantenedor transforma vidas.'
+      : 'Crie sua senha de acesso para acompanhar o impacto da sua doação no portal.'
+    const defaultHeading = isSponsorFlow
+      ? 'Obrigado por se tornar um padrinho!'
+      : 'Obrigado por transformar vidas!'
+    const defaultBody = isSponsorFlow
+      ? `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio mensal será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+      : `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Nós da YAH Hope queremos agradecer de todo o coração pela sua contribuição! Seja através de uma doação pontual, apoio mensal recorrente ou apadrinhamento, o seu gesto garante nutrição, educação e dignidade para as nossas crianças.</p><p><br></p><p>Para acompanhar os relatórios de impacto, ver fotos das nossas crianças e acessar sua área exclusiva, finalize o seu cadastro no portal criando sua senha de acesso:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`
+    const defaultCtaText = isSponsorFlow ? 'Finalizar Cadastro de Padrinho' : 'Finalizar Meu Cadastro'
+
+    const childrenList = meta?.children || []
+    const childrenNames = childrenList.map((c: any) => c.name).filter(Boolean).join(', ')
+
+    let subject = (templateData?.subject || defaultSubject)
+      .replace(/{{nome_doador}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{nome}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada')
+    let preheader = templateData?.preheader || defaultPreheader
+    let heading = (templateData?.heading || defaultHeading)
+      .replace(/{{nome_doador}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{nome}}/gi, donorName || 'Amigo(a)')
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada')
+    let body = templateData?.body || defaultBody
     let hasCta = templateData?.has_cta ?? true
-    let ctaText = templateData?.cta_text || 'Finalizar Meu Cadastro'
+    let ctaText = templateData?.cta_text || defaultCtaText
     let ctaUrl = templateData?.cta_url || 'https://yahhope.com/finalizar-cadastro'
 
     // Personaliza corpo do texto
@@ -839,6 +943,7 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
       .replace(/{{nome_doador}}/gi, donorName || 'Amigo(a)')
       .replace(/{{nome}}/gi, donorName || 'Amigo(a)')
       .replace(/{{email}}/gi, donorEmail)
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada')
 
     const SANS_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
@@ -858,6 +963,44 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
         .replace(/<ol(\s+[^>]*)?>/gi, `<ol style="margin: 0 0 16px 0; padding-left: 24px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
         .replace(/<li(\s+[^>]*)?>/gi, `<li style="margin-bottom: 6px; font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">`)
     }
+
+    // Cards da(s) criança(s) real(is) apadrinhada(s)
+    const childrenCardsHtml = childrenList.length > 0
+      ? `<div style="margin: 24px 0 8px 0;">
+          ${childrenList.map((c: any, idx: number) => {
+            const photoSrc = c.photo_url && String(c.photo_url).trim().length > 0
+              ? c.photo_url
+              : logoUrl
+            const genderLabel = c.gender === 'F' ? 'Menina' : 'Menino'
+            const ageText = formatChildAgeForEmail(c.dob)
+            const community = c.address || c.province || 'Casa Nutri - Nampula'
+            const story = c.story || 'Acompanhada com muito amor e carinho pela equipe clínica da Casa Nutri em Moçambique, recebendo fórmula terapêutica, alimentação balanceada e exames regulares.'
+            const label = childrenList.length > 1 ? `Criança Apadrinhada #${idx + 1}` : 'Seu Novo Afilhado(a)'
+            return `
+              <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin-bottom: 16px;">
+                <div style="background-color: #0f172a; padding: 10px 18px; color: #ffffff;">
+                  <span style="font-family: ${SANS_STACK}; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: ${primaryColor};">${label}</span>
+                </div>
+                <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="width: 110px; vertical-align: top; padding: 16px 0 16px 16px;">
+                      <img src="${photoSrc}" alt="${c.name}" width="96" height="96" style="width: 96px; height: 96px; object-fit: cover; border-radius: 12px; border: 2px solid ${primaryColor}; display: block;" />
+                    </td>
+                    <td style="vertical-align: top; padding: 16px;">
+                      <div style="display: inline-block; background-color: #fff7ed; color: #ea580c; font-family: ${SANS_STACK}; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 12px; margin-bottom: 6px;">
+                        ${genderLabel} • ${ageText}
+                      </div>
+                      <h3 style="margin: 0 0 4px 0; font-family: ${SANS_STACK}; font-size: 18px; font-weight: 800; color: #0f172a;">${c.name}</h3>
+                      <p style="margin: 0 0 8px 0; font-family: ${SANS_STACK}; font-size: 12px; color: #64748b; font-weight: 600;">📍 ${community}</p>
+                      <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 13px; line-height: 1.5; color: #334155;">${story}</p>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            `
+          }).join('')}
+        </div>`
+      : ''
 
     // Botão de Finalização de Cadastro (CTA)
     let ctaHtml = ''
@@ -936,6 +1079,7 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
                     <div style="font-family: ${SANS_STACK}; font-size: 15px; line-height: 1.7; color: #334155;">
                       ${personalizedBody}
                     </div>
+                    ${childrenCardsHtml}
                     ${ctaHtml}
                   </td>
                 </tr>
@@ -948,6 +1092,9 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
                     </p>
                     <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 12px; color: #64748b;">
                       Você está recebendo este e-mail por apoiar os projetos oficiais da Associação YAH Hope.
+                    </p>
+                    <p style="margin: 0 0 10px 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
+                      Não deseja mais receber nossos e-mails? <a href="${supabaseUrl}/functions/v1/track-campaign?t=u&email=${encodeURIComponent(donorEmail)}&cid=${isSponsorFlow ? 'new_sponsor' : 'donation_thank_you'}" target="_blank" style="color: #64748b; text-decoration: underline;">Cancelar recebimento</a>
                     </p>
                     <p style="margin: 0; font-family: ${SANS_STACK}; font-size: 11px; color: #94a3b8;">
                       © ${new Date().getFullYear()} Associação YAH Hope. Todos os direitos reservados.

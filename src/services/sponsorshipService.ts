@@ -166,7 +166,7 @@ export const sponsorshipService = {
         console.warn('Aviso ao consultar sponsorships:', spError.message);
       }
 
-      let allChildren = (childrenData && childrenData.length > 0) ? childrenData : FALLBACK_CHILDREN;
+      const allChildren = childrenData || [];
       const allSponsorships = sponsorshipsData || [];
 
       // Mapeia padrinhos por child_id
@@ -443,7 +443,8 @@ export const sponsorshipService = {
     name: string,
     children: ChildSponsorshipDetail[],
     monthlyAmount: number,
-    isRegistered?: boolean
+    isRegistered?: boolean,
+    forceSend: boolean = false
   ): Promise<void> {
     const cleanEmail = email.toLowerCase().trim();
     if (isRegistered === undefined) {
@@ -549,76 +550,173 @@ export const sponsorshipService = {
       `;
     }
 
-    const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 24px;">
-        <div style="text-align: center; padding: 20px 0;">
-          <img src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" alt="YAH Hope" style="max-height: 48px;" />
-        </div>
+    // Busca o template configurado em Comunicação > E-mails ('new_sponsor')
+    let templateData: any = null;
+    try {
+      const { data: tpl } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('name', 'new_sponsor')
+        .maybeSingle();
+      templateData = tpl;
+    } catch (e) {
+      console.warn('Aviso ao buscar template new_sponsor:', e);
+    }
 
-        <div style="background-color: #ffffff; border-radius: 24px; padding: 32px 28px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
-          <div style="display: inline-block; background-color: #fef3c7; color: #d97706; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 9999px; margin-bottom: 16px;">
-            Aliança de Amor e Esperança 🧡
-          </div>
+    if (templateData && templateData.is_active === false && !forceSend) {
+      console.log('Envio de e-mail de padrinho ignorado: template new_sponsor está desativado.');
+      return;
+    }
 
-          <h1 style="color: #0f172a; font-size: 26px; font-weight: 900; margin: 0 0 12px 0; line-height: 1.25;">
-            Olá, ${name}! Seja bem-vindo(a) à família YAH Hope.
-          </h1>
+    const childrenNames = children.map(c => c.name).filter(Boolean).join(', ');
+    const defaultSubject = 'Bem-vindo à família YAH Hope! 🧡 Finalize seu cadastro';
+    const defaultPreheader = 'Seu apoio mensal como padrinho e mantenedor transforma vidas.';
+    const defaultHeading = 'Obrigado por se tornar um padrinho!';
+    const defaultBody = `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio mensal será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`;
 
-          <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
-            Agradecemos de todo coração pelo seu compromisso mensal. Pelo nosso modelo de <strong>distribuição solidária e equitativa</strong>, destinamos o seu apadrinhamento para ${isMultiple ? `as <strong>${count} crianças</strong>` : 'a criança'} com maior prioridade de suporte na nossa Casa Nutri em Moçambique:
-          </p>
+    const emailSubject = (templateData?.subject || defaultSubject)
+      .replace(/{{nome_doador}}/gi, name || 'Amigo(a)')
+      .replace(/{{nome}}/gi, name || 'Amigo(a)')
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada');
 
-          ${childrenCardsHtml}
+    const emailHeading = (templateData?.heading || defaultHeading)
+      .replace(/{{nome_doador}}/gi, name || 'Amigo(a)')
+      .replace(/{{nome}}/gi, name || 'Amigo(a)')
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada');
 
-          <div style="background-color: #fff7ed; border-left: 4px solid #F49853; padding: 16px; border-radius: 12px; margin: 24px 0;">
-            <p style="margin: 0; font-size: 13px; color: #9a3412; font-weight: 700;">
-              O que o seu apadrinhamento garante todos os meses:
-            </p>
-            <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 12px; color: #c2410c; line-height: 1.6;">
-              <li>Fórmulas nutricionais terapêuticas e refeições enriquecidas diárias</li>
-              <li>Acompanhamento pediátrico, pesagens e exames clínicos periódicos</li>
-              <li>Apoio sociofamiliar na comunidade em Moçambique</li>
-              <li>Acesso exclusivo a fotos atualizadas, evolução de peso e relatórios no Portal</li>
-            </ul>
-          </div>
+    const emailPreheader = templateData?.preheader || defaultPreheader;
 
-          ${actionCtaHtml}
-        </div>
+    const rawBody = (templateData?.body || defaultBody)
+      .replace(/{{nome_doador}}/gi, name || 'Amigo(a)')
+      .replace(/{{nome}}/gi, name || 'Amigo(a)')
+      .replace(/{{email}}/gi, cleanEmail)
+      .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada');
 
-        <div style="text-align: center; padding: 24px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-          <p style="margin: 0 0 4px 0; font-weight: 600; color: #64748b;">YAH Hope International • Moçambique & Brasil</p>
-          <p style="margin: 0;">Você recebeu esta mensagem porque realizou um apadrinhamento solidário de amor na YAH Hope.</p>
-        </div>
-      </div>
-    `;
+    const htmlBody = `${rawBody}${childrenCardsHtml ? `<div style="margin-top: 24px;">${childrenCardsHtml}</div>` : ''}`;
 
-    const emailSubject = isMultiple 
-      ? `🧡 Parabéns, ${name}! Conheça as crianças que você está apadrinhando na YAH Hope`
-      : `🧡 Parabéns, ${name}! Conheça ${children[0]?.name || 'a criança'} que você está apadrinhando na YAH Hope`;
+    const hasCta = templateData?.has_cta ?? true;
+    const ctaText = templateData?.cta_text || (isRegistered ? 'Acessar Minhas Crianças no Portal' : 'Finalizar Cadastro de Padrinho');
+    const baseCtaUrl = templateData?.cta_url || `${appOrigin}/finalizar-cadastro`;
+    const sep = baseCtaUrl.includes('?') ? '&' : '?';
+    const ctaUrl = (baseCtaUrl.includes('cadastro') || baseCtaUrl.includes('finalizar') || baseCtaUrl.includes('portal') || baseCtaUrl.includes('set-password'))
+      ? `${baseCtaUrl}${sep}email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(name)}`
+      : baseCtaUrl;
 
     // Envia o e-mail transacional de apadrinhamento diretamente para o padrinho (NUNCA aciona send-accountability)
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (supabaseUrl && anonKey) {
-        await fetch(`${supabaseUrl}/functions/v1/send-campaign`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${anonKey}`
-          },
-          body: JSON.stringify({
-            isTest: true,
-            testEmail: cleanEmail,
-            subject: emailSubject,
-            body_html: htmlBody,
-            sender_name: 'YAH Hope',
-            sender_email: 'contato@yahhope.com'
-          })
-        }).catch(e => console.warn('Aviso ao enviar e-mail de apadrinhamento via edge function:', e));
+      if (!supabaseUrl || !anonKey) {
+        if (forceSend) throw new Error('Configuração do Supabase não encontrada.');
+        return;
+      }
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-campaign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`
+        },
+        body: JSON.stringify({
+          isTransactional: true,
+          to: cleanEmail,
+          recipientName: name,
+          subject: emailSubject,
+          heading: emailHeading,
+          preheader: emailPreheader,
+          body_html: htmlBody,
+          has_cta: hasCta,
+          cta_text: ctaText,
+          cta_url: ctaUrl,
+          sender_name: 'YAH Hope',
+          sender_email: 'contato@yahhope.com'
+        })
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody?.error || errBody?.message || `Erro HTTP ${res.status}`;
+        if (forceSend) throw new Error(msg);
+        console.warn('Aviso ao enviar e-mail de apadrinhamento via edge function:', msg);
       }
     } catch (e) {
+      if (forceSend) throw e;
       console.warn('Fallback de e-mail de apadrinhamento:', e);
+    }
+  },
+
+  /**
+   * Disparo manual pelo painel administrativo para padrinhos que já apadrinharam
+   * e ainda não receberam o e-mail de boas-vindas com a(s) criança(s) vinculada(s).
+   */
+  async sendManualSponsorshipEmail(email: string, name: string): Promise<{ success: boolean; childrenCount: number; error?: string }> {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    if (!cleanEmail) {
+      return { success: false, childrenCount: 0, error: 'E-mail do padrinho inválido.' };
+    }
+
+    try {
+      const { data: spRows, error: spErr } = await supabase
+        .from('sponsorships')
+        .select('id, child_id, monthly_amount, children(*)')
+        .ilike('donor_email', cleanEmail)
+        .in('status', ['active', 'paid', 'completed', 'ACTIVE'])
+        .not('child_id', 'is', null);
+
+      if (spErr) {
+        throw new Error(spErr.message);
+      }
+
+      const seenChildIds = new Set<string>();
+      const childrenDetails: ChildSponsorshipDetail[] = [];
+      let totalAmount = 0;
+
+      (spRows || []).forEach((row: any) => {
+        totalAmount += Number(row.monthly_amount) || 90;
+        const c = row.children;
+        if (c && c.id && !seenChildIds.has(c.id)) {
+          seenChildIds.add(c.id);
+          childrenDetails.push({
+            id: c.id,
+            name: c.name,
+            dob: c.dob,
+            ageText: calculateChildAge(c.dob),
+            gender: c.gender,
+            community: c.address || c.province || 'Casa Nutri - Nampula',
+            photo_url: c.photo_url || '',
+            story: c.story || 'Acompanhada com muito amor pela equipe clínica da Casa Nutri em Moçambique, recebendo suplementação e alimentação balanceada.',
+            sponsorsCount: 1,
+            maxSponsors: 2,
+            isFull: false,
+            sponsors: []
+          });
+        }
+      });
+
+      if (childrenDetails.length === 0) {
+        return {
+          success: false,
+          childrenCount: 0,
+          error: 'Este padrinho ainda não possui nenhuma criança real vinculada no banco de dados. Vincule uma criança antes de enviar o e-mail.'
+        };
+      }
+
+      await this.sendSponsorshipWelcomeEmail(
+        cleanEmail,
+        name || cleanEmail.split('@')[0],
+        childrenDetails,
+        totalAmount,
+        undefined,
+        true
+      );
+
+      return { success: true, childrenCount: childrenDetails.length };
+    } catch (err: any) {
+      return {
+        success: false,
+        childrenCount: 0,
+        error: err.message || 'Falha ao enviar e-mail manualmente.'
+      };
     }
   },
 
@@ -1252,7 +1350,7 @@ export const sponsorshipService = {
       }
 
       if (!newChildData) {
-        newChildData = FALLBACK_CHILDREN.find(c => c.id === params.newChildId);
+        console.warn('Criança não encontrada no banco para o ID:', params.newChildId);
       }
 
       // 2. Localiza o apadrinhamento existente

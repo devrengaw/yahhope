@@ -264,6 +264,18 @@ export const emailCampaignService = {
       }
     }
 
+    // Remove contatos que cancelaram o recebimento de e-mails (status = 'unsubscribed')
+    try {
+      const { data: unsubRows } = await supabase
+        .from('newsletter_subscribers')
+        .select('email')
+        .eq('status', 'unsubscribed');
+      (unsubRows || []).forEach((u: any) => {
+        const em = (u.email || '').toLowerCase().trim();
+        if (em) recipientMap.delete(em);
+      });
+    } catch {}
+
     return Array.from(recipientMap.values());
   },
 

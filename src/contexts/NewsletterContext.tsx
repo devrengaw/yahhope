@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { isSpamOrMockUser } from '../utils/userCleanup';
 
 export interface NewsletterSubscriber {
   id: string;
@@ -34,6 +35,7 @@ interface NewsletterContextType {
   addSubscriber: (email: string, source?: string) => Promise<{ success: boolean; message: string; alreadyExisted?: boolean }>;
   removeSubscriber: (id: string) => Promise<void>;
   toggleStatus: (id: string) => Promise<void>;
+  syncAllSiteEmails: () => Promise<{ added: number; total: number }>;
   exportToCSV: () => void;
   copyAllEmails: () => Promise<boolean>;
 }
@@ -230,6 +232,86 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const syncAllSiteEmails = async (): Promise<{ added: number; total: number }> => {
+    const emailSourceMap = new Map<string, string>();
+
+    try {
+      const [usersRes, donationsRes, sponsorshipsRes, apoiadoresRes] = await Promise.all([
+        supabase.from('users').select('name, email').not('email', 'is', null),
+        supabase.from('donations').select('donor_email').not('donor_email', 'is', null),
+        supabase.from('sponsorships').select('donor_email').not('donor_email', 'is', null),
+        supabase.from('apoiadores').select('email, contato_email, mail')
+      ]);
+
+      (usersRes.data || []).forEach((u: any) => {
+        if (isSpamOrMockUser(u)) return;
+        const email = (u.email || '').toLowerCase().trim();
+        if (email && email.includes('@')) {
+          emailSourceMap.set(email, 'Cadastro no Site');
+        }
+      });
+
+      (sponsorshipsRes.data || []).forEach((s: any) => {
+        const email = (s.donor_email || '').toLowerCase().trim();
+        if (email && email.includes('@') && !emailSourceMap.has(email)) {
+          emailSourceMap.set(email, 'Apadrinhamento');
+        }
+      });
+
+      (donationsRes.data || []).forEach((d: any) => {
+        const email = (d.donor_email || '').toLowerCase().trim();
+        if (email && email.includes('@') && !emailSourceMap.has(email)) {
+          emailSourceMap.set(email, 'Doação');
+        }
+      });
+
+      if (!apoiadoresRes.error && apoiadoresRes.data) {
+        apoiadoresRes.data.forEach((a: any) => {
+          const email = (a.email || a.contato_email || a.mail || '').toLowerCase().trim();
+          if (email && email.includes('@') && !emailSourceMap.has(email)) {
+            emailSourceMap.set(email, 'Apoiador');
+          }
+        });
+      }
+
+      const existingMap = new Set(subscribers.map(s => s.email.toLowerCase().trim()));
+      const { data: dbSubs } = await supabase.from('newsletter_subscribers').select('email');
+      (dbSubs || []).forEach((r: any) => {
+        if (r.email) existingMap.add(r.email.toLowerCase().trim());
+      });
+
+      const toInsert: NewsletterSubscriber[] = [];
+      emailSourceMap.forEach((source, email) => {
+        if (!existingMap.has(email)) {
+          toInsert.push({
+            id: `sub_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            email,
+            created_at: new Date().toISOString(),
+            status: 'active',
+            source
+          });
+        }
+      });
+
+      if (toInsert.length > 0) {
+        // Insere em lotes ignorando duplicatas para preservar quem já está 'unsubscribed'
+        const chunkSize = 100;
+        for (let i = 0; i < toInsert.length; i += chunkSize) {
+          const chunk = toInsert.slice(i, i + chunkSize);
+          await supabase
+            .from('newsletter_subscribers')
+            .upsert(chunk, { onConflict: 'email', ignoreDuplicates: true });
+        }
+        setSubscribers(prev => [...toInsert, ...prev]);
+      }
+
+      return { added: toInsert.length, total: existingMap.size + toInsert.length };
+    } catch (e) {
+      console.error('Erro ao sincronizar base de e-mails:', e);
+      return { added: 0, total: subscribers.length };
+    }
+  };
+
   return (
     <NewsletterContext.Provider value={{
       subscribers,
@@ -237,6 +319,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       addSubscriber,
       removeSubscriber,
       toggleStatus,
+      syncAllSiteEmails,
       exportToCSV,
       copyAllEmails
     }}>
