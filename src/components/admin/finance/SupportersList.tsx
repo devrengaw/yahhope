@@ -349,8 +349,8 @@ export function SupportersList() {
           }
         });
 
-        // 2. Se for padrinho conhecido e ainda não tem vínculos suficientes:
-        if (isCandidateForPadrinho || isKnownPadrinho) {
+        // 2. Fallback para padrinhos conhecidos APENAS se ainda não houver nenhuma criança vinculada no banco:
+        if (assignedChildrenList.length === 0 && (isCandidateForPadrinho || isKnownPadrinho)) {
           if (cleanEmail === 'lucas.wagneer@gmail.com') {
             const ch = Array.from(childrenMap.values()).find(c => c.name.toLowerCase().includes('amina')) || Array.from(childrenMap.values())[0];
             if (ch && !seenChildIds.has(ch.id)) {
@@ -371,7 +371,7 @@ export function SupportersList() {
             }
           }
 
-          // 3. REGRA CRÍTICA: Se tem direito a mais de 1 criança (ex: doação/cota > 90) ou se não tinha criança vinculada ainda:
+          // 3. Se ainda não tinha nenhuma criança vinculada, atribui conforme cotas ativas:
           if (assignedChildrenList.length < targetChildrenCount) {
             const allAvailable = Array.from(childrenMap.values());
             for (const ch of allAvailable) {
@@ -418,6 +418,17 @@ export function SupportersList() {
         const childVillage = primaryChild?.village;
         const sponsoredChildId = primaryChild?.id;
 
+        const hasInactiveSponsorshipOnly =
+          uniqueSponsorships.length > 0 &&
+          monthlySponsorships.length === 0;
+
+        const computedStatus =
+          user?.status === 'inactive' || hasInactiveSponsorshipOnly
+            ? 'inactive'
+            : userDonations.some((d: any) => d.status === 'pending')
+              ? 'pending'
+              : 'active';
+
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
           name: donorName,
@@ -425,7 +436,7 @@ export function SupportersList() {
           phone: user?.phone || uniqueSponsorships[0]?.donor_phone || lastDonation?.donor_phone || undefined,
           avatar: user?.avatar || undefined,
           role: roleDisplay,
-          status: user?.status === 'inactive' ? 'inactive' : userDonations.some((d: any) => d.status === 'pending') ? 'pending' : 'active',
+          status: computedStatus,
           joinedAt: userDonations[userDonations.length - 1]?.created_at || user?.created_at || new Date().toISOString(),
           sponsoredChildName: childName,
           sponsoredChildVillage: childVillage,

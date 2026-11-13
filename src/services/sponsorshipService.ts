@@ -1280,14 +1280,12 @@ export const sponsorshipService = {
 
       let savedRecord: any = null;
 
-      // 3. Se já existe o apadrinhamento, atualiza
+      // 3. Se já existe o apadrinhamento, atualiza apenas o child_id (preservando status atual se inativo/cortado)
       if (existingSponsorship?.id) {
         const { data: updated, error: updateErr } = await supabase
           .from('sponsorships')
           .update({
-            child_id: params.newChildId,
-            status: 'active',
-            last_sponsored_at: new Date().toISOString()
+            child_id: params.newChildId
           })
           .eq('id', existingSponsorship.id)
           .select();

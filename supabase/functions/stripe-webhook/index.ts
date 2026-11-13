@@ -264,6 +264,15 @@ async function handleStripeSync(filterEmail?: string) {
 
       const sub = subsByCustomer.get(customer.id) || subsByEmail.get(email);
       const hasActiveSub = Boolean(sub && (sub.status === 'active' || sub.status === 'trialing'));
+      const hasCanceledOrUnpaidSub = Boolean(sub && !hasActiveSub);
+
+      // Se existe assinatura na Stripe e ela foi cancelada / cortada por falta de pagamento, desativa no banco!
+      if (hasCanceledOrUnpaidSub) {
+        await supabase.from('sponsorships').update({ status: 'inactive' }).ilike('donor_email', email);
+        await supabase.from('users').update({ status: 'inactive' }).ilike('email', email);
+        results.synced_customers++;
+        continue;
+      }
       
       const isMonthly = isKnownPadrinho || isKnownMantenedor || hasActiveSub;
       
@@ -693,8 +702,10 @@ serve(async (req) => {
     // 3. EVENTO: SUBSCRIPTION UPDATED / DELETED
     else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as any
-      const isDeleted = event.type === 'customer.subscription.deleted' || subscription.status === 'canceled'
-      const status = isDeleted ? 'inactive' : subscription.status === 'active' ? 'active' : 'paused'
+      const isInactive =
+        event.type === 'customer.subscription.deleted' ||
+        ['canceled', 'unpaid', 'past_due', 'incomplete_expired'].includes(subscription.status)
+      const status = isInactive ? 'inactive' : subscription.status === 'active' || subscription.status === 'trialing' ? 'active' : 'paused'
 
       let customer: any = null
       if (subscription.customer) {
@@ -713,7 +724,7 @@ serve(async (req) => {
 
         await supabase
           .from('users')
-          .update({ status: isDeleted ? 'inactive' : 'active' })
+          .update({ status: isInactive ? 'inactive' : 'active' })
           .ilike('email', cleanEmail)
       }
     }
