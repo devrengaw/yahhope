@@ -246,18 +246,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
         };
       case 'university':
         return {
-          mobileHeader: "bg-indigo-900 text-white",
-          sidebarBg: "bg-indigo-950 border-transparent text-indigo-50",
-          moduleName: "text-indigo-300",
-          itemActiveBg: "bg-indigo-800/60 text-white shadow-inner",
-          itemInactiveBg: "text-indigo-200 hover:bg-indigo-800/40 hover:text-white",
-          iconActive: "text-indigo-100",
-          iconInactive: "text-indigo-300",
-          borderTop: "border-indigo-800/60",
-          backLink: "text-indigo-200 hover:text-white",
-          avatarBg: "bg-indigo-800 border-indigo-700 group-hover:border-white",
-          roleText: "text-indigo-300",
-          logoutBtn: "text-indigo-300 hover:text-white hover:bg-indigo-800/50"
+          mobileHeader: "bg-[#878787] text-white",
+          sidebarBg: "bg-[#878787] border-transparent text-white",
+          moduleName: "text-white/80",
+          itemActiveBg: "bg-black/20 text-white shadow-inner",
+          itemInactiveBg: "text-white/80 hover:bg-white/10 hover:text-white",
+          iconActive: "text-white",
+          iconInactive: "text-white/80",
+          borderTop: "border-white/20",
+          backLink: "text-white/80 hover:text-white",
+          avatarBg: "bg-black/20 border-transparent group-hover:border-white",
+          roleText: "text-white/80",
+          logoutBtn: "text-white/80 hover:text-white hover:bg-white/10"
         };
       case 'admin':
       default:
@@ -549,7 +549,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
                         : "bg-black/15 text-white/90 hover:bg-black/25 hover:text-white"
                     )}
                   >
-                    <GraduationCap size={16} className={module === 'university' ? "text-indigo-600" : "text-white/80"} />
+                    <GraduationCap size={16} className={module === 'university' ? "text-slate-700" : "text-white/80"} />
                     <span className="truncate">Universitário</span>
                   </Link>
                 )}

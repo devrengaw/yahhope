@@ -57,7 +57,7 @@ export function UniversityDashboard() {
       icon: Users,
       allowed: can('fu:students:view'),
       badge: `${activeStudents.length} ativos • ${pendingApplications.length} pendentes`,
-      color: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+      color: 'bg-slate-100 text-slate-700 border-slate-200',
     },
     {
       title: 'Bolsas & Pagamentos',
@@ -118,30 +118,30 @@ export function UniversityDashboard() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 rounded-[2rem] p-6 sm:p-8 text-white shadow-xl border border-indigo-800/40">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#6e6e6e] via-[#878787] to-slate-700 rounded-[2rem] p-6 sm:p-8 text-white shadow-xl border border-slate-500/30">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-400/30 px-3.5 py-1 rounded-full text-indigo-200 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 px-3.5 py-1 rounded-full text-white text-xs font-bold uppercase tracking-wider">
               <GraduationCap size={15} />
               <span>Módulo Integrado • YAH Hope</span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
               {config.program_name}
             </h1>
-            <p className="text-xs sm:text-sm text-indigo-100/80 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-100/90 leading-relaxed">
               {config.short_description}
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 shrink-0 min-w-[250px]">
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-200 uppercase tracking-wider">
+          <div className="bg-black/20 backdrop-blur-md border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 shrink-0 min-w-[250px]">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-200 uppercase tracking-wider">
               <ShieldCheck size={16} className="text-emerald-400" />
               <span>Controle de Acesso Ativo</span>
             </div>
             <p className="text-xs text-white font-semibold">
-              Operador: <span className="text-indigo-200">{user?.name}</span>
+              Operador: <span className="text-slate-200">{user?.name}</span>
             </p>
-            <p className="text-[11px] text-indigo-200/80">
+            <p className="text-[11px] text-slate-200/80">
               Privacidade LGPD/Portal: <strong className="text-emerald-300">Proteção Estrita Ativa</strong>
             </p>
             <div className="pt-1">
@@ -161,7 +161,7 @@ export function UniversityDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
               <Users size={20} />
             </div>
             {pendingApplications.length > 0 && (
@@ -309,7 +309,7 @@ export function UniversityDashboard() {
               <Link
                 key={item.path}
                 to={item.path}
-                className="bg-white rounded-3xl p-5 border border-slate-200/80 hover:border-indigo-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                className="bg-white rounded-3xl p-5 border border-slate-200/80 hover:border-slate-400 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -320,13 +320,13 @@ export function UniversityDashboard() {
                       {item.badge}
                     </span>
                   </div>
-                  <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-black text-slate-900 text-base group-hover:text-slate-700 transition-colors">
                     {item.title}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">{item.description}</p>
                 </div>
 
-                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
                   <span>Acessar área</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </div>
