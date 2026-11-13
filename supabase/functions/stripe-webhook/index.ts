@@ -53,7 +53,7 @@ async function syncMaintainerProfile(data: {
   // - Excedentes (ex: 95) apadrinham 1 criança e o excedente apoia o projeto como um todo.
   // - Quem doa R$ 50,00 (ou qualquer valor < R$ 90) é Mantenedor Mensal de Apoio Geral (child_id = NULL).
   // - Doações avulsas/pontuais não entram na tabela 'sponsorships'.
-  const canSponsorChild = isMonthly && monthlyAmount >= 90;
+  const canSponsorChild = isMonthly && monthlyAmount >= 90 && data.isSponsor !== false;
   const quotasCount = canSponsorChild ? Math.floor(monthlyAmount / 90) : 0;
 
   // 1. Atualiza ou insere o perfil na tabela 'users'
@@ -109,9 +109,13 @@ async function syncMaintainerProfile(data: {
     const { data: existingSp } = await spQuery;
 
     if (existingSp && existingSp.length > 0) {
-      // Atualiza apadrinhamento existente
+      // Atualiza apadrinhamento existente sem sobrescrever cotas múltiplas com o valor total
+      const perQuotaAmount = existingSp.length > 1
+        ? Number((monthlyAmount / existingSp.length).toFixed(2))
+        : monthlyAmount;
+
       for (const sp of existingSp) {
-        // Se o valor for menor que R$ 90 (ex: R$ 50), desvincula qualquer criança indevida!
+        // Se o valor for menor que R$ 90 (ex: R$ 50) ou for Mantenedor Geral explícito, desvincula qualquer criança indevida
         const finalChildId = canSponsorChild ? sp.child_id : null;
 
         await supabase
@@ -121,7 +125,7 @@ async function syncMaintainerProfile(data: {
             donor_name: donorName,
             donor_email: cleanEmail,
             donor_phone: donorPhone,
-            monthly_amount: monthlyAmount,
+            monthly_amount: perQuotaAmount,
             status: 'active',
             payment_method: paymentMethod,
             last_sponsored_at: timestamp,
@@ -174,12 +178,9 @@ async function syncMaintainerProfile(data: {
       }
     }
   } else {
-    // Se NÃO é mensal / não tem assinatura ativa, remove qualquer registro indevido em sponsorships!
-    if (userId) {
-      await supabase.from('sponsorships').delete().or(`donor_email.ilike.${cleanEmail},sponsor_id.eq.${userId}`);
-    } else {
-      await supabase.from('sponsorships').delete().ilike('donor_email', cleanEmail);
-    }
+    // Doação avulsa não deve apagar apadrinhamentos/mantenedores recorrentes ativos;
+    // apenas cancelamentos/exclusões de assinatura devem desativar sponsorships.
+    console.log(`[syncMaintainerProfile] Doação avulsa para ${cleanEmail}; mantendo eventuais apadrinhamentos ativos intactos.`);
   }
 
   return { userId, cleanEmail, donorName };
@@ -266,20 +267,26 @@ async function handleStripeSync(filterEmail?: string) {
       
       const isMonthly = isKnownPadrinho || isKnownMantenedor || hasActiveSub;
       
+      const stripeUnitAmount = sub?.items?.data?.[0]?.price?.unit_amount
+        ? sub.items.data[0].price.unit_amount / 100
+        : 0;
+
       let subAmount = 0;
-      if (isKnownPadrinho) {
+      if (hasActiveSub && stripeUnitAmount > 0) {
+        subAmount = stripeUnitAmount;
+      } else if (isKnownPadrinho) {
         subAmount = 90;
       } else if (isKnownMantenedor) {
         subAmount = 50;
       } else if (hasActiveSub) {
-        subAmount = sub?.items?.data?.[0]?.price?.unit_amount ? sub.items.data[0].price.unit_amount / 100 : 90;
+        subAmount = 90;
       }
 
       await syncMaintainerProfile({
         email,
         name,
         phone,
-        isSponsor: isMonthly,
+        isSponsor: !isKnownMantenedor && (isKnownPadrinho || subAmount >= 90),
         isMonthly: isMonthly,
         amount: subAmount,
         lastSponsoredAt: sub ? new Date(sub.current_period_start * 1000).toISOString() : new Date(customer.created * 1000).toISOString(),
@@ -579,11 +586,12 @@ serve(async (req) => {
       const phone = customer?.phone || null
 
       if (email && amount > 0) {
+        const isPadrinho = amount >= 90
         const syncResult = await syncMaintainerProfile({
           email,
           name,
           phone,
-          isSponsor: true,
+          isSponsor: isPadrinho,
           isMonthly: true,
           amount,
           subscriptionId: invoice.subscription as string,
@@ -610,21 +618,21 @@ serve(async (req) => {
             payment_method: 'credit_card',
             paid_at: new Date().toISOString(),
             user_id: resolvedUserId,
-            is_sponsorship: true,
+            is_sponsorship: isPadrinho,
             stripe_payment_id: paymentIdentifier,
             stripe_subscription_id: invoice.subscription as string
           })
-        }
 
-        await supabase.from('finance_transactions').insert({
-          description: `Recorrência Mensal Stripe - ${name}`,
-          amount: amount,
-          type: 'income',
-          category_id: 'cat_sponsorship',
-          status: 'completed',
-          account: 'Stripe',
-          date: new Date().toISOString()
-        })
+          await supabase.from('finance_transactions').insert({
+            description: `${isPadrinho ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${name}`,
+            amount: amount,
+            type: 'income',
+            category_id: isPadrinho ? 'cat_sponsorship' : 'cat_donations',
+            status: 'completed',
+            account: 'Stripe',
+            date: new Date().toISOString()
+          })
+        }
       }
     }
 

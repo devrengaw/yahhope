@@ -60,9 +60,12 @@ export function CommCosts() {
   }, []);
 
   const stats = useMemo(() => {
+    const allIncomes = transactions.filter(t => t.type === 'income');
     const fixedExpenses = transactions.filter(t => t.type === 'expense' && t.expense_type === 'fixed');
     const variableExpenses = transactions.filter(t => t.type === 'expense' && t.expense_type === 'variable');
     
+    const totalIncome = allIncomes.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
     // Custo mensal estrutural amortizado
     const monthlyEquivalentFixed = fixedExpenses.reduce((acc, t) => {
       const rec = t.recurrence || 'monthly';
@@ -75,11 +78,15 @@ export function CommCosts() {
 
     const totalVariable = variableExpenses.reduce((acc, t) => acc + t.amount, 0);
     const totalExpense = monthlyEquivalentFixed + totalVariable;
+    const totalBalance = totalIncome - totalExpense;
 
     return {
+      totalIncome,
       totalFixed: monthlyEquivalentFixed,
       totalVariable,
       totalExpense,
+      totalBalance,
+      incomeCount: allIncomes.length,
       fixedCount: fixedExpenses.length,
       variableCount: variableExpenses.length
     };
@@ -255,9 +262,27 @@ export function CommCosts() {
           </div>
         </div>
 
-        {/* Stats Cards de Comunicação */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Stats Cards de Comunicação (4 Colunas: Repasses, Fixos, Variáveis, Saldo/Total) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           
+          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-xl shadow-emerald-50/40">
+            <div className="flex justify-between items-start mb-3">
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
+                <TrendingUp size={22} />
+              </div>
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] rounded-lg uppercase tracking-wider">
+                {stats.incomeCount} repasses
+              </span>
+            </div>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Valor Repassado (Setor)</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              R$ {stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-slate-400 font-bold mt-2">
+              Recursos recebidos do Caixa Central
+            </p>
+          </div>
+
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40">
             <div className="flex justify-between items-start mb-3">
               <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
@@ -268,7 +293,7 @@ export function CommCosts() {
               </span>
             </div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Custos Fixos Mensais</p>
-            <p className="text-3xl font-black text-slate-900 mt-1">
+            <p className="text-2xl font-black text-slate-900 mt-1">
               R$ {stats.totalFixed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-slate-400 font-bold mt-2">
@@ -285,8 +310,8 @@ export function CommCosts() {
                 {stats.variableCount} itens variáveis
               </span>
             </div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Gastos Variáveis do Mês</p>
-            <p className="text-3xl font-black text-rose-600 mt-1">
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Gastos Variáveis</p>
+            <p className="text-2xl font-black text-rose-600 mt-1">
               R$ {stats.totalVariable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[11px] text-slate-400 font-bold mt-2">
@@ -298,18 +323,21 @@ export function CommCosts() {
             <div className="relative z-10">
               <div className="flex justify-between items-start mb-3">
                 <div className="p-3 bg-white/10 rounded-2xl text-purple-400">
-                  <Layers size={22} />
+                  <Wallet size={22} />
                 </div>
-                <span className="px-2.5 py-1 bg-white/10 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider">
-                  Total Setor
+                <span className={cn(
+                  "px-2.5 py-1 font-bold text-[10px] rounded-lg uppercase tracking-wider",
+                  stats.totalBalance >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                )}>
+                  Saldo: R$ {stats.totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Custo Total de Comunicação</p>
-              <p className="text-3xl font-black text-white mt-1">
+              <p className="text-2xl font-black text-white mt-1">
                 R$ {stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-[11px] text-slate-400 font-bold mt-2">
-                Comprometimento orçamentário mensal
+                Comprometimento orçamentário do setor
               </p>
             </div>
             <div className="absolute top-0 right-0 w-28 h-28 bg-purple-500/10 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
@@ -332,7 +360,7 @@ export function CommCosts() {
           <MonthlyExpensesManager
             transactions={transactions}
             categories={categories}
-            totalIncome={0}
+            totalIncome={stats.totalIncome}
             onSaveExpense={handleSaveExpense}
             onDeleteTransaction={handleDeleteTransaction}
             onToggleStatus={handleToggleStatus}

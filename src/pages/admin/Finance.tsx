@@ -48,7 +48,7 @@ export interface Transaction {
   expense_type?: 'fixed' | 'variable';
   recurrence?: 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'yearly' | 'none';
   module?: string;
-  currency?: 'BRL' | 'MZN';
+  currency?: string;
   original_amount?: number;
   exchange_rate?: number;
   notes?: string;
@@ -136,13 +136,22 @@ export function Finance() {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseModalType, setExpenseModalType] = useState<'fixed' | 'variable'>('fixed');
   const [isRepasseModalOpen, setIsRepasseModalOpen] = useState(false);
+  const [repasseDefaultModule, setRepasseDefaultModule] = useState<string>('nutrition');
   const [editingCategory, setEditingCategory] = useState<TransactionCategory | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterExpenseType, setFilterExpenseType] = useState<'all' | 'fixed' | 'variable'>('all');
-  const [filterOrigin, setFilterOrigin] = useState<'all' | 'padrinhos' | 'mantenedores' | 'doacoes' | 'expenses'>('all');
+  const [filterOrigin, setFilterOrigin] = useState<'all' | 'padrinhos' | 'mantenedores' | 'doacoes' | 'repasses' | 'expenses'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  // Helper para identificar se uma transação de entrada é um Repasse interno entre caixa central e projeto
+  const isInternalRepasse = (t: Transaction): boolean => {
+    if (t.type !== 'income') return false;
+    const mod = (t.module || 'global').toLowerCase();
+    const desc = (t.description || '').toLowerCase();
+    return (mod !== 'global' && mod !== '') || desc.includes('repasse orçamentário') || desc.startsWith('repasse ');
+  };
 
   const fetchData = async () => {
     try {
@@ -189,16 +198,16 @@ export function Finance() {
   const currentMonthName = `${MONTH_NAMES[currentMonth]} de ${currentYear}`;
 
   const stats = useMemo(() => {
-    // 1. Entradas
-    const allIncome = transactions.filter(t => t.type === 'income');
-    const totalIncome = allIncome.reduce((acc, t) => acc + t.amount, 0);
+    // 1. Entradas Reais Externas (excluindo repasses internos entre Caixa Central e Projetos para não duplicar receita)
+    const externalIncome = transactions.filter(t => t.type === 'income' && !isInternalRepasse(t));
+    const totalIncome = externalIncome.reduce((acc, t) => acc + t.amount, 0);
 
-    const completedIncome = allIncome
+    const completedIncome = externalIncome
       .filter(t => t.status === 'completed')
       .reduce((acc, t) => acc + t.amount, 0);
 
-    // Total de entradas do mês corrente
-    const monthlyIncome = allIncome
+    // Total de entradas reais do mês corrente
+    const monthlyIncome = externalIncome
       .filter(t => {
         const { year, month, key } = parseDateParts(t.date);
         return key !== 'unknown' && year === currentYear && month === currentMonth;
@@ -217,12 +226,12 @@ export function Finance() {
     const pendingExpensesList = allExpenses.filter(t => t.status === 'pending');
     const pendingExpenses = pendingExpensesList.reduce((acc, t) => acc + t.amount, 0);
 
-    // 3. Saldo em Caixa Efetivo
+    // 3. Saldo em Caixa Efetivo (Entradas Externas Reais - Despesas Pagas)
     const effectiveIncome = completedIncome > 0 ? completedIncome : totalIncome;
     const cashBalance = effectiveIncome - completedExpenses;
     const projectedBalance = totalIncome - totalExpense;
 
-    // 4. Custo Fixo Mensal (transações fixas amortizadas + cadastrados nos projetos)
+    // 4. Custo Fixo Mensal (transações fixas amortizadas + projetos que ainda não possuem despesas lançadas em transações)
     const fixedExpensesList = allExpenses.filter(t => t.expense_type === 'fixed');
     const fixedExpense = fixedExpensesList.reduce((acc, t) => {
       const rec = t.recurrence || 'monthly';
@@ -237,14 +246,19 @@ export function Finance() {
       .filter(t => t.expense_type === 'variable')
       .reduce((acc, t) => acc + t.amount, 0);
 
-    // Custos cadastrados nos projetos ativos e em planejamento
+    // Custos cadastrados nos projetos ativos/em planejamento que não sejam duplicatas de "Orçamento: Nome" já lançado em allExpenses
     const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
-    const projectsFixedCost = activeProjects.reduce((acc, p) => acc + (Number(p.budget) || 0), 0);
+    const projectsFixedCost = activeProjects.reduce((acc, p) => {
+      const pNameLower = (p.name || '').toLowerCase();
+      const alreadyInTransactions = allExpenses.some(t => {
+        const d = (t.description || '').toLowerCase();
+        return d === `orçamento: ${pNameLower}` || (pNameLower.includes('nutri') && t.module === 'nutrition' && t.expense_type === 'fixed');
+      });
+      if (alreadyInTransactions) return acc;
+      return acc + (Number(p.budget) || 0);
+    }, 0);
 
-    // Custo Fixo Mensal Total = Custos Fixos Operacionais + Custos Cadastrados nos Projetos
     const totalMonthlyFixed = fixedExpense + projectsFixedCost;
-
-    // Cobertura do custo fixo mensal pela receita do mês
     const fixedCoverage = totalMonthlyFixed > 0 ? Math.min((monthlyIncome / totalMonthlyFixed) * 100, 100) : 100;
 
     return {
@@ -275,9 +289,9 @@ export function Finance() {
 
     const monthlyIncome = transactions
       .filter(t => {
-        if (t.type !== 'income') return false;
-        const d = new Date(t.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        if (t.type !== 'income' || isInternalRepasse(t)) return false;
+        const { year, month, key } = parseDateParts(t.date);
+        return key !== 'unknown' && month === currentMonth && year === currentYear;
       })
       .reduce((acc, t) => acc + t.amount, 0);
 
@@ -291,19 +305,17 @@ export function Finance() {
   }, [transactions, projects]);
 
   const repasseStats = useMemo(() => {
-    // Todos os repasses destinados a módulos/projetos (entradas de recursos)
-    const projectRepasses = transactions.filter(t => 
-      t.type === 'income' && (t.module === 'nutrition' || t.module === 'communication')
-    );
+    // Todos os repasses destinados a módulos/projetos (transferências internas de recursos)
+    const projectRepasses = transactions.filter(t => isInternalRepasse(t));
     const totalRepassed = projectRepasses.reduce((acc, t) => acc + t.amount, 0);
 
     // Nutrição
-    const nutriRepassed = projectRepasses.filter(t => t.module === 'nutrition').reduce((acc, t) => acc + t.amount, 0);
+    const nutriRepassed = projectRepasses.filter(t => t.module === 'nutrition' || (t.description || '').toLowerCase().includes('nutri')).reduce((acc, t) => acc + t.amount, 0);
     const nutriExpenses = transactions.filter(t => t.type === 'expense' && t.module === 'nutrition').reduce((acc, t) => acc + t.amount, 0);
     const nutriBalance = nutriRepassed - nutriExpenses;
 
     // Comunicação
-    const commRepassed = projectRepasses.filter(t => t.module === 'communication').reduce((acc, t) => acc + t.amount, 0);
+    const commRepassed = projectRepasses.filter(t => t.module === 'communication' || (t.description || '').toLowerCase().includes('comunica')).reduce((acc, t) => acc + t.amount, 0);
     const commExpenses = transactions.filter(t => t.type === 'expense' && t.module === 'communication').reduce((acc, t) => acc + t.amount, 0);
     const commBalance = commRepassed - commExpenses;
 
@@ -330,34 +342,61 @@ export function Finance() {
       }
       const item = map.get(key)!;
       item.count += 1;
-      if (t.type === 'income') item.incomeTotal += t.amount;
-      else item.expenseTotal += t.amount;
+      if (t.type === 'income' && !isInternalRepasse(t)) item.incomeTotal += t.amount;
+      else if (t.type === 'expense') item.expenseTotal += t.amount;
     });
 
     return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [transactions]);
+
+  // Classificador unificado de origem da transação (Padrinho vs Mantenedor vs Doação Geral vs Repasse vs Despesa)
+  const classifyTransactionOrigin = (t: Transaction): 'padrinhos' | 'mantenedores' | 'doacoes' | 'repasses' | 'expenses' => {
+    if (t.type === 'expense') return 'expenses';
+    if (isInternalRepasse(t)) return 'repasses';
+
+    const desc = (t.description || '').toLowerCase();
+    // 1. Mantenedores (Apoio recorrente geral / valores de plano de mantenedor sem criança / descrição explícita de mantenedor)
+    if (
+      desc.includes('mantenedor') ||
+      desc.includes('apoio geral') ||
+      desc.includes('fundo casa nutri') ||
+      t.category_id === 'cat_monthly_maintainer' ||
+      (desc.includes('recorrência mensal') && t.amount < 90)
+    ) {
+      return 'mantenedores';
+    }
+
+    // 2. Padrinhos (Apadrinhamento de crianças / cotas >= 90 de padrinhos)
+    if (
+      desc.includes('apadrinh') ||
+      desc.includes('padrinho') ||
+      desc.includes('cota') ||
+      t.category_id === 'cat_sponsorship'
+    ) {
+      return 'padrinhos';
+    }
+
+    // 3. Se tiver recorrência mensal mas não for padrinho, é mantenedor
+    if (desc.includes('recorrência') || desc.includes('recorrencia') || t.recurrence === 'monthly') {
+      return 'mantenedores';
+    }
+
+    // 4. Demais receitas externas = Doações Gerais / Ofertas / Igrejas
+    return 'doacoes';
+  };
 
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter(t => {
         const matchesType = filterType === 'all' || t.type === filterType;
         const matchesExpenseType = filterExpenseType === 'all' || t.expense_type === filterExpenseType;
-        const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             t.account.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             (t.account || '').toLowerCase().includes(searchTerm.toLowerCase());
         const { key } = parseDateParts(t.date);
         const matchesMonth = selectedMonth === 'all' || key === selectedMonth;
 
-        const desc = t.description.toLowerCase();
-        const isSponsorTx = desc.includes('apadrinh') || desc.includes('padrinho') || t.category_id === 'cat_sponsorship' || desc.includes('cota');
-        const isMaintainerTx = !isSponsorTx && (desc.includes('mantenedor') || desc.includes('recorrência') || desc.includes('recorrencia') || desc.includes('mensal') || t.recurrence === 'monthly');
-        const isGeneralDonation = t.type === 'income' && !isSponsorTx && !isMaintainerTx;
-
-        const matchesOrigin = 
-          filterOrigin === 'all' ||
-          (filterOrigin === 'padrinhos' && isSponsorTx) ||
-          (filterOrigin === 'mantenedores' && isMaintainerTx) ||
-          (filterOrigin === 'doacoes' && isGeneralDonation) ||
-          (filterOrigin === 'expenses' && t.type === 'expense');
+        const txOrigin = classifyTransactionOrigin(t);
+        const matchesOrigin = filterOrigin === 'all' || filterOrigin === txOrigin;
 
         return matchesType && matchesExpenseType && matchesSearch && matchesMonth && matchesOrigin;
       })
@@ -399,7 +438,9 @@ export function Finance() {
       const group = map.get(key)!;
       group.transactions.push(t);
       if (t.type === 'income') {
-        group.totalIncome += t.amount;
+        if (!isInternalRepasse(t) || filterOrigin === 'repasses') {
+          group.totalIncome += t.amount;
+        }
       } else {
         group.totalExpense += t.amount;
       }
@@ -407,13 +448,66 @@ export function Finance() {
     });
 
     return groups;
-  }, [filteredTransactions]);
+  }, [filteredTransactions, filterOrigin]);
 
   const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
-    const { error } = await supabase.from('finance_transactions').insert([newTx]);
-    if (error) {
-      console.error('Error saving transaction:', error);
-      alert('Erro ao salvar transação');
+    try {
+      const basePayload: any = {
+        description: newTx.description,
+        amount: Number(newTx.amount),
+        type: newTx.type,
+        category_id: newTx.category_id || null,
+        date: newTx.date,
+        status: newTx.status || 'completed',
+        account: newTx.account || 'Conta Principal',
+        ...(newTx.expense_type ? { expense_type: newTx.expense_type } : {}),
+        ...(newTx.recurrence ? { recurrence: newTx.recurrence } : {}),
+        module: newTx.module || 'global'
+      };
+
+      const fullPayload: any = {
+        ...basePayload,
+        currency: newTx.currency || 'BRL',
+        ...(newTx.original_amount !== undefined ? { original_amount: newTx.original_amount } : {}),
+        ...(newTx.exchange_rate !== undefined ? { exchange_rate: newTx.exchange_rate } : {}),
+        ...(newTx.notes ? { notes: newTx.notes } : {})
+      };
+
+      let { data, error } = await supabase.from('finance_transactions').insert([fullPayload]).select();
+
+      // Fallback se o banco reclamar de alguma coluna opcional (currency, original_amount, exchange_rate, notes)
+      if (error && error.message?.includes('column')) {
+        const retry = await supabase.from('finance_transactions').insert([basePayload]).select();
+        data = retry.data;
+        error = retry.error;
+      }
+
+      // Fallback se category_id for uma categoria local ainda não sincronizada na FK
+      if (error && (error.message?.includes('foreign key') || error.code === '23503')) {
+        const retryNoCat = await supabase.from('finance_transactions').insert([{ ...basePayload, category_id: null }]).select();
+        data = retryNoCat.data;
+        error = retryNoCat.error;
+      }
+
+      if (error) throw error;
+
+      const savedTx: Transaction = {
+        ...(data && data[0] ? (data[0] as Transaction) : { id: 'tx_' + Date.now(), ...basePayload }),
+        currency: newTx.currency || 'BRL',
+        original_amount: newTx.original_amount,
+        exchange_rate: newTx.exchange_rate,
+        notes: newTx.notes
+      };
+      setTransactions(prev => [savedTx, ...prev]);
+    } catch (e) {
+      console.error('Error saving transaction, adding locally:', e);
+      const localTx: Transaction = {
+        id: 'tx_' + Math.random().toString(36).substring(2, 9),
+        ...newTx,
+        module: newTx.module || 'global',
+        currency: newTx.currency || 'BRL'
+      };
+      setTransactions(prev => [localTx, ...prev]);
     }
   };
 
@@ -506,21 +600,41 @@ export function Finance() {
   const handleSaveRepasse = async (repasse: RepassePayload) => {
     try {
       const incomeCat = categories.find(c => c.type === 'income');
-      const payload = {
+      const basePayload: any = {
         description: repasse.description,
         amount: repasse.amount,
         type: 'income' as const,
-        category_id: repasse.category_id || incomeCat?.id,
+        category_id: repasse.category_id || incomeCat?.id || null,
         date: repasse.date,
         status: 'completed' as const,
         account: repasse.account,
         notes: repasse.notes,
         module: repasse.module
       };
-      const { data, error } = await supabase.from('finance_transactions').insert([payload]).select();
+
+      const fullPayload: any = {
+        ...basePayload,
+        currency: repasse.currency || 'BRL',
+        ...(repasse.original_amount !== undefined ? { original_amount: repasse.original_amount } : {}),
+        ...(repasse.exchange_rate !== undefined ? { exchange_rate: repasse.exchange_rate } : {})
+      };
+
+      let { data, error } = await supabase.from('finance_transactions').insert([fullPayload]).select();
+      if (error && error.message?.includes('column')) {
+        const retry = await supabase.from('finance_transactions').insert([basePayload]).select();
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) throw error;
       if (data && data[0]) {
-        setTransactions(prev => [data[0] as Transaction, ...prev]);
+        const savedRepasse: Transaction = {
+          ...(data[0] as Transaction),
+          currency: repasse.currency || 'BRL',
+          original_amount: repasse.original_amount,
+          exchange_rate: repasse.exchange_rate,
+          module: repasse.module
+        };
+        setTransactions(prev => [savedRepasse, ...prev]);
       }
     } catch (e) {
       console.warn('Erro ao salvar repasse no Supabase, adicionando localmente:', e);
@@ -534,7 +648,10 @@ export function Finance() {
         status: 'completed',
         account: repasse.account,
         notes: repasse.notes,
-        module: repasse.module
+        module: repasse.module,
+        currency: repasse.currency || 'BRL',
+        original_amount: repasse.original_amount,
+        exchange_rate: repasse.exchange_rate
       };
       setTransactions(prev => [localTx, ...prev]);
     }
@@ -566,7 +683,7 @@ export function Finance() {
       amount?: number; 
       original_amount?: number; 
       exchange_rate?: number; 
-      currency?: 'BRL' | 'MZN';
+      currency?: string;
       date?: string; 
       notes?: string; 
       category_id?: string;
@@ -957,7 +1074,7 @@ export function Finance() {
                 </div>
               </div>
 
-              {/* Filtros Rápidos Diretos: Padrinhos vs Mantenedores vs Doações */}
+              {/* Filtros Rápidos Diretos: Padrinhos vs Mantenedores vs Doações vs Repasses vs Despesas */}
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
                   <Filter size={12} /> Filtro Rápido:
@@ -1012,6 +1129,19 @@ export function Finance() {
                 >
                   <DollarSign size={12} />
                   Doações Gerais
+                </button>
+
+                <button
+                  onClick={() => setFilterOrigin('repasses')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                    filterOrigin === 'repasses'
+                      ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                      : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-100"
+                  )}
+                >
+                  <Send size={12} />
+                  Repasses a Projetos
                 </button>
 
                 <button
@@ -1100,16 +1230,22 @@ export function Finance() {
                         <tbody className="divide-y divide-slate-50">
                           {monthGroup.transactions.map((t) => {
                             const category = categories.find(c => c.id === t.category_id);
+                            const txOrigin = classifyTransactionOrigin(t);
                             return (
                               <tr key={t.id} className="hover:bg-slate-50/80 transition-all group/row">
                                 <td className="px-8 py-6">
                                   <div className="flex items-center gap-4">
-                                    <div className={cn(
-                                      "w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover/row:scale-110",
-                                      t.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                                    )}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleStatus(t.id, t.status)}
+                                      title="Clique para alternar entre Efetivado e Pendente"
+                                      className={cn(
+                                        "w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover/row:scale-110 cursor-pointer",
+                                        t.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                      )}
+                                    >
                                       {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
-                                    </div>
+                                    </button>
                                     <div>
                                       <p className="text-xs font-black text-slate-900 tracking-tight">{formatTransactionDate(t.date)}</p>
                                       <p className={cn(
@@ -1127,7 +1263,7 @@ export function Finance() {
                                     {t.currency === 'MZN' && (
                                       <span 
                                         className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 inline-flex items-center gap-1"
-                                        title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : 'Moeda Moçambique'}
+                                        title={t.exchange_rate ? `Câmbio: 1 MZN = R$ ${t.exchange_rate.toFixed(4)} • 1 BRL = ${(1 / t.exchange_rate).toFixed(2)} MT` : 'Moeda Moçambique'}
                                       >
                                         🇲🇿 MZN
                                       </span>
@@ -1159,14 +1295,21 @@ export function Finance() {
                                       )}>
                                         {t.expense_type === 'fixed' ? 'Fixa' : 'Variável'}
                                       </span>
+                                    ) : txOrigin === 'repasses' ? (
+                                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm bg-emerald-100 text-emerald-800 border-emerald-200">
+                                        {t.module === 'nutrition' ? 'Repasse Casa Nutri' : t.module === 'communication' ? 'Repasse Comunicação' : 'Repasse Projeto'}
+                                      </span>
+                                    ) : txOrigin === 'padrinhos' ? (
+                                      <span className="inline-flex items-center gap-1 justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm bg-rose-50 text-rose-700 border-rose-200">
+                                        <Heart size={10} className="fill-rose-600 text-rose-600" /> Padrinho
+                                      </span>
+                                    ) : txOrigin === 'mantenedores' ? (
+                                      <span className="inline-flex items-center gap-1 justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm bg-blue-50 text-blue-700 border-blue-200">
+                                        <Repeat size={10} /> Mantenedor
+                                      </span>
                                     ) : (
-                                      <span className={cn(
-                                        "inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm",
-                                        t.module && t.module !== 'global'
-                                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                          : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                      )}>
-                                        {t.module && t.module !== 'global' ? `Repasse ${t.module === 'nutrition' ? 'Nutrição' : 'Comunicação'}` : 'Receita'}
+                                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter w-fit border shadow-sm bg-emerald-50 text-emerald-700 border-emerald-100">
+                                        Doação / Receita
                                       </span>
                                     )}
                                     {t.recurrence && t.recurrence !== 'none' && (
@@ -1192,8 +1335,8 @@ export function Finance() {
                                       <p className="text-lg font-black tracking-tighter text-emerald-700">
                                         {t.type === 'income' ? '+' : '-'} {(t.original_amount ?? (t.exchange_rate ? t.amount / t.exchange_rate : t.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
                                       </p>
-                                      <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)}` : undefined}>
-                                        ~ R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      <p className="text-[11px] font-bold text-slate-500 mt-0.5" title={t.exchange_rate ? `Taxa: 1 MZN = R$ ${t.exchange_rate.toFixed(4)} • 1 BRL = ${(1 / t.exchange_rate).toFixed(2)} MT` : undefined}>
+                                        R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                       </p>
                                     </>
                                   ) : (
@@ -1206,9 +1349,28 @@ export function Finance() {
                                   )}
                                 </td>
                                 <td className="px-8 py-6 text-center">
-                                  <button className="p-3 text-slate-300 hover:text-slate-900 hover:bg-white rounded-xl transition-all active:scale-95 shadow-none hover:shadow-lg hover:shadow-slate-100">
-                                    <MoreVertical size={20} />
-                                  </button>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleStatus(t.id, t.status)}
+                                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer"
+                                      title={t.status === 'completed' ? 'Marcar como Pendente' : 'Marcar como Efetivado'}
+                                    >
+                                      <CheckCircle2 size={17} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (await confirm('Deseja realmente excluir este lançamento financeiro?')) {
+                                          handleDeleteTransaction(t.id);
+                                        }
+                                      }}
+                                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                                      title="Excluir lançamento"
+                                    >
+                                      <Trash2 size={17} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1299,13 +1461,13 @@ export function Finance() {
                     Repasses Financeiros para os Projetos
                   </h3>
                   <p className="text-xs text-slate-500 font-medium mt-1">
-                    Valores repassados pela gestão central para cobrir as despesas operacionais da Casa Nutri e frentes setoriais.
+                    Valores repassados pela gestão central para cobrir as despesas operacionais da Casa Nutri, Comunicação e frentes de projetos.
                   </p>
                 </div>
 
                 <button
-                  onClick={() => setIsRepasseModalOpen(true)}
-                  className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all active:scale-95"
+                  onClick={() => { setRepasseDefaultModule('nutrition'); setIsRepasseModalOpen(true); }}
+                  className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer"
                 >
                   <Send size={15} />
                   + Novo Repasse para Projeto
@@ -1327,7 +1489,7 @@ export function Finance() {
                     R$ {repasseStats.totalRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-medium mt-2">
-                    Total transferido para todos os projetos
+                    Total transferido do Caixa Central para os projetos
                   </p>
                 </div>
 
@@ -1349,7 +1511,7 @@ export function Finance() {
                     R$ {repasseStats.nutriRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <div className="mt-2 pt-2 border-t border-emerald-200/60 flex justify-between text-[11px] font-bold text-emerald-800">
-                    <span>Despesas: R$ {repasseStats.nutriExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Custos: R$ {repasseStats.nutriExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     <span>Saldo: R$ {repasseStats.nutriBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -1372,7 +1534,7 @@ export function Finance() {
                     R$ {repasseStats.commRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <div className="mt-2 pt-2 border-t border-purple-200/60 flex justify-between text-[11px] font-bold text-purple-800">
-                    <span>Despesas: R$ {repasseStats.commExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Custos: R$ {repasseStats.commExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     <span>Saldo: R$ {repasseStats.commBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -1398,40 +1560,49 @@ export function Finance() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
-                      {repasseStats.projectRepasses.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-5 py-3.5 font-bold text-slate-900">{r.date}</td>
-                          <td className="px-5 py-3.5">
-                            <span className={cn(
-                              "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
-                              r.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                              r.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
-                              "bg-slate-100 text-slate-700 border border-slate-200"
-                            )}>
-                              {r.module === 'nutrition' ? 'Casa Nutri' : r.module === 'communication' ? 'Comunicação' : r.module}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 font-medium text-slate-700">{r.description}</td>
-                          <td className="px-5 py-3.5 text-slate-500">{r.account}</td>
-                          <td className="px-5 py-3.5 text-right font-black text-emerald-600">
-                            R$ {r.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-lg">
-                              Efetivado
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <button
-                              onClick={() => handleDeleteTransaction(r.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
-                              title="Excluir lançamento de repasse"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {repasseStats.projectRepasses.map((r) => {
+                        const matchedProject = projects.find(p => p.id === r.module || p.name.toLowerCase() === (r.module || '').toLowerCase());
+                        const destLabel = r.module === 'nutrition' ? 'Casa Nutri' : r.module === 'communication' ? 'Comunicação' : (matchedProject?.name || r.module || 'Projeto');
+                        return (
+                          <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">{formatTransactionDate(r.date)}</td>
+                            <td className="px-5 py-3.5">
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                                r.module === 'nutrition' ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                                r.module === 'communication' ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                                "bg-blue-50 text-blue-800 border border-blue-200"
+                              )}>
+                                {destLabel}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 font-medium text-slate-700">{r.description}</td>
+                            <td className="px-5 py-3.5 text-slate-500">{r.account}</td>
+                            <td className="px-5 py-3.5 text-right font-black text-emerald-600">
+                              <div>R$ {r.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                              {r.currency === 'MZN' && r.original_amount && (
+                                <div className="text-[10px] font-bold text-slate-500">
+                                  ({r.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT)
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5 text-center">
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-lg">
+                                Efetivado
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-center">
+                              <button
+                                onClick={() => handleDeleteTransaction(r.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                                title="Excluir lançamento de repasse"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {repasseStats.projectRepasses.length === 0 && (
                         <tr>
                           <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
@@ -1449,8 +1620,8 @@ export function Finance() {
             {/* Dashboard: Projeção Mensal */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-center">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 mb-1">Projeção de Cobertura</h3>
-                <p className="text-sm text-slate-500">Receita do mês vs Custo de projetos ativos</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Projeção de Cobertura dos Projetos</h3>
+                <p className="text-sm text-slate-500">Receita externa do mês vs Orçamento estimado dos projetos ativos</p>
                 <div className="mt-4 flex items-baseline gap-2">
                   <span className="text-3xl font-black text-slate-900">
                     {projectStats.coveragePercentage.toFixed(1)}%
@@ -1461,7 +1632,7 @@ export function Finance() {
               <div className="flex-1 w-full space-y-4">
                 <div>
                   <div className="flex justify-between text-sm font-bold mb-1">
-                    <span className="text-emerald-600">Receita Mês Atual</span>
+                    <span className="text-emerald-600">Receita Externa Mês Atual</span>
                     <span className="text-slate-900">R$ {projectStats.monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -1480,42 +1651,106 @@ export function Finance() {
               </div>
             </div>
 
-            {/* Listagem de Projetos */}
+            {/* Listagem de Projetos Conectados com Repasses e Custos */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map(p => (
-                <div key={p.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                      <Layers size={20} />
-                    </div>
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                      p.status === 'active' ? "bg-emerald-100 text-emerald-700" :
-                      p.status === 'planning' ? "bg-amber-100 text-amber-700" :
-                      "bg-slate-100 text-slate-700"
-                    )}>
-                      {p.status === 'active' ? 'Em Andamento' : p.status === 'planning' ? 'Planejamento' : p.status}
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-slate-900 mb-1">{p.name}</h4>
-                  <p className="text-sm text-slate-500 line-clamp-2 mb-4">{p.description || 'Sem descrição'}</p>
-                  
-                  <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+              {projects.map(p => {
+                const pNameLower = (p.name || '').toLowerCase();
+                const linkedModule = pNameLower.includes('nutri')
+                  ? 'nutrition'
+                  : (pNameLower.includes('comunica') || p.module === 'communication')
+                  ? 'communication'
+                  : p.id;
+
+                const projRepassed = repasseStats.projectRepasses
+                  .filter(r => r.module === linkedModule || r.module === p.id || (r.description || '').toLowerCase().includes(pNameLower))
+                  .reduce((acc, r) => acc + r.amount, 0);
+
+                const projRealCosts = transactions
+                  .filter(t => t.type === 'expense' && (
+                    t.module === linkedModule ||
+                    t.module === p.id ||
+                    (t.description || '').toLowerCase().includes(pNameLower)
+                  ))
+                  .reduce((acc, t) => acc + t.amount, 0);
+
+                const projBalance = projRepassed - projRealCosts;
+
+                return (
+                  <div key={p.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Custo Estimado</p>
-                      <p className="text-lg font-black text-slate-900">
-                        R$ {(p.budget || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    {p.start_date && (
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Início</p>
-                        <p className="text-xs font-bold text-slate-700">{new Date(p.start_date).toLocaleDateString('pt-BR')}</p>
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={cn(
+                          "p-3 rounded-2xl",
+                          linkedModule === 'nutrition' ? "bg-emerald-50 text-emerald-600" :
+                          linkedModule === 'communication' ? "bg-purple-50 text-purple-600" :
+                          "bg-blue-50 text-blue-600"
+                        )}>
+                          {linkedModule === 'nutrition' ? <Building2 size={20} /> : <Layers size={20} />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                            p.status === 'active' ? "bg-emerald-100 text-emerald-700" :
+                            p.status === 'planning' ? "bg-amber-100 text-amber-700" :
+                            "bg-slate-100 text-slate-700"
+                          )}>
+                            {p.status === 'active' ? 'Em Andamento' : p.status === 'planning' ? 'Planejamento' : p.status}
+                          </span>
+                        </div>
                       </div>
-                    )}
+                      <h4 className="font-bold text-slate-900 mb-1 text-base">{p.name}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2 mb-4">{p.description || 'Sem descrição'}</p>
+                    </div>
+
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Repassado</span>
+                          <span className="font-black text-emerald-600">
+                            R$ {projRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Custos Reais</span>
+                          <span className="font-black text-rose-600">
+                            R$ {projRealCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-1">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Orçamento Previsto</p>
+                          <p className="text-base font-black text-slate-900">
+                            R$ {(p.budget || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saldo no Projeto</p>
+                          <p className={cn(
+                            "text-sm font-black",
+                            projBalance >= 0 ? "text-emerald-700" : "text-rose-600"
+                          )}>
+                            R$ {projBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRepasseDefaultModule(linkedModule);
+                          setIsRepasseModalOpen(true);
+                        }}
+                        className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Send size={13} />
+                        Repassar Recursos para {p.name}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {projects.length === 0 && (
                 <div className="col-span-full p-12 text-center text-slate-500 font-medium">
                   Nenhum projeto encontrado.
@@ -1592,7 +1827,9 @@ export function Finance() {
         isOpen={isRepasseModalOpen}
         onClose={() => setIsRepasseModalOpen(false)}
         onSave={handleSaveRepasse}
+        defaultModule={repasseDefaultModule}
         categories={categories}
+        projects={projects}
       />
     </div>
   );

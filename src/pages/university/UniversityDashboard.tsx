@@ -1,25 +1,38 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  GraduationCap,
   Users,
   Award,
   UserCheck,
   BookOpen,
   Heart,
-  FileBarChart,
-  Settings,
-  CheckCircle2,
-  Clock,
-  ShieldCheck,
+  Calendar,
+  AlertCircle,
   ArrowRight,
-  Lock,
+  Clock,
+  CheckCircle2,
+  GraduationCap,
+  TrendingUp,
+  DollarSign,
 } from 'lucide-react';
+import {
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { format, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useUniversity } from '../../contexts/UniversityContext';
-import { useAuth } from '../../contexts/AuthContext';
 
 export function UniversityDashboard() {
-  const { user } = useAuth();
+  const today = new Date();
   const {
     config,
     students,
@@ -32,308 +45,579 @@ export function UniversityDashboard() {
     can,
   } = useUniversity();
 
+  // Métricas de estudantes
   const activeStudents = students.filter(
     s => s.application_status === 'approved' && s.enrollment_status === 'active'
   );
   const pendingApplications = students.filter(s => s.application_status === 'pending');
+  const graduatedStudents = students.filter(s => s.enrollment_status === 'graduated');
+  const inactiveOrSuspended = students.filter(
+    s => s.enrollment_status === 'suspended' || s.enrollment_status === 'inactive' || s.application_status === 'rejected'
+  );
+
+  // Métricas de bolsas e pagamentos
   const activeScholarships = scholarships.filter(s => s.status === 'active');
   const monthlyBudget = activeScholarships.reduce((sum, s) => sum + Number(s.monthly_amount || 0), 0);
   const pendingApprovalPayments = payments.filter(p => p.status === 'pending_approval');
   const approvedAwaitingExecution = payments.filter(p => p.status === 'approved');
-  const activeMentors = mentors.filter(m => m.status === 'active');
-  const activeSponsorships = sponsorships.filter(s => s.status === 'active');
-  const monthlyFunded = activeSponsorships.reduce((sum, s) => sum + Number(s.monthly_amount || 0), 0);
+  const paidPaymentsTotal = payments
+    .filter(p => p.status === 'paid')
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
+  // Métricas de mentores e mentorias
+  const activeMentors = mentors.filter(m => m.status === 'active');
+  const completedMentorships = mentorships.filter(m => m.status === 'completed');
+  const scheduledMentorships = mentorships.filter(m => m.status === 'scheduled');
+
+  // Métricas acadêmicas
   const avgGpa =
     academicRecords.length > 0
       ? (academicRecords.reduce((acc, r) => acc + Number(r.gpa || 0), 0) / academicRecords.length).toFixed(1)
       : '0.0';
+  const avgAttendance =
+    academicRecords.length > 0
+      ? Math.round(
+          academicRecords.reduce((acc, r) => acc + Number(r.attendance_rate || 0), 0) / academicRecords.length
+        )
+      : 0;
+  const totalCommunityHours = academicRecords.reduce(
+    (acc, r) => acc + Number(r.community_hours_completed || 0),
+    0
+  );
+  const academicAlerts = academicRecords.filter(
+    r => r.academic_status === 'atencao' || r.academic_status === 'reprovado'
+  );
 
-  const quickModules = [
-    {
-      title: 'Estudantes & Inscrições',
-      description: 'Cadastro de bolsistas, triagem de candidatos, aprovação de inscrições e dados confidenciais protegidos.',
-      path: '/futuro-universitario/students',
-      icon: Users,
-      allowed: can('fu:students:view'),
-      badge: `${activeStudents.length} ativos • ${pendingApplications.length} pendentes`,
-      color: 'bg-slate-100 text-slate-700 border-slate-200',
-    },
-    {
-      title: 'Bolsas & Pagamentos',
-      description: 'Gestão de bolsas integrais/parciais, aprovação de desembolsos e registro de pagamentos mensais.',
-      path: '/futuro-universitario/scholarships',
-      icon: Award,
-      allowed: can('fu:scholarships:view'),
-      badge: `${activeScholarships.length} bolsas • R$ ${monthlyBudget.toLocaleString('pt-BR')}/mês`,
-      color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    },
-    {
-      title: 'Mentores & Mentorias',
-      description: 'Profissionais voluntários vinculados aos estudantes e registro seguro de encontros de mentoria.',
-      path: '/futuro-universitario/mentors',
-      icon: UserCheck,
-      allowed: can('fu:mentors:view'),
-      badge: `${activeMentors.length} mentores • ${mentorships.length} sessões`,
-      color: 'bg-amber-50 text-amber-600 border-amber-100',
-    },
-    {
-      title: 'Acompanhamento Acadêmico',
-      description: 'Notas semestrais (CR/GPA), frequência, disciplinas aprovadas e horas de contrapartida comunitária.',
-      path: '/futuro-universitario/academic',
-      icon: BookOpen,
-      allowed: can('fu:academic:view'),
-      badge: `Média Geral ${avgGpa}`,
-      color: 'bg-blue-50 text-blue-600 border-blue-100',
-    },
-    {
-      title: 'Apoiadores & Padrinhos',
-      description: 'Mantenedores gerais, padrinhos individuais e apoiadores parciais vinculados ao Portal do Mantenedor.',
-      path: '/futuro-universitario/supporters',
-      icon: Heart,
-      allowed: can('fu:supporters:view'),
-      badge: `${activeSponsorships.length} vínculos • R$ ${monthlyFunded.toLocaleString('pt-BR')}/mês`,
-      color: 'bg-rose-50 text-rose-600 border-rose-100',
-    },
-    {
-      title: 'Relatórios & Impacto',
-      description: 'Indicadores de impacto, atualizações para o Portal dos Mantenedores e exportação de dados.',
-      path: '/futuro-universitario/reports',
-      icon: FileBarChart,
-      allowed: can('fu:reports:view'),
-      badge: 'Transparência & Exportação',
-      color: 'bg-purple-50 text-purple-600 border-purple-100',
-    },
-    {
-      title: 'Configurações do Módulo',
-      description: 'Parâmetros de valores de bolsa, regras de privacidade do portal e matriz de permissões.',
-      path: '/futuro-universitario/settings',
-      icon: Settings,
-      allowed: can('fu:settings:manage'),
-      badge: 'Governança & Privacidade',
-      color: 'bg-slate-100 text-slate-700 border-slate-200',
-    },
+  // Métricas de apoiadores
+  const activeSponsorships = sponsorships.filter(s => s.status === 'active');
+  const monthlyFunded = activeSponsorships.reduce((sum, s) => sum + Number(s.monthly_amount || 0), 0);
+  const individualCount = activeSponsorships.filter(s => s.modality === 'individual').length;
+  const partialCount = activeSponsorships.filter(s => s.modality === 'partial').length;
+  const generalCount = activeSponsorships.filter(s => s.modality === 'general').length;
+
+  // Dados do gráfico de rosca (Cenário Atual dos Estudantes)
+  const statusData = [
+    { name: 'Ativos', value: activeStudents.length, color: '#10b981' },
+    { name: 'Pendentes', value: pendingApplications.length, color: '#f59e0b' },
+    { name: 'Formados', value: graduatedStudents.length, color: '#64748b' },
+    { name: 'Inativos', value: inactiveOrSuspended.length, color: '#ef4444' },
   ];
 
+  // Dados do gráfico de área (Fluxo dos últimos 6 meses de pagamentos & captação)
+  const chartData = useMemo(() => {
+    return Array.from({ length: 6 }).map((_, i) => {
+      const date = subMonths(today, 5 - i);
+      const monthName = format(date, 'MMM', { locale: ptBR });
+      const refMonth = format(date, 'yyyy-MM');
+
+      const desembolsos = payments
+        .filter(p => p.reference_month === refMonth && p.status === 'paid')
+        .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+
+      return {
+        name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        desembolsos,
+        captacao: monthlyFunded,
+      };
+    });
+  }, [payments, monthlyFunded]);
+
+  // Alertas & Parâmetros críticos do módulo
+  const alerts = useMemo(() => {
+    const list: Array<{ title: string; desc: string; type: 'alert' | 'info' | 'success'; meta: string }> = [];
+
+    if (pendingApplications.length > 0) {
+      list.push({
+        title: `${pendingApplications.length} Inscrição(ões) Pendente(s)`,
+        desc: 'Candidatos aguardando avaliação e aprovação da coordenação.',
+        type: 'alert',
+        meta: 'Estudantes',
+      });
+    }
+    if (pendingApprovalPayments.length > 0) {
+      list.push({
+        title: `${pendingApprovalPayments.length} Pagamento(s) para Aprovar`,
+        desc: 'Desembolsos de bolsas aguardando aprovação financeira.',
+        type: 'alert',
+        meta: 'Bolsas',
+      });
+    }
+    if (academicAlerts.length > 0) {
+      list.push({
+        title: `${academicAlerts.length} Alerta(s) Acadêmico(s)`,
+        desc: 'Estudantes com status de atenção ou risco de reprovação.',
+        type: 'alert',
+        meta: 'Acadêmico',
+      });
+    }
+    list.push({
+      title: 'Valores Vigentes das Modalidades',
+      desc: `Padrinho: R$ ${config.full_scholarship_amount} (${config.full_scholarship_amount_mzn} MT) • Parcial: R$ ${config.partial_quota_amount} (${config.partial_quota_amount_mzn} MT)`,
+      type: 'info',
+      meta: 'Configurações',
+    });
+    list.push({
+      title: 'Contrapartida Comunitária',
+      desc: `Meta semestral: ${config.counterpart_hours_required}h por estudante • Total registrado: ${totalCommunityHours}h.`,
+      type: 'success',
+      meta: 'Impacto Social',
+    });
+
+    return list;
+  }, [
+    pendingApplications.length,
+    pendingApprovalPayments.length,
+    academicAlerts.length,
+    config,
+    totalCommunityHours,
+  ]);
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#6e6e6e] via-[#878787] to-slate-700 rounded-[2rem] p-6 sm:p-8 text-white shadow-xl border border-slate-500/30">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 px-3.5 py-1 rounded-full text-white text-xs font-bold uppercase tracking-wider">
-              <GraduationCap size={15} />
-              <span>Módulo Integrado • YAH Hope</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
-              {config.program_name}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-100/90 leading-relaxed">
-              {config.short_description}
-            </p>
-          </div>
-
-          <div className="bg-black/20 backdrop-blur-md border border-white/15 rounded-2xl p-4 sm:p-5 space-y-2 shrink-0 min-w-[250px]">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-200 uppercase tracking-wider">
-              <ShieldCheck size={16} className="text-emerald-400" />
-              <span>Controle de Acesso Ativo</span>
-            </div>
-            <p className="text-xs text-white font-semibold">
-              Operador: <span className="text-slate-200">{user?.name}</span>
-            </p>
-            <p className="text-[11px] text-slate-200/80">
-              Privacidade LGPD/Portal: <strong className="text-emerald-300">Proteção Estrita Ativa</strong>
-            </p>
-            <div className="pt-1">
-              <Link
-                to="/portal/futuro-universitario"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors"
-              >
-                <span>Ver visão no Portal do Mantenedor</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header estilo Dashboard Nutrição */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            Dashboard Geral
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium italic">
+            Visão consolidada do {config.program_name}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+          <Calendar size={16} className="text-slate-600" />
+          {format(today, "d 'de' MMMM, yyyy", { locale: ptBR })}
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
-              <Users size={20} />
-            </div>
-            {pendingApplications.length > 0 && (
-              <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full">
-                {pendingApplications.length} inscrição pendente
+      {/* Metrics Grid (4 KPIs principais) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Estudantes Ativos"
+          value={activeStudents.length.toString()}
+          icon={Users}
+          badge={`${pendingApplications.length} pendentes`}
+          badgeType={pendingApplications.length > 0 ? 'amber' : 'emerald'}
+          color="slate"
+        />
+        <MetricCard
+          title="Bolsas Mensais"
+          value={`R$ ${monthlyBudget.toLocaleString('pt-BR')}`}
+          icon={Award}
+          badge={`${activeScholarships.length} ativas`}
+          badgeType="emerald"
+          color="emerald"
+        />
+        <MetricCard
+          title="Mentores & Sessões"
+          value={activeMentors.length.toString()}
+          icon={UserCheck}
+          badge={`${completedMentorships.length} realizadas`}
+          badgeType="slate"
+          color="amber"
+        />
+        <MetricCard
+          title="Captação Apoiadores"
+          value={`R$ ${monthlyFunded.toLocaleString('pt-BR')}`}
+          icon={Heart}
+          badge={`${activeSponsorships.length} vínculos`}
+          badgeType="emerald"
+          color="rose"
+        />
+      </div>
+
+      {/* Main Content Grid (2/3 + 1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna Esquerda (2/3) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Fila de Inscrições & Pendências Operacionais */}
+          <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-6 relative z-10">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Fila de Inscrições & Bolsas</h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  Acompanhamento em tempo real
+                </p>
+              </div>
+              <span className="bg-[#878787] text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-sm">
+                {pendingApplications.length + pendingApprovalPayments.length} Pendências
               </span>
-            )}
-          </div>
-          <div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 block">
-              {activeStudents.length}
-            </span>
-            <span className="text-xs font-bold text-slate-500">Estudantes Universitários Ativos</span>
-          </div>
-        </div>
+            </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Award size={20} />
-            </div>
-            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full">
-              {activeScholarships.length} bolsas ativas
-            </span>
-          </div>
-          <div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 block">
-              R$ {monthlyBudget.toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs font-bold text-slate-500">Compromisso Mensal de Bolsas</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <UserCheck size={20} />
-            </div>
-            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-full">
-              {mentorships.length} encontros
-            </span>
-          </div>
-          <div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 block">
-              {activeMentors.length}
-            </span>
-            <span className="text-xs font-bold text-slate-500">Mentores Voluntários Ativos</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <Heart size={20} />
-            </div>
-            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full">
-              {activeSponsorships.length} apoiadores
-            </span>
-          </div>
-          <div>
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 block">
-              R$ {monthlyFunded.toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs font-bold text-slate-500">Captação Mensal Vinculada</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filas Operacionais Pendentes */}
-      {(pendingApplications.length > 0 ||
-        pendingApprovalPayments.length > 0 ||
-        approvedAwaitingExecution.length > 0) && (
-        <div className="bg-amber-50/80 border border-amber-200 rounded-3xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-              <Clock size={20} />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900">Pendências Operacionais do Módulo</h3>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Existem{' '}
-                <strong>{pendingApplications.length} inscrição(ões)</strong> aguardando avaliação,{' '}
-                <strong>{pendingApprovalPayments.length} pagamento(s)</strong> aguardando aprovação e{' '}
-                <strong>{approvedAwaitingExecution.length} pagamento(s)</strong> aprovados aguardando registro de baixa.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {pendingApplications.length > 0 && can('fu:students:view') && (
-              <Link
-                to="/futuro-universitario/students?filter=pending"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
-              >
-                Avaliar Inscrições
-              </Link>
-            )}
-            {(pendingApprovalPayments.length > 0 || approvedAwaitingExecution.length > 0) &&
-              can('fu:scholarships:view') && (
-                <Link
-                  to="/futuro-universitario/scholarships"
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all"
+            <div className="space-y-3 relative z-10">
+              {pendingApplications.map(st => (
+                <div
+                  key={st.id}
+                  className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:border-slate-300 hover:bg-white transition-all group shadow-xs"
                 >
-                  Gerenciar Pagamentos
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-800 font-black shadow-xs">
+                      {st.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900">{st.name}</h3>
+                      <p className="text-[11px] font-semibold text-slate-500">
+                        Inscrição pendente • {st.course} ({st.institution})
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-xl border text-amber-700 bg-amber-50 border-amber-200 flex items-center gap-1">
+                      <Clock size={12} /> Pendente
+                    </span>
+                    {can('fu:students:view') && (
+                      <Link
+                        to="/futuro-universitario/students?filter=pending"
+                        className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        <ArrowRight size={18} />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {pendingApprovalPayments.map(pay => {
+                const st = students.find(s => s.id === pay.student_id);
+                return (
+                  <div
+                    key={pay.id}
+                    className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:border-slate-300 hover:bg-white transition-all group shadow-xs"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-black shadow-xs">
+                        <DollarSign size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900">
+                          {st?.name || 'Estudante'} — {pay.reference_month}
+                        </h3>
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          Pagamento ({pay.category}) aguardando aprovação • R$ {pay.amount.toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    {can('fu:scholarships:view') && (
+                      <Link
+                        to="/futuro-universitario/scholarships"
+                        className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        <ArrowRight size={18} />
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+
+              {pendingApplications.length === 0 && pendingApprovalPayments.length === 0 && (
+                <div className="py-10 text-center">
+                  <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-2 opacity-70" />
+                  <p className="text-slate-400 font-medium italic text-sm">
+                    Nenhuma inscrição ou pagamento pendente de aprovação no momento.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Parâmetros Acadêmicos, Mentoria e Financeiro Consolidados */}
+          <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Parâmetros Operacionais do Módulo</h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  Acadêmico, Mentoria, Financeiro & Contrapartida
+                </p>
+              </div>
+              {can('fu:academic:view') && (
+                <Link
+                  to="/futuro-universitario/academic"
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                >
+                  <span>Ver Acadêmico</span>
+                  <ArrowRight size={14} />
                 </Link>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Média Acadêmica (CR)
+                </span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">{avgGpa}</span>
+                <span className="text-[11px] text-slate-500">{academicRecords.length} registros</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Frequência Média
+                </span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">{avgAttendance}%</span>
+                <span className="text-[11px] text-slate-500">Presença semestral</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Horas Comunitárias
+                </span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">{totalCommunityHours}h</span>
+                <span className="text-[11px] text-slate-500">
+                  Meta: {config.counterpart_hours_required}h/semestre
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Total Pago em Bolsas
+                </span>
+                <span className="text-2xl font-black text-emerald-700 mt-1 block">
+                  R$ {paidPaymentsTotal.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {approvedAwaitingExecution.length} aguardando baixa
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Mentorias Agendadas
+                </span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">
+                  {scheduledMentorships.length}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {mentorships.length} sessões no total
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Modalidades de Apoio
+                </span>
+                <span className="text-sm font-black text-slate-900 mt-1 block">
+                  {individualCount} Indiv. • {partialCount} Parc. • {generalCount} Geral
+                </span>
+                <span className="text-[11px] text-slate-500">Apoiadores ativos</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gráfico de Fluxo Financeiro */}
+          <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h2 className="text-xl font-black text-slate-900 mb-6 text-center lg:text-left">
+              Fluxo de Desembolsos vs Captação (6 Meses)
+            </h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorDesembolsos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#878787" stopOpacity={0.28} />
+                      <stop offset="95%" stopColor="#878787" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '20px',
+                      border: 'none',
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                      padding: '14px',
+                      fontWeight: 'bold',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="desembolsos"
+                    name="Desembolsos Pagos (R$)"
+                    stroke="#64748b"
+                    strokeWidth={3}
+                    fill="url(#colorDesembolsos)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Sub-módulos conforme permissões internas */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-black text-slate-900">Áreas do Futuro Universitário</h2>
-          <span className="text-xs text-slate-500 font-medium">
-            Acesso controlado pelas permissões internas do seu perfil
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {quickModules.map(item => {
-            const Icon = item.icon;
-            if (!item.allowed) {
-              return (
+        {/* Coluna Direita (1/3) */}
+        <div className="space-y-6">
+          {/* Cenário Atual (Donut Chart) */}
+          <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col">
+            <h2 className="text-xl font-black text-slate-900 mb-1">Cenário Atual</h2>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-6">
+              Distribuição dos Estudantes
+            </p>
+            <div className="flex-1 min-h-[220px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={
+                      students.length > 0
+                        ? statusData
+                        : [{ name: 'Sem cadastros', value: 1, color: '#e2e8f0' }]
+                    }
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={90}
+                    paddingAngle={students.length > 0 ? 8 : 0}
+                    dataKey="value"
+                  >
+                    {(students.length > 0
+                      ? statusData
+                      : [{ name: 'Sem cadastros', value: 1, color: '#e2e8f0' }]
+                    ).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                  {students.length}
+                </span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  Estudantes
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              {statusData.map((item, i) => (
                 <div
-                  key={item.path}
-                  className="bg-slate-100/70 rounded-3xl p-5 border border-slate-200/70 opacity-60 flex flex-col justify-between"
+                  key={i}
+                  className="bg-slate-50/70 p-3 rounded-2xl border border-slate-100 flex items-center justify-between"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center">
-                        <Icon size={20} />
-                      </div>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-200 px-2.5 py-1 rounded-full">
-                        <Lock size={11} /> Sem Permissão
-                      </span>
-                    </div>
-                    <h3 className="font-black text-slate-700 text-base">{item.title}</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed">{item.description}</p>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className="bg-white rounded-3xl p-5 border border-slate-200/80 hover:border-slate-400 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center ${item.color}`}>
-                      <Icon size={20} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
-                      {item.badge}
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      {item.name}
                     </span>
                   </div>
-                  <h3 className="font-black text-slate-900 text-base group-hover:text-slate-700 transition-colors">
-                    {item.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">{item.description}</p>
+                  <span className="text-sm font-black text-slate-900">{item.value}</span>
                 </div>
+              ))}
+            </div>
+          </div>
 
-                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>Acessar área</span>
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Link>
-            );
-          })}
+          {/* Card Escuro de Parâmetros & Alertas (estilo Nutrição) */}
+          <div className="bg-slate-900 p-6 sm:p-8 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden group">
+            <div className="relative z-10">
+              <h2 className="text-lg font-black mb-6 flex items-center gap-2">
+                <AlertCircle className="text-amber-500" size={20} />
+                Parâmetros & Alertas
+              </h2>
+              <div className="space-y-5">
+                {alerts.map((alert, i) => (
+                  <div key={i} className="flex gap-3.5 items-start">
+                    <div
+                      className={`w-2 h-2 mt-2 rounded-full shrink-0 ${
+                        alert.type === 'alert'
+                          ? 'bg-red-500 animate-pulse'
+                          : alert.type === 'success'
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-400'
+                      }`}
+                    />
+                    <div>
+                      <p className="text-sm font-black text-slate-100">{alert.title}</p>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5 leading-relaxed">
+                        {alert.desc}
+                      </p>
+                      <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase tracking-widest">
+                        {alert.meta}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap gap-3">
+                {can('fu:settings:manage') && (
+                  <Link
+                    to="/futuro-universitario/settings"
+                    className="text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1"
+                  >
+                    <span>Ajustar Parâmetros</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                )}
+                <Link
+                  to="/portal/futuro-universitario"
+                  className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 ml-auto"
+                >
+                  <GraduationCap size={14} />
+                  <span>Portal do Mantenedor</span>
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  icon: Icon,
+  badge,
+  badgeType,
+  color,
+}: {
+  title: string;
+  value: string;
+  icon: any;
+  badge: string;
+  badgeType: 'emerald' | 'amber' | 'slate';
+  color: 'slate' | 'emerald' | 'amber' | 'rose';
+}) {
+  const colors = {
+    slate: 'bg-slate-100 text-slate-700 border-slate-200',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+  };
+  const badgeColors = {
+    emerald: 'text-emerald-700 bg-emerald-50',
+    amber: 'text-amber-800 bg-amber-50',
+    slate: 'text-slate-600 bg-slate-100',
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col relative overflow-hidden group hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
+      <div className="flex justify-between items-start mb-5 relative z-10">
+        <div
+          className={`p-3.5 rounded-2xl border ${colors[color]} group-hover:scale-105 transition-transform duration-300 shadow-xs`}
+        >
+          <Icon size={22} />
+        </div>
+        <div
+          className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg ${badgeColors[badgeType]}`}
+        >
+          <TrendingUp size={11} />
+          <span>{badge}</span>
+        </div>
+      </div>
+      <div className="relative z-10">
+        <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+          {title}
+        </h3>
+        <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{value}</p>
       </div>
     </div>
   );

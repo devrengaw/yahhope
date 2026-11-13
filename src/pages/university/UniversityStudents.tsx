@@ -14,12 +14,16 @@ import {
   MapPin,
   ShieldAlert,
   X,
+  Upload,
+  Camera,
+  Trash2,
 } from 'lucide-react';
 import {
   useUniversity,
   UniversityStudent,
   UniversityStudentSensitiveData,
 } from '../../contexts/UniversityContext';
+import { uploadStudentPhoto } from '../../lib/imageUpload';
 
 export function UniversityStudents() {
   const { students, can, addStudent, updateStudent, approveApplication } = useUniversity();
@@ -43,6 +47,7 @@ export function UniversityStudents() {
   const [city, setCity] = useState('Nampula');
   const [province, setProvince] = useState('Nampula');
   const [photoUrl, setPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [institution, setInstitution] = useState('');
   const [course, setCourse] = useState('');
   const [currentSemester, setCurrentSemester] = useState(1);
@@ -589,15 +594,71 @@ export function UniversityStudents() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">URL da Foto do Estudante</label>
-                    <input
-                      type="text"
-                      disabled={Boolean(editingStudent && !can('fu:students:edit'))}
-                      value={photoUrl}
-                      onChange={e => setPhotoUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm"
-                    />
+                    <label className="block text-xs font-bold text-slate-700 mb-2">Foto do Estudante</label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center shrink-0">
+                        {photoUrl ? (
+                          <img src={photoUrl} alt="Foto do estudante" className="w-full h-full object-cover" />
+                        ) : (
+                          <Camera size={22} className="text-slate-400" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 w-full space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                              Boolean(editingStudent && !can('fu:students:edit')) || uploadingPhoto
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-[#878787] hover:bg-slate-700 text-white cursor-pointer shadow-xs'
+                            }`}
+                          >
+                            <Upload size={14} />
+                            <span>{uploadingPhoto ? 'Enviando foto...' : 'Fazer Upload da Foto'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={Boolean(editingStudent && !can('fu:students:edit')) || uploadingPhoto}
+                              onChange={async e => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  setUploadingPhoto(true);
+                                  const uploadedUrl = await uploadStudentPhoto(file, editingStudent?.id);
+                                  setPhotoUrl(uploadedUrl);
+                                } catch (err: any) {
+                                  alert(err?.message || 'Erro ao enviar foto.');
+                                } finally {
+                                  setUploadingPhoto(false);
+                                  e.target.value = '';
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {photoUrl && !(editingStudent && !can('fu:students:edit')) && (
+                            <button
+                              type="button"
+                              onClick={() => setPhotoUrl('')}
+                              className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={13} />
+                              <span>Remover</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          type="text"
+                          disabled={Boolean(editingStudent && !can('fu:students:edit'))}
+                          value={photoUrl}
+                          onChange={e => setPhotoUrl(e.target.value)}
+                          placeholder="Ou cole a URL da foto (https://...)"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-600"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div>

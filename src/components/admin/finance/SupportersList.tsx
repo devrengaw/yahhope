@@ -61,7 +61,7 @@ export function SupportersList() {
       const dbUsers = (usersRes.data || []).filter(u => !isSpamOrMockUser(u));
       const rawSponsorships = sponsorshipsRes.data || [];
       const dbDonations = donationsRes.data || [];
-      const childrenMap = new Map((childrenRes.data || []).map(c => [c.id, c]));
+      const childrenMap = new Map<string, any>((childrenRes.data || []).map(c => [c.id, c]));
 
       if (childrenRes.data) {
         setChildrenList(childrenRes.data.map(c => ({ id: c.id, name: c.name, address: c.address })).sort((a, b) => a.name.localeCompare(b.name)));
@@ -81,11 +81,14 @@ export function SupportersList() {
         if (u.email) usersByEmail.set(u.email.toLowerCase().trim(), u);
       });
 
-      // Mapear apadrinhamentos por sponsor_id e por donor_email
-      const sponsorshipsBySponsor = new Map<string, any>();
+      // Mapear apadrinhamentos por sponsor_id (array para suportar múltiplas cotas) e por donor_email
+      const sponsorshipsBySponsor = new Map<string, any[]>();
       const sponsorshipsByEmail = new Map<string, any[]>();
       dbSponsorships.forEach(sp => {
-        if (sp.sponsor_id) sponsorshipsBySponsor.set(sp.sponsor_id, sp);
+        if (sp.sponsor_id) {
+          if (!sponsorshipsBySponsor.has(sp.sponsor_id)) sponsorshipsBySponsor.set(sp.sponsor_id, []);
+          sponsorshipsBySponsor.get(sp.sponsor_id)!.push(sp);
+        }
         const spEmail = (sp.donor_email || '').toLowerCase().trim();
         if (spEmail) {
           if (!sponsorshipsByEmail.has(spEmail)) sponsorshipsByEmail.set(spEmail, []);
@@ -115,7 +118,7 @@ export function SupportersList() {
         const user = usersByEmail.get(email);
         const rawUserDonations = [...(donationsByEmail.get(email) || [])];
         const userSponsorships = [
-          ...(user ? (sponsorshipsBySponsor.has(user.id) ? [sponsorshipsBySponsor.get(user.id)] : []) : []),
+          ...(user ? (sponsorshipsBySponsor.get(user.id) || []) : []),
           ...(sponsorshipsByEmail.get(email) || [])
         ];
 
@@ -302,15 +305,22 @@ export function SupportersList() {
         const totalSpAmt = spAmounts.reduce((a, b) => a + b, 0);
         const effectiveMonthlyAmount = Math.max(maxSpAmt, totalSpAmt);
 
-        // REGRA DE OURO: Se a pessoa faz uma doação ou apadrinha com mais de 90 reais,
-        // ela PRECISA receber mais de uma criança!
-        const isCandidateForPadrinho = !isKnownMantenedor && (
+        const hasExplicitSponsorship =
+          uniqueSponsorships.some(sp => Boolean(sp.child_id)) ||
+          userDonations.some(d => d.is_sponsorship || (d.campaign_title && d.campaign_title.toLowerCase().includes('apadrinh')));
+
+        const isExplicitMaintainer =
+          isKnownMantenedor || (user?.role === 'MANTENEDOR' && !hasExplicitSponsorship && !isKnownPadrinho);
+
+        // REGRA DE OURO: Se a pessoa apadrinha com >= 90 reais (e não é Mantenedor Geral explícito),
+        // recebe 1 criança por múltiplo de R$ 90.
+        const isCandidateForPadrinho = !isExplicitMaintainer && (
           isKnownPadrinho ||
           user?.role === 'SPONSOR' ||
           user?.role === 'PADRINHO' ||
           effectiveMonthlyAmount >= 90 ||
           uniqueSponsorships.some(sp => sp.child_id || Number(sp.monthly_amount || 0) >= 90) ||
-          userDonations.some(d => d.is_sponsorship || (d.campaign_title && d.campaign_title.toLowerCase().includes('apadrinh')))
+          hasExplicitSponsorship
         );
 
         // REGRA DE OURO: Acompanha crianças a cada múltiplo de R$ 90 (90 = 1, 180 = 2, 270 = 3...).

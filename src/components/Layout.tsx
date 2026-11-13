@@ -73,7 +73,7 @@ const universityNavItems: Array<{
   icon: any;
   requiredPerm?: UniversityPermissionKey;
 }> = [
-  { name: 'Visão Geral', path: '/futuro-universitario', icon: LayoutDashboard },
+  { name: 'Dashboard', path: '/futuro-universitario', icon: LayoutDashboard },
   { name: 'Estudantes', path: '/futuro-universitario/students', icon: Users, requiredPerm: 'fu:students:view' },
   { name: 'Bolsas & Pagamentos', path: '/futuro-universitario/scholarships', icon: Award, requiredPerm: 'fu:scholarships:view' },
   { name: 'Mentores & Mentorias', path: '/futuro-universitario/mentors', icon: UserCheck, requiredPerm: 'fu:mentors:view' },

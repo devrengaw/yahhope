@@ -63,6 +63,8 @@ export function ExpenseModal({
   const [expenseType, setExpenseType] = useState<'fixed' | 'variable'>(defaultExpenseType);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [amountBrl, setAmountBrl] = useState('');
+  const [isCustomBrl, setIsCustomBrl] = useState(false);
   const [currency, setCurrency] = useState<'BRL' | 'MZN'>('BRL');
   const [exchangeRate, setExchangeRate] = useState<number>(0.08103);
   const [rateInfo, setRateInfo] = useState<ExchangeRateResult | null>(null);
@@ -83,8 +85,10 @@ export function ExpenseModal({
       getMznToBrlRate()
         .then(info => {
           setRateInfo(info);
-          setExchangeRate(info.rate);
-          setCustomRateInput(info.rate.toFixed(4));
+          if (!isCustomBrl) {
+            setExchangeRate(info.rate);
+            setCustomRateInput(info.rate.toFixed(4));
+          }
         })
         .catch(err => console.warn('Erro ao obter cotação:', err))
         .finally(() => setIsLoadingRate(false));
@@ -99,6 +103,11 @@ export function ExpenseModal({
       setExchangeRate(info.rate);
       setCustomRateInput(info.rate.toFixed(4));
       setIsEditingRate(false);
+      setIsCustomBrl(false);
+      const raw = parseFloat(amount);
+      if (!isNaN(raw) && raw > 0) {
+        setAmountBrl((raw * info.rate).toFixed(2));
+      }
     } finally {
       setIsLoadingRate(false);
     }
@@ -108,7 +117,40 @@ export function ExpenseModal({
     const val = parseFloat(customRateInput.replace(',', '.'));
     if (!isNaN(val) && val > 0) {
       setExchangeRate(val);
+      setIsCustomBrl(false);
+      const raw = parseFloat(amount);
+      if (!isNaN(raw) && raw > 0) {
+        setAmountBrl((raw * val).toFixed(2));
+      }
       setIsEditingRate(false);
+    }
+  };
+
+  const handleMznAmountChange = (val: string) => {
+    setAmount(val);
+    const numMzn = parseFloat(val);
+    if (!isNaN(numMzn) && numMzn > 0) {
+      if (isCustomBrl && parseFloat(amountBrl) > 0) {
+        const newRate = parseFloat(amountBrl) / numMzn;
+        setExchangeRate(newRate);
+        setCustomRateInput(newRate.toFixed(4));
+      } else {
+        setAmountBrl((numMzn * exchangeRate).toFixed(2));
+      }
+    } else if (!isCustomBrl) {
+      setAmountBrl('');
+    }
+  };
+
+  const handleConvertedBrlChange = (val: string) => {
+    setAmountBrl(val);
+    setIsCustomBrl(true);
+    const numBrl = parseFloat(val);
+    const numMzn = parseFloat(amount);
+    if (!isNaN(numBrl) && numBrl > 0 && !isNaN(numMzn) && numMzn > 0) {
+      const newRate = numBrl / numMzn;
+      setExchangeRate(newRate);
+      setCustomRateInput(newRate.toFixed(4));
     }
   };
 
@@ -180,7 +222,10 @@ export function ExpenseModal({
   const getMonthlyAmortization = () => {
     const rawVal = parseFloat(amount);
     if (isNaN(rawVal) || rawVal <= 0) return null;
-    const val = currency === 'MZN' ? rawVal * exchangeRate : rawVal;
+    const parsedBrl = parseFloat(amountBrl);
+    const val = currency === 'MZN'
+      ? (!isNaN(parsedBrl) && parsedBrl > 0 ? parsedBrl : rawVal * exchangeRate)
+      : rawVal;
     if (recurrence === 'bimonthly') return val / 2;
     if (recurrence === 'quarterly') return val / 3;
     if (recurrence === 'semiannual') return val / 6;
@@ -204,13 +249,15 @@ export function ExpenseModal({
     setIsSubmitting(true);
     try {
       const rawAmount = parseFloat(amount);
+      const parsedBrl = parseFloat(amountBrl);
       const finalAmountInBrl = currency === 'MZN' 
-        ? Number((rawAmount * exchangeRate).toFixed(2)) 
+        ? (!isNaN(parsedBrl) && parsedBrl > 0 ? Number(parsedBrl.toFixed(2)) : Number((rawAmount * exchangeRate).toFixed(2)))
         : rawAmount;
+      const finalRate = currency === 'MZN' && rawAmount > 0 ? (finalAmountInBrl / rawAmount) : exchangeRate;
 
       const formattedOriginal = rawAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       const currencyNote = currency === 'MZN'
-        ? `[Moçambique] Lançado em Meticais: ${formattedOriginal} MT (Cotação aplicada: 1 MZN = R$ ${exchangeRate.toFixed(4)}).`
+        ? `[Moçambique] Lançado em Meticais: ${formattedOriginal} MT | Convertido: R$ ${finalAmountInBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Cotação aplicada: 1 MZN = R$ ${finalRate.toFixed(4)} • 1 BRL = ${(1 / (finalRate || 1)).toFixed(2)} MT).`
         : '';
 
       const safeDueDay = Math.min(Math.max(1, dueDay || 10), 31);
@@ -230,7 +277,7 @@ export function ExpenseModal({
       );
 
       await onSave({
-        description: description + (currency === 'MZN' ? ` (${formattedOriginal} MT)` : ''),
+        description: description + (currency === 'MZN' && !description.includes('MT') ? ` (${formattedOriginal} MT)` : ''),
         amount: finalAmountInBrl,
         type: 'expense',
         category_id: effectiveCatId,
@@ -246,13 +293,15 @@ export function ExpenseModal({
         notes: notes ? `${notes}\n${currencyNote}`.trim() : currencyNote || undefined,
         currency,
         original_amount: rawAmount,
-        exchange_rate: currency === 'MZN' ? exchangeRate : 1,
+        exchange_rate: currency === 'MZN' ? finalRate : 1,
         module: detectedModule
       });
 
       // Reset
       setDescription('');
       setAmount('');
+      setAmountBrl('');
+      setIsCustomBrl(false);
       setCategoryId('');
       setNotes('');
       onClose();
@@ -447,10 +496,10 @@ export function ExpenseModal({
               </div>
 
               {/* Valor e Vencimento / Data */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={cn("grid grid-cols-1 gap-4", currency === 'MZN' ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                    Valor {expenseType === 'fixed' && recurrence !== 'monthly' ? `do Pagamento (${recurrence === 'semiannual' ? 'Semestral' : recurrence === 'yearly' ? 'Anual' : recurrence === 'quarterly' ? 'Trimestral' : 'Bimestral'})` : 'Estimado'} ({currency === 'MZN' ? 'Meticais' : 'Reais'})
+                    Valor ({currency === 'MZN' ? 'Meticais - MT' : 'Reais - R$'})
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
@@ -461,13 +510,41 @@ export function ExpenseModal({
                       step="0.01"
                       min="0"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => currency === 'MZN' ? handleMznAmountChange(e.target.value) : setAmount(e.target.value)}
                       placeholder={currency === 'MZN' ? "0,00 MT" : "0,00"}
                       className="w-full border-2 border-slate-100 rounded-2xl pl-14 pr-4 py-3 text-sm font-black text-slate-900 focus:outline-none focus:ring-4 focus:ring-slate-500/5 focus:border-slate-300 transition-all"
                       required
                     />
                   </div>
                 </div>
+
+                {currency === 'MZN' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-black uppercase tracking-wider text-emerald-800">
+                        Valor em Reais (R$)
+                      </label>
+                      <span className="text-[9px] font-bold text-emerald-600">
+                        {isCustomBrl ? 'Cotação manual' : 'Auto / Editável'}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-sm">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amountBrl}
+                        onChange={(e) => handleConvertedBrlChange(e.target.value)}
+                        placeholder="0,00"
+                        className="w-full border-2 border-emerald-200 bg-emerald-50/40 rounded-2xl pl-12 pr-4 py-3 text-sm font-black text-emerald-950 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {expenseType === 'fixed' && recurrence === 'monthly' ? (
                   <div>
@@ -512,9 +589,9 @@ export function ExpenseModal({
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       <div>
                         <p className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
-                          <span>Cotação Oficial Metical (MZN) → Real (BRL)</span>
+                          <span>{isCustomBrl ? 'Cotação Negociada Aplicada (MZN ↔ BRL)' : 'Cotação Oficial Metical (MZN) → Real (BRL)'}</span>
                           <span className="text-[10px] bg-emerald-200/80 text-emerald-800 px-1.5 py-0.2 rounded font-black">
-                            {rateInfo?.source === 'api' ? 'Tempo Real' : rateInfo?.source === 'cache' ? 'Em Cache' : 'Estimada'}
+                            {isCustomBrl ? 'Valor Já Convertido' : rateInfo?.source === 'api' ? 'Tempo Real' : rateInfo?.source === 'cache' ? 'Em Cache' : 'Estimada'}
                           </span>
                         </p>
                         <p className="text-[11px] text-emerald-700 font-bold">
@@ -532,7 +609,7 @@ export function ExpenseModal({
                         title="Buscar cotação mais recente na internet"
                       >
                         <RefreshCw size={12} className={isLoadingRate ? "animate-spin" : ""} />
-                        <span>{isLoadingRate ? 'Consultando...' : 'Atualizar Cotação'}</span>
+                        <span>{isLoadingRate ? 'Consultando...' : isCustomBrl ? 'Usar Cotação Oficial' : 'Atualizar Cotação'}</span>
                       </button>
 
                       <button
@@ -579,7 +656,7 @@ export function ExpenseModal({
                       </span>
                       <div className="text-right">
                         <span className="text-base font-black text-emerald-950 bg-white px-3 py-1 rounded-xl border border-emerald-300 shadow-sm inline-block">
-                          R$ {(parseFloat(amount) * exchangeRate).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          R$ {(parseFloat(amountBrl) || (parseFloat(amount) * exchangeRate)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">
                           Calculado de {parseFloat(amount).toLocaleString('pt-BR')} MT

@@ -369,6 +369,13 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       if (financeIncomeData && financeIncomeData.length > 0) {
         financeIncomeData.forEach(ft => {
           if (isSpamFinanceTransaction(ft)) return;
+          // Exclui repasses internos entre caixa central e projetos para nunca duplicar arrecadação
+          const ftModule = (ft.module || 'global').toLowerCase();
+          const ftDescLower = (ft.description || '').toLowerCase();
+          if ((ftModule !== 'global' && ftModule !== '') || ftDescLower.includes('repasse orçamentário') || ftDescLower.startsWith('repasse ')) {
+            return;
+          }
+
           const ftAmount = Number(ft.amount || 0);
           if (ftAmount <= 0) return;
           const ftDateStr = (ft.date || '').slice(0, 10);
@@ -395,14 +402,14 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
               id: `ft_${ft.id}`,
               campaign_id: undefined, // Direciona para a fase ativa da régua (Casa Nutri)
               campaign_title: ft.description || 'Doação / Entrada Financeira',
-              donor_name: ft.description?.replace(/^(Apadrinhamento Mensal|Doação Mensal|Recorrência Mensal)[^-\n]*-\s*/i, '') || 'Mantenedor YAH Hope',
+              donor_name: ft.description?.replace(/^(Apadrinhamento Mensal|Mantenedor Mensal|Doação Mensal|Recorrência Mensal)[^-\n]*-\s*/i, '') || 'Apoiador YAH Hope',
               donor_email: '',
               amount: ftAmount,
               status: 'paid',
               payment_method: ft.account?.toLowerCase().includes('pix') ? 'pix' : 'credit_card',
               date: ft.date || new Date().toISOString(),
               paid_at: ft.date || new Date().toISOString(),
-              is_sponsorship: true
+              is_sponsorship: ftDescLower.includes('apadrinh') || ftDescLower.includes('padrinho') || ft.category_id === 'cat_sponsorship'
             });
           }
         });
