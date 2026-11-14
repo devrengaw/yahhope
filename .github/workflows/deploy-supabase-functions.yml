@@ -34,15 +34,15 @@ jobs:
 
       - name: Deploy Edge Functions (JWT verified)
         run: |
-          supabase functions deploy send-campaign --project-ref $PROJECT_REF
-          supabase functions deploy send-accountability --project-ref $PROJECT_REF
-          supabase functions deploy create-checkout --project-ref $PROJECT_REF
-          supabase functions deploy delete-user --project-ref $PROJECT_REF
-          supabase functions deploy invite-user --project-ref $PROJECT_REF
+          supabase functions deploy send-campaign --remote=$PROJECT_REF --yes
+          supabase functions deploy send-accountability --remote=$PROJECT_REF --yes
+          supabase functions deploy create-checkout --remote=$PROJECT_REF --yes
+          supabase functions deploy delete-user --remote=$PROJECT_REF --yes
+          supabase functions deploy invite-user --remote=$PROJECT_REF --yes
 
       - name: Deploy Edge Functions (Public / Webhooks - No JWT)
         run: |
-          supabase functions deploy track-campaign --project-ref $PROJECT_REF --no-verify-jwt
-          supabase functions deploy stripe-webhook --project-ref $PROJECT_REF --no-verify-jwt
-          supabase functions deploy infinitepay-webhook --project-ref $PROJECT_REF --no-verify-jwt
-          supabase functions deploy resend-webhook --project-ref $PROJECT_REF --no-verify-jwt
+          supabase functions deploy track-campaign --remote=$PROJECT_REF --no-verify-jwt --yes
+          supabase functions deploy stripe-webhook --remote=$PROJECT_REF --no-verify-jwt --yes
+          supabase functions deploy infinitepay-webhook --remote=$PROJECT_REF --no-verify-jwt --yes
+          supabase functions deploy resend-webhook --remote=$PROJECT_REF --no-verify-jwt --yes
