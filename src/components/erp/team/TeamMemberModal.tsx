@@ -212,7 +212,6 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
                 onChange={e => setPhone(e.target.value)}
                 placeholder="+55 11 99999-9999"
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                required
               />
             </div>
           </div>
@@ -240,6 +239,9 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
                 <option value="coordinator">Coordenador(a)</option>
                 <option value="observer">Observador(a) de Saúde</option>
                 <option value="admin">Administrador(a)</option>
+                <option value="SPONSOR">Padrinho (Site)</option>
+                <option value="MANTENEDOR">Mantenedor (Site)</option>
+                <option value="USER">Conta do Site (Usuário)</option>
               </select>
             </div>
             <div>

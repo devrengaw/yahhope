@@ -94,6 +94,8 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
   const [webhookCopied, setWebhookCopied] = useState(false);
   const [webhookTestStatus, setWebhookTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [webhookTestMessage, setWebhookTestMessage] = useState<string>('');
+  const [isSyncingHistory, setIsSyncingHistory] = useState(false);
+  const [syncHistoryFeedback, setSyncHistoryFeedback] = useState<string | null>(null);
 
   // Modal para Registro Manual de Resposta
   const [replyModalRecipient, setReplyModalRecipient] = useState<{ recipient: CampaignRecipient; campaignId: string } | null>(null);
@@ -161,6 +163,33 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
     } catch (err: any) {
       setWebhookTestStatus('error');
       setWebhookTestMessage(err.message || 'Não foi possível conectar ao endpoint do Webhook.');
+    }
+  };
+
+  const handleSyncResendHistory = async () => {
+    setIsSyncingHistory(true);
+    setSyncHistoryFeedback(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-campaign', {
+        body: { action: 'sync_resend_history' }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const imported = data?.importedCount || 0;
+      setSyncHistoryFeedback(
+        imported > 0
+          ? `${imported} e-mail(s) antigo(s) resgatado(s) do Resend!`
+          : 'Nenhum e-mail antigo novo para importar (tudo já está sincronizado).'
+      );
+      await loadData();
+      setTimeout(() => setSyncHistoryFeedback(null), 6000);
+    } catch (err: any) {
+      console.error('Erro ao sincronizar histórico Resend:', err);
+      setSyncHistoryFeedback(`Erro ao resgatar histórico: ${err?.message || 'Verifique se a Edge Function foi atualizada.'}`);
+      setTimeout(() => setSyncHistoryFeedback(null), 7000);
+    } finally {
+      setIsSyncingHistory(false);
     }
   };
 
@@ -645,6 +674,15 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <button
+            onClick={handleSyncResendHistory}
+            disabled={isSyncingHistory}
+            className="px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 font-bold transition-all text-sm flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
+            title="Buscar e importar no histórico os e-mails automáticos e manuais já enviados pelo Resend"
+          >
+            <RefreshCw size={16} className={isSyncingHistory ? 'animate-spin' : ''} />
+            <span>{isSyncingHistory ? 'Resgatando...' : 'Resgatar Enviados'}</span>
+          </button>
+          <button
             onClick={() => {
               setIsWebhookModalOpen(true);
               setWebhookTestStatus('idle');
@@ -673,6 +711,20 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
           </button>
         </div>
       </div>
+
+      {syncHistoryFeedback && (
+        <div className={cn(
+          "px-5 py-3.5 rounded-2xl border text-sm font-semibold flex items-center justify-between gap-3",
+          syncHistoryFeedback.startsWith('Erro')
+            ? "bg-rose-50 border-rose-200 text-rose-700"
+            : "bg-emerald-50 border-emerald-200 text-emerald-800"
+        )}>
+          <span>{syncHistoryFeedback}</span>
+          <button onClick={() => setSyncHistoryFeedback(null)} className="text-current opacity-70 hover:opacity-100">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* CARDS DE KPI / PERFORMANCE GLOBAL AVANÇADA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

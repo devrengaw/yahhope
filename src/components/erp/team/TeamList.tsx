@@ -8,9 +8,10 @@ interface TeamListProps {
   onEdit?: (member: TeamMember) => void;
   onDelete?: (id: string) => void;
   onResendInvite?: (member: TeamMember) => void;
+  onQuickRoleChange?: (member: TeamMember, newRole: TeamMemberRole) => void;
 }
 
-export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamListProps) {
+export function TeamList({ members, onEdit, onDelete, onResendInvite, onQuickRoleChange }: TeamListProps) {
   const [categories, setCategories] = useState<{ id: string; name: string; color: string }[]>([]);
 
   useEffect(() => {
@@ -20,21 +21,32 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamList
   }, []);
   
   const getRoleBadge = (role: TeamMemberRole) => {
-    switch (role) {
-      case 'admin':
+    const normalized = String(role || '').toUpperCase();
+    switch (normalized) {
+      case 'ADMIN':
+      case 'MASTER':
         return { label: 'Administrador', colors: 'bg-slate-800 text-white' };
-      case 'coordinator':
+      case 'COORDINATOR':
+      case 'COORDENADOR':
         return { label: 'Coordenador', colors: 'bg-blue-100 text-blue-800 border-blue-200' };
-      case 'doctor':
+      case 'DOCTOR':
         return { label: 'Médico(a)', colors: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-      case 'nurse':
+      case 'NURSE':
         return { label: 'Enfermeiro(a)', colors: 'bg-teal-100 text-teal-800 border-teal-200' };
-      case 'social_worker':
+      case 'SOCIAL_WORKER':
         return { label: 'Assistente Social', colors: 'bg-orange-100 text-orange-800 border-orange-200' };
-      case 'volunteer':
+      case 'VOLUNTEER':
+      case 'VOLUNTARIO':
         return { label: 'Voluntário(a)', colors: 'bg-purple-100 text-purple-800 border-purple-200' };
-      case 'observer':
+      case 'OBSERVER':
         return { label: 'Observador(a)', colors: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+      case 'SPONSOR':
+      case 'PADRINHO':
+        return { label: 'Padrinho (Site)', colors: 'bg-amber-100 text-amber-800 border-amber-200' };
+      case 'MANTENEDOR':
+        return { label: 'Mantenedor (Site)', colors: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+      case 'USER':
+        return { label: 'Conta do Site', colors: 'bg-sky-100 text-sky-800 border-sky-200' };
       default:
         return { label: role, colors: 'bg-slate-100 text-slate-800 border-slate-200' };
     }
@@ -122,9 +134,22 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite }: TeamList
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${roleBadge.colors}`}>
-                        {roleBadge.label}
-                      </span>
+                      {(['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(member.role || '').toUpperCase()) && onQuickRoleChange) ? (
+                        <select
+                          value={String(member.role || 'USER').toUpperCase()}
+                          onChange={(e) => onQuickRoleChange(member, e.target.value as TeamMemberRole)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/40 ${roleBadge.colors}`}
+                          title="Alterar classificação entre Padrinho e Mantenedor"
+                        >
+                          <option value="SPONSOR">Padrinho</option>
+                          <option value="MANTENEDOR">Mantenedor</option>
+                          <option value="USER">Conta do Site (Sem tipo)</option>
+                        </select>
+                      ) : (
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${roleBadge.colors}`}>
+                          {roleBadge.label}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-slate-600 text-sm">
                       {member.department || '-'}

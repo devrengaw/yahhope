@@ -220,7 +220,18 @@ export const mockInventoryCategories: InventoryCategory[] = [];
 
 export const mockTransactionCategories: TransactionCategory[] = [];
 
-export type TeamMemberRole = 'admin' | 'coordinator' | 'volunteer' | 'doctor' | 'nurse' | 'social_worker' | 'acs' | 'observer';
+export type TeamMemberRole =
+  | 'admin'
+  | 'coordinator'
+  | 'volunteer'
+  | 'doctor'
+  | 'nurse'
+  | 'social_worker'
+  | 'acs'
+  | 'observer'
+  | 'SPONSOR'
+  | 'MANTENEDOR'
+  | 'USER';
 export type TeamMemberStatus = 'active' | 'inactive' | 'on_leave';
 
 export interface TeamMember {

@@ -14,7 +14,8 @@ import {
   Camera,
   Link as LinkIcon,
   ExternalLink,
-  MapPin
+  MapPin,
+  Search
 } from 'lucide-react';
 import { UserCategorySettings } from '../../components/admin/UserCategorySettings';
 import { LocalProjectsSettings } from '../../components/admin/LocalProjectsSettings';
@@ -39,7 +40,7 @@ import {
   saveOrgSettings, 
   OrganizationSettings 
 } from '../../services/organizationSettingsService';
-import { isInternalTeamUser, purgeSpamUsersFromDatabase } from '../../utils/userCleanup';
+import { isInternalTeamUser, isSpamOrMockUser, purgeSpamUsersFromDatabase } from '../../utils/userCleanup';
 import { Loader2, Check } from 'lucide-react';
 
 type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
@@ -79,6 +80,8 @@ export function Settings() {
   // User/Team State
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userFilter, setUserFilter] = useState<'all' | 'supporters' | 'team'>('all');
+  const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -95,19 +98,33 @@ export function Settings() {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       if (data) {
-        const validTeamUsers = data.filter(u => isInternalTeamUser(u));
-        const mappedMembers = validTeamUsers.map(u => ({
-          id: u.id,
-          name: u.name || 'Sem Nome',
-          email: u.email || '',
-          role: u.role || 'USER',
-          phone: u.phone || '-', 
-          department: u.department || '-',
-          join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-          status: u.status || 'active',
-          category_id: u.category_id || undefined,
-          permissions: u.permissions || []
-        })) as TeamMember[];
+        const validUsers = data.filter(u => !isSpamOrMockUser(u));
+        const mappedMembers = validUsers.map(u => {
+          const upperRole = String(u.role || 'USER').trim().toUpperCase();
+          let normalizedRole: TeamMember['role'] = 'USER';
+          if (upperRole === 'SPONSOR' || upperRole === 'PADRINHO') normalizedRole = 'SPONSOR';
+          else if (upperRole === 'MANTENEDOR') normalizedRole = 'MANTENEDOR';
+          else if (upperRole === 'USER') normalizedRole = 'USER';
+          else if (upperRole === 'MASTER') normalizedRole = 'admin';
+          else if (upperRole === 'COORDENADOR') normalizedRole = 'coordinator';
+          else if (upperRole === 'VOLUNTARIO') normalizedRole = 'volunteer';
+          else normalizedRole = (u.role || 'USER').toLowerCase() as TeamMember['role'];
+
+          const isSiteAccount = ['SPONSOR', 'MANTENEDOR', 'USER'].includes(normalizedRole);
+
+          return {
+            id: u.id,
+            name: u.name || 'Sem Nome',
+            email: u.email || '',
+            role: normalizedRole,
+            phone: u.phone || '-', 
+            department: u.department || (isSiteAccount ? 'Cadastro pelo Site' : '-'),
+            join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            status: u.status || 'active',
+            category_id: u.category_id || undefined,
+            permissions: u.permissions || []
+          } as TeamMember;
+        });
         
         setMembers(mappedMembers.sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime()));
       }
@@ -231,6 +248,28 @@ export function Settings() {
     setIsUserModalOpen(true);
   };
 
+  const handleQuickRoleChange = async (member: TeamMember, newRole: TeamMember['role']) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      setMembers(prev => prev.map(m => (m.id === member.id ? { ...m, role: newRole } : m)));
+      const label = newRole === 'SPONSOR' ? 'Padrinho' : newRole === 'MANTENEDOR' ? 'Mantenedor' : 'Conta do Site';
+      addNotification({
+        title: 'Classificação Atualizada',
+        message: `${member.name} agora está classificado(a) como ${label}.`,
+        type: 'success'
+      });
+    } catch (err: any) {
+      console.error('Error updating role:', err);
+      showAlert('Erro', 'Não foi possível alterar o tipo de apoiador: ' + (err?.message || 'Erro desconhecido'));
+    }
+  };
+
   const handleResendInvite = async (member: TeamMember) => {
     if (await confirm({ title: 'Reenviar Convite', message: `Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`, type: 'info' })) {
       try {
@@ -303,20 +342,72 @@ export function Settings() {
             </div>
           )}
 
-          {activeTab === 'users' && (
+          {activeTab === 'users' && (() => {
+            const supporterMembers = members.filter(m => ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(m.role).toUpperCase()));
+            const internalMembers = members.filter(m => isInternalTeamUser({ role: m.role }));
+            const filteredMembers = members.filter(m => {
+              const matchesSearch = !userSearch.trim() ||
+                m.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+                m.email.toLowerCase().includes(userSearch.toLowerCase());
+              if (!matchesSearch) return false;
+              if (userFilter === 'supporters') return ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(m.role).toUpperCase());
+              if (userFilter === 'team') return isInternalTeamUser({ role: m.role });
+              return true;
+            });
+
+            return (
             <div className="space-y-8">
               <TeamSummary members={members} />
               <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">
-                <h2 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-tighter text-left">Diretório Global de Usuários</h2>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter text-left">Diretório Global de Usuários</h2>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Buscar por nome ou e-mail..."
+                        className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-400 w-full sm:w-64"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setUserFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Todos ({members.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserFilter('supporters')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'supporters' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Padrinhos & Mantenedores ({supporterMembers.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserFilter('team')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'team' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Equipe ({internalMembers.length})
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <TeamList 
-                  members={members} 
+                  members={filteredMembers} 
                   onEdit={handleEditMember}
                   onDelete={handleDeleteMember}
                   onResendInvite={handleResendInvite}
+                  onQuickRoleChange={handleQuickRoleChange}
                 />
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {activeTab === 'user-categories' && (
             <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">

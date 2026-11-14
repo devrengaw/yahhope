@@ -20,6 +20,134 @@ serve(async (req) => {
 
   try {
     const bodyJson = await req.json()
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      throw new Error("RESEND_API_KEY não configurada no ambiente Supabase.");
+    }
+
+    if (bodyJson?.action === 'sync_resend_history') {
+      const allEmails: any[] = [];
+      let afterCursor: string | null = null;
+      let page = 0;
+
+      while (page < 5) {
+        const url = afterCursor
+          ? `https://api.resend.com/emails?limit=100&after=${encodeURIComponent(afterCursor)}`
+          : `https://api.resend.com/emails?limit=100`;
+
+        const listRes = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${resendApiKey}` }
+        });
+
+        if (!listRes.ok) {
+          const errText = await listRes.text();
+          throw new Error(`Erro ao consultar histórico no Resend (${listRes.status}): ${errText}`);
+        }
+
+        const listData = await listRes.json();
+        const batch = Array.isArray(listData?.data) ? listData.data : [];
+        allEmails.push(...batch);
+
+        if (!listData?.has_more || batch.length === 0) break;
+        afterCursor = batch[batch.length - 1].id;
+        page++;
+      }
+
+      const { data: existingRows } = await supabase
+        .from('email_campaign_recipients')
+        .select('resend_id')
+        .not('resend_id', 'is', null);
+
+      const existingIds = new Set((existingRows || []).map((r: any) => r.resend_id));
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      for (const item of allEmails) {
+        if (!item?.id || existingIds.has(item.id)) {
+          skippedCount++;
+          continue;
+        }
+        if ((item.subject || '').includes('[TESTE]')) {
+          skippedCount++;
+          continue;
+        }
+
+        const toList: string[] = Array.isArray(item.to)
+          ? item.to.filter(Boolean)
+          : (item.to ? [String(item.to)] : []);
+
+        if (toList.length === 0) {
+          skippedCount++;
+          continue;
+        }
+
+        const lastEvent = String(item.last_event || 'sent').toLowerCase();
+        const isClicked = lastEvent === 'clicked';
+        const isOpened = isClicked || lastEvent === 'opened';
+        const isDelivered = isOpened || lastEvent === 'delivered';
+        const isBounced = lastEvent === 'bounced' || lastEvent === 'complained';
+        const recipientStatus = isClicked
+          ? 'clicked'
+          : isOpened
+            ? 'opened'
+            : isDelivered
+              ? 'delivered'
+              : isBounced
+                ? 'bounced'
+                : 'sent';
+
+        const sentAt = item.created_at || new Date().toISOString();
+        const { data: createdCamp, error: campInsertErr } = await supabase
+          .from('email_campaigns')
+          .insert({
+            title: item.subject || 'E-mail Enviado (Resend)',
+            subject: item.subject || 'Sem assunto',
+            audience_type: 'automatico',
+            audience_summary: `Histórico Resend (${toList.join(', ')})`,
+            status: 'sent',
+            total_recipients: toList.length,
+            sent_count: toList.length,
+            delivered_count: isDelivered ? toList.length : 0,
+            opened_count: isOpened ? toList.length : 0,
+            clicked_count: isClicked ? toList.length : 0,
+            bounced_count: isBounced ? toList.length : 0,
+            sent_at: sentAt
+          })
+          .select('id')
+          .single();
+
+        if (campInsertErr || !createdCamp?.id) {
+          console.error('Erro ao importar campanha do Resend:', campInsertErr);
+          skippedCount++;
+          continue;
+        }
+
+        const recipientRows = toList.map((toEmail: string) => ({
+          campaign_id: createdCamp.id,
+          email: toEmail,
+          name: toEmail.split('@')[0],
+          recipient_type: 'automatico',
+          status: recipientStatus,
+          resend_id: item.id,
+          sent_at: sentAt,
+          delivered_at: isDelivered ? sentAt : null,
+          opened_at: isOpened ? sentAt : null,
+          clicked_at: isClicked ? sentAt : null,
+          open_count: isOpened ? 1 : 0,
+          click_count: isClicked ? 1 : 0
+        }));
+
+        await supabase.from('email_campaign_recipients').insert(recipientRows);
+        existingIds.add(item.id);
+        importedCount++;
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, importedCount, skippedCount, totalFetched: allEmails.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     const { 
       campaignId, 
       isTest, 
@@ -42,11 +170,6 @@ serve(async (req) => {
 
     if (!campaignId && !isTest && !isTransactional) {
       throw new Error("campaignId é obrigatório para disparo em massa")
-    }
-
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY não configurada no ambiente Supabase.");
     }
 
     // 1. Carregar Campanha se campaignId fornecido
