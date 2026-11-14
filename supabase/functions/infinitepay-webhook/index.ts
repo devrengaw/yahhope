@@ -68,6 +68,18 @@ serve(async (req) => {
     const activeCampaign = campaigns?.[0]
 
     if (activeCampaign && amount > 0) {
+      // Verifica se já houve doação anterior antes de inserir a nova
+      let isRepeatDonor = false
+      if (donorEmail) {
+        const { data: prevDon } = await supabase
+          .from('donations')
+          .select('id')
+          .ilike('donor_email', donorEmail)
+          .eq('status', 'paid')
+          .limit(1)
+        isRepeatDonor = Boolean(prevDon && prevDon.length > 0)
+      }
+
       // 1. Atualiza o valor na régua de arrecadação
       await supabase.from('campaigns').update({
         current_amount: Number(activeCampaign.current_amount) + amount
@@ -106,7 +118,7 @@ serve(async (req) => {
           source: 'Doação InfinitePay'
         }, { onConflict: 'email', ignoreDuplicates: true })
 
-        await sendThankYouEmail(donorEmail, donorName)
+        await sendThankYouEmail(donorEmail, donorName, isRepeatDonor || Boolean(resolvedUserId))
       }
 
       console.log(`Sucesso: Adicionado R$ ${amount} à régua da campanha!`)
@@ -124,7 +136,7 @@ serve(async (req) => {
   }
 })
 
-async function sendThankYouEmail(donorEmail: string, donorName: string) {
+async function sendThankYouEmail(donorEmail: string, donorName: string, isRepeatOrRegistered = false) {
   if (!donorEmail) return
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   if (!resendApiKey) return
@@ -182,17 +194,19 @@ async function sendThankYouEmail(donorEmail: string, donorName: string) {
 
     let ctaHtml = ''
     if (hasCta && ctaText && ctaUrl) {
-      const sep = ctaUrl.includes('?') ? '&' : '?'
-      const targetCtaUrl = (ctaUrl.includes('cadastro') || ctaUrl.includes('finalizar') || ctaUrl.includes('portal') || ctaUrl.includes('set-password'))
-        ? `${ctaUrl}${sep}email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`
-        : ctaUrl
+      const effectiveCtaText = isRepeatOrRegistered ? 'Acessar Portal do Apoiador' : ctaText
+      const effectiveCtaUrl = isRepeatOrRegistered ? 'https://www.yahhope.com/portal/dashboard' : ctaUrl
+      const sep = effectiveCtaUrl.includes('?') ? '&' : '?'
+      const targetCtaUrl = (effectiveCtaUrl.includes('cadastro') || effectiveCtaUrl.includes('finalizar') || effectiveCtaUrl.includes('portal') || effectiveCtaUrl.includes('set-password'))
+        ? `${effectiveCtaUrl}${sep}email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`
+        : effectiveCtaUrl
 
       ctaHtml = `
         <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 32px auto 12px auto; text-align: center;">
           <tr>
             <td align="center" style="border-radius: 12px; background-color: ${primaryColor}; box-shadow: 0 4px 14px rgba(244, 152, 83, 0.35);">
               <a href="${targetCtaUrl}" target="_blank" style="display: inline-block; padding: 15px 34px; font-family: ${SANS_STACK}; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px; letter-spacing: 0.01em; -webkit-text-size-adjust: none;">
-                ${ctaText}
+                ${effectiveCtaText}
               </a>
             </td>
           </tr>

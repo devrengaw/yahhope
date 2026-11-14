@@ -618,6 +618,16 @@ serve(async (req) => {
       const isPix = session.metadata?.paymentMethod === 'pix' || session.payment_method_types?.includes('pix')
       const paymentMethod = isPix ? 'pix' : 'credit_card'
 
+      // Verifica antes de inserir se já é doador/padrinho/mantenedor recorrente para não repetir e-mail de boas-vindas todo mês
+      let isRepeatSupporter = false
+      if (donorEmail) {
+        const [{ data: prevDonations }, { data: prevSp }] = await Promise.all([
+          supabase.from('donations').select('id').ilike('donor_email', donorEmail).eq('status', 'paid').limit(1),
+          supabase.from('sponsorships').select('id').ilike('donor_email', donorEmail).eq('status', 'active').limit(1)
+        ])
+        isRepeatSupporter = Boolean((prevDonations && prevDonations.length > 0) || (prevSp && prevSp.length > 0))
+      }
+
       // Atualiza o perfil do mantenedor e apadrinhamento
       const syncResult = await syncMaintainerProfile({
         email: donorEmail,
@@ -714,13 +724,18 @@ serve(async (req) => {
           })
       }
 
-      // Envia e-mail de agradecimento da primeira doação com botão de finalização de cadastro
-      await sendThankYouEmail(donorEmail, donorName, {
-        isSponsorship,
-        isMonthly,
-        amount,
-        children: assignedChildren
-      })
+      // Envia e-mail de boas-vindas apenas na primeira doação/assinatura; para apoiadores recorrentes ou já cadastrados, evita repetir "Bem-vindo" todo mês
+      if ((isSponsorship || isMonthly) && isRepeatSupporter) {
+        console.log(`E-mail de boas-vindas ignorado para ${donorEmail}: apoiador já possui histórico ativo.`)
+      } else {
+        await sendThankYouEmail(donorEmail, donorName, {
+          isSponsorship,
+          isMonthly,
+          amount,
+          children: assignedChildren,
+          isRepeatDonor: isRepeatSupporter
+        })
+      }
     }
 
     // 2. EVENTO: INVOICE PAYMENT SUCCEEDED (Recorrência Mensal Confirmada)
@@ -859,7 +874,7 @@ function formatChildAgeForEmail(dobString?: string): string {
   return `${months} ${months === 1 ? 'mês' : 'meses'}`
 }
 
-async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: { isSponsorship?: boolean; isMonthly?: boolean; amount?: number; children?: any[] }) {
+async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: { isSponsorship?: boolean; isMonthly?: boolean; amount?: number; children?: any[]; isRepeatDonor?: boolean }) {
   if (!donorEmail) return
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   if (!resendApiKey) return
@@ -1013,21 +1028,27 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
         </div>`
       : ''
 
-    // Botão de Finalização de Cadastro (CTA)
+    // Botão de Finalização de Cadastro (CTA) ou Portal se já for doador recorrente
     let ctaHtml = ''
     if (hasCta && ctaText && ctaUrl) {
+      let effectiveCtaText = ctaText
+      let effectiveCtaUrl = ctaUrl
+      if (meta?.isRepeatDonor) {
+        effectiveCtaText = 'Acessar Portal do Apoiador'
+        effectiveCtaUrl = 'https://www.yahhope.com/portal/dashboard'
+      }
       // Concatena parâmetros de e-mail e nome para preencher automaticamente na tela de finalização
-      const sep = ctaUrl.includes('?') ? '&' : '?'
-      const targetCtaUrl = (ctaUrl.includes('cadastro') || ctaUrl.includes('finalizar') || ctaUrl.includes('portal') || ctaUrl.includes('set-password'))
-        ? `${ctaUrl}${sep}email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`
-        : ctaUrl
+      const sep = effectiveCtaUrl.includes('?') ? '&' : '?'
+      const targetCtaUrl = (effectiveCtaUrl.includes('cadastro') || effectiveCtaUrl.includes('finalizar') || effectiveCtaUrl.includes('portal') || effectiveCtaUrl.includes('set-password'))
+        ? `${effectiveCtaUrl}${sep}email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`
+        : effectiveCtaUrl
 
       ctaHtml = `
         <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 32px auto 12px auto; text-align: center;">
           <tr>
             <td align="center" style="border-radius: 12px; background-color: ${primaryColor}; box-shadow: 0 4px 14px rgba(244, 152, 83, 0.35);">
               <a href="${targetCtaUrl}" target="_blank" style="display: inline-block; padding: 15px 34px; font-family: ${SANS_STACK}; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px; letter-spacing: 0.01em; -webkit-text-size-adjust: none;">
-                ${ctaText}
+                ${effectiveCtaText}
               </a>
             </td>
           </tr>
