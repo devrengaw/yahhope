@@ -267,19 +267,19 @@ export function CommEmailTemplates() {
       if (tab === 'new_sponsor') {
         const { data: sponsorships, error } = await supabase
           .from('sponsorships')
-          .select('sponsor_email, sponsor_name, monthly_amount, child_id, status, children(name)')
-          .neq('status', 'cancelled');
+          .select('donor_email, donor_name, monthly_amount, child_id, status, children(name)')
+          .eq('status', 'active');
 
         if (error) throw error;
 
         const childNamesByEmail = new Map<string, Set<string>>();
         for (const s of sponsorships || []) {
-          const email = (s.sponsor_email || '').trim().toLowerCase();
+          const email = (s.donor_email || '').trim().toLowerCase();
           if (!email) continue;
           const isSponsor = s.child_id !== null || Number(s.monthly_amount || 0) >= 90;
           if (!isSponsor) continue;
 
-          const name = (s.sponsor_name || email.split('@')[0]).trim();
+          const name = (s.donor_name || email.split('@')[0]).trim();
           if (isSpamOrMockUser({ email, name })) continue;
 
           const childObj = Array.isArray(s.children) ? s.children[0] : s.children;
@@ -302,24 +302,27 @@ export function CommEmailTemplates() {
           }
         }
       } else if (tab === 'new_maintainer') {
-        const [{ data: sponsorships }, { data: users }] = await Promise.all([
+        const [{ data: sponsorships, error: spErr }, { data: users, error: usrErr }] = await Promise.all([
           supabase
             .from('sponsorships')
-            .select('sponsor_email, sponsor_name, monthly_amount, child_id, status')
-            .neq('status', 'cancelled'),
+            .select('donor_email, donor_name, monthly_amount, child_id, status')
+            .eq('status', 'active'),
           supabase
             .from('users')
             .select('email, name, role')
             .eq('role', 'MANTENEDOR')
         ]);
 
+        if (spErr) throw spErr;
+        if (usrErr) throw usrErr;
+
         for (const s of sponsorships || []) {
-          const email = (s.sponsor_email || '').trim().toLowerCase();
+          const email = (s.donor_email || '').trim().toLowerCase();
           if (!email) continue;
           const isMaintainer = s.child_id === null && Number(s.monthly_amount || 0) < 90;
           if (!isMaintainer) continue;
 
-          const name = (s.sponsor_name || email.split('@')[0]).trim();
+          const name = (s.donor_name || email.split('@')[0]).trim();
           if (isSpamOrMockUser({ email, name })) continue;
 
           if (!map.has(email)) {
