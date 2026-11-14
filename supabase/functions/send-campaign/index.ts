@@ -41,6 +41,15 @@ serve(async (req) => {
 
         if (!listRes.ok) {
           const errText = await listRes.text();
+          if (listRes.status === 401 || listRes.status === 403) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'Sua RESEND_API_KEY no Supabase tem permissão apenas de envio (Sending access). Para resgatar e-mails antigos, crie uma API Key com "Full access" no Resend e atualize a secret RESEND_API_KEY no Supabase.'
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            );
+          }
           throw new Error(`Erro ao consultar histórico no Resend (${listRes.status}): ${errText}`);
         }
 
@@ -102,6 +111,7 @@ serve(async (req) => {
           .insert({
             title: item.subject || 'E-mail Enviado (Resend)',
             subject: item.subject || 'Sem assunto',
+            body_html: `<p>E-mail resgatado do histórico do Resend (Assunto: ${item.subject || 'Sem assunto'}).</p>`,
             audience_type: 'automatico',
             audience_summary: `Histórico Resend (${toList.join(', ')})`,
             status: 'sent',

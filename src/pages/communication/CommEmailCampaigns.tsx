@@ -173,8 +173,19 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
       const { data, error } = await supabase.functions.invoke('send-campaign', {
         body: { action: 'sync_resend_history' }
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) {
+        let detailedMessage = error.message;
+        try {
+          const errBody = await (error as any)?.context?.json?.();
+          if (errBody?.error) detailedMessage = errBody.error;
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(detailedMessage);
+      }
+      if (data?.success === false || data?.error) {
+        throw new Error(data.error || 'Erro desconhecido ao sincronizar histórico.');
+      }
 
       const imported = data?.importedCount || 0;
       setSyncHistoryFeedback(
