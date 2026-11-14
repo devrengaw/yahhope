@@ -76,6 +76,15 @@ serve(async (req) => {
           skippedCount++;
           continue;
         }
+        const fromStr = String(item.from || '').toLowerCase();
+        const isYahHopeDomain =
+          fromStr.includes('yahhope.com') ||
+          fromStr.includes('yahhope.org') ||
+          fromStr.includes('yahchurch.com');
+        if (!isYahHopeDomain) {
+          skippedCount++;
+          continue;
+        }
         if ((item.subject || '').includes('[TESTE]')) {
           skippedCount++;
           continue;
@@ -111,6 +120,7 @@ serve(async (req) => {
           .insert({
             title: item.subject || 'E-mail Enviado (Resend)',
             subject: item.subject || 'Sem assunto',
+            sender_email: item.from || 'contato@yahhope.com',
             body_html: `<p>E-mail resgatado do histórico do Resend (Assunto: ${item.subject || 'Sem assunto'}).</p>`,
             audience_type: 'automatico',
             audience_summary: `Histórico Resend (${toList.join(', ')})`,
