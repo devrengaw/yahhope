@@ -23,12 +23,12 @@ serve(async (req) => {
     if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured.");
 
     // Fetch Global Settings
-    let logoUrl = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png';
+    let logoUrl = 'https://www.yahhope.com/logo-black.png';
     let primaryColor = '#F49853';
 
     const { data: settings } = await supabase.from('email_settings').select('*').limit(1).maybeSingle();
     if (settings) {
-      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png')) logoUrl = settings.logo_url;
+      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png') && !settings.logo_url.includes('hope.yahchurch.com/wp-content')) logoUrl = settings.logo_url;
       if (settings.primary_color) primaryColor = settings.primary_color;
     }
 

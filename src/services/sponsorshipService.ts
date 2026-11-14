@@ -462,7 +462,7 @@ export const sponsorshipService = {
     const childrenCardsHtml = children.map((c, index) => {
       const photoSrc = c.photo_url && c.photo_url.trim().length > 0 
         ? c.photo_url 
-        : 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png';
+        : 'https://www.yahhope.com/logo-black.png';
 
       const genderBadge = c.gender === 'F' ? 'Menina' : 'Menino';
 

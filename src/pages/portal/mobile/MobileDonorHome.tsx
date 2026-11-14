@@ -24,7 +24,9 @@ import {
   Target,
   MapPin,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  X,
+  ZoomIn
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -47,6 +49,18 @@ export function MobileDonorHome() {
   const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [impactFilter, setImpactFilter] = useState<'all' | 'general' | 'children'>('all');
+  const [zoomedImpactPhoto, setZoomedImpactPhoto] = useState<{ url: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!zoomedImpactPhoto) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setZoomedImpactPhoto(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedImpactPhoto]);
 
   const fetchCommitments = () => {
     sponsorshipService.getSupporterCommitments(user?.id, user?.email, user?.name)
@@ -716,7 +730,10 @@ export function MobileDonorHome() {
                   return (
                     <div
                       key={item.id}
-                      className="bg-white p-5 rounded-[1.75rem] border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 hover:shadow-sm transition-all"
+                      onClick={() => item.img_url && setZoomedImpactPhoto({ url: item.img_url, title: item.title })}
+                      className={`bg-white p-5 rounded-[1.75rem] border border-slate-200/80 shadow-xs space-y-2 hover:border-slate-300 hover:shadow-sm transition-all ${
+                        item.img_url ? 'cursor-pointer group' : ''
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         {isChildUpdate ? (
@@ -736,8 +753,16 @@ export function MobileDonorHome() {
                       <h4 className="font-heading font-black text-slate-900 text-sm leading-snug">{item.title}</h4>
                       <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">{item.content}</p>
                       {item.img_url && (
-                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
-                          <img src={item.img_url} alt={item.title} className="w-full h-36 object-cover" />
+                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 relative">
+                          <img
+                            src={item.img_url}
+                            alt={item.title}
+                            className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                          />
+                          <div className="absolute bottom-2 right-2 bg-slate-950/70 backdrop-blur-xs text-white px-2.5 py-1 rounded-full text-[10px] font-gotham-bold flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                            <ZoomIn size={12} />
+                            <span>Ampliar</span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -879,6 +904,44 @@ export function MobileDonorHome() {
         isActive={Boolean(monthlyCommitments?.generalMonthlySupport?.active)}
         onSuccess={() => fetchCommitments()}
       />
+
+      {/* Lightbox / Foto Ampliada da Atualização de Impacto */}
+      {zoomedImpactPhoto && (
+        <div
+          className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in"
+          onClick={() => setZoomedImpactPhoto(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[92vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 text-white gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <TrendingUp size={18} className="text-emerald-400 shrink-0" />
+                <h3 className="text-base sm:text-lg font-heading font-black tracking-tight truncate">
+                  {zoomedImpactPhoto.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomedImpactPhoto(null)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer shrink-0"
+                title="Fechar (Esc)"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-slate-900 max-h-[82vh] flex items-center justify-center">
+              <img
+                src={zoomedImpactPhoto.url}
+                alt={zoomedImpactPhoto.title}
+                className="max-h-[80vh] w-auto max-w-full object-contain rounded-xl select-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

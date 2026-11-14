@@ -979,15 +979,29 @@ export function MobileDonorChildren() {
                     </div>
                     <div className="space-y-2.5">
                       {childUpdates.map(upd => (
-                        <div key={upd.id} className="p-3 bg-orange-50/40 border border-orange-100 rounded-xl space-y-1.5">
+                        <div
+                          key={upd.id}
+                          onClick={() => upd.img_url && setZoomedPhoto({ url: upd.img_url, name: upd.title || child.name })}
+                          className={`p-3 bg-orange-50/40 border border-orange-100 rounded-xl space-y-1.5 transition-all ${
+                            upd.img_url ? 'cursor-pointer hover:border-orange-300 hover:bg-orange-50/70 group' : ''
+                          }`}
+                        >
                           <div className="flex items-center justify-between text-[10px] text-slate-500 font-gotham-medium">
                             <span className="font-gotham-bold text-slate-800">{upd.title}</span>
                             <span>{upd.created_at ? new Date(upd.created_at).toLocaleDateString('pt-BR') : upd.date}</span>
                           </div>
                           <p className="text-xs text-slate-700 font-gotham-light leading-relaxed">{upd.content}</p>
                           {upd.img_url && (
-                            <div className="pt-1">
-                              <img src={upd.img_url} alt={upd.title} className="w-full h-32 object-cover rounded-lg border border-orange-100" />
+                            <div className="pt-1 relative">
+                              <img
+                                src={upd.img_url}
+                                alt={upd.title}
+                                className="w-full h-32 object-cover rounded-lg border border-orange-100 group-hover:scale-[1.01] transition-transform duration-300"
+                              />
+                              <div className="absolute bottom-2 right-2 bg-slate-950/70 backdrop-blur-xs text-white px-2 py-0.5 rounded-full text-[10px] font-gotham-bold flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                                <ZoomIn size={11} />
+                                <span>Ampliar</span>
+                              </div>
                             </div>
                           )}
                         </div>

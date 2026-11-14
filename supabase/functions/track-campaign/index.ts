@@ -151,7 +151,7 @@ serve(async (req) => {
 </head>
 <body style="margin:0;padding:24px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;">
   <div style="max-width:480px;width:100%;background:#ffffff;border-radius:20px;padding:32px;text-align:center;border:1px solid #e2e8f0;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05);">
-    <img src="https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png" alt="YAH Hope" style="max-height:44px;margin-bottom:20px;" />
+    <img src="https://www.yahhope.com/logo-black.png" alt="YAH Hope" style="max-height:44px;margin-bottom:20px;" />
     <h1 style="margin:0 0 10px 0;font-size:20px;color:#0f172a;">Recebimento cancelado</h1>
     <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#475569;">
       O e-mail <strong>${targetEmail || 'informado'}</strong> foi removido da nossa lista de envios e nossa equipe já foi notificada.

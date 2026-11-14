@@ -78,13 +78,13 @@ serve(async (req) => {
     const activeCtaUrl = directCtaUrl || campaign?.cta_url || ''
 
     // 2. Carregar Configurações Globais de Marca (email_settings)
-    let logoUrl = 'https://hope.yahchurch.com/wp-content/uploads/2025/09/Logo_Laranja-1024x511.png'
-    let logoLinkUrl = 'https://hope.yahchurch.com'
+    let logoUrl = 'https://www.yahhope.com/logo-black.png'
+    let logoLinkUrl = 'https://www.yahhope.com'
     let primaryColor = '#F49853'
 
     const { data: settings } = await supabase.from('email_settings').select('*').limit(1).maybeSingle()
     if (settings) {
-      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png')) {
+      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png') && !settings.logo_url.includes('hope.yahchurch.com/wp-content')) {
         logoUrl = settings.logo_url
       }
       if (settings.logo_link_url) logoLinkUrl = settings.logo_link_url
