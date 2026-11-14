@@ -35,7 +35,9 @@ serve(async (req) => {
       sender_email: directSenderEmail,
       has_cta: directHasCta,
       cta_text: directCtaText,
-      cta_url: directCtaUrl
+      cta_url: directCtaUrl,
+      dispatchSource,
+      dispatchTitle
     } = bodyJson
 
     if (!campaignId && !isTest && !isTransactional) {
@@ -334,10 +336,67 @@ serve(async (req) => {
     if (isTest || isTransactional) {
       const recipientTarget = to || testEmail || 'contato@yahhope.com'
       const targetName = isTransactional ? (recipientName || 'Mantenedor(a)') : 'Destinatário Teste'
-      const singleHtml = buildEmailHtml(activeBodyHtml, isTransactional ? 'transactional' : 'test-preview', targetName, recipientTarget)
       const finalSubject = isTransactional
         ? activeSubject
         : (activeSubject.startsWith('[TESTE]') ? activeSubject : `[TESTE] ${activeSubject}`)
+
+      // Registra disparos transacionais/manuais/automáticos em email_campaigns para aparecerem em "Disparo & Campanhas"
+      let logCampaignId = campaign?.id || null
+      let logRecipientId = isTransactional ? 'transactional' : 'test-preview'
+      if (isTransactional && !isTest) {
+        try {
+          const nowIso = new Date().toISOString()
+          const sourceType = dispatchSource || 'manual'
+          const { data: createdCamp } = await supabase
+            .from('email_campaigns')
+            .insert({
+              title: dispatchTitle || (sourceType === 'automatico' ? `[Automático] ${activeHeading || finalSubject}` : `[Manual] ${activeHeading || finalSubject}`),
+              subject: finalSubject,
+              preheader: activePreheader,
+              heading: activeHeading,
+              body_html: activeBodyHtml,
+              sender_name: activeSenderName,
+              sender_email: fromEmail,
+              audience_type: sourceType,
+              audience_summary: sourceType === 'automatico' ? 'Disparo automático do sistema' : `Disparo manual (${recipientTarget})`,
+              has_cta: Boolean(activeHasCta),
+              cta_text: activeCtaText,
+              cta_url: activeCtaUrl,
+              status: 'sent',
+              total_recipients: 1,
+              sent_count: 1,
+              delivered_count: 1,
+              sent_at: nowIso
+            })
+            .select('id')
+            .maybeSingle()
+
+          if (createdCamp?.id) {
+            logCampaignId = createdCamp.id
+            campaign = { ...campaign, id: createdCamp.id }
+            const { data: createdRec } = await supabase
+              .from('email_campaign_recipients')
+              .insert({
+                campaign_id: createdCamp.id,
+                email: recipientTarget.toLowerCase().trim(),
+                name: targetName,
+                recipient_type: 'apoiador',
+                status: 'sent',
+                sent_at: nowIso
+              })
+              .select('id')
+              .maybeSingle()
+
+            if (createdRec?.id) {
+              logRecipientId = createdRec.id
+            }
+          }
+        } catch (logErr) {
+          console.warn('Aviso ao registrar disparo transacional:', logErr)
+        }
+      }
+
+      const singleHtml = buildEmailHtml(activeBodyHtml, logRecipientId, targetName, recipientTarget)
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -356,8 +415,26 @@ serve(async (req) => {
 
       const resData = await res.json()
       if (!res.ok) {
+        if (logCampaignId && logRecipientId !== 'transactional' && logRecipientId !== 'test-preview') {
+          await supabase.from('email_campaign_recipients').update({
+            status: 'failed',
+            error_message: resData?.message || 'Erro desconhecido Resend'
+          }).eq('id', logRecipientId)
+          await supabase.from('email_campaigns').update({
+            status: 'failed',
+            sent_count: 0,
+            delivered_count: 0,
+            failed_count: 1
+          }).eq('id', logCampaignId)
+        }
         const errorDetail = resData?.message || resData?.error || JSON.stringify(resData)
         throw new Error(`Falha no Resend (${res.status}): ${errorDetail}`)
+      }
+
+      if (resData?.id && logRecipientId !== 'transactional' && logRecipientId !== 'test-preview') {
+        await supabase.from('email_campaign_recipients').update({
+          resend_id: resData.id
+        }).eq('id', logRecipientId)
       }
 
       return new Response(JSON.stringify({ 
@@ -365,7 +442,8 @@ serve(async (req) => {
         isTest: Boolean(isTest),
         isTransactional: Boolean(isTransactional),
         target: recipientTarget, 
-        resendId: resData.id 
+        resendId: resData.id,
+        campaignId: logCampaignId
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

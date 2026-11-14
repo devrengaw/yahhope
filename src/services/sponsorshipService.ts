@@ -629,7 +629,9 @@ export const sponsorshipService = {
           cta_text: ctaText,
           cta_url: ctaUrl,
           sender_name: 'YAH Hope',
-          sender_email: 'contato@yahhope.com'
+          sender_email: 'contato@yahhope.com',
+          dispatchSource: forceSend ? 'manual' : 'automatico',
+          dispatchTitle: forceSend ? `[Manual] Boas-vindas Padrinho (${name})` : `[Automático] Boas-vindas Padrinho (${name})`
         })
       });
 

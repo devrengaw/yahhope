@@ -1141,7 +1141,7 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
       </html>
     `
 
-    await fetch('https://api.resend.com/emails', {
+    const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,
@@ -1155,6 +1155,55 @@ async function sendThankYouEmail(donorEmail: string, donorName: string, meta?: {
         reply_to: 'contato@yahhope.com'
       })
     })
+    const resendData = await resendRes.json().catch(() => ({}))
+
+    try {
+      const nowIso = new Date().toISOString()
+      const autoTitle = isSponsorWithChild
+        ? '[Automático] Boas-vindas Padrinho'
+        : isMaintainer
+          ? '[Automático] Boas-vindas Mantenedor'
+          : '[Automático] Agradecimento de Doação'
+      const { data: campRow } = await supabase
+        .from('email_campaigns')
+        .insert({
+          title: autoTitle,
+          subject,
+          preheader,
+          heading,
+          body_html: personalizedBody,
+          sender_name: 'YAH Hope',
+          sender_email: 'contato@yahhope.com',
+          audience_type: 'automatico',
+          audience_summary: `Disparo automático Stripe (${donorEmail})`,
+          has_cta: Boolean(hasCta),
+          cta_text: ctaText,
+          cta_url: ctaUrl,
+          status: resendRes.ok ? 'sent' : 'failed',
+          total_recipients: 1,
+          sent_count: resendRes.ok ? 1 : 0,
+          delivered_count: resendRes.ok ? 1 : 0,
+          failed_count: resendRes.ok ? 0 : 1,
+          sent_at: nowIso
+        })
+        .select('id')
+        .maybeSingle()
+
+      if (campRow?.id) {
+        await supabase.from('email_campaign_recipients').insert({
+          campaign_id: campRow.id,
+          email: donorEmail.toLowerCase().trim(),
+          name: donorName,
+          recipient_type: isSponsorWithChild ? 'sponsor' : 'donor',
+          status: resendRes.ok ? 'sent' : 'failed',
+          resend_id: resendData?.id || null,
+          error_message: resendRes.ok ? null : (resendData?.message || 'Erro no Resend'),
+          sent_at: nowIso
+        })
+      }
+    } catch (logErr) {
+      console.warn('Aviso ao registrar disparo automático Stripe:', logErr)
+    }
 
     console.log(`E-mail de agradecimento e finalização de cadastro enviado com sucesso para ${donorEmail}`)
   } catch (emailErr) {

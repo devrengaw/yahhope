@@ -487,7 +487,9 @@ export function CommEmailTemplates() {
                 cta_text: tpl.cta_text || 'Acessar Portal',
                 cta_url: ctaUrl,
                 sender_name: 'YAH Hope',
-                sender_email: 'contato@yahhope.com'
+                sender_email: 'contato@yahhope.com',
+                dispatchSource: 'manual',
+                dispatchTitle: `[Manual] ${activeTab === 'new_maintainer' ? 'Mantenedor' : activeTab === 'donation_thank_you' ? 'Agradecimento' : 'Novo Usuário'} (${recipient.name})`
               })
             });
 

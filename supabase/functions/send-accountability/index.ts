@@ -102,7 +102,34 @@ serve(async (req) => {
 
     const SANS_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
+    const nowIso = new Date().toISOString();
+    const isManual = Boolean(reqBody.manual_force);
+    const { data: campRow } = await supabase
+      .from('email_campaigns')
+      .insert({
+        title: isManual ? '[Manual] Prestação de Contas' : '[Automático] Prestação de Contas',
+        subject,
+        body_html: body,
+        sender_name: 'YAH Hope',
+        sender_email: 'contato@yahhope.com',
+        audience_type: isManual ? 'manual' : 'automatico',
+        audience_summary: isManual
+          ? `Disparo manual de prestação de contas (${uniqueDonors.size} apoiadores)`
+          : `Disparo automático de prestação de contas (${uniqueDonors.size} apoiadores)`,
+        has_cta: false,
+        status: 'sent',
+        total_recipients: uniqueDonors.size,
+        sent_count: 0,
+        delivered_count: 0,
+        failed_count: 0,
+        sent_at: nowIso
+      })
+      .select('id')
+      .maybeSingle();
+
     const emailPromises: Promise<any>[] = [];
+    let sentOk = 0;
+    let sentFail = 0;
 
     uniqueDonors.forEach((name, email) => {
       const personalizedBody = body
@@ -156,27 +183,50 @@ serve(async (req) => {
         </html>
       `;
 
-      const request = fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'YAH Hope <contato@yahhope.com>', // Ensure this domain is verified in Resend!
-          to: email,
-          subject: subject,
-          html: htmlBody,
-          text: personalizedBody
-        })
-      });
+      const request = (async () => {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'YAH Hope <contato@yahhope.com>',
+            to: email,
+            subject: subject,
+            html: htmlBody,
+            text: personalizedBody
+          })
+        });
+        const resData = await res.json().catch(() => ({}));
+        if (res.ok) sentOk++;
+        else sentFail++;
+        if (campRow?.id) {
+          await supabase.from('email_campaign_recipients').insert({
+            campaign_id: campRow.id,
+            email,
+            name: name || '',
+            recipient_type: 'apoiador',
+            status: res.ok ? 'sent' : 'failed',
+            resend_id: resData?.id || null,
+            error_message: res.ok ? null : (resData?.message || 'Erro no Resend'),
+            sent_at: nowIso
+          });
+        }
+      })();
 
       emailPromises.push(request);
     });
 
-    // We can use Promise.all to send them in parallel, 
-    // or batch API if Resend batch is preferred, but loop fetch works for < 100 requests easily.
     await Promise.all(emailPromises);
+
+    if (campRow?.id) {
+      await supabase.from('email_campaigns').update({
+        sent_count: sentOk,
+        delivered_count: sentOk,
+        failed_count: sentFail
+      }).eq('id', campRow.id);
+    }
 
     // Registra a data do envio realizado no template
     await supabase.from('email_templates').update({

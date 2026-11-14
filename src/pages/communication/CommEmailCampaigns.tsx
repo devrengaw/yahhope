@@ -859,6 +859,16 @@ export function CommEmailCampaigns({ embedded = false }: CommEmailCampaignsProps
                       <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium">
                         {camp.audience_summary || `${camp.total_recipients} destinatários`}
                       </span>
+                      {camp.audience_type === 'automatico' && (
+                        <span className="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full font-bold">
+                          Automático
+                        </span>
+                      )}
+                      {camp.audience_type === 'manual' && (
+                        <span className="text-[11px] bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-0.5 rounded-full font-bold">
+                          Disparo Manual
+                        </span>
+                      )}
                     </div>
 
                     {camp.status === 'draft' ? (
