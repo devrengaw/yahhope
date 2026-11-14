@@ -171,7 +171,7 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       last_clinical_date: clinicalDate
     };
 
-    setVisits(prev => [newVisit as HomeVisit, ...prev]);
+    setVisits(prev => [newVisit as unknown as HomeVisit, ...prev]);
 
     const { data, error } = await supabase.from('home_visits').insert([{
       patient_id: newVisit.patient_id,

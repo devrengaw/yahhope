@@ -167,7 +167,7 @@ export function WorkspaceSidebar({ isMobileOpen = false, onClose }: WorkspaceSid
               <Plus size={14} />
             </button>
           </div>
-          {Array.from(new Map(channels.map(c => [c.name.toLowerCase().trim(), c])).values()).map(channel => (
+          {Array.from(new Map<string, (typeof channels)[number]>(channels.map(c => [c.name.toLowerCase().trim(), c])).values()).map(channel => (
             <NavLink
               key={channel.id}
               to={`/workspace/chat/${channel.name}`}

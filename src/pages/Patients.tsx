@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, ChevronRight, X, User, MapPin, Activity, Building2, History, UserX, CheckCircle2 } from 'lucide-react';
 import { calculateAge, cn, formatLocalDate } from '../lib/utils';
@@ -177,7 +177,7 @@ export function Patients() {
     setHospDischargeNotes('');
   };
 
-  const handleConfirmDischarge = async (e: React.FormEvent) => {
+  const handleConfirmDischarge = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedHospitalizedPatient) return;
     setIsSavingDischarge(true);

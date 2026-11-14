@@ -13,6 +13,10 @@ interface State {
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
+  declare props: Props;
+  declare state: State;
+  declare setState: (state: Partial<State>) => void;
+
   constructor(props: Props) {
     super(props);
     this.state = {

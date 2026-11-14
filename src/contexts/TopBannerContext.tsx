@@ -162,7 +162,7 @@ export function TopBannerProvider({ children }: { children: ReactNode }) {
                 link: sanitized.buttonLink,
               },
               updated_at: new Date().toISOString()
-            }, { onConflict: 'key' }).then(() => {}).catch(() => {});
+            }, { onConflict: 'key' }).then(() => {}, () => {});
           }
         }
       } catch {

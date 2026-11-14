@@ -328,14 +328,14 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
               supabase.from('blog_posts').update({
                 views_count: Math.max(rawV, def.views_count),
                 reads_count: Math.max(rawR, def.reads_count)
-              }).eq('id', rawRow.id).then(() => {}).catch(() => {});
+              }).eq('id', rawRow.id).then(() => {}, () => {});
             }
           }
         }
 
         // Set state preserving any higher client-side counters (prevents jumping down)
         setPosts(prev => {
-          const prevMap = new Map(prev.map(item => [String(item.id), item]));
+          const prevMap = new Map<string, (typeof prev)[number]>(prev.map(item => [String(item.id), item]));
           return loadedPosts.map(lp => {
             const cleanId = String(lp.id);
             const prevItem = prevMap.get(cleanId) || 

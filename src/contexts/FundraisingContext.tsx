@@ -736,7 +736,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       });
 
       for (let i = 0; i < orderedIds.length; i++) {
-        supabase.from('campaigns').update({ priority: i + 1 }).eq('id', orderedIds[i]).then(() => {}).catch(() => {});
+        supabase.from('campaigns').update({ priority: i + 1 }).eq('id', orderedIds[i]).then(() => {}, () => {});
       }
       return { success: true };
     } catch (err) {
