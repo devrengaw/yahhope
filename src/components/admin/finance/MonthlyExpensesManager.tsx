@@ -1280,7 +1280,7 @@ export function MonthlyExpensesManager({
                 {group.items.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium text-xs bg-slate-50/20">
-                      Nenhum gasto registrado para este mês ainda. Custos fixos e despesas do período aparecerão aqui.
+                      Nenhum gasto variável registrado para este mês ainda. Custos fixos e despesas do período aparecerão aqui.
                     </td>
                   </tr>
                 ) : (

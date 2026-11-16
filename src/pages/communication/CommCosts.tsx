@@ -23,6 +23,7 @@ import { CostsAccessGuard } from '../../components/common/CostsAccessGuard';
 import { useAuth } from '../../contexts/AuthContext';
 import { Transaction, TransactionCategory } from '../admin/Finance';
 import { getLocalCategories, fetchAndSyncCategories } from '../../services/financeCategoryService';
+import { ensureCurrentMonthRecurringTransactions } from '../../services/financeTransactionService';
 
 export function CommCosts() {
   const { user } = useAuth();
@@ -40,7 +41,10 @@ export function CommCosts() {
         supabase.from('finance_transactions').select('*').eq('module', 'communication').order('date', { ascending: false }),
         fetchAndSyncCategories()
       ]);
-      if (txRes.data) setTransactions(txRes.data);
+      if (txRes.data) {
+        const updated = await ensureCurrentMonthRecurringTransactions(txRes.data, 'communication');
+        setTransactions(updated);
+      }
       if (syncedCats) setCategories(syncedCats);
     } catch (e) {
       console.error('Erro ao carregar finanças de comunicação:', e);

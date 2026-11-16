@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type RefObject } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter } from 'recharts';
 import { differenceInMonths, differenceInDays } from 'date-fns';
@@ -12,7 +12,7 @@ interface GrowthChartsProps {
 }
 
 // Helper to generate combined data
-const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F', events: ClinicalEvent[], dob: string) => {
+export const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeight' | 'hcForAge', gender: 'M' | 'F', events: ClinicalEvent[], dob: string) => {
   const dataMap = new Map<number, any>();
 
   // 1. Add WHO base X values
@@ -172,6 +172,58 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
     return null;
   };
 
+  const renderComposedChart = (chart: typeof charts[number], fixedWidth?: number, fixedHeight?: number) => (
+    <ComposedChart
+      data={chart.data}
+      width={fixedWidth}
+      height={fixedHeight}
+      margin={{ top: 20, right: 30, left: 10, bottom: 25 }}
+    >
+      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+      <XAxis
+        dataKey="x"
+        type="number"
+        domain={['dataMin', 'dataMax']}
+        tickCount={20}
+        stroke="#94a3b8"
+        tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+        tickLine={{ stroke: '#cbd5e1' }}
+        label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: -15, fill: '#334155', fontWeight: 'bold', fontSize: 12 }}
+      />
+      <YAxis
+        domain={chart.domain}
+        tickCount={20}
+        stroke="#94a3b8"
+        tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+        tickLine={{ stroke: '#cbd5e1' }}
+        tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
+        label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: -5, fill: '#334155', fontWeight: 'bold', fontSize: 12 }}
+      />
+      {!fixedWidth && <Tooltip content={<CustomTooltip />} />}
+
+      {/* WHO Curves */}
+      <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+      <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+      <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+      <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+      <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+
+      {/* Patient Data Points */}
+      <Line
+        type="monotone"
+        dataKey="patientValue"
+        name="Paciente"
+        stroke={isBoy ? '#3b82f6' : '#ec4899'}
+        strokeWidth={3}
+        connectNulls={true}
+        dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }}
+        activeDot={{ r: 8 }}
+        isAnimationActive={false}
+      />
+      <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
+    </ComposedChart>
+  );
+
   return (
     <div className="space-y-4">
       {/* Slider Controls */}
@@ -197,50 +249,7 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
         
         <div className={cn("p-4 h-[400px] w-full", themeClasses.lightBg)}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={activeChartData.data} margin={{ top: 20, right: 30, left: 10, bottom: 25 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="x" 
-                type="number" 
-                domain={['dataMin', 'dataMax']} 
-                tickCount={20}
-                stroke="#94a3b8"
-                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-                tickLine={{ stroke: '#cbd5e1' }}
-                label={{ value: activeChartData.xAxisLabel, position: 'insideBottom', offset: -15, fill: '#334155', fontWeight: 'bold', fontSize: 12 }} 
-              />
-              <YAxis 
-                domain={activeChartData.domain} 
-                tickCount={20}
-                stroke="#94a3b8"
-                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-                tickLine={{ stroke: '#cbd5e1' }}
-                tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
-                label={{ value: activeChartData.yAxisLabel, angle: -90, position: 'insideLeft', offset: -5, fill: '#334155', fontWeight: 'bold', fontSize: 12 }} 
-              />
-              <Tooltip content={<CustomTooltip />} />
-              
-              {/* WHO Curves */}
-              <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
-
-              {/* Patient Data Points */}
-              <Line 
-                type="monotone"
-                dataKey="patientValue" 
-                name="Paciente"
-                stroke={isBoy ? '#3b82f6' : '#ec4899'} 
-                strokeWidth={3} 
-                connectNulls={true}
-                dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }} 
-                activeDot={{ r: 8 }} 
-                isAnimationActive={false}
-              />
-              <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
-            </ComposedChart>
+            {renderComposedChart(activeChartData)}
           </ResponsiveContainer>
         </div>
       </div>
@@ -252,6 +261,113 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
         <div className="flex items-center gap-1"><div className="w-4 h-1 bg-emerald-500"></div> Mediana (0)</div>
         <div className="flex items-center gap-1"><div className={cn("w-3 h-3 rounded-full", isBoy ? "bg-blue-900" : "bg-pink-900")}></div> Medições do Paciente</div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Offscreen renderer for all 3 WHO growth charts at fixed pixel dimensions,
+ * used when exporting the complete clinical history PDF.
+ */
+export function GrowthChartsExportView({
+  patient,
+  events,
+  containerRef,
+}: {
+  patient: Patient;
+  events: ClinicalEvent[];
+  containerRef: RefObject<HTMLDivElement | null>;
+}) {
+  const isBoy = patient.gender === 'M';
+
+  const charts = useMemo(() => [
+    {
+      id: 'heightForAge' as const,
+      title: `Estatura por Idade - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
+      xAxisLabel: 'Idade (meses)',
+      yAxisLabel: 'Estatura (cm)',
+      data: generateCombinedChartData('heightForAge', patient.gender, events, patient.dob),
+      domain: [45, 125],
+    },
+    {
+      id: 'weightForHeight' as const,
+      title: `Peso por Estatura - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
+      xAxisLabel: 'Estatura (cm)',
+      yAxisLabel: 'Peso (kg)',
+      data: generateCombinedChartData('weightForHeight', patient.gender, events, patient.dob),
+      domain: [2, 30],
+    },
+    {
+      id: 'hcForAge' as const,
+      title: `Perímetro Craniano - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
+      xAxisLabel: 'Idade (meses)',
+      yAxisLabel: 'Perímetro Craniano (cm)',
+      data: generateCombinedChartData('hcForAge', patient.gender, events, patient.dob),
+      domain: [32, 54],
+    },
+  ], [isBoy, patient.gender, events, patient.dob]);
+
+  return (
+    <div
+      ref={containerRef}
+      aria-hidden="true"
+      style={{
+        position: 'fixed',
+        left: '-10000px',
+        top: 0,
+        width: '740px',
+        background: '#ffffff',
+        pointerEvents: 'none',
+        zIndex: -1,
+      }}
+    >
+      {charts.map((chart) => (
+        <div key={chart.id} data-export-chart={chart.id} style={{ background: '#ffffff', padding: '8px' }}>
+          <ComposedChart
+            data={chart.data}
+            width={720}
+            height={290}
+            margin={{ top: 18, right: 28, left: 10, bottom: 24 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis
+              dataKey="x"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              tickCount={20}
+              stroke="#94a3b8"
+              tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+              tickLine={{ stroke: '#cbd5e1' }}
+              label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: -14, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
+            />
+            <YAxis
+              domain={chart.domain}
+              tickCount={16}
+              stroke="#94a3b8"
+              tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+              tickLine={{ stroke: '#cbd5e1' }}
+              tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
+              label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: -2, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
+            />
+            <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+            <Line
+              type="monotone"
+              dataKey="patientValue"
+              name="Paciente"
+              stroke={isBoy ? '#3b82f6' : '#ec4899'}
+              strokeWidth={3}
+              connectNulls={true}
+              dot={{ r: 5, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
+            <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
+          </ComposedChart>
+        </div>
+      ))}
     </div>
   );
 }

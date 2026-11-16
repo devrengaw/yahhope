@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2, History, RotateCcw, AlertTriangle, AlertCircle, UserCheck, UserX } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Activity, Home, Calendar, User, Weight, X, Stethoscope, Clock, BriefcaseMedical, Heart, Send, CheckCircle2, Sparkles, Package, Edit2, Trash2, Save, MessageSquare, Building2, History, RotateCcw, AlertTriangle, AlertCircle, UserCheck, UserX, Download, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePatients } from '../contexts/PatientContext';
 import { ClinicalEvent } from '../lib/mockData';
 import { calculateAge, cn, formatLocalDate, parseLocalDate, formatDisplayDate } from '../lib/utils';
 import { calculateMedicationDuration } from '../lib/medicationUtils';
 import { StatusBadge } from '../components/StatusBadge';
-import { GrowthCharts } from '../components/GrowthCharts';
+import { GrowthCharts, GrowthChartsExportView } from '../components/GrowthCharts';
+import { exportClinicalHistoryPdf } from '../utils/exportClinicalHistoryPdf';
 import { PatientProfile } from '../components/PatientProfile';
 import { differenceInMonths, addDays, differenceInDays } from 'date-fns';
 import { useInventory } from '../contexts/InventoryContext';
@@ -69,6 +70,8 @@ export function PatientDetails() {
 
   const [activeTab, setActiveTab] = useState<'resumo' | 'ficha' | 'historico'>('resumo');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const exportChartsRef = useRef<HTMLDivElement | null>(null);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [activeSessionAptId, setActiveSessionAptId] = useState<string | null>(aptId || null);
@@ -528,6 +531,37 @@ export function PatientDetails() {
       }
     });
   }
+
+  const handleExportPdf = async () => {
+    if (!patient || isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      // Allow React to mount GrowthChartsExportView and Recharts to render SVGs
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await exportClinicalHistoryPdf({
+        patient,
+        events: patientEvents,
+        latestWeightEvent,
+        latestHeightEvent,
+        latestMuacEvent,
+        latestHeadEvent,
+        latestClinicalEvent,
+        activeKitProducts,
+        activeMedications,
+        items,
+        kits,
+        getVisitForEvent,
+        formatProfessionalName,
+        isHospitalized: isPatientHospitalized,
+        chartsContainer: exportChartsRef.current,
+      });
+    } catch (err) {
+      console.error('Erro ao exportar histórico clínico em PDF:', err);
+      alert('Não foi possível gerar o PDF do histórico clínico. Tente novamente.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleDeleteMedication = (index: number) => {
     if (!latestClinicalEvent) return;
@@ -1485,6 +1519,16 @@ export function PatientDetails() {
                 )}
               </>
             )}
+
+        <button
+          onClick={handleExportPdf}
+          disabled={isExportingPdf}
+          className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm text-sm cursor-pointer active:scale-95"
+          title="Exportar histórico clínico completo da criança com informações e gráficos em PDF"
+        >
+          {isExportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+          {isExportingPdf ? 'Gerando PDF...' : 'Exportar Histórico (PDF)'}
+        </button>
 
         {showImpactSuccess && (
           <div className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 animate-in slide-in-from-right-4 duration-300 shadow-lg shadow-emerald-500/20">
@@ -3809,6 +3853,13 @@ export function PatientDetails() {
         </div>
       </div>
     </div>
+    {isExportingPdf && (
+      <GrowthChartsExportView
+        patient={patient}
+        events={patientEvents}
+        containerRef={exportChartsRef}
+      />
+    )}
     </>
   );
 }
