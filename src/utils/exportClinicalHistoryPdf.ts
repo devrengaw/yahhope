@@ -1,20 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { ClinicalEvent, InventoryItem, Kit, Patient } from '../lib/mockData';
 import { calculateAge, parseLocalDate } from '../lib/utils';
-import { calculateMedicationDuration } from '../lib/medicationUtils';
 import { matchDefaultKitByIdOrName, matchInventoryItem } from '../lib/defaultNutritionKits';
-
-export interface ActiveKitProductSummary {
-  kitName: string;
-  itemName: string;
-  category: string;
-  quantity: number | string;
-  unit: string;
-  dosage?: string;
-}
 
 export interface ExportClinicalHistoryParams {
   patient: Patient;
@@ -24,8 +14,6 @@ export interface ExportClinicalHistoryParams {
   latestMuacEvent?: ClinicalEvent;
   latestHeadEvent?: ClinicalEvent;
   latestClinicalEvent?: ClinicalEvent;
-  activeKitProducts: ActiveKitProductSummary[];
-  activeMedications: any[];
   items: InventoryItem[];
   kits: Kit[];
   getVisitForEvent: (date: string) => any;
@@ -34,16 +22,9 @@ export interface ExportClinicalHistoryParams {
   chartsContainer: HTMLDivElement | null;
 }
 
-interface FullAdmissionData {
+interface BasicProfileData {
   child: any;
   caregiver: any;
-  household: any;
-  socioeconomics: any;
-  initialAssessment: any;
-  gestational: any;
-  feeding: any;
-  clinical: any;
-  physical: any;
 }
 
 const PAGE_MARGIN = 14;
@@ -106,25 +87,46 @@ async function svgElementToPngDataUrl(svg: SVGSVGElement): Promise<string> {
 }
 
 /**
- * Attempts to load a remote image URL as a data URL for embedding in jsPDF.
- * Returns null if loading fails or times out (e.g., CORS restriction).
+ * Attempts to load a remote or data URL image as a square JPEG data URL for embedding in jsPDF.
+ * Uses fetch(cors) -> Blob first to avoid browser cache CORS issues, with Image fallback.
  */
 async function loadImageAsDataUrl(url?: string): Promise<string | null> {
   if (!url) return null;
+
+  let objectUrlToRevoke: string | null = null;
   try {
+    let imageSrc = url;
+    if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(url, { mode: 'cors', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const blob = await res.blob();
+          objectUrlToRevoke = URL.createObjectURL(blob);
+          imageSrc = objectUrlToRevoke;
+        }
+      } catch {
+        // Fallback to direct Image loading below
+      }
+    }
+
     const img = await Promise.race([
       new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
-        image.crossOrigin = 'anonymous';
+        if (!imageSrc.startsWith('data:') && !imageSrc.startsWith('blob:')) {
+          image.crossOrigin = 'anonymous';
+        }
         image.onload = () => resolve(image);
         image.onerror = reject;
-        image.src = url;
+        image.src = imageSrc;
       }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
     ]);
 
     const canvas = document.createElement('canvas');
-    const size = 160;
+    const size = 240;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
@@ -136,60 +138,32 @@ async function loadImageAsDataUrl(url?: string): Promise<string | null> {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, size, size);
     ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-    return canvas.toDataURL('image/jpeg', 0.85);
+    return canvas.toDataURL('image/jpeg', 0.9);
   } catch {
     return null;
+  } finally {
+    if (objectUrlToRevoke) {
+      URL.revokeObjectURL(objectUrlToRevoke);
+    }
   }
 }
 
-async function fetchFullAdmissionData(patientId: string): Promise<FullAdmissionData> {
-  const result: FullAdmissionData = {
+async function fetchBasicProfileData(patientId: string): Promise<BasicProfileData> {
+  const result: BasicProfileData = {
     child: null,
     caregiver: null,
-    household: null,
-    socioeconomics: null,
-    initialAssessment: null,
-    gestational: null,
-    feeding: null,
-    clinical: null,
-    physical: null,
   };
 
   try {
-    const [childRes, caregiverRes, triageRes, iaRes] = await Promise.all([
+    const [childRes, caregiverRes] = await Promise.all([
       supabase.from('children').select('*').eq('id', patientId).maybeSingle(),
       supabase.from('caregivers').select('*').eq('child_id', patientId).maybeSingle(),
-      supabase.from('social_triage').select('*').eq('child_id', patientId).maybeSingle(),
-      supabase.from('initial_assessments').select('*').eq('child_id', patientId).maybeSingle(),
     ]);
 
     result.child = childRes.data;
     result.caregiver = caregiverRes.data;
-
-    if (triageRes.data?.id) {
-      const [houseRes, socioRes] = await Promise.all([
-        supabase.from('household_conditions').select('*').eq('social_triage_id', triageRes.data.id).maybeSingle(),
-        supabase.from('socioeconomics').select('*').eq('social_triage_id', triageRes.data.id).maybeSingle(),
-      ]);
-      result.household = houseRes.data;
-      result.socioeconomics = socioRes.data;
-    }
-
-    if (iaRes.data?.id) {
-      result.initialAssessment = iaRes.data;
-      const [gestRes, feedRes, clinRes, physRes] = await Promise.all([
-        supabase.from('gestational_history').select('*').eq('assessment_id', iaRes.data.id).maybeSingle(),
-        supabase.from('feeding_history').select('*').eq('assessment_id', iaRes.data.id).maybeSingle(),
-        supabase.from('clinical_history').select('*').eq('assessment_id', iaRes.data.id).maybeSingle(),
-        supabase.from('physical_exam').select('*').eq('assessment_id', iaRes.data.id).maybeSingle(),
-      ]);
-      result.gestational = gestRes.data;
-      result.feeding = feedRes.data;
-      result.clinical = clinRes.data;
-      result.physical = physRes.data;
-    }
   } catch (err) {
-    console.warn('Erro ao buscar dados completos da ficha para PDF:', err);
+    console.warn('Erro ao buscar dados cadastrais para PDF:', err);
   }
 
   return result;
@@ -305,8 +279,6 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
     latestMuacEvent,
     latestHeadEvent,
     latestClinicalEvent,
-    activeKitProducts,
-    activeMedications,
     items,
     kits,
     getVisitForEvent,
@@ -315,10 +287,16 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
     chartsContainer,
   } = params;
 
-  const [admission, photoDataUrl] = await Promise.all([
-    fetchFullAdmissionData(patient.id),
+  const [admission, initialPhotoDataUrl] = await Promise.all([
+    fetchBasicProfileData(patient.id),
     loadImageAsDataUrl(patient.photo_url),
   ]);
+
+  const photoDataUrl =
+    initialPhotoDataUrl ||
+    (!patient.photo_url && admission.child?.photo_url
+      ? await loadImageAsDataUrl(admission.child.photo_url)
+      : null);
 
   // Capture all 3 Recharts SVGs from the offscreen export container
   const chartMeta = [
@@ -368,25 +346,40 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
   let y = 37;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, 26, 3, 3, 'FD');
+  doc.roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, 30, 3, 3, 'FD');
 
-  const textStartX = photoDataUrl ? PAGE_MARGIN + 26 : PAGE_MARGIN + 5;
+  const photoBoxSize = 24;
+  const photoX = PAGE_MARGIN + 3;
+  const photoY = y + 3;
+  const textStartX = photoX + photoBoxSize + 5;
+
   if (photoDataUrl) {
-    doc.addImage(photoDataUrl, 'JPEG', PAGE_MARGIN + 3.5, y + 3, 20, 20);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(photoX - 0.5, photoY - 0.5, photoBoxSize + 1, photoBoxSize + 1, 2, 2, 'FD');
+    doc.addImage(photoDataUrl, 'JPEG', photoX, photoY, photoBoxSize, photoBoxSize);
+  } else {
+    doc.setFillColor(209, 250, 229);
+    doc.setDrawColor(167, 243, 208);
+    doc.roundedRect(photoX, photoY, photoBoxSize, photoBoxSize, 2, 2, 'FD');
+    doc.setTextColor(4, 120, 87);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(patient.name.charAt(0).toUpperCase(), photoX + photoBoxSize / 2, photoY + 14.5, { align: 'center' });
   }
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(patient.name, textStartX, y + 8.5);
+  doc.text(patient.name, textStartX, y + 9.5);
 
   // Status Pill
   doc.setFillColor(...statusColors.bg);
-  doc.roundedRect(PAGE_MARGIN + CONTENT_WIDTH - 42, y + 4, 38, 7, 2, 2, 'F');
+  doc.roundedRect(PAGE_MARGIN + CONTENT_WIDTH - 42, y + 4.5, 38, 7, 2, 2, 'F');
   doc.setTextColor(...statusColors.text);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.text(currentStatus.toUpperCase(), PAGE_MARGIN + CONTENT_WIDTH - 23, y + 8.7, { align: 'center' });
+  doc.text(currentStatus.toUpperCase(), PAGE_MARGIN + CONTENT_WIDTH - 23, y + 9.2, { align: 'center' });
 
   doc.setTextColor(71, 85, 105);
   doc.setFont('helvetica', 'normal');
@@ -394,15 +387,15 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
   doc.text(
     `ID: ${safeText(patient.registration_number)}   |   Nascimento: ${formatDateBr(patient.dob)} (${calculateAge(patient.dob)})   |   Gênero: ${patient.gender === 'M' ? 'Masculino' : 'Feminino'}`,
     textStartX,
-    y + 15.5
+    y + 17
   );
   doc.text(
     `Comunidade/Endereço: ${safeText(admission.child?.address || patient.community)}   |   Responsável: ${safeText(admission.caregiver?.name || patient.guardian_name)}`,
     textStartX,
-    y + 21.5
+    y + 23.5
   );
 
-  y += 32;
+  y += 36;
 
   // ============================================================================
   // SECTION 1: IDENTIFICAÇÃO, LOCALIZAÇÃO E RESPONSÁVEL
@@ -499,78 +492,11 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
   y += 27;
 
   // ============================================================================
-  // SECTION 3: KITS NUTRICIONAIS & MEDICAMENTOS ATIVOS
-  // ============================================================================
-  y = drawSectionTitle(doc, '3. Kits Nutricionais e Medicamentos Ativos', y, [217, 119, 6]);
-
-  if (activeKitProducts.length > 0) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
-      theme: 'striped',
-      headStyles: { fillColor: [217, 119, 6], textColor: 255, fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 8, cellPadding: 2.2 },
-      head: [['Kit Nutricional', 'Produto / Insumo', 'Categoria', 'Quantidade', 'Posologia / Obs.']],
-      body: activeKitProducts.map((p) => [
-        p.kitName,
-        p.itemName,
-        p.category,
-        `${p.quantity} ${p.unit}`,
-        p.dosage || '--',
-      ]),
-    });
-    y = getLastAutoTableY(doc, y) + 5;
-  } else {
-    y = ensureSpace(doc, y, 10);
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Nenhum kit nutricional ativo registrado no último atendimento.', PAGE_MARGIN, y + 3);
-    y += 9;
-  }
-
-  if (activeMedications.length > 0 && latestClinicalEvent) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
-      theme: 'striped',
-      headStyles: { fillColor: [5, 150, 105], textColor: 255, fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 8, cellPadding: 2.2 },
-      head: [['Medicamento / Suplemento', 'Posologia', 'Prescrito em', 'Duração / Reposição']],
-      body: activeMedications.map((m) => {
-        const invItem = items.find((it) => (m.item_id && it.id === m.item_id) || it.name.toLowerCase() === (m.medication || '').toLowerCase());
-        const qty = typeof m.quantity === 'number' ? m.quantity : parseInt(m.quantity || '1', 10) || 1;
-        const calc = calculateMedicationDuration(invItem, m.treatment, qty, latestClinicalEvent.date);
-        const durationDays = m.duration_days || calc.durationDays;
-        let durText = 'Uso contínuo / sem prazo';
-        if (durationDays) {
-          const endDate = calc.renewalDate || addDays(parseLocalDate(latestClinicalEvent.date), durationDays);
-          durText = `${durationDays} dias (Próx.: ${endDate.toLocaleDateString('pt-BR')})`;
-        }
-        return [
-          m.medication || '--',
-          m.treatment || 'Posologia não informada',
-          formatDateBr(latestClinicalEvent.date),
-          durText,
-        ];
-      }),
-    });
-    y = getLastAutoTableY(doc, y) + 6;
-  } else {
-    y = ensureSpace(doc, y, 10);
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Nenhum medicamento ou suplemento ativo prescrito no momento.', PAGE_MARGIN, y + 3);
-    y += 9;
-  }
-
-  // ============================================================================
-  // SECTION 4: GRÁFICOS DE CRESCIMENTO (PADRÕES OMS)
+  // SECTION 3: GRÁFICOS DE CRESCIMENTO (PADRÕES OMS)
   // ============================================================================
   if (capturedCharts.length > 0) {
     const themeRgb: [number, number, number] = patient.gender === 'M' ? [37, 99, 235] : [219, 39, 119];
-    y = drawSectionTitle(doc, '4. Gráficos de Crescimento (Padrões OMS)', y, themeRgb);
+    y = drawSectionTitle(doc, '3. Gráficos de Crescimento (Padrões OMS)', y, themeRgb);
 
     for (const chart of capturedCharts) {
       const chartBoxHeight = 84; // header 7mm + image 72mm + padding
@@ -612,113 +538,9 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
   }
 
   // ============================================================================
-  // SECTION 5: CADASTRO COMPLETO (ADMISSÃO)
+  // SECTION 4: TABELA DE EVOLUÇÃO ANTROPOMÉTRICA
   // ============================================================================
-  y = drawSectionTitle(doc, '5. Ficha Completa de Admissão', y, [79, 70, 229]);
-
-  y = renderKeyValueGridTable(
-    doc,
-    y,
-    'Triagem Social e Condições de Moradia',
-    [
-      ['Tipo de Casa', admission.household?.housing_type || patient.housing_type],
-      ['Cômodos', admission.household?.rooms],
-      ['Material', admission.household?.dwelling_type],
-      ['Telhado', admission.household?.roof],
-      ['Saneamento', admission.household?.sanitation || patient.sanitation],
-      ['Esgoto', admission.household?.sewage],
-      ['Lixo', admission.household?.garbage],
-      ['Animais no Quintal', admission.household?.animals],
-      ['Renda Mensal', admission.socioeconomics?.monthly_income ? `MZN ${admission.socioeconomics.monthly_income}` : null],
-      ['Trabalho Pai', admission.socioeconomics?.father_job],
-      ['Trabalho Mãe', admission.socioeconomics?.mother_job],
-      ['Trabalho Responsável', admission.socioeconomics?.caregiver_job],
-      ['Observações Sociais', admission.socioeconomics?.observations],
-    ],
-    2
-  );
-
-  y = renderKeyValueGridTable(
-    doc,
-    y,
-    'História Gestacional',
-    [
-      ['Intercorrências Pré-Natal', admission.gestational?.prenatal_problems],
-      ['Consultas Pré-Natal', admission.gestational?.prenatal_consultations],
-      ['Tipo de Parto', admission.gestational?.delivery_type],
-      ['Idade Gestacional', admission.gestational?.gestational_age],
-      ['APGAR 1 min / 5 min', `${safeText(admission.gestational?.apgar_1)} / ${safeText(admission.gestational?.apgar_5)}`],
-      ['Peso ao Nascer', admission.gestational?.birth_weight ? `${admission.gestational.birth_weight} kg` : null],
-      ['Estatura ao Nascer', admission.gestational?.birth_height ? `${admission.gestational.birth_height} cm` : null],
-      ['PC ao Nascer', admission.gestational?.birth_hc ? `${admission.gestational.birth_hc} cm` : null],
-      ['Intercorrências no Parto', admission.gestational?.birth_problems],
-    ],
-    2
-  );
-
-  y = renderKeyValueGridTable(
-    doc,
-    y,
-    'Alimentação',
-    [
-      ['Leite Materno', admission.feeding ? (admission.feeding.breast_milk ? 'Sim' : 'Não') : null],
-      ['Exclusivo Até (meses)', admission.feeding?.exclusive_breast_milk_until],
-      ['Idade Desmame', admission.feeding?.weaning_age],
-      ['Intro: Água/Chá', admission.feeding?.water_tea_intro],
-      ['Intro: Leite de Vaca', admission.feeding?.cow_milk_intro],
-      ['Intro: Papa Salgada', admission.feeding?.salty_mush_intro],
-      ['Intro: Suco', admission.feeding?.juice_intro],
-      ['Intro: Sopa', admission.feeding?.soup_intro],
-      ['Outros Alimentos', admission.feeding?.other_foods],
-      ['Alimentação Atual', admission.feeding?.current_feeding],
-    ],
-    2
-  );
-
-  y = renderKeyValueGridTable(
-    doc,
-    y,
-    'História Clínica e Familiar',
-    [
-      ['Doenças Prévias', admission.clinical?.previous_diseases],
-      ['Suplementos', admission.clinical?.supplements],
-      ['Imunização', admission.clinical?.immunization],
-      ['Histórico Materno', admission.clinical?.mother_history],
-      ['Histórico Paterno', admission.clinical?.father_history],
-      ['Desnutrição na Família', admission.clinical?.family_malnutrition_history],
-      ['Consanguinidade', admission.clinical ? (admission.clinical.consanguinity ? 'Sim' : 'Não') : null],
-      ['Doenças Hereditárias', admission.clinical?.hereditary_diseases],
-      ['Dinâmica Familiar', admission.clinical?.family_dynamics],
-    ],
-    2
-  );
-
-  y = renderKeyValueGridTable(
-    doc,
-    y,
-    'Avaliação Inicial e Exame Físico',
-    [
-      ['Data da Avaliação', formatDateBr(admission.initialAssessment?.date)],
-      ['Informante', admission.initialAssessment?.informant],
-      ['Queixa Principal', admission.initialAssessment?.main_complaint],
-      ['História da Doença', admission.initialAssessment?.history],
-      ['Medicamentos em Uso', admission.initialAssessment?.current_medications],
-      ['Peso Inicial', admission.physical?.weight ? `${admission.physical.weight} kg` : null],
-      ['Estatura Inicial', admission.physical?.height ? `${admission.physical.height} cm` : null],
-      ['Perímetro Braquial', admission.physical?.muac ? `${admission.physical.muac} cm` : null],
-      ['Perímetro Cefálico', admission.physical?.head_circumference ? `${admission.physical.head_circumference} cm` : null],
-      ['Edema Bilateral', admission.physical?.bilateral_edema],
-      ['Temperatura Axilar', admission.physical?.axillary_temperature ? `${admission.physical.axillary_temperature} °C` : null],
-      ['Saúde Oral', admission.physical?.oral_health],
-      ['Outros Achados', admission.physical?.other_findings],
-    ],
-    2
-  );
-
-  // ============================================================================
-  // SECTION 6: TABELA DE EVOLUÇÃO ANTROPOMÉTRICA
-  // ============================================================================
-  y = drawSectionTitle(doc, '6. Tabela de Evolução Antropométrica', y);
+  y = drawSectionTitle(doc, '4. Tabela de Evolução Antropométrica', y);
 
   const clinicalRows = events.filter((e) => e.event_type !== 'acs_visit' && e.event_type !== 'observation');
   if (clinicalRows.length > 0) {
@@ -772,9 +594,9 @@ export async function exportClinicalHistoryPdf(params: ExportClinicalHistoryPara
   }
 
   // ============================================================================
-  // SECTION 7: HISTÓRICO CLÍNICO DETALHADO (LINHA DO TEMPO)
+  // SECTION 5: HISTÓRICO CLÍNICO DETALHADO (LINHA DO TEMPO)
   // ============================================================================
-  y = drawSectionTitle(doc, '7. Histórico Clínico Completo (Linha do Tempo)', y);
+  y = drawSectionTitle(doc, '5. Histórico Clínico Completo (Linha do Tempo)', y);
 
   if (events.length > 0) {
     const timelineRows = events.map((ev) => {

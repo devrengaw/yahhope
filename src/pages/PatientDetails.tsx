@@ -546,8 +546,6 @@ export function PatientDetails() {
         latestMuacEvent,
         latestHeadEvent,
         latestClinicalEvent,
-        activeKitProducts,
-        activeMedications,
         items,
         kits,
         getVisitForEvent,
