@@ -165,7 +165,21 @@ export function Finance() {
         supabase.from('projects').select('*').order('created_at', { ascending: false })
       ]);
       if (txRes.data) {
-        const cleanTxs = txRes.data.filter(t => !isSpamFinanceTransaction(t));
+        const cleanTxs = txRes.data
+          .filter(t => !isSpamFinanceTransaction(t))
+          .map(t => {
+            const desc = (t.description || '').toLowerCase();
+            const isPadrinhoTx = t.type === 'income' && (
+              t.category_id === 'cat_sponsorship' ||
+              desc.includes('apadrinh') ||
+              desc.includes('padrinho')
+            );
+            // REGRA DE OURO: Apadrinhamento de criança tem valor mínimo de R$ 90,00 por cota (nunca R$ 30)
+            if (isPadrinhoTx && t.amount > 0 && t.amount < 90) {
+              return { ...t, amount: 90 };
+            }
+            return t;
+          });
         const updatedTxs = await ensureCurrentMonthRecurringTransactions(cleanTxs);
         setTransactions(updatedTxs);
       }

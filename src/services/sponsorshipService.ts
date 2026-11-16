@@ -156,11 +156,10 @@ export const sponsorshipService = {
         console.warn('Aviso ao consultar children no Supabase, usando catálogo local:', childError.message);
       }
 
-      // 2. Busca apadrinhamentos ativos (consulta direta resiliente)
+      // 2. Busca apadrinhamentos (consulta resiliente que não descarta registros por variação de status)
       const { data: sponsorshipsData, error: spError } = await supabase
         .from('sponsorships')
-        .select('*')
-        .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
+        .select('*');
 
       if (spError) {
         console.warn('Aviso ao consultar sponsorships:', spError.message);
@@ -169,27 +168,47 @@ export const sponsorshipService = {
       const allChildren = childrenData || [];
       const allSponsorships = sponsorshipsData || [];
 
-      // Mapeia padrinhos por child_id
+      // Mapeia padrinhos por child_id (resiliente a variações de status e case de ID)
       const sponsorsByChild = new Map<string, any[]>();
       allSponsorships.forEach(sp => {
         if (!sp.child_id) return;
-        if (!sponsorsByChild.has(sp.child_id)) {
-          sponsorsByChild.set(sp.child_id, []);
+        
+        // Ignora apenas status explicitamente cancelados ou substituídos
+        const st = String(sp.status || 'active').toLowerCase().trim();
+        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced') {
+          return;
+        }
+
+        const cleanChildId = String(sp.child_id).trim().toLowerCase();
+        if (!sponsorsByChild.has(cleanChildId)) {
+          sponsorsByChild.set(cleanChildId, []);
         }
         const sponsorName = sp.donor_name || sp.users?.name || sp.donor_email?.split('@')[0] || 'Padrinho';
         const sponsorEmail = sp.donor_email || sp.users?.email || '';
-        sponsorsByChild.get(sp.child_id)!.push({
+        
+        // REGRA DE OURO: O valor mínimo de apadrinhamento por cota é R$ 90,00 (nunca R$ 30)
+        const rawAmt = Number(sp.monthly_amount);
+        const effectiveAmt = (!isNaN(rawAmt) && rawAmt >= quotaCost) ? rawAmt : quotaCost;
+
+        sponsorsByChild.get(cleanChildId)!.push({
           id: sp.id,
           name: sponsorName,
           email: sponsorEmail,
-          monthly_amount: Number(sp.monthly_amount) || quotaCost,
+          monthly_amount: effectiveAmt,
           created_at: sp.created_at
         });
       });
 
       // Monta lista de crianças com detalhes de apadrinhamento
       const childrenDetails: ChildSponsorshipDetail[] = allChildren.map(c => {
-        const sponsors = sponsorsByChild.get(c.id) || [];
+        const cleanId = String(c.id).trim().toLowerCase();
+        // Busca direta pelo ID limpo ou pelo nome se houver vínculo nominal
+        let sponsors = sponsorsByChild.get(cleanId) || [];
+        if (sponsors.length === 0 && c.name) {
+          // Fallback por nome se ID diferir por formatação
+          const matchedKey = Array.from(sponsorsByChild.keys()).find(k => k === cleanId);
+          if (matchedKey) sponsors = sponsorsByChild.get(matchedKey) || [];
+        }
         const sponsorsCount = sponsors.length;
         const isFull = sponsorsCount >= maxSponsorsPerChild;
 
@@ -660,9 +679,8 @@ export const sponsorshipService = {
     try {
       const { data: spRows, error: spErr } = await supabase
         .from('sponsorships')
-        .select('id, child_id, monthly_amount, children(*)')
+        .select('id, child_id, monthly_amount, status, children(*)')
         .ilike('donor_email', cleanEmail)
-        .in('status', ['active', 'paid', 'completed', 'ACTIVE'])
         .not('child_id', 'is', null);
 
       if (spErr) {
@@ -674,7 +692,10 @@ export const sponsorshipService = {
       let totalAmount = 0;
 
       (spRows || []).forEach((row: any) => {
-        totalAmount += Number(row.monthly_amount) || 90;
+        const st = String(row.status || 'active').toLowerCase().trim();
+        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced') return;
+        
+        totalAmount += Math.max(90, Number(row.monthly_amount) || 90);
         const c = row.children;
         if (c && c.id && !seenChildIds.has(c.id)) {
           seenChildIds.add(c.id);
@@ -891,24 +912,25 @@ export const sponsorshipService = {
         queryBySponsorId = await supabase
           .from('sponsorships')
           .select('*, children(*)')
-          .eq('sponsor_id', userId)
-          .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
+          .eq('sponsor_id', userId);
       }
 
       if (cleanEmail) {
         queryByEmail = await supabase
           .from('sponsorships')
           .select('*, children(*)')
-          .ilike('donor_email', cleanEmail)
-          .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
+          .ilike('donor_email', cleanEmail);
       }
 
       const seenSpIds = new Set<string>();
 
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
         if (!seenSpIds.has(item.id)) {
-          seenSpIds.add(item.id);
-          combinedData.push(item);
+          const st = String(item.status || 'active').toLowerCase().trim();
+          if (st !== 'canceled' && st !== 'cancelled' && st !== 'inactive' && st !== 'replaced') {
+            seenSpIds.add(item.id);
+            combinedData.push(item);
+          }
         }
       });
 

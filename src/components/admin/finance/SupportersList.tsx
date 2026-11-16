@@ -221,7 +221,11 @@ export function SupportersList() {
         uniqueSponsorships.forEach(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
           const isSpPaid = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
-          const spAmount = Number(sp.monthly_amount || sp.amount || 90);
+          // REGRA DE OURO: Cada cota de criança tem valor mínimo de R$ 90,00 (nunca R$ 30)
+          const rawAmt = Number(sp.monthly_amount || sp.amount);
+          const spAmount = (sp.child_id || isSponsorRole)
+            ? Math.max(90, (!isNaN(rawAmt) && rawAmt > 0) ? rawAmt : 90)
+            : ((!isNaN(rawAmt) && rawAmt > 0) ? rawAmt : 90);
           const childTitle = sp.children?.name 
             ? `Apadrinhamento Mensal - ${sp.children.name}` 
             : 'Apadrinhamento Mensal (Casa Nutri)';
@@ -311,7 +315,11 @@ export function SupportersList() {
         });
 
         // Calcula o valor mensal comprometido (apadrinhamento ou recorrência)
-        const spAmounts = monthlySponsorships.map(sp => Number(sp.monthly_amount || sp.amount || 0));
+        // REGRA DE OURO: Cada cota de apadrinhamento de criança é no mínimo R$ 90,00
+        const spAmounts = monthlySponsorships.map(sp => {
+          const raw = Number(sp.monthly_amount || sp.amount || 0);
+          return sp.child_id ? Math.max(90, raw) : raw;
+        });
         const maxSpAmt = spAmounts.length > 0 ? Math.max(...spAmounts) : 0;
         const totalSpAmt = spAmounts.reduce((a, b) => a + b, 0);
         const effectiveMonthlyAmount = Math.max(maxSpAmt, totalSpAmt);

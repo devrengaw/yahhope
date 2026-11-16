@@ -431,9 +431,15 @@ export async function ensureCurrentMonthRecurringTransactions(
           const newDate = `${currentMonthKey}-${String(recDay).padStart(2, '0')}`;
           const isSettled = currentDay >= recDay || currentDay >= 15;
 
+          const isSp = template.category_id === 'cat_sponsorship' ||
+            (template.description || '').toLowerCase().includes('apadrinh') ||
+            (template.description || '').toLowerCase().includes('padrinho');
+          // REGRA DE OURO: Apadrinhamento de criança tem valor mínimo de R$ 90,00 por cota (nunca R$ 30)
+          const finalAmt = isSp ? Math.max(90, Number(template.amount) || 90) : Number(template.amount);
+
           const basePayload: any = {
             description: template.description,
-            amount: Number(template.amount),
+            amount: finalAmt,
             type: 'income',
             category_id: template.category_id || 'cat_sponsorship',
             date: newDate,

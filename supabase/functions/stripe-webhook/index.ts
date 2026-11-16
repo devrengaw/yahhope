@@ -110,10 +110,10 @@ async function syncMaintainerProfile(data: {
 
     if (existingSp && existingSp.length > 0) {
       const targetQuotas = canSponsorChild ? Math.max(quotasCount, existingSp.length) : existingSp.length;
-      // Atualiza apadrinhamento existente dividindo o valor total pelas cotas reais
-      const perQuotaAmount = targetQuotas > 1
+      // REGRA DE OURO: Cada cota de apadrinhamento tem valor mínimo de R$ 90,00 (nunca R$ 30,00)
+      const perQuotaAmount = Math.max(90, targetQuotas > 1 && monthlyAmount >= targetQuotas * 90
         ? Number((monthlyAmount / targetQuotas).toFixed(2))
-        : monthlyAmount;
+        : (monthlyAmount >= 90 ? monthlyAmount : 90));
 
       const existingChildIds = new Set(existingSp.map((sp: any) => sp.child_id).filter(Boolean));
       const missingCount = canSponsorChild ? Math.max(0, quotasCount - existingSp.length) : 0;
@@ -221,7 +221,7 @@ async function syncMaintainerProfile(data: {
           donor_name: donorName,
           donor_email: cleanEmail,
           donor_phone: donorPhone,
-          monthly_amount: quotasCount > 1 ? monthlyAmount / quotasCount : monthlyAmount,
+          monthly_amount: Math.max(90, quotasCount > 1 && monthlyAmount >= quotasCount * 90 ? monthlyAmount / quotasCount : (monthlyAmount >= 90 ? monthlyAmount : 90)),
           quotas_count: 1,
           status: 'active',
           payment_method: paymentMethod,

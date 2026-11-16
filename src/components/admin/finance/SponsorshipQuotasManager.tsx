@@ -394,7 +394,7 @@ export function SponsorshipQuotasManager() {
                           <div key={sp.id} className="text-xs bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 flex items-center justify-between">
                             <span className="font-bold text-slate-800 truncate max-w-[150px]">{sp.name}</span>
                             <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                              R$ {sp.monthly_amount.toFixed(0)}/mês
+                              R$ {Math.max(quotaCost, sp.monthly_amount || quotaCost).toFixed(0)}/mês
                             </span>
                           </div>
                         ))}
