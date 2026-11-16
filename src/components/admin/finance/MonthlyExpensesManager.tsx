@@ -344,9 +344,11 @@ export function MonthlyExpensesManager({
     return transactions.filter(t => t.type === 'expense');
   }, [transactions]);
 
-  // Meses disponíveis com gastos para o filtro
+  // Meses disponíveis com gastos para o filtro (sempre inclui o mês atual)
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    monthSet.add(currentMonthKey);
     allExpenses.forEach(t => {
       if (t.date) {
         monthSet.add(t.date.substring(0, 7)); // YYYY-MM
@@ -355,13 +357,11 @@ export function MonthlyExpensesManager({
     return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
   }, [allExpenses]);
 
-  // Mês de referência ativo para métricas mensais
+  // Mês de referência ativo para métricas mensais (sempre o mês atual em tempo real se não filtrado especificamente)
   const activeMonthKey = useMemo(() => {
     if (selectedMonth !== 'all') return selectedMonth;
-    const currentMonthKey = new Date().toISOString().substring(0, 7);
-    if (availableMonths.includes(currentMonthKey)) return currentMonthKey;
-    return availableMonths[0] || currentMonthKey;
-  }, [selectedMonth, availableMonths]);
+    return new Date().toISOString().substring(0, 7);
+  }, [selectedMonth]);
 
   // Nome formatado do mês de referência
   const activeMonthLabel = useMemo(() => {
@@ -576,6 +576,25 @@ export function MonthlyExpensesManager({
       };
     } = {};
 
+    // Garante que o mês atual sempre tenha um bloco visível quando na visão geral ou filtrando o mês atual
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    if (selectedMonth === 'all' || selectedMonth === currentMonthKey) {
+      const parts = currentMonthKey.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const dateObj = new Date(year, month, 1);
+      const rawLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+
+      groups[currentMonthKey] = {
+        monthKey: currentMonthKey,
+        monthLabel: label,
+        items: [],
+        totalBrl: 0,
+        totalMzn: 0
+      };
+    }
+
     filteredExpenses.forEach(t => {
       const monthKey = t.date ? t.date.substring(0, 7) : 'sem-data';
       if (!groups[monthKey]) {
@@ -609,7 +628,7 @@ export function MonthlyExpensesManager({
     });
 
     return Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-  }, [filteredExpenses]);
+  }, [filteredExpenses, selectedMonth]);
 
   const handleOpenModal = (type: 'fixed' | 'variable') => {
     setModalDefaultType(type);
@@ -1258,7 +1277,14 @@ export function MonthlyExpensesManager({
                 </tr>
 
                 {/* Linhas de Gastos do Mês */}
-                {group.items.map((t) => {
+                {group.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium text-xs bg-slate-50/20">
+                      Nenhum gasto registrado para este mês ainda. Custos fixos e despesas do período aparecerão aqui.
+                    </td>
+                  </tr>
+                ) : (
+                  group.items.map((t) => {
                   const category = localCategories.find(c => c.id === t.category_id);
                   const isFixed = t.expense_type === 'fixed';
 
@@ -1491,7 +1517,7 @@ export function MonthlyExpensesManager({
 
                     </tr>
                   );
-                })}
+                }))}
               </React.Fragment>
             ))}
           </tbody>

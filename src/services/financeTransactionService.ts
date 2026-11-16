@@ -255,6 +255,148 @@ export async function saveExpenseTransaction(
 }
 
 /**
+ * Garante que os custos fixos recorrentes (aluguel, folha, serviços, etc.)
+ * tenham seus lançamentos gerados para o mês atual com status 'pending' (a pagar),
+ * permitindo que a gestão financeira "comece novamente" na virada de cada mês.
+ */
+export async function ensureCurrentMonthRecurringExpenses(
+  transactions: Transaction[],
+  targetModule?: string
+): Promise<Transaction[]> {
+  if (!transactions || transactions.length === 0) return transactions;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+  const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+  // 1. Filtra gastos fixos recorrentes
+  const recurringFixed = transactions.filter(t => {
+    if (t.type !== 'expense') return false;
+    if (t.expense_type !== 'fixed') return false;
+    if (targetModule && t.module && t.module !== 'global' && t.module !== targetModule) return false;
+    const rec = t.recurrence || 'monthly';
+    return rec !== 'none';
+  });
+
+  if (recurringFixed.length === 0) return transactions;
+
+  // 2. Agrupa pelo identificador único do gasto fixo para pegar a última definição
+  const templateMap = new Map<string, Transaction>();
+  recurringFixed.forEach(t => {
+    const desc = (t.description || '').trim().toLowerCase();
+    const mod = (t.module || 'global').trim().toLowerCase();
+    const acc = (t.account || '').trim().toLowerCase();
+    const key = `${desc}:::${mod}:::${acc}`;
+
+    const existing = templateMap.get(key);
+    if (!existing || (t.date || '') > (existing.date || '')) {
+      templateMap.set(key, t);
+    }
+  });
+
+  // 3. Para cada modelo de gasto fixo, verifica se já existe lançamento no mês atual
+  const missingRecurringExpenses: Transaction[] = [];
+
+  for (const [key, template] of templateMap.entries()) {
+    const alreadyExistsInCurrentMonth = transactions.some(t => {
+      if (t.type !== 'expense') return false;
+      const tMonth = t.date ? t.date.substring(0, 7) : '';
+      if (tMonth !== currentMonthKey) return false;
+      
+      const desc = (t.description || '').trim().toLowerCase();
+      const mod = (t.module || 'global').trim().toLowerCase();
+      const acc = (t.account || '').trim().toLowerCase();
+      return `${desc}:::${mod}:::${acc}` === key;
+    });
+
+    if (!alreadyExistsInCurrentMonth) {
+      // O template deve ser de um mês anterior
+      const templateMonth = template.date ? template.date.substring(0, 7) : '';
+      if (templateMonth && templateMonth < currentMonthKey) {
+        // Extrai o dia de vencimento original
+        let dueDay = 10;
+        if (template.date) {
+          const parts = template.date.split('-');
+          if (parts.length === 3) {
+            const parsedDay = parseInt(parts[2], 10);
+            if (!isNaN(parsedDay) && parsedDay >= 1 && parsedDay <= 31) {
+              dueDay = Math.min(parsedDay, 28);
+            }
+          }
+        }
+        const newDate = `${currentMonthKey}-${String(dueDay).padStart(2, '0')}`;
+
+        const basePayload: any = {
+          description: template.description,
+          amount: Number(template.amount),
+          type: 'expense',
+          category_id: template.category_id || null,
+          date: newDate,
+          status: 'pending', // Começa como pendente/a pagar no novo mês!
+          account: template.account || 'Conta Principal',
+          expense_type: 'fixed',
+          recurrence: template.recurrence || 'monthly',
+          module: template.module || 'global'
+        };
+
+        const fullPayload: any = {
+          ...basePayload,
+          currency: template.currency || 'BRL',
+          original_amount: template.original_amount ?? template.amount,
+          exchange_rate: template.exchange_rate ?? 1,
+          notes: template.notes ? `[Renovação automática para ${currentMonthKey}] ${template.notes}` : `Renovação automática para ${currentMonthKey}`
+        };
+
+        let createdTx: Transaction | null = null;
+
+        try {
+          // Insere no Supabase para persistir o novo ciclo
+          let { data, error } = await supabase.from('finance_transactions').insert([fullPayload]).select();
+          if (error && error.message?.includes('column')) {
+            const retry = await supabase.from('finance_transactions').insert([basePayload]).select();
+            data = retry.data;
+            error = retry.error;
+          }
+          if (error && (error.message?.includes('foreign key') || error.code === '23503')) {
+            const retryNoCat = await supabase.from('finance_transactions').insert([{ ...basePayload, category_id: null }]).select();
+            data = retryNoCat.data;
+            error = retryNoCat.error;
+          }
+
+          if (data && data[0]) {
+            createdTx = data[0] as Transaction;
+          }
+        } catch (dbErr) {
+          console.warn('Erro ao inserir renovação de custo fixo no Supabase:', dbErr);
+        }
+
+        if (!createdTx) {
+          createdTx = {
+            id: `local_recurring_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            ...fullPayload
+          };
+        }
+
+        missingRecurringExpenses.push(createdTx);
+      }
+    }
+  }
+
+  if (missingRecurringExpenses.length === 0) {
+    return transactions;
+  }
+
+  const combined = [...missingRecurringExpenses, ...transactions].sort((a, b) => {
+    const timeA = new Date(a.date || '').getTime() || 0;
+    const timeB = new Date(b.date || '').getTime() || 0;
+    return timeB - timeA;
+  });
+
+  return combined;
+}
+
+/**
  * Carrega as transações do módulo com mesclagem e sincronização segura entre Supabase e LocalStorage.
  */
 export async function fetchModuleTransactions(moduleName: string = 'nutrition'): Promise<Transaction[]> {

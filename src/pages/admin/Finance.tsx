@@ -35,6 +35,7 @@ import { ProjectRepasseModal, RepassePayload } from '../../components/admin/fina
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { cn } from '../../lib/utils';
 import { isSpamFinanceTransaction, purgeSpamFinanceTransactions } from '../../utils/userCleanup';
+import { ensureCurrentMonthRecurringExpenses } from '../../services/financeTransactionService';
 
 export interface Transaction {
   id: string;
@@ -144,6 +145,7 @@ export function Finance() {
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'padrinhos' | 'mantenedores' | 'doacoes' | 'repasses' | 'expenses'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [projectPeriodMode, setProjectPeriodMode] = useState<'month' | 'all'>('month');
 
   // Helper para identificar se uma transação de entrada é um Repasse interno entre caixa central e projeto
   const isInternalRepasse = (t: Transaction): boolean => {
@@ -163,7 +165,8 @@ export function Finance() {
       ]);
       if (txRes.data) {
         const cleanTxs = txRes.data.filter(t => !isSpamFinanceTransaction(t));
-        setTransactions(cleanTxs);
+        const updatedTxs = await ensureCurrentMonthRecurringExpenses(cleanTxs);
+        setTransactions(updatedTxs);
       }
       if (syncedCategories) setCategories(syncedCategories);
       if (projRes.data && projRes.data.length > 0) {
@@ -305,35 +308,62 @@ export function Finance() {
   }, [transactions, projects]);
 
   const repasseStats = useMemo(() => {
+    const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
     // Todos os repasses destinados a módulos/projetos (transferências internas de recursos)
     const projectRepasses = transactions.filter(t => isInternalRepasse(t));
     const totalRepassed = projectRepasses.reduce((acc, t) => acc + t.amount, 0);
 
+    const monthlyProjectRepasses = projectRepasses.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const monthlyRepassed = monthlyProjectRepasses.reduce((acc, t) => acc + t.amount, 0);
+
     // Nutrição
-    const nutriRepassed = projectRepasses.filter(t => t.module === 'nutrition' || (t.description || '').toLowerCase().includes('nutri')).reduce((acc, t) => acc + t.amount, 0);
-    const nutriExpenses = transactions.filter(t => t.type === 'expense' && t.module === 'nutrition').reduce((acc, t) => acc + t.amount, 0);
+    const nutriRepassesAll = projectRepasses.filter(t => t.module === 'nutrition' || (t.description || '').toLowerCase().includes('nutri'));
+    const nutriRepassesMonth = nutriRepassesAll.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const nutriRepassed = (projectPeriodMode === 'month' ? nutriRepassesMonth : nutriRepassesAll).reduce((acc, t) => acc + t.amount, 0);
+
+    const nutriExpensesAll = transactions.filter(t => t.type === 'expense' && t.module === 'nutrition');
+    const nutriExpensesMonth = nutriExpensesAll.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const nutriExpenses = (projectPeriodMode === 'month' ? nutriExpensesMonth : nutriExpensesAll).reduce((acc, t) => acc + t.amount, 0);
     const nutriBalance = nutriRepassed - nutriExpenses;
 
     // Comunicação
-    const commRepassed = projectRepasses.filter(t => t.module === 'communication' || (t.description || '').toLowerCase().includes('comunica')).reduce((acc, t) => acc + t.amount, 0);
-    const commExpenses = transactions.filter(t => t.type === 'expense' && t.module === 'communication').reduce((acc, t) => acc + t.amount, 0);
+    const commRepassesAll = projectRepasses.filter(t => t.module === 'communication' || (t.description || '').toLowerCase().includes('comunica'));
+    const commRepassesMonth = commRepassesAll.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const commRepassed = (projectPeriodMode === 'month' ? commRepassesMonth : commRepassesAll).reduce((acc, t) => acc + t.amount, 0);
+
+    const commExpensesAll = transactions.filter(t => t.type === 'expense' && t.module === 'communication');
+    const commExpensesMonth = commExpensesAll.filter(t => t.date && t.date.startsWith(currentMonthKey));
+    const commExpenses = (projectPeriodMode === 'month' ? commExpensesMonth : commExpensesAll).reduce((acc, t) => acc + t.amount, 0);
     const commBalance = commRepassed - commExpenses;
+
+    const displayRepassed = projectPeriodMode === 'month' ? monthlyRepassed : totalRepassed;
 
     return {
       projectRepasses,
+      monthlyProjectRepasses,
       totalRepassed,
+      monthlyRepassed,
+      displayRepassed,
       nutriRepassed,
       nutriExpenses,
       nutriBalance,
       commRepassed,
       commExpenses,
-      commBalance
+      commBalance,
+      currentMonthKey
     };
-  }, [transactions]);
+  }, [transactions, currentMonth, currentYear, projectPeriodMode]);
 
   const availableMonths = useMemo(() => {
     const map = new Map<string, { key: string; label: string; count: number; incomeTotal: number; expenseTotal: number }>();
     
+    // Sempre garante o mês atual disponível no seletor
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentLabel = `${MONTH_NAMES[now.getMonth()]} de ${now.getFullYear()}`;
+    map.set(currentKey, { key: currentKey, label: currentLabel, count: 0, incomeTotal: 0, expenseTotal: 0 });
+
     transactions.forEach(t => {
       const { key, label } = parseDateParts(t.date);
       if (key === 'unknown') return;
@@ -447,7 +477,7 @@ export function Finance() {
       group.balance = group.totalIncome - group.totalExpense;
     });
 
-    return groups;
+    return groups.sort((a, b) => b.key.localeCompare(a.key));
   }, [filteredTransactions, filterOrigin]);
 
   const handleSaveTransaction = async (newTx: Omit<Transaction, 'id'>) => {
@@ -795,10 +825,10 @@ export function Finance() {
                 <TrendingUp size={22} />
               </div>
               <div className="flex items-center gap-1 text-emerald-700 font-black text-[10px] bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                Mês Atual
+                {currentMonthName}
               </div>
             </div>
-            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Entradas do Mês</p>
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Entradas do Mês ({MONTH_NAMES[currentMonth]})</p>
             <p className="text-2xl font-black text-slate-900 mt-1">
               R$ {stats.monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
@@ -1474,22 +1504,68 @@ export function Finance() {
                 </button>
               </div>
 
+              {/* Seletor de Período dos Projetos: Mês Atual vs Acumulado */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-wider pl-1">Período dos Projetos:</span>
+                  <div className="inline-flex bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setProjectPeriodMode('month')}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                        projectPeriodMode === 'month' 
+                          ? "bg-slate-900 text-white shadow-xs" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Calendar size={13} className={projectPeriodMode === 'month' ? "text-amber-400" : "text-slate-400"} />
+                      Mês Atual ({currentMonthName})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProjectPeriodMode('all')}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                        projectPeriodMode === 'all' 
+                          ? "bg-slate-900 text-white shadow-xs" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      <Layers size={13} className={projectPeriodMode === 'all' ? "text-indigo-400" : "text-slate-400"} />
+                      Todos os Meses (Acumulado)
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs font-bold text-slate-500 pr-1">
+                  {projectPeriodMode === 'month' 
+                    ? `Visualizando repasses e custos operacionais de ${currentMonthName}`
+                    : 'Visualizando histórico financeiro consolidado de todos os meses'
+                  }
+                </div>
+              </div>
+
               {/* 3 Cards de Indicadores de Repasse */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 
                 {/* Total Repassado a Projetos */}
                 <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md relative overflow-hidden">
                   <div className="flex justify-between items-start mb-2">
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Repassado Acumulado</p>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                      {projectPeriodMode === 'month' ? `Total Repassado (${currentMonthName})` : 'Total Repassado Acumulado'}
+                    </p>
                     <span className="px-2 py-0.5 bg-white/10 text-emerald-400 font-bold text-[10px] rounded-lg">
-                      {repasseStats.projectRepasses.length} repasses
+                      {projectPeriodMode === 'month' ? repasseStats.monthlyProjectRepasses.length : repasseStats.projectRepasses.length} repasses
                     </span>
                   </div>
                   <p className="text-2xl font-black text-white mt-1">
-                    R$ {repasseStats.totalRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {repasseStats.displayRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-medium mt-2">
-                    Total transferido do Caixa Central para os projetos
+                    {projectPeriodMode === 'month' 
+                      ? `Recursos repassados neste mês de ${currentMonthName}`
+                      : 'Total transferido do Caixa Central para os projetos (todos os meses)'
+                    }
                   </p>
                 </div>
 
@@ -1498,7 +1574,9 @@ export function Finance() {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-1.5">
                       <Building2 size={16} className="text-emerald-700" />
-                      <p className="text-emerald-900 text-[10px] font-black uppercase tracking-widest">Repasse Casa Nutri</p>
+                      <p className="text-emerald-900 text-[10px] font-black uppercase tracking-widest">
+                        Repasse Casa Nutri {projectPeriodMode === 'month' ? `(${MONTH_NAMES[currentMonth]})` : '(Geral)'}
+                      </p>
                     </div>
                     <span className={cn(
                       "px-2 py-0.5 font-black text-[9px] rounded-md uppercase tracking-wider",
@@ -1521,13 +1599,25 @@ export function Finance() {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-1.5">
                       <Layers size={16} className="text-purple-700" />
-                      <p className="text-purple-900 text-[10px] font-black uppercase tracking-widest">Repasse Comunicação</p>
+                      <p className="text-purple-900 text-[10px] font-black uppercase tracking-widest">
+                        Repasse Comunicação {projectPeriodMode === 'month' ? `(${MONTH_NAMES[currentMonth]})` : '(Geral)'}
+                      </p>
                     </div>
                     <span className={cn(
                       "px-2 py-0.5 font-black text-[9px] rounded-md uppercase tracking-wider",
                       repasseStats.commBalance >= 0 ? "bg-purple-200/60 text-purple-900" : "bg-rose-100 text-rose-800"
                     )}>
                       {repasseStats.commBalance >= 0 ? 'Superávit' : 'Déficit'}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-black text-purple-950 mt-1">
+                    R$ {repasseStats.commRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-purple-200/60 flex justify-between text-[11px] font-bold text-purple-800">
+                    <span>Custos: R$ {repasseStats.commExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Saldo: R$ {repasseStats.commBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
                     </span>
                   </div>
                   <p className="text-2xl font-black text-purple-950 mt-1">
