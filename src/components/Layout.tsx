@@ -151,7 +151,12 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
     const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication' || permissionKey === 'analytics';
-    if (isDashboard) return true;
+    if (isDashboard) {
+      if (user?.role === 'OBSERVER' && item.path === '/nutrition') {
+        return user.permissions.includes('dashboard') || user.permissions.includes('/nutrition');
+      }
+      return true;
+    }
 
     const mappedKey = 
       permissionKey === 'atendimento' ? 'attendance' :

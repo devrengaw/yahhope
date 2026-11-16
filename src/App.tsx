@@ -202,10 +202,13 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
-function ObserverRestricted({ children }: { children: React.ReactNode }) {
+function ObserverRestricted({ children, requiredPermission }: { children: React.ReactNode; requiredPermission?: string }) {
   const { user } = useAuth();
   if (user?.role === 'OBSERVER') {
-    return <Navigate to="/nutrition/patients" replace />;
+    const hasPermission = requiredPermission && Array.isArray(user.permissions) && user.permissions.includes(requiredPermission);
+    if (!hasPermission) {
+      return <Navigate to="/nutrition/patients" replace />;
+    }
   }
   return <>{children}</>;
 }
@@ -236,7 +239,7 @@ function RootRedirect() {
   if (!user) return <Navigate to="/login" />;
   if (user.role === 'SPONSOR') return <Navigate to="/portal/dashboard" />;
   if (user.role === 'ADMIN') return <Navigate to="/admin" />;
-  if (user.role === 'OBSERVER') return <Navigate to="/nutrition/patients" />;
+  if (user.role === 'OBSERVER') return <Navigate to={getDefaultAuthorizedRouteForUser(user)} />;
   return <Navigate to={getDefaultAuthorizedRouteForUser(user)} />;
 }
 
@@ -390,7 +393,7 @@ export default function App() {
                                           <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR', 'OBSERVER']} requiredModule="nutrition">
                                             <Layout module="nutrition">
                                               <Routes>
-                                                <Route path="/" element={<ObserverRestricted><Dashboard /></ObserverRestricted>} />
+                                                <Route path="/" element={<ObserverRestricted requiredPermission="dashboard"><Dashboard /></ObserverRestricted>} />
                                                 <Route path="/patients" element={<Patients />} />
                                                 <Route path="/patients/new" element={<ObserverRestricted><NewPatient /></ObserverRestricted>} />
                                                 <Route path="/patients/:id" element={<PatientDetails />} />

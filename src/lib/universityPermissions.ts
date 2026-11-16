@@ -211,7 +211,11 @@ export function getDefaultAuthorizedRouteForUser(user?: User | null): string {
   if (!user) return '/login';
   const role = (user.role || '').toUpperCase();
   if (role === 'SPONSOR' || role === 'MANTENEDOR' || role === 'PADRINHO') return '/portal/dashboard';
-  if (role === 'OBSERVER') return '/nutrition/patients';
+  if (role === 'OBSERVER') {
+    return Array.isArray(user.permissions) && user.permissions.includes('dashboard')
+      ? '/nutrition'
+      : '/nutrition/patients';
+  }
   if (role === 'ADMIN') return '/admin';
 
   const { hasWorkspace, hasNutrition, hasUniversity, hasCommunication, hasAdmin } = getUserAuthorizedModules(user);

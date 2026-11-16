@@ -148,7 +148,9 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
       join_date: joinDate,
       department,
       category_id: categoryId || undefined,
-      permissions: role === 'observer' ? ['patients'] : selectedPermissions
+      permissions: role === 'observer'
+        ? (selectedPermissions.length > 0 ? selectedPermissions : ['patients'])
+        : selectedPermissions
     });
     
     // Reset form

@@ -64,7 +64,7 @@ export function Login() {
         }
 
         if (user.role === 'OBSERVER') {
-          navigate('/nutrition/patients');
+          navigate(getDefaultAuthorizedRouteForUser(user));
           return;
         }
 

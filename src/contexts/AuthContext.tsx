@@ -164,7 +164,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: finalUser.name,
         email: finalUser.email,
         role: roleStr,
-        permissions: roleStr === 'OBSERVER' ? ['patients'] : ((finalUser.permissions && Array.isArray(finalUser.permissions)) ? finalUser.permissions : getPermissionsForRole(roleStr)),
+        permissions: (finalUser.permissions && Array.isArray(finalUser.permissions) && (roleStr !== 'OBSERVER' || finalUser.permissions.length > 0))
+          ? finalUser.permissions
+          : getPermissionsForRole(roleStr),
         avatar: avatarImg || (finalUser.name ? finalUser.name[0].toUpperCase() : 'U'),
         avatar_url: avatarImg || undefined,
         phone: phoneVal || undefined,
