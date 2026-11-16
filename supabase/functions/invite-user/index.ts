@@ -57,12 +57,14 @@ serve(async (req) => {
     }
 
     // 2. Fetch Global Settings & Templates
-    let logoUrl = 'https://yahhope.com/Logo+icone.png';
+    let logoUrl = 'https://www.yahhope.com/logo-black.png';
     let primaryColor = '#F49853';
 
     const { data: settings } = await supabase.from('email_settings').select('*').limit(1).single();
     if (settings) {
-      if (settings.logo_url) logoUrl = settings.logo_url;
+      if (settings.logo_url && !settings.logo_url.includes('Logo+icone.png')) {
+        logoUrl = settings.logo_url;
+      }
       if (settings.primary_color) primaryColor = settings.primary_color;
     }
 
@@ -144,6 +146,48 @@ serve(async (req) => {
     if (!request.ok) {
       const errorText = await request.text();
       throw new Error(`Erro do Resend: ${errorText}`);
+    }
+
+    const resendData = await request.json().catch(() => ({}));
+
+    try {
+      const nowIso = new Date().toISOString();
+      const { data: createdCamp } = await supabase
+        .from('email_campaigns')
+        .insert({
+          title: `Automático: Convite de Usuário (${name || email})`,
+          subject,
+          preheader,
+          heading,
+          body_html: body,
+          sender_name: 'YAH Hope',
+          sender_email: 'contato@yahhope.com',
+          audience_type: 'automatico',
+          audience_summary: `${name || email} (${email})`,
+          has_cta: true,
+          cta_text: ctaText,
+          cta_url: actionLink,
+          status: 'sent',
+          total_recipients: 1,
+          sent_count: 1,
+          sent_at: nowIso
+        })
+        .select('id')
+        .single();
+
+      if (createdCamp?.id) {
+        await supabase.from('email_campaign_recipients').insert({
+          campaign_id: createdCamp.id,
+          email,
+          name: name || email,
+          recipient_type: 'automatico',
+          status: 'sent',
+          resend_id: resendData?.id || null,
+          sent_at: nowIso
+        });
+      }
+    } catch (logErr) {
+      console.error('Erro ao registrar envio de convite em email_campaigns:', logErr);
     }
 
     return new Response(JSON.stringify({ success: true, message: 'Convite enviado com sucesso.' }), {
