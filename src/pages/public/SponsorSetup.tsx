@@ -5,8 +5,10 @@ import { KeyRound, Lock, ArrowRight, User, Mail, HeartHandshake, CheckCircle2, L
 import { useAuth } from '../../contexts/AuthContext';
 import { SEO } from '../../components/common/SEO';
 import { isSpamOrMockUser } from '../../utils/userCleanup';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function SponsorSetup() {
+  const { tr } = useLanguage();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [name, setName] = useState(searchParams.get('nome') || searchParams.get('name') || '');
@@ -62,17 +64,17 @@ export function SponsorSetup() {
     e.preventDefault();
     
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem. Tente novamente.');
+      setError(tr('As senhas não coincidem. Tente novamente.', 'Passwords do not match. Please try again.'));
       return;
     }
     
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+      setError(tr('A senha deve ter pelo menos 6 caracteres.', 'Password must be at least 6 characters long.'));
       return;
     }
 
     if (isSpamOrMockUser({ name, email })) {
-      setError('Por favor, informe seu nome completo válido.');
+      setError(tr('Por favor, informe seu nome completo válido.', 'Please enter a valid full name.'));
       return;
     }
 
@@ -114,7 +116,7 @@ export function SponsorSetup() {
       if (msg.includes('already registered') || msg.includes('already been taken') || msg.includes('user already')) {
         setAlreadyRegistered(true);
       } else {
-        setError(err.message || 'Ocorreu um erro ao criar seu acesso. Tente novamente.');
+        setError(err.message || tr('Ocorreu um erro ao criar seu acesso. Tente novamente.', 'An error occurred while creating your account. Please try again.'));
       }
     } finally {
       setIsLoading(false);
@@ -133,7 +135,7 @@ export function SponsorSetup() {
       if (resetErr) throw resetErr;
       setResetSent(true);
     } catch (err: any) {
-      setError(err.message || 'Não foi possível enviar o e-mail de redefinição.');
+      setError(err.message || tr('Não foi possível enviar o e-mail de redefinição.', 'Could not send the password reset email.'));
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +144,8 @@ export function SponsorSetup() {
   return (
     <div className="min-h-screen flex items-center justify-center font-sans relative py-12 px-4 sm:px-6 lg:px-8 bg-slate-900 overflow-hidden">
       <SEO
-        title="Finalizar Cadastro | Portal do Mantenedor - YAH Hope"
-        description="Finalize seu cadastro de mantenedor da YAH Hope para acessar o portal exclusivo."
+        title={tr('Finalizar Cadastro | Portal do Mantenedor - YAH Hope', 'Complete Registration | Supporter Portal - YAH Hope')}
+        description={tr('Finalize seu cadastro de mantenedor da YAH Hope para acessar o portal exclusivo.', 'Complete your YAH Hope supporter registration to access the exclusive portal.')}
         canonical="https://yahhope.com/finalizar-cadastro"
         noIndex={true}
       />
@@ -171,17 +173,17 @@ export function SponsorSetup() {
           </div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
             {user
-              ? 'Você já está conectado!'
+              ? tr('Você já está conectado!', 'You are already signed in!')
               : alreadyRegistered
-              ? 'Cadastro já existente'
-              : 'Finalize seu Cadastro'}
+              ? tr('Cadastro já existente', 'Account already exists')
+              : tr('Finalize seu Cadastro', 'Complete Your Registration')}
           </h2>
           <p className="mt-3 text-sm text-slate-500 font-medium px-2 leading-relaxed">
             {user
-              ? `Sua conta (${user.email}) já está ativa na YAH Hope. Acesse o portal para acompanhar suas doações e afilhados.`
+              ? tr(`Sua conta (${user.email}) já está ativa na YAH Hope. Acesse o portal para acompanhar suas doações e afilhados.`, `Your account (${user.email}) is already active on YAH Hope. Access the portal to track your donations and sponsored children.`)
               : alreadyRegistered
-              ? `O e-mail ${email} já possui uma conta cadastrada na YAH Hope. Entre com sua senha ou solicite uma nova.`
-              : `Obrigado por apoiar a YAH Hope${detectedRole === 'MANTENEDOR' ? ' como Mantenedor' : ''}! Crie sua senha para acompanhar o impacto da sua doação e acessar o portal.`}
+              ? tr(`O e-mail ${email} já possui uma conta cadastrada na YAH Hope. Entre com sua senha ou solicite uma nova.`, `The email ${email} already has an account registered on YAH Hope. Sign in with your password or request a new one.`)
+              : tr(`Obrigado por apoiar a YAH Hope${detectedRole === 'MANTENEDOR' ? ' como Mantenedor' : ''}! Crie sua senha para acompanhar o impacto da sua doação e acessar o portal.`, `Thank you for supporting YAH Hope${detectedRole === 'MANTENEDOR' ? ' as a Monthly Supporter' : ''}! Create your password to track your impact and access the portal.`)}
           </p>
 
           {user ? (
@@ -191,7 +193,7 @@ export function SponsorSetup() {
                 onClick={() => navigate('/portal/dashboard')}
                 className="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-xl text-sm font-black text-white bg-orange-600 hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20 cursor-pointer"
               >
-                Acessar meu Portal
+                {tr('Acessar meu Portal', 'Access My Portal')}
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -204,7 +206,7 @@ export function SponsorSetup() {
               )}
               {resetSent && (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs font-bold text-center">
-                  Enviamos um link para redefinir sua senha para {email}. Confira sua caixa de entrada.
+                  {tr(`Enviamos um link para redefinir sua senha para ${email}. Confira sua caixa de entrada.`, `We sent a password reset link to ${email}. Please check your inbox.`)}
                 </div>
               )}
               <Link
@@ -212,7 +214,7 @@ export function SponsorSetup() {
                 className="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-xl text-sm font-black text-white bg-orange-600 hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20"
               >
                 <LogIn size={18} />
-                Entrar no Portal
+                {tr('Entrar no Portal', 'Sign In to Portal')}
               </Link>
               <button
                 type="button"
@@ -220,7 +222,7 @@ export function SponsorSetup() {
                 onClick={handleSendPasswordReset}
                 className="w-full py-3 px-4 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-60 cursor-pointer"
               >
-                {resetSent ? 'Link de redefinição enviado' : 'Esqueci minha senha / Criar nova senha'}
+                {resetSent ? tr('Link de redefinição enviado', 'Reset link sent') : tr('Esqueci minha senha / Criar nova senha', 'Forgot password / Create new password')}
               </button>
             </div>
           ) : (
@@ -232,7 +234,7 @@ export function SponsorSetup() {
             )}
             
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Nome Completo</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('Nome Completo', 'Full Name')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <User size={18} />
@@ -243,13 +245,13 @@ export function SponsorSetup() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="Seu nome completo"
+                  placeholder={tr('Seu nome completo', 'Your full name')}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">E-mail</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('E-mail', 'Email')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <Mail size={18} />
@@ -261,13 +263,13 @@ export function SponsorSetup() {
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => inspectSupporterEmail(email)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="E-mail usado na doação"
+                  placeholder={tr('E-mail usado na doação', 'Email used for donation')}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Senha</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('Senha', 'Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <KeyRound size={18} />
@@ -278,13 +280,13 @@ export function SponsorSetup() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="Mínimo de 6 caracteres"
+                  placeholder={tr('Mínimo de 6 caracteres', 'Minimum 6 characters')}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Confirmar Senha</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('Confirmar Senha', 'Confirm Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <Lock size={18} />
@@ -295,7 +297,7 @@ export function SponsorSetup() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="Repita a senha"
+                  placeholder={tr('Repita a senha', 'Repeat password')}
                 />
               </div>
             </div>
@@ -306,16 +308,16 @@ export function SponsorSetup() {
                 disabled={isLoading || !password || !confirmPassword || !name || !email}
                 className={`group relative w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-600 hover:bg-${themeColor}-700 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70 cursor-pointer`}
               >
-                {isLoading ? 'Aguarde...' : 'Criar meu Acesso'}
+                {isLoading ? tr('Aguarde...', 'Please wait...') : tr('Criar meu Acesso', 'Create My Account')}
                 {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
               </button>
             </div>
 
             <div className="pt-4 text-center">
               <p className="text-xs text-slate-500 font-medium">
-                Já possui uma conta ou senha cadastrada?{' '}
+                {tr('Já possui uma conta ou senha cadastrada?', 'Already have an account?')}{' '}
                 <Link to="/login" className="text-orange-600 hover:text-orange-700 font-bold hover:underline">
-                  Fazer Login
+                  {tr('Fazer Login', 'Sign In')}
                 </Link>
               </p>
             </div>

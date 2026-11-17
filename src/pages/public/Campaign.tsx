@@ -22,11 +22,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { SEO } from '../../components/common/SEO';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const QUOTAS = [
-  { amount: 50, label: 'Alimenta uma criança', icon: Heart },
-  { amount: 120, label: 'Apadrinhamento mensal', icon: Target },
-  { amount: 300, label: 'Cesta básica + Suplementos', icon: TrendingUp },
+  { amount: 50, label: 'Alimenta uma criança', labelEn: 'Feeds a child', icon: Heart },
+  { amount: 120, label: 'Apadrinhamento mensal', labelEn: 'Monthly sponsorship', icon: Target },
+  { amount: 300, label: 'Cesta básica + Suplementos', labelEn: 'Food basket + Supplements', icon: TrendingUp },
 ];
 
 const FALLBACK_CAMPAIGN: CampaignType = {
@@ -41,6 +42,7 @@ const FALLBACK_CAMPAIGN: CampaignType = {
 };
 
 export function Campaign() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -206,7 +208,7 @@ export function Campaign() {
     const finalEmail = email.trim() || user?.email || '';
 
     if (!user && (!finalName || !finalEmail)) {
-      alert('Por favor, informe seu nome e e-mail.');
+      alert(tr('Por favor, informe seu nome e e-mail.', 'Please enter your name and email.'));
       return;
     }
 
@@ -268,7 +270,7 @@ export function Campaign() {
       }
     } catch (error: any) {
       console.error('Donation error:', error);
-      alert(`Erro ao processar a doação: ${error.message || 'Falha na rede'}.`);
+      alert(tr(`Erro ao processar a doação: ${error.message || 'Falha na rede'}.`, `Error processing donation: ${error.message || 'Network error'}.`));
       setIsLoading(false);
     }
   };
@@ -282,9 +284,12 @@ export function Campaign() {
           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 size={40} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Doação Realizada com Sucesso!</h2>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">{tr('Doação Realizada com Sucesso!', 'Donation Completed Successfully!')}</h2>
           <p className="text-slate-500 mb-6 text-sm leading-relaxed">
-            Seu apoio impulsiona a nossa régua de arrecadação e viabiliza a transformação de vidas na comunidade.
+            {tr(
+              'Seu apoio impulsiona a nossa régua de arrecadação e viabiliza a transformação de vidas na comunidade.',
+              'Your support advances our fundraising tracker and makes life transformation possible in the community.'
+            )}
           </p>
 
           {/* Convite para cadastro no Portal caso não tenha login */}
@@ -292,13 +297,16 @@ export function Campaign() {
             <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-5 mb-6 text-left">
               <div className="flex items-center gap-2 text-orange-800 font-black text-xs uppercase tracking-wider mb-1.5">
                 <Heart size={14} className="fill-orange-600 text-orange-600" />
-                <span>Portal do Mantenedor</span>
+                <span>{tr('Portal do Mantenedor', 'Supporter Portal')}</span>
               </div>
               <h3 className="font-black text-slate-900 text-base mb-1">
-                Deseja criar seu acesso agora?
+                {tr('Deseja criar seu acesso agora?', 'Would you like to create your account now?')}
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                No portal você pode acompanhar relatórios de transparência, crianças atendidas e o histórico de suas doações.
+                {tr(
+                  'No portal você pode acompanhar relatórios de transparência, crianças atendidas e o histórico de suas doações.',
+                  'In the portal, you can follow transparency reports, supported children, and your donation history.'
+                )}
               </p>
 
               <div className="flex flex-col gap-2">
@@ -306,13 +314,13 @@ export function Campaign() {
                   to={`/login?tab=register&email=${encodeURIComponent(email || searchParams.get('email') || '')}&name=${encodeURIComponent(name || searchParams.get('name') || '')}`}
                   className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl transition-all shadow-md text-center block"
                 >
-                  Sim, Quero Criar Minha Conta
+                  {tr('Sim, Quero Criar Minha Conta', 'Yes, Create My Account')}
                 </Link>
                 <Link
                   to="/"
                   className="w-full bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 rounded-xl border border-slate-200 text-center block transition-colors"
                 >
-                  Não, continuar sem cadastro
+                  {tr('Não, continuar sem cadastro', 'No, continue without an account')}
                 </Link>
               </div>
             </div>
@@ -322,13 +330,13 @@ export function Campaign() {
                 to="/portal/dashboard"
                 className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-md block"
               >
-                Ir para o Portal do Mantenedor
+                {tr('Ir para o Portal do Mantenedor', 'Go to Supporter Portal')}
               </Link>
               <Link
                 to="/"
                 className="inline-block text-xs font-bold text-slate-500 hover:text-slate-700 py-1"
               >
-                Voltar à Página Inicial
+                {tr('Voltar à Página Inicial', 'Back to Home Page')}
               </Link>
             </div>
           )}
@@ -341,8 +349,8 @@ export function Campaign() {
     <div className="flex flex-col h-full justify-between">
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-black text-slate-900">Escolha o valor</h3>
-          <span className="text-xs font-bold text-slate-400">Doação segura</span>
+          <h3 className="text-base font-black text-slate-900">{tr('Escolha o valor', 'Choose an amount')}</h3>
+          <span className="text-xs font-bold text-slate-400">{tr('Doação segura', 'Secure donation')}</span>
         </div>
         
         <div className="space-y-3 mb-6">
@@ -369,7 +377,7 @@ export function Campaign() {
                   <p className={cn("font-black text-lg", !isCustom && selectedAmount === q.amount ? "text-emerald-900" : "text-slate-900")}>
                     R$ {q.amount}
                   </p>
-                  <p className="text-xs text-slate-400 font-medium">{q.label}</p>
+                  <p className="text-xs text-slate-400 font-medium">{isEn ? q.labelEn : q.label}</p>
                 </div>
               </div>
               <div className={cn(
@@ -400,7 +408,7 @@ export function Campaign() {
               </div>
               <div className="text-left w-full">
                 <p className={cn("font-black text-lg", isCustom ? "text-emerald-900" : "text-slate-900")}>
-                  Outro Valor
+                  {tr('Outro Valor', 'Other Amount')}
                 </p>
                 {isCustom && (
                   <div className="mt-2 relative">
@@ -437,10 +445,10 @@ export function Campaign() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-bold text-slate-900 truncate">
-                      {user.name || 'Usuário Conectado'}
+                      {user.name || tr('Usuário Conectado', 'Connected User')}
                     </p>
                     <span className="text-[9px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                      Logado ✓
+                      {tr('Logado ✓', 'Signed In ✓')}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 truncate font-medium">
@@ -452,25 +460,25 @@ export function Campaign() {
           ) : (
             <>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{tr('Nome Completo', 'Full Name')}</label>
                 <input 
                   type="text" 
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
-                  placeholder="Seu nome"
+                  placeholder={tr('Seu nome', 'Your name')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">E-mail</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{tr('E-mail', 'Email')}</label>
                 <input 
                   type="email" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-medium bg-white"
-                  placeholder="seu@email.com"
+                  placeholder={tr('seu@email.com', 'your@email.com')}
                 />
               </div>
             </>
@@ -478,7 +486,7 @@ export function Campaign() {
 
           {(camp.accept_pix !== false || camp.accept_card !== false) && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Forma de Pagamento</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">{tr('Forma de Pagamento', 'Payment Method')}</label>
               <div className="flex gap-3">
                 {camp.accept_pix !== false && (
                   <label className="flex-1 cursor-pointer">
@@ -491,7 +499,7 @@ export function Campaign() {
                       className="peer sr-only" 
                     />
                     <div className="p-2.5 text-center border border-slate-200 rounded-xl font-bold text-xs text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors shadow-xs">
-                      PIX ou Boleto
+                      {tr('PIX ou Boleto', 'PIX or Boleto')}
                     </div>
                   </label>
                 )}
@@ -506,7 +514,7 @@ export function Campaign() {
                       className="peer sr-only" 
                     />
                     <div className="p-2.5 text-center border border-slate-200 rounded-xl font-bold text-xs text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-colors shadow-xs">
-                      Cartão de Crédito
+                      {tr('Cartão de Crédito', 'Credit Card')}
                     </div>
                   </label>
                 )}
@@ -526,17 +534,17 @@ export function Campaign() {
               </div>
               <div>
                 <span className="text-sm font-black uppercase tracking-wider block">
-                  Seja um Mantenedor Mensal
+                  {tr('Seja um Mantenedor Mensal', 'Become a Monthly Supporter')}
                 </span>
                 <span className="text-xs text-white/95 font-medium">
-                  Apoiar com R$ {isCustom ? (customAmount || '50') : selectedAmount}/mês
+                  {tr(`Apoiar com R$ ${isCustom ? (customAmount || '50') : selectedAmount}/mês`, `Support with R$ ${isCustom ? (customAmount || '50') : selectedAmount}/mo`)}
                 </span>
               </div>
             </div>
             <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform shrink-0" />
           </button>
           <p className="text-[10px] text-slate-400 -mt-2 text-center font-medium">
-            * Mantenedores mensais cobrem os custos fixos dos projetos que zeram todo mês.
+            {tr('* Mantenedores mensais cobrem os custos fixos dos projetos que zeram todo mês.', '* Monthly supporters cover fixed project costs that reset every month.')}
           </p>
 
           {/* 2. Botão de Doação com "Doação sem recorrência" menor embaixo dentro do botão */}
@@ -546,15 +554,15 @@ export function Campaign() {
             className="w-full bg-[#0F172A] hover:bg-slate-800 disabled:opacity-70 text-white py-3.5 px-4 rounded-2xl flex flex-col items-center justify-center transition-all shadow-md shadow-slate-900/10 cursor-pointer group mt-1"
           >
             {isLoading ? (
-              <span className="animate-pulse text-sm font-bold">Processando...</span>
+              <span className="animate-pulse text-sm font-bold">{tr('Processando...', 'Processing...')}</span>
             ) : (
               <>
                 <div className="flex items-center justify-center gap-2 text-sm md:text-base font-black">
-                  <span>Doar R$ {isCustom ? (customAmount || '0') : selectedAmount} para a Régua</span>
+                  <span>{tr(`Doar R$ ${isCustom ? (customAmount || '0') : selectedAmount} para a Régua`, `Donate R$ ${isCustom ? (customAmount || '0') : selectedAmount} to the Tracker`)}</span>
                   <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
                 </div>
                 <span className="text-[11px] font-medium text-slate-300 mt-0.5">
-                  Doação sem recorrência
+                  {tr('Doação sem recorrência', 'One-time donation')}
                 </span>
               </>
             )}
@@ -572,10 +580,10 @@ export function Campaign() {
                 </div>
                 <div>
                   <span className="text-xs font-black uppercase tracking-wider block">
-                    Apadrinhar uma Criança
+                    {tr('Apadrinhar uma Criança', 'Sponsor a Child')}
                   </span>
                   <span className="text-[11px] text-white/95 font-medium">
-                    R$ 90/mês para nutrição na Casa Nutri
+                    {tr('R$ 90/mês para nutrição na Casa Nutri', 'R$ 90/mo for nutrition at Casa Nutri')}
                   </span>
                 </div>
               </div>
@@ -590,8 +598,8 @@ export function Campaign() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <SEO 
-        title={`${targetCampaign.title} | Faça sua Doação - YAH Hope`}
-        description={targetCampaign.description || "Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos sociais."}
+        title={`${targetCampaign.title} | ${tr('Faça sua Doação - YAH Hope', 'Make Your Donation - YAH Hope')}`}
+        description={targetCampaign.description || tr('Doe para as ações humanitárias da YAH Hope. Sua contribuição combate a desnutrição infantil e financia projetos sociais.', 'Donate to YAH Hope’s humanitarian actions. Your contribution fights child malnutrition and funds social projects.')}
         keywords="doação humanitária, doar para ONG, combate à desnutrição, doação Moçambique, apadrinhar criança YAH Hope"
         canonical="https://yahhope.com/campanha"
         jsonLd={{
@@ -626,7 +634,7 @@ export function Campaign() {
             textShadow: '0 4px 20px rgba(0,0,0,0.6)'
           }}
         >
-          {availableCampaigns.length > 1 ? 'Participe' : (targetCampaign.type === 'specific' ? targetCampaign.title : 'Participe')}
+          {availableCampaigns.length > 1 ? tr('Participe', 'Join In') : (targetCampaign.type === 'specific' ? targetCampaign.title : tr('Participe', 'Join In'))}
         </h1>
       </div>
 
@@ -638,28 +646,31 @@ export function Campaign() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
             <div>
               <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-                Como funcionam os estágios do projeto
+                {tr('Como funcionam os estágios do projeto', 'How the project stages work')}
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-2xl font-gotham-regular leading-relaxed">
-                Cada campanha representa um estágio sequencial de transformação. As doações pontuais acumuladas avançam a régua geral passo a passo, viabilizando e desbloqueando cada fase do nosso trabalho em campo!
+                {tr(
+                  'Cada campanha representa um estágio sequencial de transformação. As doações pontuais acumuladas avançam a régua geral passo a passo, viabilizando e desbloqueando cada fase do nosso trabalho em campo!',
+                  'Each campaign represents a sequential stage of transformation. Accumulated one-time donations advance the overall tracker step by step, funding and unlocking each phase of our field work!'
+                )}
               </p>
             </div>
 
             <div className="flex items-center gap-3 bg-slate-50/90 py-2.5 px-3.5 rounded-xl border border-slate-200/70 self-start lg:self-auto shadow-inner">
               <div className="text-right">
                 <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">
-                  Progresso da Fase Atual
+                  {tr('Progresso da Fase Atual', 'Current Stage Progress')}
                 </span>
                 <span className="text-lg md:text-xl font-black text-emerald-600">
-                  R$ {(currentActiveStage ? currentActiveStage.campStats.currentAmount : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(currentActiveStage ? currentActiveStage.campStats.currentAmount : 0).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </span>
                 <span className="text-[11px] text-slate-400 block font-medium">
-                  Alvo da Fase: R$ {(currentActiveStage?.campaign.target_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {tr('Alvo da Fase:', 'Stage Target:')} R$ {(currentActiveStage?.campaign.target_amount || 0).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 via-[#F49853] to-orange-500 text-white flex flex-col items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-orange-500/25">
                 <span>{currentActiveStage?.stageProgress || 0}%</span>
-                <span className="text-[8px] font-bold uppercase text-white/90">fase ativa</span>
+                <span className="text-[8px] font-bold uppercase text-white/90">{tr('fase ativa', 'active')}</span>
               </div>
             </div>
           </div>
@@ -669,10 +680,10 @@ export function Campaign() {
             <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 mb-1.5">
               <span className="flex items-center gap-1 text-slate-700">
                 <Layers size={12} className="text-[#F49853]" />
-                Progresso da Fase Atual: {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} • ${currentActiveStage.campaign.title}` : 'Fase Ativa'}
+                {tr('Progresso da Fase Atual:', 'Current Stage Progress:')} {currentActiveStage ? `${tr('Estágio', 'Stage')} ${currentActiveStage.stageNumber} • ${currentActiveStage.campaign.title}` : tr('Fase Ativa', 'Active Stage')}
               </span>
               <span className="text-[#F49853] font-bold">
-                {currentActiveStage?.stageProgress || 0}% atingido
+                {currentActiveStage?.stageProgress || 0}% {tr('atingido', 'reached')}
               </span>
             </div>
 
@@ -717,12 +728,12 @@ export function Campaign() {
                               ? "bg-amber-100 text-amber-800 animate-pulse" 
                               : "bg-slate-200 text-slate-600"
                       )}>
-                        Estágio {stage.stageNumber}
+                        {tr(`Estágio ${stage.stageNumber}`, `Stage ${stage.stageNumber}`)}
                       </span>
                       {stage.isReached ? (
                         <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
                       ) : stage.isCurrent ? (
-                        <span className="text-[9px] font-black text-amber-600 uppercase">Ativo 🔥</span>
+                        <span className="text-[9px] font-black text-amber-600 uppercase">{tr('Ativo 🔥', 'Active 🔥')}</span>
                       ) : (
                         <Lock size={11} className="text-slate-400 shrink-0" />
                       )}
@@ -734,7 +745,7 @@ export function Campaign() {
                       {stage.campaign.title}
                     </p>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 mt-0.5 font-medium">
-                      <span>Meta: R$ {stage.campaign.target_amount.toLocaleString('pt-BR')}</span>
+                      <span>{tr('Meta:', 'Goal:')} R$ {stage.campaign.target_amount.toLocaleString(isEn ? 'en-US' : 'pt-BR')}</span>
                       <span className={cn("font-bold", isSelected ? "text-emerald-700 font-black" : "text-emerald-600")}>
                         {stage.stageProgress}%
                       </span>
@@ -757,16 +768,16 @@ export function Campaign() {
             <div className="flex items-center justify-between px-1">
               <div>
                 <h3 className="text-xl font-black text-slate-900">
-                  {displayedStage ? `Estágio ${displayedStage.stageNumber}: ${displayedStage.campaign.title}` : 'Estágio da Régua'}
+                  {displayedStage ? `${tr('Estágio', 'Stage')} ${displayedStage.stageNumber}: ${displayedStage.campaign.title}` : tr('Estágio da Régua', 'Tracker Stage')}
                 </h3>
                 <p className="text-xs text-slate-500">
                   {displayedStage?.isCurrent 
-                    ? 'Estágio atualmente sendo financiado pelas doações pontuais.' 
-                    : 'Clique nos estágios da régua acima para explorar cada fase.'}
+                    ? tr('Estágio atualmente sendo financiado pelas doações pontuais.', 'Stage currently being funded by one-time donations.') 
+                    : tr('Clique nos estágios da régua acima para explorar cada fase.', 'Click the stages on the tracker above to explore each phase.')}
                 </p>
               </div>
               <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                {displayedStage?.isCurrent ? 'Estágio Ativo 🔥' : displayedStage?.isReached ? 'Conquistado ✓' : 'Próxima Fase'}
+                {displayedStage?.isCurrent ? tr('Estágio Ativo 🔥', 'Active Stage 🔥') : displayedStage?.isReached ? tr('Conquistado ✓', 'Achieved ✓') : tr('Próxima Fase', 'Next Phase')}
               </span>
             </div>
 
@@ -791,26 +802,26 @@ export function Campaign() {
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
                       <span className="bg-slate-900 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5">
-                        <Layers size={12} /> ESTÁGIO #{stage.stageNumber}
+                        <Layers size={12} /> {tr(`ESTÁGIO #${stage.stageNumber}`, `STAGE #${stage.stageNumber}`)}
                       </span>
 
                       {stage.isReached ? (
                         <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Estágio Conquistado
+                          <CheckCircle2 size={12} /> {tr('Estágio Conquistado', 'Stage Achieved')}
                         </span>
                       ) : stage.isCurrent ? (
                         <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 animate-pulse">
-                          <Flame size={12} /> Estágio em Andamento na Régua
+                          <Flame size={12} /> {tr('Estágio em Andamento na Régua', 'Active Stage on Tracker')}
                         </span>
                       ) : (
                         <span className="bg-slate-100 text-slate-600 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1">
-                          <Lock size={12} /> Próximo na Fila
+                          <Lock size={12} /> {tr('Próximo na Fila', 'Up Next')}
                         </span>
                       )}
                     </div>
 
                     <span className="text-xs font-bold text-slate-400">
-                      Faixa: R$ {stage.prevTarget.toLocaleString('pt-BR')} - R$ {stage.threshold.toLocaleString('pt-BR')}
+                      {tr('Faixa:', 'Range:')} R$ {stage.prevTarget.toLocaleString(isEn ? 'en-US' : 'pt-BR')} - R$ {stage.threshold.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
                     </span>
                   </div>
 
@@ -832,7 +843,7 @@ export function Campaign() {
                     <div className="flex justify-between items-end mb-4">
                       <div>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                          Progresso deste Estágio
+                          {tr('Progresso deste Estágio', 'Stage Progress')}
                         </p>
                         <p className={cn(
                           "text-3xl md:text-4xl font-black",
@@ -841,15 +852,15 @@ export function Campaign() {
                           {stage.stageProgress}%
                         </p>
                         <p className="text-xs text-slate-500 font-bold mt-0.5">
-                          R$ {campStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} acumulados
+                          R$ {campStats.currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })} {tr('acumulados', 'raised')}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                          Meta do Estágio
+                          {tr('Meta do Estágio', 'Stage Goal')}
                         </p>
                         <p className="text-xl md:text-2xl font-black text-slate-900">
-                          R$ {campStats.targetAmount.toLocaleString('pt-BR')}
+                          R$ {campStats.targetAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
                         </p>
                       </div>
                     </div>
@@ -900,7 +911,7 @@ export function Campaign() {
                     {camp.milestones && camp.milestones.length > 0 && (
                       <div className="mt-8 pt-4 border-t border-slate-200/60 space-y-3">
                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                          Fases internas deste estágio:
+                          {tr('Fases internas deste estágio:', 'Internal milestones of this stage:')}
                         </h4>
                         <div className="space-y-2">
                           {camp.milestones.map((m, idx) => {
@@ -941,13 +952,16 @@ export function Campaign() {
                 </div>
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-200 block mb-1">
-                    Apadrinhamento Casa Nutri
+                    {tr('Apadrinhamento Casa Nutri', 'Casa Nutri Sponsorship')}
                   </span>
                   <h4 className="text-lg font-black leading-tight text-white">
-                    Deseja Apadrinhar uma Criança?
+                    {tr('Deseja Apadrinhar uma Criança?', 'Want to Sponsor a Child?')}
                   </h4>
                   <p className="text-xs text-emerald-100/90 mt-1 max-w-md font-medium leading-relaxed">
-                    Com R$ 90/mês você garante nutrição plena diária, exames clínicos e recebe atualizações do desenvolvimento do seu afilhado.
+                    {tr(
+                      'Com R$ 90/mês você garante nutrição plena diária, exames clínicos e recebe atualizações do desenvolvimento do seu afilhado.',
+                      'With R$ 90/month you guarantee full daily nutrition, clinical checkups, and receive updates on your sponsored child’s development.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -955,7 +969,7 @@ export function Campaign() {
                 to="/apadrinhar"
                 className="bg-white hover:bg-emerald-50 text-emerald-800 font-black text-xs uppercase tracking-wider px-5 py-3.5 rounded-2xl transition-all shadow-md shrink-0 whitespace-nowrap flex items-center gap-2 group cursor-pointer"
               >
-                <span>Conhecer e Apadrinhar</span>
+                <span>{tr('Conhecer e Apadrinhar', 'Explore & Sponsor')}</span>
                 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
@@ -964,20 +978,23 @@ export function Campaign() {
           {/* Coluna Direita (lg:col-span-5): Caixa Fixa de Doação para a Régua */}
           <div className="lg:col-span-5 lg:sticky lg:top-24">
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Faça sua contribuição</h2>
-              <p className="text-xs text-slate-500 mb-5">Escolha abaixo a melhor forma de apoiar nossa missão humanitária.</p>
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">{tr('Faça sua contribuição', 'Make your contribution')}</h2>
+              <p className="text-xs text-slate-500 mb-5">{tr('Escolha abaixo a melhor forma de apoiar nossa missão humanitária.', 'Choose the best way below to support our humanitarian mission.')}</p>
               
               {/* Identificação da Fase que está sendo impulsionada agora */}
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-4 mb-6">
                 <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-black uppercase tracking-wider mb-1">
                   <Flame size={14} className="text-emerald-600 animate-pulse" />
-                  Fase sendo financiada na régua:
+                  {tr('Fase sendo financiada na régua:', 'Stage currently being funded:')}
                 </div>
                 <h3 className="font-black text-slate-900 text-base leading-snug">
-                  Estágio #{currentActiveStage?.stageNumber || 1}: {targetCampaign.title}
+                  {tr('Estágio', 'Stage')} #{currentActiveStage?.stageNumber || 1}: {targetCampaign.title}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-medium">
-                  Cada doação única avança a régua geral e financia este estágio até desbloquear o próximo.
+                  {tr(
+                    'Cada doação única avança a régua geral e financia este estágio até desbloquear o próximo.',
+                    'Each one-time donation advances the overall tracker and funds this stage until the next one is unlocked.'
+                  )}
                 </p>
               </div>
 

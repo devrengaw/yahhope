@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface SEOProps {
   title?: string;
@@ -12,8 +13,10 @@ export interface SEOProps {
   jsonLd?: Record<string, any> | Array<Record<string, any>>;
 }
 
-const DEFAULT_TITLE = 'YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social';
-const DEFAULT_DESCRIPTION = 'A YAH Hope é uma agência humanitária dedicada a erradicar a desnutrição infantil, garantir acesso à água potável, saúde e educação em Moçambique e no Brasil.';
+const DEFAULT_TITLE_PT = 'YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social';
+const DEFAULT_TITLE_EN = 'YAH Hope | Faith in Action, Child Nutrition & Social Transformation';
+const DEFAULT_DESCRIPTION_PT = 'A YAH Hope é uma agência humanitária dedicada a erradicar a desnutrição infantil, garantir acesso à água potável, saúde e educação em Moçambique e no Brasil.';
+const DEFAULT_DESCRIPTION_EN = 'YAH Hope is a humanitarian agency dedicated to eradicating child malnutrition, ensuring access to clean water, healthcare, and education in Mozambique and Brazil.';
 const DEFAULT_IMAGE = 'https://yahhope.com/hero_bg.jpg';
 const SITE_URL = 'https://yahhope.com';
 
@@ -50,7 +53,7 @@ function setHreflangLink(hreflang: string, href: string) {
 
 export function SEO({
   title,
-  description = DEFAULT_DESCRIPTION,
+  description,
   keywords,
   canonical,
   ogImage = DEFAULT_IMAGE,
@@ -59,17 +62,21 @@ export function SEO({
   jsonLd
 }: SEOProps) {
   const location = useLocation();
+  const { language } = useLanguage();
+  const isEn = language === 'en';
+  const resolvedDescription = description || (isEn ? DEFAULT_DESCRIPTION_EN : DEFAULT_DESCRIPTION_PT);
 
   useEffect(() => {
     // 1. Page Title
+    const defaultTitle = isEn ? DEFAULT_TITLE_EN : DEFAULT_TITLE_PT;
     const formattedTitle = title 
       ? (title.includes('YAH Hope') ? title : `${title} | YAH Hope`) 
-      : DEFAULT_TITLE;
+      : defaultTitle;
     document.title = formattedTitle;
 
     // 2. Primary Meta Tags
     setMetaTag('name', 'title', formattedTitle);
-    setMetaTag('name', 'description', description);
+    setMetaTag('name', 'description', resolvedDescription);
     if (keywords) {
       setMetaTag('name', 'keywords', keywords);
     }
@@ -83,20 +90,22 @@ export function SEO({
     if (!noIndex) {
       setHreflangLink('pt-BR', currentUrl);
       setHreflangLink('pt-MZ', currentUrl);
+      setHreflangLink('en', currentUrl);
       setHreflangLink('x-default', currentUrl);
     }
 
     // 4. Open Graph Tags
     setMetaTag('property', 'og:title', formattedTitle);
-    setMetaTag('property', 'og:description', description);
+    setMetaTag('property', 'og:description', resolvedDescription);
     setMetaTag('property', 'og:url', currentUrl);
     setMetaTag('property', 'og:type', ogType);
+    setMetaTag('property', 'og:locale', isEn ? 'en_US' : 'pt_BR');
     setMetaTag('property', 'og:image', resolvedOgImage);
 
     // 5. Twitter Card Tags
     setMetaTag('name', 'twitter:url', currentUrl);
     setMetaTag('name', 'twitter:title', formattedTitle);
-    setMetaTag('name', 'twitter:description', description);
+    setMetaTag('name', 'twitter:description', resolvedDescription);
     setMetaTag('name', 'twitter:image', resolvedOgImage);
 
     // 6. JSON-LD Dynamic Schema (with automatic BreadcrumbList for internal public pages)
@@ -121,7 +130,7 @@ export function SEO({
           {
             '@type': 'ListItem',
             position: 1,
-            name: 'Início',
+            name: isEn ? 'Home' : 'Início',
             item: `${SITE_URL}/`
           },
           {
@@ -153,7 +162,7 @@ export function SEO({
         dynamicSchema.remove();
       }
     };
-  }, [title, description, keywords, canonical, ogImage, ogType, noIndex, jsonLd, location.pathname, location.search]);
+  }, [title, resolvedDescription, keywords, canonical, ogImage, ogType, noIndex, jsonLd, location.pathname, location.search, isEn]);
 
   return null;
 }

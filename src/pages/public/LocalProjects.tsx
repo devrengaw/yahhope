@@ -5,8 +5,10 @@ import { useWebsiteProjects } from '../../contexts/WebsiteProjectsContext';
 import { YAHHopeProject } from '../../lib/mockData';
 import { SEO } from '../../components/common/SEO';
 import { ProjectDetailModal } from '../../components/public/ProjectDetailModal';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function LocalProjects() {
+  const { tr } = useLanguage();
   const { projects } = useWebsiteProjects();
   const [selectedProject, setSelectedProject] = useState<YAHHopeProject | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,9 +90,9 @@ export function LocalProjects() {
                 {project.location}
               </span>
             )}
-            {project.status === 'active' && <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Heart size={12} /> Em Andamento</span>}
-            {project.status === 'planned' && <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Clock size={12} /> Planejado</span>}
-            {project.status === 'completed' && <span className="bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><CheckCircle size={12} /> Concluído</span>}
+            {project.status === 'active' && <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Heart size={12} /> {tr('Em Andamento', 'Active')}</span>}
+            {project.status === 'planned' && <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><Clock size={12} /> {tr('Planejado', 'Planned')}</span>}
+            {project.status === 'completed' && <span className="bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5"><CheckCircle size={12} /> {tr('Concluído', 'Completed')}</span>}
           </div>
           <h3 className="text-2xl font-black text-white leading-tight group-hover:text-amber-200 transition-colors">{project.title}</h3>
         </div>
@@ -105,7 +107,7 @@ export function LocalProjects() {
           }}
           className="flex items-center justify-between w-full p-4 rounded-2xl bg-slate-50 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors group/btn cursor-pointer"
         >
-          <span className="font-bold text-sm tracking-tight">Conhecer projeto & apoiar</span>
+          <span className="font-bold text-sm tracking-tight">{tr('Conhecer projeto & apoiar', 'Explore project & support')}</span>
           <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
         </button>
       </div>
@@ -115,8 +117,11 @@ export function LocalProjects() {
   return (
     <div className="min-h-screen bg-white">
       <SEO 
-        title="Nossos Projetos e Alcance Global | YAH Hope"
-        description="Conheça os projetos humanitários da YAH Hope: combate à desnutrição, acesso a água limpa e educação em Moçambique, e nossa base de mobilização e governança no Brasil."
+        title={tr('Nossos Projetos e Alcance Global | YAH Hope', 'Our Projects & Global Reach | YAH Hope')}
+        description={tr(
+          'Conheça os projetos humanitários da YAH Hope: combate à desnutrição, acesso a água limpa e educação em Moçambique, e nossa base de mobilização e governança no Brasil.',
+          'Explore YAH Hope humanitarian projects: fighting malnutrition, clean water access, and education in Mozambique, plus our mobilization and governance hub in Brazil.'
+        )}
         keywords="projetos humanitários, ONG Moçambique, Nampula, poços de água potável África, combate à desnutrição infantil, YAH Hope Brasil"
         canonical="https://yahhope.com/projetos"
         ogImage="https://yahhope.com/projetos_hero.jpg"
@@ -159,10 +164,13 @@ export function LocalProjects() {
             <Globe2 size={32} />
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 uppercase font-heading">
-            Nossos Projetos & <span className="text-[#F49853]">Alcance</span>
+            {tr('Nossos Projetos & ', 'Our Projects & ')}<span className="text-[#F49853]">{tr('Alcance', 'Reach')}</span>
           </h1>
           <p className="text-lg sm:text-xl text-slate-200 max-w-3xl mx-auto leading-relaxed font-gotham-light">
-            Iniciativas de alto impacto que transformam realidades. Do socorro humanitário e resgate infantil em Moçambique à nossa base institucional e de mobilização no Brasil.
+            {tr(
+              'Iniciativas de alto impacto que transformam realidades. Do socorro humanitário e resgate infantil em Moçambique à nossa base institucional e de mobilização no Brasil.',
+              'High-impact initiatives that transform lives. From humanitarian relief and child rescue in Mozambique to our institutional and mobilization hub in Brazil.'
+            )}
           </p>
 
           {/* Region Filter Tabs */}
@@ -175,7 +183,7 @@ export function LocalProjects() {
                   : 'bg-white/10 backdrop-blur-md text-slate-200 hover:bg-white/20 hover:text-white border border-white/15'
               }`}
             >
-              Todos os Projetos
+              {tr('Todos os Projetos', 'All Projects')}
             </button>
             <button
               onClick={() => handleRegionChange('mocambique')}
@@ -186,7 +194,7 @@ export function LocalProjects() {
               }`}
             >
               <span>🇲🇿</span>
-              <span>Moçambique (Nampula)</span>
+              <span>{tr('Moçambique (Nampula)', 'Mozambique (Nampula)')}</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                 activeRegion === 'mocambique' ? 'bg-white/25 text-white' : 'bg-white/15 text-slate-200'
               }`}>
@@ -202,7 +210,7 @@ export function LocalProjects() {
               }`}
             >
               <span>🇧🇷</span>
-              <span>Brasil (Sede & Expansão)</span>
+              <span>{tr('Brasil (Sede & Expansão)', 'Brazil (HQ & Expansion)')}</span>
               {projects.filter(isBrazilProject).length > 0 && (
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                   activeRegion === 'brasil' ? 'bg-white/25 text-white' : 'bg-white/15 text-slate-200'
@@ -221,18 +229,21 @@ export function LocalProjects() {
           <div className="bg-amber-50/70 border border-amber-200/60 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
             <div>
               <div className="flex items-center gap-2 text-xs font-gotham-bold uppercase tracking-wider text-amber-700 mb-1">
-                <span>🇲🇿 Campo de Atuação Humanitária</span>
+                <span>{tr('🇲🇿 Campo de Atuação Humanitária', '🇲🇿 Humanitarian Field Operations')}</span>
               </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">Província de Nampula, Moçambique</h3>
+              <h3 className="text-2xl font-black text-slate-900 mb-2">{tr('Província de Nampula, Moçambique', 'Nampula Province, Mozambique')}</h3>
               <p className="text-slate-600 text-sm max-w-2xl font-gotham-light leading-relaxed">
-                Nossa linha de frente no acolhimento de crianças com desnutrição severa, perfuração de poços artesianos para água limpa e capacitação profissional de famílias em comunidades vulneráveis.
+                {tr(
+                  'Nossa linha de frente no acolhimento de crianças com desnutrição severa, perfuração de poços artesianos para água limpa e capacitação profissional de famílias em comunidades vulneráveis.',
+                  'Our frontline caring for children with severe malnutrition, drilling artesian wells for clean water, and empowering families with vocational training in vulnerable communities.'
+                )}
               </p>
             </div>
             <div className="bg-white px-5 py-3 rounded-2xl shadow-xs border border-amber-100 text-center shrink-0">
               <span className="block text-2xl font-black text-[#F49853]">
                 {projects.filter(p => !isBrazilProject(p)).length}
               </span>
-              <span className="text-[11px] text-slate-500 font-gotham-medium">Projetos em Andamento</span>
+              <span className="text-[11px] text-slate-500 font-gotham-medium">{tr('Projetos em Andamento', 'Active Projects')}</span>
             </div>
           </div>
         </div>
@@ -246,27 +257,30 @@ export function LocalProjects() {
             <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#F49853]/15 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 max-w-3xl">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider mb-6">
-                <span>🇧🇷 Base de Governança & Mobilização</span>
+                <span>{tr('🇧🇷 Base de Governança & Mobilização', '🇧🇷 Governance & Mobilization Hub')}</span>
               </div>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-heading font-black tracking-tight leading-tight mb-5">
-                A Força da YAH Hope no <span className="text-[#F49853]">Brasil</span>
+                {tr('A Força da YAH Hope no ', 'The Strength of YAH Hope in ')}<span className="text-[#F49853]">{tr('Brasil', 'Brazil')}</span>
               </h2>
               <p className="text-slate-300 text-base sm:text-lg leading-relaxed font-gotham-light mb-8">
-                No Brasil concentramos nossa sede de governança, auditoria contínua e mobilização de mantenedores. É a partir daqui que articulamos famílias, profissionais e voluntários cuja generosidade sustenta diariamente as operações em Moçambique, enquanto estruturamos o início de frentes sociais comunitárias no Brasil.
+                {tr(
+                  'No Brasil concentramos nossa sede de governança, auditoria contínua e mobilização de mantenedores. É a partir daqui que articulamos famílias, profissionais e voluntários cuja generosidade sustenta diariamente as operações em Moçambique, enquanto estruturamos o início de frentes sociais comunitárias no Brasil.',
+                  'In Brazil we concentrate our governance headquarters, continuous auditing, and supporter mobilization. From here, we connect families, professionals, and volunteers whose generosity sustains daily operations in Mozambique, while structuring community social initiatives in Brazil.'
+                )}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
                   to="/mantenedor"
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-sm transition-all shadow-lg shadow-orange-500/25"
                 >
-                  <span>Seja Mantenedor Mensal</span>
+                  <span>{tr('Seja Mantenedor Mensal', 'Become a Monthly Supporter')}</span>
                   <ArrowRight size={16} />
                 </Link>
                 <Link
                   to="/sobre-nos"
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-gotham-bold text-sm transition-all backdrop-blur-sm"
                 >
-                  <span>Conhecer Nossa Estrutura</span>
+                  <span>{tr('Conhecer Nossa Estrutura', 'Explore Our Structure')}</span>
                 </Link>
               </div>
             </div>
@@ -278,9 +292,12 @@ export function LocalProjects() {
               <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-5">
                 <Building2 size={24} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Sede & Governança</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{tr('Sede & Governança', 'HQ & Governance')}</h3>
               <p className="text-slate-600 text-sm leading-relaxed font-gotham-light">
-                Com sede administrativa em São Paulo, garantimos compliance ético, controle financeiro rigoroso e transparência na prestação de contas aos nossos apoiadores.
+                {tr(
+                  'Com sede administrativa em São Paulo, garantimos compliance ético, controle financeiro rigoroso e transparência na prestação de contas aos nossos apoiadores.',
+                  'Headquartered in São Paulo, we ensure ethical compliance, strict financial controls, and transparent accountability to our supporters.'
+                )}
               </p>
             </div>
 
@@ -288,9 +305,12 @@ export function LocalProjects() {
               <div className="w-12 h-12 rounded-2xl bg-amber-100 text-[#F49853] flex items-center justify-center mb-5">
                 <Users size={24} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Rede de Mantenedores</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{tr('Rede de Mantenedores', 'Supporters Network')}</h3>
               <p className="text-slate-600 text-sm leading-relaxed font-gotham-light">
-                Conectamos milhares de mantenedores e padrinhos que viabilizam tratamentos médicos, compra de insumos clínicos, fórmulas terapêuticas e bolsas de estudo.
+                {tr(
+                  'Conectamos milhares de mantenedores e padrinhos que viabilizam tratamentos médicos, compra de insumos clínicos, fórmulas terapêuticas e bolsas de estudo.',
+                  'We connect thousands of monthly supporters and sponsors who make medical treatments, clinical supplies, therapeutic formulas, and scholarships possible.'
+                )}
               </p>
             </div>
 
@@ -298,9 +318,12 @@ export function LocalProjects() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-5">
                 <Sparkles size={24} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3">Futuras Frentes no Brasil</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{tr('Futuras Frentes no Brasil', 'Future Initiatives in Brazil')}</h3>
               <p className="text-slate-600 text-sm leading-relaxed font-gotham-light">
-                Estamos em fase de mapeamento para desenvolver projetos comunitários voltados à segurança nutricional e apoio materno-infantil em regiões vulneráveis do país.
+                {tr(
+                  'Estamos em fase de mapeamento para desenvolver projetos comunitários voltados à segurança nutricional e apoio materno-infantil em regiões vulneráveis do país.',
+                  'We are mapping opportunities to launch community projects focused on nutritional security and maternal-child support in vulnerable regions of Brazil.'
+                )}
               </p>
             </div>
           </div>
@@ -308,16 +331,19 @@ export function LocalProjects() {
           {filteredProjects.length === 0 && (
             <div className="p-8 rounded-3xl bg-amber-50/60 border border-amber-200/70 text-center max-w-2xl mx-auto">
               <span className="text-sm font-gotham-bold text-amber-900 block mb-1">
-                Frentes Comunitárias de Campo no Brasil em Planejamento
+                {tr('Frentes Comunitárias de Campo no Brasil em Planejamento', 'Community Field Initiatives in Brazil Under Planning')}
               </span>
               <p className="text-xs text-amber-800 leading-relaxed font-gotham-light mb-4">
-                Hoje todo o nosso atendimento assistencial de campo está concentrado na emergência em Nampula (Moçambique). Deseja propor uma parceria institucional ou atuar como voluntário no Brasil?
+                {tr(
+                  'Hoje todo o nosso atendimento assistencial de campo está concentrado na emergência em Nampula (Moçambique). Deseja propor uma parceria institucional ou atuar como voluntário no Brasil?',
+                  'Currently, all our direct field relief is focused on the emergency in Nampula (Mozambique). Would you like to propose an institutional partnership or volunteer in Brazil?'
+                )}
               </p>
               <Link 
                 to="/voluntariado-e-parcerias" 
                 className="text-xs font-gotham-bold text-[#F49853] hover:underline inline-flex items-center gap-1"
               >
-                <span>Inscreva-se como voluntário ou proponha uma parceria</span>
+                <span>{tr('Inscreva-se como voluntário ou proponha uma parceria', 'Apply as a volunteer or propose a partnership')}</span>
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -334,8 +360,8 @@ export function LocalProjects() {
                 <Heart size={24} />
               </div>
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Em Andamento</h2>
-                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">Ações com impacto imediato e atendimento contínuo</p>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">{tr('Em Andamento', 'In Progress')}</h2>
+                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">{tr('Ações com impacto imediato e atendimento contínuo', 'Initiatives with immediate impact and ongoing care')}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -354,8 +380,8 @@ export function LocalProjects() {
                 <Clock size={24} />
               </div>
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Próximos Passos</h2>
-                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">Iniciativas em estruturação e captação de recursos</p>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">{tr('Próximos Passos', 'Next Steps')}</h2>
+                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">{tr('Iniciativas em estruturação e captação de recursos', 'Initiatives in structuring and fundraising phase')}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -374,8 +400,8 @@ export function LocalProjects() {
                 <CheckCircle size={24} />
               </div>
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Concluídos</h2>
-                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">Etapas concluídas com metas atingidas</p>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">{tr('Concluídos', 'Completed')}</h2>
+                <p className="text-xs text-slate-500 font-gotham-light mt-0.5">{tr('Etapas concluídas com metas atingidas', 'Completed milestones with goals achieved')}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -390,8 +416,8 @@ export function LocalProjects() {
           <div className="w-24 h-24 bg-slate-100 rounded-[2rem] mx-auto flex items-center justify-center mb-6">
             <MapPin className="text-slate-300" size={40} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-4">Nenhum projeto encontrado</h2>
-          <p className="text-slate-500 text-lg">Em breve divulgaremos as novas iniciativas da YAH Hope nesta localidade.</p>
+          <h2 className="text-2xl font-black text-slate-900 mb-4">{tr('Nenhum projeto encontrado', 'No projects found')}</h2>
+          <p className="text-slate-500 text-lg">{tr('Em breve divulgaremos as novas iniciativas da YAH Hope nesta localidade.', 'We will soon announce new YAH Hope initiatives in this region.')}</p>
         </div>
       )}
 

@@ -4,8 +4,10 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Heart, Lock, Mail, UserPlus, LogIn, CheckSquare, Square, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 import { getDefaultAuthorizedRouteForUser } from '../../lib/universityPermissions';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function Login() {
+  const { tr } = useLanguage();
   const { loginWithEmail, registerWithEmail, sendPasswordResetEmail, user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -104,11 +106,11 @@ export function Login() {
         const res = await loginWithEmail(email, password);
         
         if (!res.success) {
-          setErrorMessage(res.error || 'Credenciais inválidas! Verifique seu e-mail e senha.');
+          setErrorMessage(res.error || tr('Credenciais inválidas! Verifique seu e-mail e senha.', 'Invalid credentials! Please check your email and password.'));
         }
       } else if (activeTab === 'register') {
         if (!acceptPrivacy) {
-          setConsentError('Você precisa aceitar a Política de Privacidade para criar sua conta.');
+          setConsentError(tr('Você precisa aceitar a Política de Privacidade para criar sua conta.', 'You must accept the Privacy Policy to create your account.'));
           setIsLoading(false);
           return;
         }
@@ -121,9 +123,12 @@ export function Login() {
         
         if (!res.success) {
           if (res.error?.includes('Error sending confirmation email')) {
-            setErrorMessage('Não foi possível enviar o e-mail de confirmação pelo servidor (SMTP). Verifique as configurações de SMTP no Supabase ou os dados do domínio.');
+            setErrorMessage(tr(
+              'Não foi possível enviar o e-mail de confirmação pelo servidor (SMTP). Verifique as configurações de SMTP no Supabase ou os dados do domínio.',
+              'Could not send the confirmation email via the server (SMTP). Please check SMTP settings in Supabase or domain configuration.'
+            ));
           } else {
-            setErrorMessage(res.error || 'Ocorreu um erro ao realizar o cadastro.');
+            setErrorMessage(res.error || tr('Ocorreu um erro ao realizar o cadastro.', 'An error occurred while creating your account.'));
           }
         } else {
           setIsRegisteredSuccess(true);
@@ -132,15 +137,15 @@ export function Login() {
         const success = await sendPasswordResetEmail(email);
         
         if (success) {
-          setInfoMessage('Link de recuperação enviado com sucesso! Verifique sua caixa de entrada.');
+          setInfoMessage(tr('Link de recuperação enviado com sucesso! Verifique sua caixa de entrada.', 'Recovery link sent successfully! Please check your inbox.'));
           switchTab('login');
         } else {
-          setErrorMessage('Erro ao enviar o link de recuperação. Por favor, verifique se o e-mail é válido.');
+          setErrorMessage(tr('Erro ao enviar o link de recuperação. Por favor, verifique se o e-mail é válido.', 'Error sending recovery link. Please verify that the email address is valid.'));
         }
       }
     } catch (error: any) {
       console.error(error);
-      setErrorMessage(error?.message || 'Ocorreu um erro inesperado.');
+      setErrorMessage(error?.message || tr('Ocorreu um erro inesperado.', 'An unexpected error occurred.'));
     } finally {
       setIsLoading(false);
     }
@@ -151,8 +156,14 @@ export function Login() {
   return (
     <div className="relative flex-1 min-h-[calc(100vh-140px)] flex items-center justify-center font-gotham-regular py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <SEO 
-        title={isAdminMode ? "Área Administrativa | YAH Hope" : activeTab === 'register' ? "Cadastro de Mantenedor | YAH Hope" : "Entrar | Portal do Mantenedor - YAH Hope"}
-        description={isAdminMode ? "Acesso administrativo restrito para colaboradores e gestão da YAH Hope." : "Acesse sua área exclusiva para acompanhar crianças atendidas pela Casa Nutri, projetos e relatórios de transparência."}
+        title={isAdminMode
+          ? tr('Área Administrativa | YAH Hope', 'Admin Area | YAH Hope')
+          : activeTab === 'register'
+            ? tr('Cadastro de Mantenedor | YAH Hope', 'Supporter Registration | YAH Hope')
+            : tr('Entrar | Portal do Mantenedor - YAH Hope', 'Sign In | Supporter Portal - YAH Hope')}
+        description={isAdminMode
+          ? tr('Acesso administrativo restrito para colaboradores e gestão da YAH Hope.', 'Restricted administrative access for YAH Hope staff and management.')
+          : tr('Acesse sua área exclusiva para acompanhar crianças atendidas pela Casa Nutri, projetos e relatórios de transparência.', 'Access your exclusive area to follow children cared for by Casa Nutri, projects, and transparency reports.')}
         canonical="https://yahhope.com/login"
         noIndex={true}
       />
@@ -181,28 +192,28 @@ export function Login() {
 
             <div>
               <span className="text-xs font-black uppercase tracking-widest text-[#F49853] block mb-1">
-                Quase Pronto!
+                {tr('Quase Pronto!', 'Almost Done!')}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
-                Confirme seu E-mail
+                {tr('Confirme seu E-mail', 'Confirm Your Email')}
               </h2>
             </div>
 
             <div className="bg-orange-50/90 border border-orange-200/80 rounded-2xl p-4 text-left space-y-2">
               <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
-                Enviamos um link de confirmação para:
+                {tr('Enviamos um link de confirmação para:', 'We sent a confirmation link to:')}
               </p>
               <p className="text-sm sm:text-base font-bold text-slate-900 bg-white px-3 py-2 rounded-xl border border-orange-200 break-all text-center">
                 {email}
               </p>
               <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                Para ativar sua conta e liberar o acesso ao <strong>Portal do Mantenedor</strong>, abra seu e-mail e clique no botão de confirmação.
+                {tr('Para ativar sua conta e liberar o acesso ao ', 'To activate your account and unlock access to the ')}<strong>{tr('Portal do Mantenedor', 'Supporter Portal')}</strong>{tr(', abra seu e-mail e clique no botão de confirmação.', ', open your email and click the confirmation button.')}
               </p>
             </div>
 
             <div className="bg-slate-50/90 rounded-2xl p-3.5 border border-slate-100 text-left text-xs text-slate-500 space-y-1">
-              <p className="font-bold text-slate-700">Não encontrou o e-mail?</p>
-              <p>Verifique sua caixa de <strong>Spam</strong> ou <strong>Lixo Eletrônico</strong>. Pode levar alguns instantes para chegar.</p>
+              <p className="font-bold text-slate-700">{tr('Não encontrou o e-mail?', "Didn't find the email?")}</p>
+              <p>{tr('Verifique sua caixa de ', 'Check your ')}<strong>{tr('Spam', 'Spam')}</strong>{tr(' ou ', ' or ')}<strong>{tr('Lixo Eletrônico', 'Junk')}</strong>{tr('. Pode levar alguns instantes para chegar.', ' folder. It may take a few moments to arrive.')}</p>
             </div>
 
             <div className="pt-2 space-y-2.5">
@@ -215,13 +226,13 @@ export function Login() {
                 className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn size={18} />
-                <span>Já confirmei, ir para Login</span>
+                <span>{tr('Já confirmei, ir para Login', 'Already confirmed, go to Sign In')}</span>
               </button>
               <Link
                 to="/"
                 className="block text-xs font-bold text-slate-500 hover:text-slate-800 py-1 transition-colors"
               >
-                Voltar à Página Inicial
+                {tr('Voltar à Página Inicial', 'Back to Home Page')}
               </Link>
             </div>
           </div>
@@ -229,25 +240,25 @@ export function Login() {
           <>
             <div className="relative z-10 text-center flex flex-col items-center">
               <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight">
-                {isAdminMode ? 'Área Administrativa' : 'Ihale!'}
+                {isAdminMode ? tr('Área Administrativa', 'Admin Area') : 'Ihale!'}
               </h2>
               <h3 className="text-lg sm:text-xl font-bold text-slate-700 mt-1">
                 {isAdminMode 
-                  ? (activeTab === 'recovery' ? 'Recuperar Acesso' : 'Gestão & Operações')
+                  ? (activeTab === 'recovery' ? tr('Recuperar Acesso', 'Recover Access') : tr('Gestão & Operações', 'Management & Operations'))
                   : activeTab === 'recovery' 
-                    ? 'Recuperar Senha' 
+                    ? tr('Recuperar Senha', 'Recover Password') 
                     : activeTab === 'register' 
-                      ? 'Cadastro de Mantenedor' 
-                      : 'Portal do Mantenedor'}
+                      ? tr('Cadastro de Mantenedor', 'Supporter Registration') 
+                      : tr('Portal do Mantenedor', 'Supporter Portal')}
               </h3>
               <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium max-w-sm">
                 {isAdminMode 
-                  ? 'Acesso restrito para colaboradores, equipe técnica e liderança da YAH Hope.'
+                  ? tr('Acesso restrito para colaboradores, equipe técnica e liderança da YAH Hope.', 'Restricted access for YAH Hope staff, technical team, and leadership.')
                   : activeTab === 'recovery' 
-                    ? 'Insira seu e-mail para receber as instruções de recuperação.' 
+                    ? tr('Insira seu e-mail para receber as instruções de recuperação.', 'Enter your email to receive recovery instructions.') 
                     : activeTab === 'register'
-                      ? 'Crie sua conta para acompanhar seus impactos, crianças e doações.'
-                      : 'Acesse sua área exclusiva para acompanhar o impacto das suas doações.'}
+                      ? tr('Crie sua conta para acompanhar seus impactos, crianças e doações.', 'Create your account to track your impact, sponsored children, and donations.')
+                      : tr('Acesse sua área exclusiva para acompanhar o impacto das suas doações.', 'Access your exclusive area to follow the impact of your donations.')}
               </p>
             </div>
 
@@ -255,10 +266,10 @@ export function Login() {
             {!isAdminMode && activeTab === 'register' && (
               <div className="relative z-10 p-3.5 bg-orange-50 border border-orange-200/80 rounded-2xl text-left space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#F49853] block">
-                  Ativação de Conta de Mantenedor
+                  {tr('Ativação de Conta de Mantenedor', 'Supporter Account Activation')}
                 </span>
                 <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                  Crie sua senha para acessar sua área de apadrinhamento e acompanhar o impacto do seu apoio.
+                  {tr('Crie sua senha para acessar sua área de apadrinhamento e acompanhar o impacto do seu apoio.', 'Create your password to access your sponsorship area and follow the impact of your support.')}
                 </p>
               </div>
             )}
@@ -269,7 +280,7 @@ export function Login() {
               <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs flex items-start gap-2.5 text-left animate-shake">
                 <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-bold text-rose-900">Atenção</p>
+                  <p className="font-bold text-rose-900">{tr('Atenção', 'Attention')}</p>
                   <p className="text-rose-700 font-medium leading-relaxed mt-0.5">{errorMessage}</p>
                 </div>
               </div>
@@ -280,7 +291,7 @@ export function Login() {
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs flex items-start gap-2.5 text-left animate-fade-in">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-bold text-emerald-950">Sucesso</p>
+                  <p className="font-bold text-emerald-950">{tr('Sucesso', 'Success')}</p>
                   <p className="text-emerald-800 font-medium leading-relaxed mt-0.5">{infoMessage}</p>
                 </div>
               </div>
@@ -290,7 +301,7 @@ export function Login() {
             {activeTab === 'register' && (
               <div>
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">
-                  Nome Completo
+                  {tr('Nome Completo', 'Full Name')}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -302,7 +313,7 @@ export function Login() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 sm:text-sm transition-all"
-                    placeholder="Seu nome completo"
+                    placeholder={tr('Seu nome completo', 'Your full name')}
                   />
                 </div>
               </div>
@@ -310,7 +321,7 @@ export function Login() {
 
             <div>
               <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">
-                E-mail
+                {tr('E-mail', 'Email')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -322,7 +333,7 @@ export function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 sm:text-sm transition-all"
-                  placeholder="seu@email.com"
+                  placeholder={tr('seu@email.com', 'your@email.com')}
                 />
               </div>
             </div>
@@ -331,7 +342,7 @@ export function Login() {
               <div>
                 <div className="flex justify-between items-center mb-1.5 px-1">
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Senha
+                    {tr('Senha', 'Password')}
                   </label>
                   {activeTab === 'login' && (
                     <button
@@ -339,7 +350,7 @@ export function Login() {
                       onClick={() => switchTab('recovery')}
                       className="text-xs font-bold text-orange-600 hover:text-orange-700"
                     >
-                      Esqueceu?
+                      {tr('Esqueceu?', 'Forgot?')}
                     </button>
                   )}
                 </div>
@@ -359,7 +370,7 @@ export function Login() {
                 </div>
                 {activeTab === 'register' && (
                   <p className="text-[11px] text-slate-400 mt-1 px-1">
-                    Mínimo de 6 caracteres.
+                    {tr('Mínimo de 6 caracteres.', 'Minimum 6 characters.')}
                   </p>
                 )}
               </div>
@@ -377,7 +388,10 @@ export function Login() {
                     className="mt-0.5 rounded text-orange-500 focus:ring-orange-500 border-slate-300 w-4 h-4 cursor-pointer"
                   />
                   <span>
-                    Autorizo o contato e o recebimento de mensagens, atualizações de projetos e novidades da plataforma YAH Hope via WhatsApp e e-mail.
+                    {tr(
+                      'Autorizo o contato e o recebimento de mensagens, atualizações de projetos e novidades da plataforma YAH Hope via WhatsApp e e-mail.',
+                      'I authorize contact and receiving messages, project updates, and news from the YAH Hope platform via WhatsApp and email.'
+                    )}
                   </span>
                 </label>
 
@@ -394,15 +408,15 @@ export function Login() {
                     className="mt-0.5 rounded text-orange-500 focus:ring-orange-500 border-slate-300 w-4 h-4 cursor-pointer"
                   />
                   <span>
-                    Concordo com os{' '}
+                    {tr('Concordo com os ', 'I agree to the ')}
                     <Link to="/termos-de-servico" target="_blank" className="font-bold text-orange-600 hover:underline">
-                      Termos de Serviço
+                      {tr('Termos de Serviço', 'Terms of Service')}
                     </Link>{' '}
-                    e a{' '}
+                    {tr('e a ', 'and the ')}
                     <Link to="/politica-de-privacidade" target="_blank" className="font-bold text-orange-600 hover:underline">
-                      Política de Privacidade
+                      {tr('Política de Privacidade', 'Privacy Policy')}
                     </Link>{' '}
-                    da YAH Hope. *
+                    {tr('da YAH Hope. *', 'of YAH Hope. *')}
                   </span>
                 </label>
 
@@ -421,12 +435,12 @@ export function Login() {
                 className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-[#F49853] hover:bg-[#e0853d] focus:outline-none focus:ring-4 focus:ring-orange-500/20 transition-all shadow-lg shadow-orange-500/20 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
               >
                 {isLoading 
-                  ? 'Aguarde...' 
+                  ? tr('Aguarde...', 'Please wait...') 
                   : activeTab === 'recovery' 
-                    ? 'Enviar Link de Recuperação' 
+                    ? tr('Enviar Link de Recuperação', 'Send Recovery Link') 
                     : activeTab === 'register' 
-                      ? 'Criar Conta de Mantenedor' 
-                      : 'Entrar na Plataforma'}
+                      ? tr('Criar Conta de Mantenedor', 'Create Supporter Account') 
+                      : tr('Entrar na Plataforma', 'Sign In')}
               </button>
             </div>
 
@@ -438,20 +452,20 @@ export function Login() {
                     to="/login"
                     className="text-xs font-bold text-orange-600 hover:text-orange-700 underline"
                   >
-                    ← É mantenedor ou doador? Acessar Portal do Mantenedor
+                    {tr('← É mantenedor ou doador? Acessar Portal do Mantenedor', '← Supporter or donor? Access the Supporter Portal')}
                   </Link>
                 </div>
               ) : (
                 <>
                   {activeTab === 'register' ? (
                     <p className="text-xs text-slate-500">
-                      Já possui conta cadastrada?{' '}
+                      {tr('Já possui conta cadastrada?', 'Already have an account?')}{' '}
                       <button
                         type="button"
                         onClick={() => switchTab('login')}
                         className="font-bold text-orange-600 hover:text-orange-700 underline cursor-pointer"
                       >
-                        Fazer Login
+                        {tr('Fazer Login', 'Sign In')}
                       </button>
                     </p>
                   ) : activeTab === 'recovery' ? (
@@ -460,7 +474,7 @@ export function Login() {
                       onClick={() => switchTab('login')}
                       className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-all cursor-pointer"
                     >
-                      Voltar para o login
+                      {tr('Voltar para o login', 'Back to sign in')}
                     </button>
                   ) : null}
                 </>

@@ -42,6 +42,7 @@ import { useDonationModal } from '../../contexts/DonationModalContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
 import { Layers } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
 const STRIPE_QUOTAS = [
@@ -54,6 +55,7 @@ export function Home() {
   const navigate = useNavigate();
   const { openDonationModal } = useDonationModal();
   const { user } = useAuth();
+  const { tr, isEn } = useLanguage();
 
   // Carousel State
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -173,8 +175,14 @@ export function Home() {
   return (
     <div className="bg-white min-h-screen font-gotham-regular text-slate-800 antialiased selection:bg-[#F49853] selection:text-white">
       <SEO 
-        title="YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social"
-        description="A YAH Hope é uma agência humanitária que combate a desnutrição infantil, garante acesso à água potável, saúde e educação em Moçambique e no Brasil. Conheça e apoie!"
+        title={tr(
+          'YAH Hope | Fé em Ação, Nutrição Infantil e Transformação Social',
+          'YAH Hope | Faith in Action, Child Nutrition & Social Transformation'
+        )}
+        description={tr(
+          'A YAH Hope é uma agência humanitária que combate a desnutrição infantil, garante acesso à água potável, saúde e educação em Moçambique e no Brasil. Conheça e apoie!',
+          'YAH Hope is a humanitarian agency fighting child malnutrition, ensuring access to clean water, healthcare, and education in Mozambique and Brazil. Learn more and support!'
+        )}
         keywords="YAH Hope, ONG, ajuda humanitária, combate à desnutrição infantil, Moçambique, Nampula, apadrinhar criança, doação ONG, projetos sociais"
         canonical="https://yahhope.com/"
         ogImage="https://yahhope.com/hero_bg.jpg"
@@ -232,11 +240,14 @@ export function Home() {
             {/* Left Column: Headline and Story */}
             <div className="lg:col-span-7 xl:col-span-7 text-left space-y-6">
               <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-heading font-black tracking-tight leading-[1.05] text-white drop-shadow-md">
-                BEM-VINDO À <span className="block text-[#FFE8B3]">YAH HOPE</span>
+                {tr('BEM-VINDO À', 'WELCOME TO')} <span className="block text-[#FFE8B3]">YAH HOPE</span>
               </h1>
 
               <p className="text-lg sm:text-xl md:text-2xl text-white/95 font-gotham-regular leading-relaxed max-w-xl drop-shadow-xs">
-                Mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.
+                {tr(
+                  'Mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.',
+                  'More than a social organization; we are guardians of human dignity, weaving stories of transformation and resilience in forgotten communities.'
+                )}
               </p>
             </div>
 
@@ -323,7 +334,7 @@ export function Home() {
                           )}
                         </div>
                         <div className="flex items-center gap-1 text-[11px] font-gotham-bold pt-2" style={{ color: item.color || '#F49853' }}>
-                          <span>Ler história completa</span>
+                          <span>{tr('Ler história completa', 'Read full story')}</span>
                           <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
@@ -364,7 +375,7 @@ export function Home() {
                           <span>{item.location}</span>
                         </div>
                         <span className="text-white/70 group-hover:text-white flex items-center gap-0.5 transition-colors">
-                          Ler mais <ArrowRight size={10} />
+                          {tr('Ler mais', 'Read more')} <ArrowRight size={10} />
                         </span>
                       </div>
                     </div>
@@ -413,13 +424,16 @@ export function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-12">
             <span className="text-[#F49853] font-gotham-bold uppercase tracking-widest text-xs block mb-2">
-              Resultados Reais & Metas Alcançadas
+              {tr('Resultados Reais & Metas Alcançadas', 'Real Results & Goals Achieved')}
             </span>
             <h2 className="text-3xl md:text-5xl font-heading font-black text-slate-900 tracking-tight">
-              O impacto da sua solidariedade.
+              {tr('O impacto da sua solidariedade.', 'The impact of your generosity.')}
             </h2>
             <p className="text-sm sm:text-base text-slate-600 font-gotham-light mt-3">
-              Acompanhe a régua oficial de arrecadação cumulativa. Cada doação desbloqueia um novo estágio de transformação humanitária em Moçambique e no Brasil.
+              {tr(
+                'Acompanhe a régua oficial de arrecadação cumulativa. Cada doação desbloqueia um novo estágio de transformação humanitária em Moçambique e no Brasil.',
+                'Follow our official cumulative fundraising tracker. Every donation unlocks a new stage of humanitarian transformation in Mozambique and Brazil.'
+              )}
             </p>
           </div>
 
@@ -467,31 +481,34 @@ export function Home() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
                 <div>
                   <span className="text-[11px] font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-1">
-                    Campanhas Humanitárias • Régua Geral
+                    {tr('Campanhas Humanitárias • Régua Geral', 'Humanitarian Campaigns • Overall Tracker')}
                   </span>
                   <h3 className="text-xl sm:text-2xl font-heading font-black text-slate-900 tracking-tight">
-                    Progresso das Metas em Campo
+                    {tr('Progresso das Metas em Campo', 'Field Goals Progress')}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 font-gotham-light mt-1 max-w-xl">
-                    As doações pontuais e cotas mensais de apadrinhamento avançam a régua continuamente, financiando desde a nutrição clínica até poços artesianos e bolsas.
+                    {tr(
+                      'As doações pontuais e cotas mensais de apadrinhamento avançam a régua continuamente, financiando desde a nutrição clínica até poços artesianos e bolsas.',
+                      'One-time donations and monthly sponsorship shares continuously advance the tracker, funding everything from clinical nutrition to clean water wells and scholarships.'
+                    )}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4 bg-orange-50/70 py-3 px-5 rounded-2xl border border-orange-200/80 shrink-0 self-start lg:self-auto">
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-gotham-bold text-slate-400 block tracking-wider">
-                      Arrecadação Global
+                      {tr('Arrecadação Global', 'Global Fundraising')}
                     </span>
                     <span className="text-xl sm:text-2xl font-black text-[#F49853] block leading-tight">
-                      R$ {totalRulerRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {totalRulerRaised.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                     <span className="text-xs text-slate-500 font-gotham-medium">
-                      de R$ {totalRulerGoal.toLocaleString('pt-BR')} ({rulerOverallPercentage}%)
+                      {tr('de', 'of')} R$ {totalRulerGoal.toLocaleString(isEn ? 'en-US' : 'pt-BR')} ({rulerOverallPercentage}%)
                     </span>
                   </div>
                   <div className="w-13 h-13 rounded-2xl bg-[#F49853] text-white flex flex-col items-center justify-center font-black text-sm shrink-0 shadow-md shadow-[#F49853]/30">
                     <span>{rulerOverallPercentage}%</span>
-                    <span className="text-[8px] font-bold uppercase tracking-wider text-white/90">meta</span>
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-white/90">{tr('meta', 'goal')}</span>
                   </div>
                 </div>
               </div>
@@ -501,10 +518,12 @@ export function Home() {
                 <div className="flex justify-between items-center text-xs font-gotham-bold">
                   <span className="flex items-center gap-1.5 text-slate-700">
                     <Layers size={14} className="text-[#F49853]" />
-                    <span>Régua Contínua de Arrecadação</span>
+                    <span>{tr('Régua Contínua de Arrecadação', 'Continuous Fundraising Tracker')}</span>
                   </span>
                   <span className="text-[#F49853]">
-                    {currentActiveStage ? `Estágio ${currentActiveStage.stageNumber} em andamento: ${currentActiveStage.campaign.title}` : 'Metas 100% Alcançadas'}
+                    {currentActiveStage
+                      ? tr(`Estágio ${currentActiveStage.stageNumber} em andamento: ${currentActiveStage.campaign.title}`, `Stage ${currentActiveStage.stageNumber} in progress: ${currentActiveStage.campaign.title}`)
+                      : tr('Metas 100% Alcançadas', '100% Goals Achieved')}
                   </span>
                 </div>
 
@@ -542,13 +561,13 @@ export function Home() {
                               ? "bg-[#F49853] text-white shadow-xs"
                               : "bg-slate-200 text-slate-600"
                         )}>
-                          Estágio {stage.stageNumber}
+                          {tr(`Estágio ${stage.stageNumber}`, `Stage ${stage.stageNumber}`)}
                         </span>
                         {stage.isReached ? (
                           <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
                         ) : stage.isCurrent ? (
                           <span className="text-[10px] font-black text-[#F49853] uppercase flex items-center gap-1">
-                            Ativo 🔥
+                            {tr('Ativo 🔥', 'Active 🔥')}
                           </span>
                         ) : (
                           <Lock size={13} className="text-slate-400 shrink-0" />
@@ -559,17 +578,17 @@ export function Home() {
                         {stage.campaign.title}
                       </h4>
                       <p className="text-[11px] text-slate-500 font-gotham-light line-clamp-2 leading-relaxed mb-3">
-                        {stage.campaign.description || 'Ações de impacto social e combate à desnutrição.'}
+                        {stage.campaign.description || tr('Ações de impacto social e combate à desnutrição.', 'Social impact initiatives and fighting malnutrition.')}
                       </p>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-baseline text-[11px] font-gotham-bold mb-1">
                         <span className="text-slate-600">
-                          {stage.isReached ? 'Meta Concluída' : stage.isCurrent ? 'Em Andamento' : 'Meta Futura'}
+                          {stage.isReached ? tr('Meta Concluída', 'Goal Reached') : stage.isCurrent ? tr('Em Andamento', 'In Progress') : tr('Meta Futura', 'Upcoming Goal')}
                         </span>
                         <span className="text-slate-900 font-black">
-                          R$ {stage.campaign.target_amount?.toLocaleString('pt-BR')}
+                          R$ {stage.campaign.target_amount?.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
                         </span>
                       </div>
 
@@ -594,7 +613,10 @@ export function Home() {
               {/* Botões de Ação da Régua */}
               <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-xs text-slate-500 font-gotham-light text-center sm:text-left">
-                  Todas as doações são auditadas com 100% de transparência e relatórios de campo.
+                  {tr(
+                    'Todas as doações são auditadas com 100% de transparência e relatórios de campo.',
+                    'All donations are audited with 100% transparency and field reports.'
+                  )}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -602,7 +624,7 @@ export function Home() {
                     to="/campanha"
                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-sm"
                   >
-                    <span>Ver Régua Completa</span>
+                    <span>{tr('Ver Régua Completa', 'View Full Tracker')}</span>
                     <ArrowRight size={14} />
                   </Link>
 
@@ -611,7 +633,7 @@ export function Home() {
                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-[#F49853]/20"
                   >
                     <Heart size={14} fill="currentColor" />
-                    <span>Seja Mantenedor Mensal</span>
+                    <span>{tr('Seja Mantenedor Mensal', 'Become a Monthly Supporter')}</span>
                   </Link>
                 </div>
               </div>
@@ -626,17 +648,17 @@ export function Home() {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
               <span className="text-[#F49853] font-gotham-bold tracking-widest uppercase text-xs block mb-1">
-                Frentes de Atuação
+                {tr('Frentes de Atuação', 'Areas of Action')}
               </span>
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-black text-slate-900 leading-tight">
-                Levando nossa dedicação onde ela é mais necessária.
+                {tr('Levando nossa dedicação onde ela é mais necessária.', 'Bringing our dedication where it is needed most.')}
               </h2>
             </div>
             <Link
               to="/projetos"
               className="inline-flex items-center gap-2 text-[#F49853] font-gotham-bold text-sm hover:text-[#e0853d] transition-colors shrink-0"
             >
-              <span>Ver Todos os Projetos</span>
+              <span>{tr('Ver Todos os Projetos', 'View All Projects')}</span>
               <ArrowRight size={16} />
             </Link>
           </div>
@@ -699,7 +721,7 @@ export function Home() {
             {/* Left Column: MANI-FESTO Title */}
             <div className="lg:col-span-5 text-left">
               <h2 className="text-6xl sm:text-7xl md:text-8xl lg:text-8xl xl:text-9xl font-heading font-black text-white uppercase tracking-tight leading-[0.88] select-none drop-shadow-md">
-                MANI-<br />FESTO
+                {tr('MANI-', 'MANI-')}<br />{tr('FESTO', 'FESTO')}
               </h2>
               <p className="text-2xl sm:text-3xl lg:text-4xl font-heading font-black text-slate-800 tracking-tight mt-3">
                 YAH Hope
@@ -709,24 +731,42 @@ export function Home() {
             {/* Right Column: Manifesto Copy (Justified) */}
             <div className="lg:col-span-7 text-left space-y-4">
               <h3 className="font-heading font-bold text-base sm:text-lg md:text-xl text-white leading-snug drop-shadow-xs">
-                Como encontrar futuro em cenários que para muitos são impossíveis de serem mudados?
+                {tr(
+                  'Como encontrar futuro em cenários que para muitos são impossíveis de serem mudados?',
+                  'How do we find a future in places that many believe are impossible to change?'
+                )}
               </h3>
 
               <div className="space-y-3.5 text-xs sm:text-sm md:text-base font-gotham-regular text-white/95 text-justify leading-relaxed drop-shadow-xs">
                 <p>
-                  Na jornada da esperança, nasce a missão da YAH Hope. Somos mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.
+                  {tr(
+                    'Na jornada da esperança, nasce a missão da YAH Hope. Somos mais do que uma organização social; somos guardiões da dignidade humana, tecendo histórias de transformação e resiliência em comunidades esquecidas.',
+                    'On the journey of hope, the mission of YAH Hope was born. We are more than a social organization; we are guardians of human dignity, weaving stories of transformation and resilience in forgotten communities.'
+                  )}
                 </p>
                 <p>
-                  Acreditamos no poder transformador da esperança. Plantamos sementes através de ações conectadas a nutrição, geração de renda, escolaridade e entre tantas outras que são essenciais para o desenvolvimento humano. E assim, cultivamos um futuro em que cada indivíduo possa crescer independentemente das adversidades.
+                  {tr(
+                    'Acreditamos no poder transformador da esperança. Plantamos sementes através de ações conectadas a nutrição, geração de renda, escolaridade e entre tantas outras que são essenciais para o desenvolvimento humano. E assim, cultivamos um futuro em que cada indivíduo possa crescer independentemente das adversidades.',
+                    'We believe in the transformative power of hope. We plant seeds through initiatives connected to nutrition, income generation, education, and many other areas essential for human development. In doing so, we cultivate a future where every individual can grow regardless of adversity.'
+                  )}
                 </p>
                 <p>
-                  Nosso compromisso com a dignidade vai além do presente. Adotamos uma abordagem sustentável em todas as nossas iniciativas, assegurando que o impacto positivo seja duradouro e capaz de transformar gerações futuras.
+                  {tr(
+                    'Nosso compromisso com a dignidade vai além do presente. Adotamos uma abordagem sustentável em todas as nossas iniciativas, assegurando que o impacto positivo seja duradouro e capaz de transformar gerações futuras.',
+                    'Our commitment to dignity goes beyond the present. We adopt a sustainable approach in all our initiatives, ensuring that our positive impact is lasting and capable of transforming future generations.'
+                  )}
                 </p>
                 <p>
-                  Trabalhamos para que cada pessoa não apenas sobreviva, mas viva com dignidade. Somos construtores de comunidades resilientes. Através de cada projeto executado juntamente com a população local, subimos um degrau na promoção da dignidade humana.
+                  {tr(
+                    'Trabalhamos para que cada pessoa não apenas sobreviva, mas viva com dignidade. Somos construtores de comunidades resilientes. Através de cada projeto executado juntamente com a população local, subimos um degrau na promoção da dignidade humana.',
+                    'We work so that every person does not merely survive, but lives with dignity. We are builders of resilient communities. Through every project carried out alongside the local population, we take another step forward in promoting human dignity.'
+                  )}
                 </p>
                 <p>
-                  Junte-se a nós nessa jornada. A YAH Hope é mais do que uma organização; é um movimento, uma chama ardente que ilumina caminhos antes obscuros. Onde há esperança, há dignidade, e onde há dignidade, há a promessa de uma população mais forte e resplandecente.
+                  {tr(
+                    'Junte-se a nós nessa jornada. A YAH Hope é mais do que uma organização; é um movimento, uma chama ardente que ilumina caminhos antes obscuros. Onde há esperança, há dignidade, e onde há dignidade, há a promessa de uma população mais forte e resplandecente.',
+                    'Join us on this journey. YAH Hope is more than an organization; it is a movement, a burning flame that illuminates once-dark paths. Where there is hope, there is dignity, and where there is dignity, there is the promise of a stronger, brighter community.'
+                  )}
                 </p>
               </div>
             </div>
@@ -764,17 +804,23 @@ export function Home() {
 
         <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
           <span className="text-[#F49853] font-gotham-bold text-xs uppercase tracking-widest block mb-3 drop-shadow-sm">
-            O Valor de Cada Vida
+            {tr('O Valor de Cada Vida', 'The Value of Every Life')}
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black mb-6 leading-tight drop-shadow-md">
-            As pessoas estão no centro de tudo o que fazemos.
+            {tr('As pessoas estão no centro de tudo o que fazemos.', 'People are at the heart of everything we do.')}
           </h2>
           <div className="space-y-4 text-slate-100 text-base md:text-lg font-gotham-light leading-relaxed mb-10 max-w-2xl mx-auto drop-shadow">
             <p>
-              Nosso trabalho ultrapassa fronteiras e culturas. Cremos que todos merecem esperança, que a dignidade humana é um dom inestimável e que juntos podemos transformar o futuro de quem mais precisa.
+              {tr(
+                'Nosso trabalho ultrapassa fronteiras e culturas. Cremos que todos merecem esperança, que a dignidade humana é um dom inestimável e que juntos podemos transformar o futuro de quem mais precisa.',
+                'Our work crosses borders and cultures. We believe everyone deserves hope, that human dignity is a priceless gift, and that together we can transform the future of those who need it most.'
+              )}
             </p>
             <p>
-              A esperança não chega sozinha — ela se manifesta quando você e eu decidimos agir.
+              {tr(
+                'A esperança não chega sozinha — ela se manifesta quando você e eu decidimos agir.',
+                'Hope does not arrive on its own — it comes to life when you and I decide to act.'
+              )}
             </p>
           </div>
           <div>
@@ -782,7 +828,7 @@ export function Home() {
               onClick={() => openDonationModal()}
               className="inline-flex items-center gap-3 bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-4 rounded-full font-gotham-bold text-base md:text-lg shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
-              <span>Seja um Agente de Esperança</span>
+              <span>{tr('Seja um Agente de Esperança', 'Become an Agent of Hope')}</span>
               <ArrowRight size={18} />
             </button>
           </div>
@@ -793,16 +839,19 @@ export function Home() {
       <section className="py-16 bg-[#FFFBF7] border-t border-orange-100 font-gotham-regular">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 mb-3">
-            Receba as últimas notícias e relatórios de campo da YAH Hope
+            {tr('Receba as últimas notícias e relatórios de campo da YAH Hope', 'Receive the latest news and field reports from YAH Hope')}
           </h2>
           <p className="text-slate-600 text-sm font-gotham-light mb-8 max-w-xl mx-auto">
-            Acompanhe de perto as vidas que estão sendo salvas e veja relatórios fotográficos periódicos direto de Moçambique.
+            {tr(
+              'Acompanhe de perto as vidas que estão sendo salvas e veja relatórios fotográficos periódicos direto de Moçambique.',
+              'Follow the lives being saved up close and receive periodic photo reports straight from Mozambique.'
+            )}
           </p>
 
           {emailSubmitted ? (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl max-w-md mx-auto flex items-center justify-center gap-2 text-sm font-gotham-bold animate-fade-in">
               <CheckCircle2 size={18} className="text-emerald-600" />
-              <span>Obrigado! Você receberá nossos informativos de campo.</span>
+              <span>{tr('Obrigado! Você receberá nossos informativos de campo.', 'Thank you! You will receive our field updates.')}</span>
             </div>
           ) : (
             <form onSubmit={handleNewsletter} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
@@ -811,14 +860,14 @@ export function Home() {
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="Digite seu melhor e-mail..."
+                placeholder={tr('Digite seu melhor e-mail...', 'Enter your best email...')}
                 className="flex-1 px-5 py-3.5 rounded-full border border-slate-300 focus:border-[#F49853] focus:outline-hidden text-sm bg-white text-slate-800 font-gotham-regular"
               />
               <button
                 type="submit"
                 className="bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-3.5 rounded-full font-gotham-bold text-sm tracking-wide transition-all shadow-md shrink-0 flex items-center justify-center gap-2 active:scale-95"
               >
-                <span>Inscrever-se</span>
+                <span>{tr('Inscrever-se', 'Subscribe')}</span>
                 <ArrowRight size={15} />
               </button>
             </form>
@@ -911,7 +960,7 @@ export function Home() {
                     className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Heart size={16} fill="currentColor" />
-                    <span>Apoiar Esta Causa</span>
+                    <span>{tr('Apoiar Esta Causa', 'Support This Cause')}</span>
                   </button>
 
                   <Link
@@ -925,7 +974,7 @@ export function Home() {
                     onClick={() => setReadingHighlight(null)}
                     className="w-full sm:w-auto text-xs font-gotham-bold text-slate-700 hover:text-slate-900 px-5 py-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-center transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <span>Ver no Blog</span>
+                    <span>{tr('Ver no Blog', 'View on Blog')}</span>
                     <ArrowRight size={13} />
                   </Link>
                 </div>
@@ -935,7 +984,7 @@ export function Home() {
                   onClick={() => setReadingHighlight(null)}
                   className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-bold text-xs transition-colors"
                 >
-                  Fechar
+                  {tr('Fechar', 'Close')}
                 </button>
               </div>
             </div>

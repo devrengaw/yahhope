@@ -17,8 +17,10 @@ import {
   BookOpen
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function Blog() {
+  const { tr } = useLanguage();
   const { posts, incrementViews, incrementReads, toggleLike, incrementShares } = useBlog();
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
@@ -164,8 +166,8 @@ export function Blog() {
     return (
       <div className="min-h-screen bg-slate-50/60 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 font-gotham-regular">
         <SEO 
-          title={`${selectedPost.title} | Blog YAH Hope`}
-          description={selectedPost.excerpt || selectedPost.content?.replace(/<[^>]*>/g, '').slice(0, 155) || 'Acompanhe esta história de transformação e impacto social da YAH Hope.'}
+          title={`${selectedPost.title} | ${tr('Blog YAH Hope', 'YAH Hope Blog')}`}
+          description={selectedPost.excerpt || selectedPost.content?.replace(/<[^>]*>/g, '').slice(0, 155) || tr('Acompanhe esta história de transformação e impacto social da YAH Hope.', 'Follow this story of transformation and social impact from YAH Hope.')}
           ogImage={selectedPost.image}
           ogType="article"
           canonical={`https://yahhope.com/blog/${selectedPost.id}`}
@@ -204,7 +206,7 @@ export function Blog() {
               className="inline-flex items-center gap-2 text-xs sm:text-sm font-gotham-bold text-slate-600 hover:text-[#F49853] transition-colors py-2 px-3 sm:px-4 rounded-xl hover:bg-white bg-white/60 border border-slate-200/80 shadow-xs cursor-pointer group"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span>Voltar para todas as matérias</span>
+              <span>{tr('Voltar para todas as matérias', 'Back to all stories')}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -229,7 +231,7 @@ export function Blog() {
                 className="inline-flex items-center gap-2 text-xs font-gotham-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80 py-2 px-3.5 sm:px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
-                <span>{copied ? 'Link Copiado!' : 'Compartilhar'}</span>
+                <span>{copied ? tr('Link Copiado!', 'Link Copied!') : tr('Compartilhar', 'Share')}</span>
               </button>
             </div>
           </div>
@@ -252,12 +254,12 @@ export function Blog() {
               <div className="absolute bottom-6 left-6 right-6 text-white">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <span className="bg-[#F49853] text-white text-xs font-gotham-bold px-3 py-1 rounded-full shadow-md uppercase tracking-wider">
-                    {selectedPost.category || 'Geral'}
+                    {selectedPost.category || tr('Geral', 'General')}
                   </span>
                   {selectedPost.featured_home && (
                     <span className="bg-white/20 backdrop-blur-xs text-white text-xs font-gotham-bold px-3 py-1 rounded-full shadow-md flex items-center gap-1">
                       <Star size={12} className="fill-amber-400 text-amber-400" />
-                      <span>Destaque na Home</span>
+                      <span>{tr('Destaque na Home', 'Featured')}</span>
                     </span>
                   )}
                 </div>
@@ -277,11 +279,11 @@ export function Blog() {
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1.5 text-white/90">
-                    <Eye size={13} /> {selectedPost.views_count ?? 0} visualizações
+                    <Eye size={13} /> {selectedPost.views_count ?? 0} {tr('visualizações', 'views')}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1.5 text-white/90">
-                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} leituras
+                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} {tr('leituras', 'reads')}
                   </span>
                 </div>
               </div>
@@ -324,7 +326,7 @@ export function Blog() {
                     }`}
                   >
                     <Heart size={18} className={hasLiked ? "fill-rose-500 text-rose-500" : ""} />
-                    <span>{hasLiked ? 'Você curtiu' : 'Curtir este artigo'}</span>
+                    <span>{hasLiked ? tr('Você curtiu', 'Liked') : tr('Curtir este artigo', 'Like this article')}</span>
                     <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-xs font-mono text-slate-700">
                       {selectedPost.likes_count ?? 0}
                     </span>
@@ -336,7 +338,7 @@ export function Blog() {
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-bold text-sm transition-all cursor-pointer shadow-xs active:scale-95"
                   >
                     <Share2 size={16} />
-                    <span>Compartilhar</span>
+                    <span>{tr('Compartilhar', 'Share')}</span>
                     {selectedPost.shares_count ? (
                       <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-xs font-mono text-slate-700">
                         {selectedPost.shares_count}
@@ -347,11 +349,11 @@ export function Blog() {
 
                 <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
                   <span className="flex items-center gap-1">
-                    <Eye size={13} /> {selectedPost.views_count ?? 0} visualizações
+                    <Eye size={13} /> {selectedPost.views_count ?? 0} {tr('visualizações', 'views')}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
-                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} pessoas leram
+                    <BookOpen size={13} /> {selectedPost.reads_count ?? 0} {tr('pessoas leram', 'people read')}
                   </span>
                 </div>
               </div>
@@ -361,13 +363,16 @@ export function Blog() {
                 <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F49853]/20 text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider mb-2">
                     <Heart size={12} fill="currentColor" />
-                    <span>Faça Parte Desta Missão</span>
+                    <span>{tr('Faça Parte Desta Missão', 'Be Part of This Mission')}</span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-heading font-black text-white">
-                    Transforme Vidas Conosco
+                    {tr('Transforme Vidas Conosco', 'Transform Lives With Us')}
                   </h3>
                   <p className="text-white/70 text-xs sm:text-sm mt-1 max-w-md font-gotham-light">
-                    Sua doação ajuda a alimentar crianças, financiar bolsas e manter a esperança viva em comunidades vulneráveis.
+                    {tr(
+                      'Sua doação ajuda a alimentar crianças, financiar bolsas e manter a esperança viva em comunidades vulneráveis.',
+                      'Your donation helps feed children, fund scholarships, and keep hope alive in vulnerable communities.'
+                    )}
                   </p>
                 </div>
                 <Link
@@ -375,7 +380,7 @@ export function Blog() {
                   className="bg-[#F49853] hover:bg-[#e0853d] text-white px-7 py-3.5 rounded-2xl font-gotham-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 shrink-0 hover:scale-105"
                 >
                   <Heart size={16} fill="currentColor" />
-                  <span>Apoiar Este Projeto</span>
+                  <span>{tr('Apoiar Este Projeto', 'Support This Project')}</span>
                 </Link>
               </div>
 
@@ -387,7 +392,7 @@ export function Blog() {
                   className="inline-flex items-center gap-2 text-xs font-gotham-bold text-slate-500 hover:text-slate-900 py-2 transition-colors cursor-pointer"
                 >
                   <ArrowLeft size={14} />
-                  <span>Voltar para todas as matérias</span>
+                  <span>{tr('Voltar para todas as matérias', 'Back to all stories')}</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -397,7 +402,7 @@ export function Blog() {
                     className="inline-flex items-center gap-1.5 text-xs font-gotham-bold text-slate-500 hover:text-slate-800 py-2 px-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     <Share2 size={13} />
-                    <span>Compartilhar</span>
+                    <span>{tr('Compartilhar', 'Share')}</span>
                   </button>
                 </div>
               </div>
@@ -411,7 +416,7 @@ export function Blog() {
               <div className="flex items-center gap-2 mb-6">
                 <Sparkles size={18} className="text-[#F49853]" />
                 <h3 className="text-2xl font-heading font-black text-slate-900">
-                  Outras Histórias de Transformação
+                  {tr('Outras Histórias de Transformação', 'More Stories of Transformation')}
                 </h3>
               </div>
 
@@ -457,7 +462,7 @@ export function Blog() {
                         </span>
                       </div>
                       <span className="text-[#F49853] flex items-center gap-1">
-                        Ler história
+                        {tr('Ler história', 'Read story')}
                         <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                       </span>
                     </div>
@@ -478,8 +483,11 @@ export function Blog() {
   return (
     <div className="min-h-screen bg-slate-50/50 py-12 px-4 sm:px-6 lg:px-8 font-gotham-regular">
       <SEO 
-        title="Histórias de Esperança e Notícias | Blog YAH Hope"
-        description="Acompanhe histórias reais de transformação, notícias de ações humanitárias e relatórios de campo da YAH Hope em Moçambique e no Brasil."
+        title={tr('Histórias de Esperança e Notícias | Blog YAH Hope', 'Stories of Hope & News | YAH Hope Blog')}
+        description={tr(
+          'Acompanhe histórias reais de transformação, notícias de ações humanitárias e relatórios de campo da YAH Hope em Moçambique e no Brasil.',
+          'Follow real stories of transformation, humanitarian news, and field reports from YAH Hope in Mozambique and Brazil.'
+        )}
         keywords="blog YAH Hope, histórias de superação, missões Moçambique, ajuda humanitária notícias, testemunhos, voluntariado"
         canonical="https://yahhope.com/blog"
         jsonLd={{
@@ -509,22 +517,25 @@ export function Blog() {
         {/* Header */}
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-100 text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider mb-3">
-            <span>Histórias & Transformação</span>
+            <span>{tr('Histórias & Transformação', 'Stories & Transformation')}</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight font-heading">
-            Blog YAH Hope
+            {tr('Blog YAH Hope', 'YAH Hope Blog')}
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto mt-3 font-gotham-light">
-            Acompanhe nossas histórias, relatórios de campo e o impacto que o amor prático está gerando no Brasil e em Moçambique.
+            {tr(
+              'Acompanhe nossas histórias, relatórios de campo e o impacto que o amor prático está gerando no Brasil e em Moçambique.',
+              'Follow our stories, field reports, and the impact that practical love is making in Brazil and Mozambique.'
+            )}
           </p>
         </div>
 
         {/* Posts Grid */}
         {publishedPosts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xs max-w-lg mx-auto p-8">
-            <h3 className="font-heading font-bold text-slate-800 text-lg">Nenhum artigo publicado ainda</h3>
+            <h3 className="font-heading font-bold text-slate-800 text-lg">{tr('Nenhum artigo publicado ainda', 'No articles published yet')}</h3>
             <p className="text-sm text-slate-500 mt-2">
-              Volte em breve para acompanhar as novidades e relatórios de campo da YAH Hope.
+              {tr('Volte em breve para acompanhar as novidades e relatórios de campo da YAH Hope.', 'Check back soon for news and field reports from YAH Hope.')}
             </p>
           </div>
         ) : (
@@ -547,12 +558,12 @@ export function Blog() {
                   />
                   <div className="absolute top-3 left-3 flex items-center gap-2">
                     <span className="bg-white/95 backdrop-blur-xs text-slate-800 text-[11px] font-gotham-bold px-3 py-1 rounded-full shadow-sm">
-                      {post.category || 'Geral'}
+                      {post.category || tr('Geral', 'General')}
                     </span>
                     {post.featured_home && (
                       <span className="bg-amber-500 text-white text-[10px] font-gotham-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
                         <Star size={10} className="fill-white" />
-                        <span>Destaque</span>
+                        <span>{tr('Destaque', 'Featured')}</span>
                       </span>
                     )}
                   </div>
@@ -595,12 +606,12 @@ export function Blog() {
 
                   <div className="pt-5 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-gotham-bold text-[#F49853]">
                     <span className="group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                      Ler matéria completa
+                      {tr('Ler matéria completa', 'Read full story')}
                       <ArrowRight size={13} />
                     </span>
 
                     <span className="text-slate-400 font-mono text-[11px] font-normal flex items-center gap-1">
-                      <BookOpen size={12} /> {post.reads_count ?? 0} leram
+                      <BookOpen size={12} /> {post.reads_count ?? 0} {tr('leram', 'reads')}
                     </span>
                   </div>
                 </div>

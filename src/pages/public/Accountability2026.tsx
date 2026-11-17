@@ -24,6 +24,8 @@ import { supabase } from '../../lib/supabase';
 import { SEO } from '../../components/common/SEO';
 import { PublicFooter } from '../../components/PublicFooter';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/common/LanguageSwitcher';
 import { isSpamFinanceTransaction, deduplicateFinanceTransactions } from '../../utils/userCleanup';
 import {
   ACCOUNTABILITY_2026_DOMAIN,
@@ -59,6 +61,7 @@ interface PublicProject {
 }
 
 export function Accountability2026() {
+  const { tr, isEn } = useLanguage();
   const [searchParams] = useSearchParams();
   const forceLivePreview = searchParams.get('preview') === 'live';
 
@@ -201,24 +204,30 @@ export function Accountability2026() {
         repassedAmt,
         spentAmt,
         investedAmt: Math.max(repassedAmt, spentAmt),
-        status: 'Em execução'
+        status: isEn ? 'In progress' : 'Em execução'
       };
     };
 
     const executedProjects = [
       buildProjectSummary(
         'nutrition',
-        nutriProj?.name || 'Casa Nutri — Nutrição Infantil (Moçambique)',
+        nutriProj?.name || tr('Casa Nutri — Nutrição Infantil (Moçambique)', 'Casa Nutri — Child Nutrition (Mozambique)'),
         nutriProj?.description ||
-          'Acompanhamento nutricional clínico, suplementação, cestas básicas, visitas domiciliares e cuidado contínuo às crianças e famílias em Moçambique.',
-        'Saúde & Nutrição Infantil'
+          tr(
+            'Acompanhamento nutricional clínico, suplementação, cestas básicas, visitas domiciliares e cuidado contínuo às crianças e famílias em Moçambique.',
+            'Clinical nutritional monitoring, supplementation, food baskets, home visits, and ongoing care for children and families in Mozambique.'
+          ),
+        tr('Saúde & Nutrição Infantil', 'Child Health & Nutrition')
       ),
       buildProjectSummary(
         'communication',
-        commProj?.name || 'Comunicação, Transparência & Captação',
+        commProj?.name || tr('Comunicação, Transparência & Captação', 'Communication, Transparency & Fundraising'),
         commProj?.description ||
-          'Manutenção da plataforma de apadrinhamento, portal do mantenedor, prestação de contas e mobilização de novos apoiadores.',
-        'Infraestrutura & Transparência'
+          tr(
+            'Manutenção da plataforma de apadrinhamento, portal do mantenedor, prestação de contas e mobilização de novos apoiadores.',
+            'Maintenance of the sponsorship platform, supporter portal, financial reporting, and mobilization of new supporters.'
+          ),
+        tr('Infraestrutura & Transparência', 'Infrastructure & Transparency')
       ),
       ...projects
         .filter(p => {
@@ -229,8 +238,8 @@ export function Accountability2026() {
           buildProjectSummary(
             p.id,
             p.name,
-            p.description || 'Projeto social acompanhado e executado pela YAH Hope.',
-            p.category || 'Desenvolvimento Social'
+            p.description || tr('Projeto social acompanhado e executado pela YAH Hope.', 'Social project monitored and executed by YAH Hope.'),
+            p.category || tr('Desenvolvimento Social', 'Social Development')
           )
         )
     ];
@@ -254,8 +263,11 @@ export function Accountability2026() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
       <SEO
-        title="Prestação de Contas 2026 | YAH Hope"
-        description="Portal Oficial de Transparência e Prestação de Contas 2026 da YAH Hope: Entradas, Saídas, Saldo em Caixa e Projetos Executados."
+        title={tr('Prestação de Contas 2026 | YAH Hope', '2026 Accountability Report | YAH Hope')}
+        description={tr(
+          'Portal Oficial de Transparência e Prestação de Contas 2026 da YAH Hope: Entradas, Saídas, Saldo em Caixa e Projetos Executados.',
+          'Official 2026 Transparency and Accountability Portal of YAH Hope: Income, Expenses, Cash Balance, and Executed Projects.'
+        )}
       />
 
       {/* TOP BAR INSTITUCIONAL */}
@@ -281,14 +293,15 @@ export function Accountability2026() {
           <div className="flex items-center gap-2.5">
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
               <ShieldCheck size={14} />
-              Transparência 2026
+              {tr('Transparência 2026', '2026 Transparency')}
             </span>
             <a
               href="https://yahhope.com"
               className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
-              Site Oficial <ExternalLink size={13} />
+              {tr('Site Oficial', 'Official Site')} <ExternalLink size={13} />
             </a>
+            <LanguageSwitcher theme="dark" />
           </div>
         </div>
       </header>
@@ -301,7 +314,7 @@ export function Accountability2026() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10 text-center space-y-5">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/15 text-amber-300 text-xs font-black uppercase tracking-wider">
             <Heart size={14} className="text-[#F49853] fill-[#F49853]" />
-            Portal Oficial de Prestação de Contas • Exercício 2026
+            {tr('Portal Oficial de Prestação de Contas • Exercício 2026', 'Official Accountability Portal • Fiscal Year 2026')}
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-3xl mx-auto">
@@ -319,7 +332,7 @@ export function Accountability2026() {
             </div>
             <div>
               <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 block mb-1">
-                Você veio pelo Cartão de Agradecimento?
+                {tr('Você veio pelo Cartão de Agradecimento?', 'Did you arrive via the Thank-You Card?')}
               </span>
               <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
                 {config.thankYouMessage}
@@ -341,14 +354,17 @@ export function Accountability2026() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
-                    Caminho Oficial Registrado • {ACCOUNTABILITY_2026_DOMAIN}
+                    {tr(`Caminho Oficial Registrado • ${ACCOUNTABILITY_2026_DOMAIN}`, `Official Registered Domain • ${ACCOUNTABILITY_2026_DOMAIN}`)}
                   </span>
                 </div>
                 <h2 className="text-lg sm:text-xl font-black text-slate-900">
-                  Demonstrativo Financeiro 2026 em Fase de Consolidação
+                  {tr('Demonstrativo Financeiro 2026 em Fase de Consolidação', '2026 Financial Statement Under Consolidation')}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-2xl">
-                  Este endereço oficial (<strong>{ACCOUNTABILITY_2026_DOMAIN}</strong>) já está ativo para os cartões de agradecimento da YAH Hope. Os relatórios detalhados de entradas, saídas, posição de caixa e execução de cada projeto são atualizados periodicamente pela nossa equipe financeira abaixo.
+                  {tr(
+                    `Este endereço oficial (${ACCOUNTABILITY_2026_DOMAIN}) já está ativo para os cartões de agradecimento da YAH Hope. Os relatórios detalhados de entradas, saídas, posição de caixa e execução de cada projeto são atualizados periodicamente pela nossa equipe financeira abaixo.`,
+                    `This official address (${ACCOUNTABILITY_2026_DOMAIN}) is now active for YAH Hope thank-you cards. Detailed reports on income, expenses, cash balance, and project execution are updated periodically by our finance team below.`
+                  )}
                 </p>
               </div>
             </div>
@@ -357,7 +373,7 @@ export function Accountability2026() {
               href="https://yahhope.com/portal/login"
               className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center gap-2 shrink-0 transition-all"
             >
-              Acessar Portal do Apoiador <ArrowUpRight size={15} />
+              {tr('Acessar Portal do Apoiador', 'Access Supporter Portal')} <ArrowUpRight size={15} />
             </a>
           </div>
         )}
@@ -370,8 +386,8 @@ export function Accountability2026() {
                 <FileCheck2 size={18} />
               </div>
               <div>
-                <h2 className="text-sm font-black text-slate-900">Balancete de Transparência em Tempo Real</h2>
-                <p className="text-xs text-slate-500">Dados sincronizados diretamente com a Central Financeira YAH Hope</p>
+                <h2 className="text-sm font-black text-slate-900">{tr('Balancete de Transparência em Tempo Real', 'Real-Time Transparency Balance Sheet')}</h2>
+                <p className="text-xs text-slate-500">{tr('Dados sincronizados diretamente com a Central Financeira YAH Hope', 'Data synced directly with the YAH Hope Finance Hub')}</p>
               </div>
             </div>
 
@@ -384,7 +400,7 @@ export function Accountability2026() {
                   selectedYear === '2026' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
                 )}
               >
-                Exercício 2026
+                {tr('Exercício 2026', 'Fiscal Year 2026')}
               </button>
               <button
                 type="button"
@@ -394,7 +410,7 @@ export function Accountability2026() {
                   selectedYear === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
                 )}
               >
-                Histórico Completo
+                {tr('Histórico Completo', 'Full History')}
               </button>
             </div>
           </div>
@@ -410,22 +426,22 @@ export function Accountability2026() {
                   <TrendingUp size={24} />
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  1. Nossa Entrada
+                  {tr('1. Nossa Entrada', '1. Our Income')}
                 </span>
               </div>
 
               <p className="text-xs font-black uppercase tracking-wider text-slate-400">
-                Total Arrecadado (Doações & Apoios)
+                {tr('Total Arrecadado (Doações & Apoios)', 'Total Raised (Donations & Support)')}
               </p>
 
               {showNumbers ? (
                 <p className="text-3xl font-black text-slate-900 mt-1">
-                  R$ {summary.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {summary.totalIncome.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               ) : (
                 <div className="mt-2">
                   <span className="inline-flex items-center gap-1.5 text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                    <Clock size={14} /> Em consolidação contábil 2026
+                    <Clock size={14} /> {tr('Em consolidação contábil 2026', 'Under 2026 accounting consolidation')}
                   </span>
                 </div>
               )}
@@ -434,32 +450,32 @@ export function Accountability2026() {
             <div className="mt-6 pt-4 border-t border-slate-100 space-y-2 text-xs">
               <div className="flex items-center justify-between text-slate-600">
                 <span className="flex items-center gap-1.5 font-bold">
-                  <Heart size={12} className="text-rose-500 fill-rose-500" /> Padrinhos (Cotas):
+                  <Heart size={12} className="text-rose-500 fill-rose-500" /> {tr('Padrinhos (Cotas):', 'Sponsors (Shares):')}
                 </span>
                 <strong className="text-slate-900">
                   {showNumbers
-                    ? `R$ ${summary.padrinhosIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Registrado'}
+                    ? `R$ ${summary.padrinhosIncome.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Registrado', 'Recorded')}
                 </strong>
               </div>
               <div className="flex items-center justify-between text-slate-600">
                 <span className="flex items-center gap-1.5 font-bold">
-                  <Repeat size={12} className="text-blue-500" /> Mantenedores Mensais:
+                  <Repeat size={12} className="text-blue-500" /> {tr('Mantenedores Mensais:', 'Monthly Supporters:')}
                 </span>
                 <strong className="text-slate-900">
                   {showNumbers
-                    ? `R$ ${summary.mantenedoresIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Registrado'}
+                    ? `R$ ${summary.mantenedoresIncome.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Registrado', 'Recorded')}
                 </strong>
               </div>
               <div className="flex items-center justify-between text-slate-600">
                 <span className="flex items-center gap-1.5 font-bold">
-                  <DollarSign size={12} className="text-emerald-600" /> Doações & Ofertas:
+                  <DollarSign size={12} className="text-emerald-600" /> {tr('Doações & Ofertas:', 'Donations & Gifts:')}
                 </span>
                 <strong className="text-slate-900">
                   {showNumbers
-                    ? `R$ ${summary.doacoesIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Registrado'}
+                    ? `R$ ${summary.doacoesIncome.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Registrado', 'Recorded')}
                 </strong>
               </div>
             </div>
@@ -473,22 +489,22 @@ export function Accountability2026() {
                   <TrendingDown size={24} />
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-200">
-                  2. Nossa Saída
+                  {tr('2. Nossa Saída', '2. Our Expenses')}
                 </span>
               </div>
 
               <p className="text-xs font-black uppercase tracking-wider text-slate-400">
-                Custos & Investimento Social Executado
+                {tr('Custos & Investimento Social Executado', 'Costs & Social Investment Executed')}
               </p>
 
               {showNumbers ? (
                 <p className="text-3xl font-black text-rose-600 mt-1">
-                  R$ {summary.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {summary.totalExpense.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               ) : (
                 <div className="mt-2">
                   <span className="inline-flex items-center gap-1.5 text-sm font-black text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
-                    <Clock size={14} /> Em consolidação contábil 2026
+                    <Clock size={14} /> {tr('Em consolidação contábil 2026', 'Under 2026 accounting consolidation')}
                   </span>
                 </div>
               )}
@@ -496,16 +512,16 @@ export function Accountability2026() {
 
             <div className="mt-6 pt-4 border-t border-slate-100 space-y-2 text-xs">
               <div className="flex items-center justify-between text-slate-600">
-                <span className="font-bold">Repassado aos Projetos:</span>
+                <span className="font-bold">{tr('Repassado aos Projetos:', 'Transferred to Projects:')}</span>
                 <strong className="text-slate-900">
                   {showNumbers
-                    ? `R$ ${summary.totalRepassed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Auditado por projeto'}
+                    ? `R$ ${summary.totalRepassed.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Auditado por projeto', 'Audited per project')}
                 </strong>
               </div>
               <div className="flex items-center justify-between text-slate-600">
-                <span className="font-bold">Aplicação Direta:</span>
-                <strong className="text-emerald-700">Nutrição, Saúde e Operação</strong>
+                <span className="font-bold">{tr('Aplicação Direta:', 'Direct Allocation:')}</span>
+                <strong className="text-emerald-700">{tr('Nutrição, Saúde e Operação', 'Nutrition, Health & Operations')}</strong>
               </div>
             </div>
           </div>
@@ -518,22 +534,22 @@ export function Accountability2026() {
                   <Wallet size={24} />
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  3. Quanto Temos em Caixa
+                  {tr('3. Quanto Temos em Caixa', '3. Cash Balance')}
                 </span>
               </div>
 
               <p className="text-xs font-black uppercase tracking-wider text-slate-400">
-                Saldo Total Consolidado em Caixa
+                {tr('Saldo Total Consolidado em Caixa', 'Total Consolidated Cash Balance')}
               </p>
 
               {showNumbers ? (
                 <p className="text-3xl font-black text-white mt-1">
-                  R$ {summary.consolidatedCash.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {summary.consolidatedCash.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               ) : (
                 <div className="mt-2">
                   <span className="inline-flex items-center gap-1.5 text-sm font-black text-emerald-300 bg-white/10 px-3 py-1.5 rounded-xl border border-white/15">
-                    <Clock size={14} /> Em consolidação contábil 2026
+                    <Clock size={14} /> {tr('Em consolidação contábil 2026', 'Under 2026 accounting consolidation')}
                   </span>
                 </div>
               )}
@@ -541,19 +557,19 @@ export function Accountability2026() {
 
             <div className="mt-6 pt-4 border-t border-white/10 space-y-2 text-xs relative z-10">
               <div className="flex items-center justify-between text-slate-300">
-                <span className="font-medium">Caixa Central Livre:</span>
+                <span className="font-medium">{tr('Caixa Central Livre:', 'Unrestricted Central Cash:')}</span>
                 <strong className="text-white">
                   {showNumbers
-                    ? `R$ ${summary.centralCash.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Reserva Institucional'}
+                    ? `R$ ${summary.centralCash.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Reserva Institucional', 'Institutional Reserve')}
                 </strong>
               </div>
               <div className="flex items-center justify-between text-slate-300">
-                <span className="font-medium">Saldo Alocado nos Projetos:</span>
+                <span className="font-medium">{tr('Saldo Alocado nos Projetos:', 'Allocated Project Balance:')}</span>
                 <strong className="text-emerald-400">
                   {showNumbers
-                    ? `R$ ${summary.projectsCash.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : 'Fundo de Execução'}
+                    ? `R$ ${summary.projectsCash.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                    : tr('Fundo de Execução', 'Execution Fund')}
                 </strong>
               </div>
             </div>
@@ -565,13 +581,16 @@ export function Accountability2026() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
             <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
-                <Layers size={12} /> 4. Projetos Executados
+                <Layers size={12} /> {tr('4. Projetos Executados', '4. Executed Projects')}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Cada Projeto Executado pela YAH Hope
+                {tr('Cada Projeto Executado pela YAH Hope', 'Every Project Executed by YAH Hope')}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                Veja para onde os recursos são direcionados e o impacto gerado em cada frente de atuação.
+                {tr(
+                  'Veja para onde os recursos são direcionados e o impacto gerado em cada frente de atuação.',
+                  'See where resources are directed and the impact generated across each area of action.'
+                )}
               </p>
             </div>
           </div>
@@ -617,22 +636,22 @@ export function Accountability2026() {
                   <div className="bg-white rounded-2xl p-4 border border-slate-200/70 grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                        Recursos Repassados
+                        {tr('Recursos Repassados', 'Transferred Funds')}
                       </span>
                       <span className="text-sm sm:text-base font-black text-emerald-700 mt-0.5 block">
                         {showNumbers
-                          ? `R$ ${proj.repassedAmt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                          : 'Em consolidação'}
+                          ? `R$ ${proj.repassedAmt.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                          : tr('Em consolidação', 'Consolidating')}
                       </span>
                     </div>
                     <div className="border-l border-slate-100 pl-4">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                        Despesas Executadas
+                        {tr('Despesas Executadas', 'Executed Expenses')}
                       </span>
                       <span className="text-sm sm:text-base font-black text-slate-900 mt-0.5 block">
                         {showNumbers
-                          ? `R$ ${proj.spentAmt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                          : 'Em consolidação'}
+                          ? `R$ ${proj.spentAmt.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}`
+                          : tr('Em consolidação', 'Consolidating')}
                       </span>
                     </div>
                   </div>
@@ -646,13 +665,17 @@ export function Accountability2026() {
         <section className="bg-slate-900 rounded-3xl p-8 sm:p-10 text-white flex flex-col lg:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center lg:text-left max-w-xl">
             <div className="inline-flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider">
-              <Sparkles size={15} /> Compromisso YAH Hope com cada doador
+              <Sparkles size={15} /> {tr('Compromisso YAH Hope com cada doador', 'YAH Hope Commitment to Every Donor')}
             </div>
             <h3 className="text-xl sm:text-2xl font-black">
-              Obrigado por transformar vidas conosco em 2026!
+              {tr('Obrigado por transformar vidas conosco em 2026!', 'Thank you for transforming lives with us in 2026!')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Guarde o seu Cartão de Agradecimento. Sempre que quiser consultar a evolução das nossas entradas, saídas, saldo em caixa e projetos executados, basta apontar a câmera do celular para o QR Code ou acessar <strong>{ACCOUNTABILITY_2026_DOMAIN}</strong>.
+              {tr(
+                'Guarde o seu Cartão de Agradecimento. Sempre que quiser consultar a evolução das nossas entradas, saídas, saldo em caixa e projetos executados, basta apontar a câmera do celular para o QR Code ou acessar ',
+                'Keep your Thank-You Card. Whenever you wish to check our income, expenses, cash balance, and executed projects, simply scan the QR Code or visit '
+              )}
+              <strong>{ACCOUNTABILITY_2026_DOMAIN}</strong>.
             </p>
           </div>
 
@@ -661,13 +684,13 @@ export function Accountability2026() {
               href="https://yahhope.com/mantenedor"
               className="px-5 py-3.5 rounded-2xl bg-[#F49853] hover:bg-[#e08743] text-slate-950 font-black text-xs sm:text-sm transition-all"
             >
-              Conhecer Programa de Mantenedores
+              {tr('Conhecer Programa de Mantenedores', 'Explore Monthly Supporter Program')}
             </a>
             <a
               href="https://yahhope.com"
               className="px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm transition-all"
             >
-              Voltar ao Site Principal
+              {tr('Voltar ao Site Principal', 'Back to Main Website')}
             </a>
           </div>
         </section>

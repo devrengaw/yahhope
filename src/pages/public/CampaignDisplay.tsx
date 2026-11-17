@@ -4,8 +4,10 @@ import { useFundraising } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
 import { CheckCircle2, Calendar, Target, Sparkles, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function CampaignDisplay() {
+  const { tr, isEn } = useLanguage();
   const [searchParams] = useSearchParams();
   const urlCampaignId = searchParams.get('id') || searchParams.get('campaign');
 
@@ -119,7 +121,7 @@ export function CampaignDisplay() {
       }}
     >
       <SEO
-        title="Painel da Campanha | YAH Hope"
+        title={tr('Painel da Campanha | YAH Hope', 'Campaign Display | YAH Hope')}
         canonical="https://yahhope.com/campanha-display"
         noIndex={true}
       />
@@ -129,7 +131,7 @@ export function CampaignDisplay() {
       {/* Header Topo */}
       <div className="w-full max-w-7xl mx-auto z-10 flex flex-col items-center justify-center flex-shrink-0 mt-2 mb-4 md:mb-6">
         <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-2xl text-center uppercase tracking-[0.1em] transform scale-x-105">
-          Participe
+          {tr('Participe', 'Join In')}
         </h1>
       </div>
 
@@ -145,17 +147,17 @@ export function CampaignDisplay() {
               <div className="flex items-center gap-2">
                 {slideStats.isMonthly ? (
                   <span className="bg-blue-500/25 text-blue-200 border border-blue-400/40 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wider">
-                    <Calendar size={13} /> Meta do Mês • {currentMonthName}
+                    <Calendar size={13} /> {tr(`Meta do Mês • ${currentMonthName}`, `Monthly Goal • ${currentMonthName}`)}
                   </span>
                 ) : (
                   <span className="bg-purple-500/25 text-purple-200 border border-purple-400/40 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wider">
-                    <Target size={13} /> Campanha Especial
+                    <Target size={13} /> {tr('Campanha Especial', 'Special Campaign')}
                   </span>
                 )}
 
                 <span className="bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={12} className="text-amber-400" />
-                  Estágio #{currentSlideIndex + 1} de {activeCampaigns.length}
+                  {tr(`Estágio #${currentSlideIndex + 1} de ${activeCampaigns.length}`, `Stage #${currentSlideIndex + 1} of ${activeCampaigns.length}`)}
                 </span>
               </div>
 
@@ -216,10 +218,10 @@ export function CampaignDisplay() {
             <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 mb-6">
               <div className="flex justify-between items-center text-xs mb-1.5">
                 <span className="text-emerald-200/90 font-bold">
-                  Evolução desta campanha individual:
+                  {tr('Evolução desta campanha individual:', 'Progress of this individual campaign:')}
                 </span>
                 <span className="text-white font-black">
-                  R$ {slideStats.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} de R$ {slideStats.targetAmount.toLocaleString('pt-BR')} ({slideStats.percentage}%)
+                  R$ {slideStats.currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })} {tr('de', 'of')} R$ {slideStats.targetAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR')} ({slideStats.percentage}%)
                 </span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
@@ -240,20 +242,20 @@ export function CampaignDisplay() {
                     {overallPercentage}%
                   </span>
                   <span className="text-emerald-200/90 text-sm md:text-base font-bold">
-                    (R$ {totalRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                    (R$ {totalRaised.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})
                   </span>
                 </div>
               </div>
               
               <div className="text-right">
                 <p className="text-emerald-200/80 uppercase tracking-widest font-bold text-xs md:text-sm mb-1">
-                  Meta Geral Unificada
+                  {tr('Meta Geral Unificada', 'Unified Overall Goal')}
                 </p>
                 <p className="text-2xl md:text-3xl font-black text-white">
-                  R$ {totalGoal.toLocaleString('pt-BR')}
+                  R$ {totalGoal.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
                 </p>
                 <p className="text-[11px] text-emerald-300/80 font-medium">
-                  {activeCampaigns.length} {activeCampaigns.length === 1 ? 'estágio na régua' : 'estágios na régua'}
+                  {activeCampaigns.length} {activeCampaigns.length === 1 ? tr('estágio na régua', 'stage on tracker') : tr('estágios na régua', 'stages on tracker')}
                 </p>
               </div>
             </div>
@@ -326,18 +328,21 @@ export function CampaignDisplay() {
         {/* Painel Direito: QR Code que leva para a Página Geral de Campanhas */}
         <div className="bg-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[2.5rem] p-6 md:p-8 text-center shadow-2xl flex flex-col items-center justify-center transform lg:scale-105 relative z-20 self-stretch mt-4 lg:mt-0">
           <div className="absolute -top-5 bg-brand-orange text-white font-black uppercase tracking-widest px-6 py-1.5 rounded-full shadow-lg text-sm flex items-center gap-1.5">
-            <Sparkles size={14} /> Apoie Agora
+            <Sparkles size={14} /> {tr('Apoie Agora', 'Support Now')}
           </div>
           
-          <h2 className="text-2xl font-black text-white mb-1 mt-3">Escaneie para Doar</h2>
+          <h2 className="text-2xl font-black text-white mb-1 mt-3">{tr('Escaneie para Doar', 'Scan to Donate')}</h2>
           <p className="text-emerald-100/90 mb-6 text-sm font-medium px-4">
-            Aponte a câmera do celular para escolher uma das campanhas no site e transformar vidas.
+            {tr(
+              'Aponte a câmera do celular para escolher uma das campanhas no site e transformar vidas.',
+              'Point your phone camera to choose a campaign on our site and transform lives.'
+            )}
           </p>
           
           <div className="bg-white p-4 rounded-3xl shadow-inner border-4 border-white/20">
             <img 
               src={qrCodeUrl} 
-              alt="QR Code para Página de Doação" 
+              alt={tr('QR Code para Página de Doação', 'QR Code for Donation Page')} 
               className="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl"
               crossOrigin="anonymous"
             />
@@ -348,7 +353,7 @@ export function CampaignDisplay() {
               yahhope.com/campanha
             </p>
             <p className="text-emerald-200/60 text-[11px] mt-1 uppercase font-bold tracking-widest">
-              PIX • Cartão de Crédito
+              {tr('PIX • Cartão de Crédito', 'PIX • Credit Card')}
             </p>
           </div>
         </div>

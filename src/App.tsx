@@ -53,6 +53,7 @@ import { PatientProvider } from './contexts/PatientContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { ConfirmProvider } from './contexts/ConfirmContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { AnnouncementProvider } from './contexts/AnnouncementContext';
 import { ImpactProvider } from './contexts/ImpactContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -273,7 +274,8 @@ export default function App() {
   }, []);
 
   return (
-    <ConfirmProvider>
+    <LanguageProvider>
+      <ConfirmProvider>
       <AuthProvider>
         <NotificationProvider>
           <FundraisingProvider>
@@ -550,5 +552,6 @@ export default function App() {
         </NotificationProvider>
       </AuthProvider>
     </ConfirmProvider>
+    </LanguageProvider>
   );
 }

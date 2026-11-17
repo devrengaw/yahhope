@@ -24,6 +24,8 @@ import {
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
 import { PublicFooter } from '../../components/PublicFooter';
 import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../../components/common/LanguageSwitcher';
 
 /**
  * Estrutura escalável de projetos para a campanha institucional da YAH Hope.
@@ -137,8 +139,60 @@ const SPONSORSHIP_QUOTA_OPTIONS = [
 ];
 
 export function CampaignHotsite() {
+  const { tr, isEn } = useLanguage();
   const [selectedModality, setSelectedModality] = useState<'sponsorship' | 'general'>('sponsorship');
   const [selectedQuotas, setSelectedQuotas] = useState<number>(1);
+
+  const publishedProjects = PUBLISHED_CAMPAIGN_PROJECTS.map((p) => ({
+    ...p,
+    name: isEn ? 'Child Nutrition Care — Mozambique' : p.name,
+    summary: isEn
+      ? 'We currently care for 10 children facing malnutrition, offering ongoing support and guidance to their families. Our commitment is to walk alongside every story with responsibility, care, and closeness.'
+      : p.summary,
+    location: isEn ? 'Mozambique' : p.location,
+    category: isEn ? 'Health & Nutrition' : p.category,
+    statusLabel: isEn ? 'Active' : p.statusLabel,
+    verifiedHighlights: isEn
+      ? ['10 children currently supported', 'Family support & guidance', 'Continuous follow-up care']
+      : p.verifiedHighlights,
+  }));
+
+  const institutionalPillars = INSTITUTIONAL_PILLARS.map((pillar) => ({
+    ...pillar,
+    title: isEn
+      ? pillar.id === 'cuidar'
+        ? 'CARE'
+        : pillar.id === 'fortalecer'
+          ? 'STRENGTHEN'
+          : 'TRANSFORM'
+      : pillar.title,
+    description: isEn
+      ? pillar.id === 'cuidar'
+        ? 'Being present in the face of human need, offering warmth, attention, and support.'
+        : pillar.id === 'fortalecer'
+          ? 'Helping families and communities build self-reliance, security, and new possibilities.'
+          : 'Creating opportunities that can bring lasting change to people’s lives.'
+      : pillar.description,
+  }));
+
+  const transparencyFeatures = TRANSPARENCY_FEATURES.map((item, idx) => {
+    if (!isEn) return item;
+    const enItems = [
+      { title: 'Exclusive portal', description: 'A dedicated space for monthly supporters and sponsors to follow their journey with YAH Hope.' },
+      { title: 'Children updates', description: 'Thoughtful and respectful updates on the development of the children supported by the project.' },
+      { title: 'Project updates', description: 'Periodic reports on ongoing field actions and milestones achieved on the ground.' },
+      { title: 'Initiative tracking', description: 'A clear view of how each area of work evolves alongside the families and communities served.' },
+      { title: 'Use of resources', description: 'Transparent access to your monthly contributions and financial accountability reports.' },
+      { title: 'YAH Hope communications', description: 'Firsthand access to institutional announcements, news, and the organization’s next steps.' },
+    ];
+    return { ...item, ...enItems[idx] };
+  });
+
+  const sponsorshipQuotaOptions = SPONSORSHIP_QUOTA_OPTIONS.map((opt) => ({
+    ...opt,
+    label: isEn ? (opt.quotas === 1 ? '1 child' : `${opt.quotas} children`) : opt.label,
+    price: isEn ? `R$ ${opt.quotas * 90}/mo` : opt.price,
+  }));
 
   useEffect(() => {
     recordCampaignPageView('Hotsite - Um convite para levar esperança | YAH Hope');
@@ -167,26 +221,35 @@ export function CampaignHotsite() {
   return (
     <div className="min-h-screen bg-[#070B12] text-slate-100 antialiased selection:bg-[#F49853] selection:text-white overflow-x-hidden flex flex-col">
       <SEO 
-        title="Um convite para levar esperança | YAH Hope" 
-        description="A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas."
+        title={tr('Um convite para levar esperança | YAH Hope', 'An invitation to bring hope | YAH Hope')} 
+        description={tr(
+          'A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas.',
+          'YAH Hope exists to turn care into opportunity. Today, we walk alongside children and families in Mozambique. With you, we can stay present and reach new lives.'
+        )}
         keywords="YAH Hope, apadrinhar criança, mantenedor YAH Hope, desnutrição infantil Moçambique, ONG ajuda humanitária"
         canonical="https://yahhope.com/campanha-yahhope"
         ogImage="https://yahhope.com/login_bg_real.jpg"
       />
 
-      {/* TOPO INSTITUCIONAL LIMPO: Apenas o Logo Centralizado apontando para www.yahhope.com */}
-      <header className="sticky top-0 z-40 py-2.5 sm:py-3 px-4 border-b border-white/10 bg-[#070B12]/85 backdrop-blur-md flex items-center justify-center">
-        <a 
-          href="https://www.yahhope.com" 
-          title="Ir para o site principal da YAH Hope"
-          className="inline-block transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F49853] rounded-lg"
-        >
-          <img 
-            src="/logo.png" 
-            alt="YAH Hope" 
-            className="h-14 sm:h-18 md:h-20 w-auto object-contain drop-shadow-xl"
-          />
-        </a>
+      {/* TOPO INSTITUCIONAL LIMPO: Logo Centralizado + Seletor de Idioma à Direita */}
+      <header className="sticky top-0 z-40 py-2.5 sm:py-3 px-4 border-b border-white/10 bg-[#070B12]/85 backdrop-blur-md grid grid-cols-3 items-center">
+        <div />
+        <div className="flex justify-center">
+          <a 
+            href="https://www.yahhope.com" 
+            title={tr('Ir para o site principal da YAH Hope', 'Go to main YAH Hope website')}
+            className="inline-block transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F49853] rounded-lg"
+          >
+            <img 
+              src="/logo.png" 
+              alt="YAH Hope" 
+              className="h-14 sm:h-18 md:h-20 w-auto object-contain drop-shadow-xl"
+            />
+          </a>
+        </div>
+        <div className="flex justify-end">
+          <LanguageSwitcher theme="dark" />
+        </div>
       </header>
 
       <main className="flex-1">
@@ -216,11 +279,14 @@ export function CampaignHotsite() {
                 id="hero-heading"
                 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.1] drop-shadow-sm"
               >
-                Um convite para levar esperança.
+                {tr('Um convite para levar esperança.', 'An invitation to bring hope.')}
               </h1>
 
               <p className="text-base sm:text-xl text-slate-200 leading-relaxed font-normal max-w-xl text-justify">
-                A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas.
+                {tr(
+                  'A YAH Hope existe para transformar cuidado em oportunidades. Hoje, acompanhamos crianças e famílias em Moçambique. Com você, queremos continuar presentes e alcançar novas vidas.',
+                  'YAH Hope exists to turn care into opportunity. Today, we walk alongside children and families in Mozambique. With you, we can stay present and reach new lives.'
+                )}
               </p>
 
               {/* CTAs Primário e Secundário */}
@@ -231,7 +297,7 @@ export function CampaignHotsite() {
                   className="min-h-[50px] px-7 py-3.5 rounded-2xl bg-[#F49853] hover:bg-[#e38640] text-white font-bold text-sm sm:text-base tracking-wide shadow-xl shadow-[#F49853]/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-[0.99]"
                 >
                   <Heart size={18} className="fill-current" />
-                  <span>Quero fazer parte</span>
+                  <span>{tr('Quero fazer parte', 'I want to join')}</span>
                 </button>
 
                 <button
@@ -239,7 +305,7 @@ export function CampaignHotsite() {
                   onClick={() => scrollToSection('quem-somos', 'Hero CTA - Conheça nosso trabalho')}
                   className="min-h-[50px] px-7 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/25 backdrop-blur-md font-semibold text-sm sm:text-base transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 >
-                  <span>Conheça nosso trabalho</span>
+                  <span>{tr('Conheça nosso trabalho', 'Explore our work')}</span>
                   <ArrowRight size={17} />
                 </button>
               </div>
@@ -258,22 +324,25 @@ export function CampaignHotsite() {
           <div className="max-w-6xl mx-auto space-y-12">
             <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
               <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block">
-                Quem Somos e o Que Nos Move
+                {tr('Quem Somos e o Que Nos Move', 'Who We Are & What Moves Us')}
               </span>
               <h2 
                 id="quem-somos-heading"
                 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
               >
-                Cuidar hoje. Construir possibilidades para o amanhã.
+                {tr('Cuidar hoje. Construir possibilidades para o amanhã.', 'Caring today. Building possibilities for tomorrow.')}
               </h2>
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
-                Acreditamos que cada vida carrega uma história e um futuro de possibilidades. Nosso compromisso é caminhar ao lado de pessoas e comunidades, oferecendo cuidado, fortalecendo vínculos e criando oportunidades de transformação.
+                {tr(
+                  'Acreditamos que cada vida carrega uma história e um futuro de possibilidades. Nosso compromisso é caminhar ao lado de pessoas e comunidades, oferecendo cuidado, fortalecendo vínculos e criando oportunidades de transformação.',
+                  'We believe every life carries a story and a future full of possibility. Our commitment is to walk alongside people and communities, offering care, strengthening bonds, and creating opportunities for transformation.'
+                )}
               </p>
             </div>
 
             {/* Três Pilares Institucionais */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {INSTITUTIONAL_PILLARS.map((pillar) => {
+              {institutionalPillars.map((pillar) => {
                 const IconComponent = pillar.icon;
                 return (
                   <div
@@ -309,22 +378,25 @@ export function CampaignHotsite() {
           <div className="max-w-6xl mx-auto space-y-10">
             <div className="max-w-3xl text-left space-y-3">
               <span className="text-xs font-bold uppercase tracking-widest text-[#92BF78] block">
-                Nosso Trabalho na Prática
+                {tr('Nosso Trabalho na Prática', 'Our Work in Action')}
               </span>
               <h2 
                 id="projetos-heading"
                 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
               >
-                Esperança que se transforma em ação.
+                {tr('Esperança que se transforma em ação.', 'Hope turned into action.')}
               </h2>
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
-                Cada iniciativa da YAH Hope nasce para responder a necessidades reais com responsabilidade, acompanhamento próximo e compromisso com a dignidade humana.
+                {tr(
+                  'Cada iniciativa da YAH Hope nasce para responder a necessidades reais com responsabilidade, acompanhamento próximo e compromisso com a dignidade humana.',
+                  'Every YAH Hope initiative is born to respond to real needs with responsibility, close follow-up, and commitment to human dignity.'
+                )}
               </p>
             </div>
 
             {/* Lista de Projetos Ativos Aprovados */}
             <div className="space-y-8">
-              {PUBLISHED_CAMPAIGN_PROJECTS.map((project) => (
+              {publishedProjects.map((project) => (
                 <div
                   key={project.id}
                   className="rounded-3xl bg-slate-900/90 border border-white/15 overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12"
@@ -354,7 +426,7 @@ export function CampaignHotsite() {
                   <div className="lg:col-span-7 p-6 sm:p-8 md:p-10 flex flex-col justify-between space-y-6">
                     <div className="space-y-4">
                       <div className="text-xs font-bold uppercase tracking-wider text-[#F49853]">
-                        {project.category} • Projeto Ativo
+                        {project.category} • {tr('Projeto Ativo', 'Active Project')}
                       </div>
 
                       <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-snug">
@@ -383,14 +455,14 @@ export function CampaignHotsite() {
 
                     <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/10">
                       <p className="text-xs sm:text-sm text-slate-400">
-                        Cuidado integral voltado à criança e à orientação da sua família.
+                        {tr('Cuidado integral voltado à criança e à orientação da sua família.', 'Holistic care focused on the child and guiding their family.')}
                       </p>
                       <button
                         type="button"
                         onClick={() => handleSelectModality(project.contributionMode, `Projeto Ativo CTA - ${project.name}`)}
                         className="px-5 py-3 rounded-xl bg-white/10 hover:bg-[#F49853] text-white font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
                       >
-                        <span>Participar desta história</span>
+                        <span>{tr('Participar desta história', 'Be part of this story')}</span>
                         <ArrowRight size={15} />
                       </button>
                     </div>
@@ -404,10 +476,13 @@ export function CampaignHotsite() {
               <div className="space-y-1">
                 <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                   <Sparkles size={16} className="text-[#F49853] shrink-0" />
-                  <span>Visão de continuidade e novas iniciativas</span>
+                  <span>{tr('Visão de continuidade e novas iniciativas', 'Vision for continuity and new initiatives')}</span>
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl text-justify">
-                  À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo o acolhimento a mais crianças, oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.
+                  {tr(
+                    'À medida que nossa rede de apoio mensal se fortalece, preparamos novos passos planejados com responsabilidade — incluindo o acolhimento a mais crianças, oficinas de capacitação e geração de renda para famílias, apoio educacional a jovens e novos programas comunitários.',
+                    'As our monthly support network grows stronger, we are responsibly preparing new steps—including welcoming more children, vocational training and income-generation workshops for families, educational support for youth, and new community programs.'
+                  )}
                 </p>
               </div>
             </div>
@@ -437,16 +512,19 @@ export function CampaignHotsite() {
           <div className="relative z-10 max-w-6xl mx-auto space-y-12">
             <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
               <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block drop-shadow-sm">
-                Formas de Participar
+                {tr('Formas de Participar', 'Ways to Participate')}
               </span>
               <h2 
                 id="modalidades-heading"
                 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md"
               >
-                Existem muitas formas de fazer parte dessa história.
+                {tr('Existem muitas formas de fazer parte dessa história.', 'There are many ways to be part of this story.')}
               </h2>
               <p className="text-base sm:text-lg text-slate-200 leading-relaxed drop-shadow-sm text-justify">
-                Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Escolha como você prefere caminhar com a YAH Hope:
+                {tr(
+                  'Uma contribuição mensal permite cuidar do presente e planejar o que vem depois com mais segurança. Escolha como você prefere caminhar com a YAH Hope:',
+                  'A monthly contribution allows us to care for today and plan ahead with greater stability. Choose how you would like to walk with YAH Hope:'
+                )}
               </p>
             </div>
 
@@ -461,31 +539,34 @@ export function CampaignHotsite() {
                       <Users size={22} />
                     </div>
                     <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-slate-200 border border-white/10">
-                      Apoio Institucional Mensal
+                      {tr('Apoio Institucional Mensal', 'Monthly Institutional Support')}
                     </span>
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="text-xl sm:text-2xl font-black text-white">
-                      Mantenedor YAH Hope
+                      {tr('Mantenedor YAH Hope', 'YAH Hope Supporter')}
                     </h3>
                     <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
-                      Como mantenedor, você contribui mensalmente para a continuidade do trabalho da YAH Hope, apoiando suas ações e seu crescimento.
+                      {tr(
+                        'Como mantenedor, você contribui mensalmente para a continuidade do trabalho da YAH Hope, apoiando suas ações e seu crescimento.',
+                        'As a monthly supporter, you contribute each month to the continuity of YAH Hope’s work, backing its operations and growth.'
+                      )}
                     </p>
                   </div>
 
                   <div className="pt-2 space-y-3 border-t border-white/10 text-xs sm:text-sm text-slate-300 text-justify">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
-                      <span>Sua contribuição é destinada à sustentação global dos projetos ativos e à estruturação de novas iniciativas da organização.</span>
+                      <span>{tr('Sua contribuição é destinada à sustentação global dos projetos ativos e à estruturação de novas iniciativas da organização.', 'Your contribution sustains active projects overall and helps structure new initiatives for the organization.')}</span>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
-                      <span>Opções mensais sugeridas de <strong>R$ 50</strong>, <strong>R$ 100</strong>, <strong>R$ 200</strong> ou qualquer outro valor de sua escolha.</span>
+                      <span>{tr('Opções mensais sugeridas de ', 'Suggested monthly options of ')}<strong>R$ 50</strong>, <strong>R$ 100</strong>, <strong>R$ 200</strong>{tr(' ou qualquer outro valor de sua escolha.', ' or any custom amount of your choice.')}</span>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
-                      <span>Acesso completo ao Portal Exclusivo com atualizações dos projetos e relatórios de prestação de contas.</span>
+                      <span>{tr('Acesso completo ao Portal Exclusivo com atualizações dos projetos e relatórios de prestação de contas.', 'Full access to the Exclusive Portal with project updates and financial accountability reports.')}</span>
                     </div>
                   </div>
                 </div>
@@ -496,7 +577,7 @@ export function CampaignHotsite() {
                   className="w-full min-h-[48px] py-3.5 px-6 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
                 >
                   <Users size={17} />
-                  <span>Quero ser mantenedor</span>
+                  <span>{tr('Quero ser mantenedor', 'Become a supporter')}</span>
                 </button>
               </div>
 
@@ -508,26 +589,29 @@ export function CampaignHotsite() {
                       <Heart size={22} className="fill-[#F49853]" />
                     </div>
                     <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F49853]/20 text-[#F49853] border border-[#F49853]/30">
-                      Programa de Apadrinhamento
+                      {tr('Programa de Apadrinhamento', 'Sponsorship Program')}
                     </span>
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="text-xl sm:text-2xl font-black text-white">
-                      Padrinho ou Madrinha
+                      {tr('Padrinho ou Madrinha', 'Child Sponsor')}
                     </h3>
                     <p className="text-sm sm:text-base text-slate-300 leading-relaxed text-justify">
-                      Como padrinho ou madrinha, você participa do programa de apadrinhamento, contribuindo mensalmente para o cuidado das crianças acompanhadas.
+                      {tr(
+                        'Como padrinho ou madrinha, você participa do programa de apadrinhamento, contribuindo mensalmente para o cuidado das crianças acompanhadas.',
+                        'As a sponsor, you join our sponsorship program, contributing monthly to the care and well-being of the children we support.'
+                      )}
                     </p>
                   </div>
 
                   {/* Opções de Cotas (1 a 4 crianças) */}
                   <div className="space-y-2 pt-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
-                      Opções de participação mensal:
+                      {tr('Opções de participação mensal:', 'Monthly participation options:')}
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {SPONSORSHIP_QUOTA_OPTIONS.map((opt) => (
+                      {sponsorshipQuotaOptions.map((opt) => (
                         <button
                           key={opt.quotas}
                           type="button"
@@ -554,11 +638,11 @@ export function CampaignHotsite() {
                   <div className="pt-2 space-y-2.5 border-t border-white/10 text-xs sm:text-sm text-slate-300 text-justify">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
-                      <span><strong>Distribuição justa e coletiva:</strong> As contribuições sustentam o cuidado integral de todas as crianças acompanhadas com equidade.</span>
+                      <span><strong>{tr('Distribuição justa e coletiva:', 'Fair and collective distribution:')}</strong> {tr('As contribuições sustentam o cuidado integral de todas as crianças acompanhadas com equidade.', 'Contributions sustain comprehensive care for all supported children equitably.')}</span>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-[#92BF78] shrink-0 mt-0.5" />
-                      <span>Após a confirmação, você recebe por e-mail e no portal o perfil de acompanhamento e notícias periódicas do desenvolvimento.</span>
+                      <span>{tr('Após a confirmação, você recebe por e-mail e no portal o perfil de acompanhamento e notícias periódicas do desenvolvimento.', 'After confirmation, you receive your child’s profile and periodic progress updates via email and in the portal.')}</span>
                     </div>
                   </div>
                 </div>
@@ -569,7 +653,7 @@ export function CampaignHotsite() {
                   className="w-full min-h-[48px] py-3.5 px-6 rounded-2xl bg-[#F49853] hover:bg-[#e38640] text-white font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#F49853]/25 cursor-pointer active:scale-[0.99]"
                 >
                   <Heart size={17} className="fill-current" />
-                  <span>Quero ser padrinho ou madrinha</span>
+                  <span>{tr('Quero ser padrinho ou madrinha', 'Become a child sponsor')}</span>
                 </button>
               </div>
 
@@ -588,22 +672,25 @@ export function CampaignHotsite() {
           <div className="max-w-6xl mx-auto space-y-12">
             <div className="max-w-3xl mx-auto text-left sm:text-center space-y-4">
               <span className="text-xs font-bold uppercase tracking-widest text-[#92BF78] block">
-                Acompanhamento e Transparência
+                {tr('Acompanhamento e Transparência', 'Follow-Up & Transparency')}
               </span>
               <h2 
                 id="transparencia-heading"
                 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight"
               >
-                Você faz parte e acompanha essa história.
+                {tr('Você faz parte e acompanha essa história.', 'You are part of this story—and you follow it.')}
               </h2>
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed text-justify">
-                Queremos que você saiba como o trabalho está caminhando e o que seu apoio ajuda a construir. É uma forma de manter você por perto e cultivar uma relação de confiança ao longo do tempo.
+                {tr(
+                  'Queremos que você saiba como o trabalho está caminhando e o que seu apoio ajuda a construir. É uma forma de manter você por perto e cultivar uma relação de confiança ao longo do tempo.',
+                  'We want you to see how the work is progressing and what your support helps build. It is our way of keeping you close and nurturing a relationship of trust over time.'
+                )}
               </p>
             </div>
 
             {/* Grid de 6 Cards Visuais do Portal do Mantenedor */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {TRANSPARENCY_FEATURES.map((item, idx) => {
+              {transparencyFeatures.map((item, idx) => {
                 const IconComp = item.icon;
                 return (
                   <div
@@ -649,16 +736,19 @@ export function CampaignHotsite() {
           <div className="relative z-10 max-w-5xl mx-auto space-y-10">
             <div className="max-w-2xl mx-auto text-left sm:text-center space-y-3">
               <span className="text-xs font-bold uppercase tracking-widest text-[#F49853] block drop-shadow-sm">
-                Sua Participação Começa Aqui
+                {tr('Sua Participação Começa Aqui', 'Your Participation Starts Here')}
               </span>
               <h2 
                 id="participar-heading"
                 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md"
               >
-                Vamos levar esperança juntos?
+                {tr('Vamos levar esperança juntos?', 'Shall we bring hope together?')}
               </h2>
               <p className="text-sm sm:text-base text-slate-200 leading-relaxed drop-shadow-sm text-justify">
-                Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.
+                {tr(
+                  'Com seu apoio, queremos continuar cuidando das crianças que já acompanhamos, fortalecer suas famílias e abrir espaço para que essa rede alcance mais vidas.',
+                  'With your support, we want to keep caring for the children already under our wing, strengthen their families, and expand this network to reach even more lives.'
+                )}
               </p>
             </div>
 
@@ -674,7 +764,10 @@ export function CampaignHotsite() {
                   <div className="p-4 rounded-2xl bg-slate-950/70 backdrop-blur-md border border-white/15 flex items-center gap-3 text-xs text-slate-200 shadow-xl">
                     <ShieldCheck size={18} className="text-[#92BF78] shrink-0" />
                     <span>
-                      Ambiente criptografado. Você pode gerenciar sua assinatura a qualquer momento pelo Portal do Mantenedor.
+                      {tr(
+                        'Ambiente criptografado. Você pode gerenciar sua assinatura a qualquer momento pelo Portal do Mantenedor.',
+                        'Encrypted environment. You can manage your subscription anytime through the Supporter Portal.'
+                      )}
                     </span>
                   </div>
                 </div>

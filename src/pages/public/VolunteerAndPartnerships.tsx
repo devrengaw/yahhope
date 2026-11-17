@@ -29,11 +29,13 @@ import {
 import { SEO } from '../../components/common/SEO';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 type TabMode = 'voluntariado' | 'parcerias';
 type CorporatePartnershipType = 'investimento' | 'doacao_produto' | 'doacao_servico' | 'multiplas';
 
 export function VolunteerAndPartnerships() {
+  const { tr, isEn } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabMode>('voluntariado');
 
   // ==========================================
@@ -72,17 +74,29 @@ export function VolunteerAndPartnerships() {
   const [partSuccess, setPartSuccess] = useState(false);
   const [partError, setPartError] = useState('');
 
-  const AREAS_OPTIONS = [
-    'Saúde / Medicina / Enfermagem',
-    'Nutrição / Alimentação',
-    'Educação / Alfabetização infantil',
-    'Comunicação / Fotografia / Vídeo / Mídias',
-    'Tecnologia / Design / Desenvolvimento',
-    'Logística / Operações de Campo',
-    'Apoio Administrativo / Captação de Recursos',
-    'Aconselhamento / Apoio Psicológico / Capelania',
-    'Outra área de atuação'
-  ];
+  const AREAS_OPTIONS = isEn
+    ? [
+        'Health / Medicine / Nursing',
+        'Nutrition / Food Security',
+        'Education / Child Literacy',
+        'Communication / Photography / Video / Media',
+        'Technology / Design / Development',
+        'Logistics / Field Operations',
+        'Administrative Support / Fundraising',
+        'Counseling / Psychological Support / Chaplaincy',
+        'Other area of expertise'
+      ]
+    : [
+        'Saúde / Medicina / Enfermagem',
+        'Nutrição / Alimentação',
+        'Educação / Alfabetização infantil',
+        'Comunicação / Fotografia / Vídeo / Mídias',
+        'Tecnologia / Design / Desenvolvimento',
+        'Logística / Operações de Campo',
+        'Apoio Administrativo / Captação de Recursos',
+        'Aconselhamento / Apoio Psicológico / Capelania',
+        'Outra área de atuação'
+      ];
 
   const toggleArea = (area: string) => {
     if (volSelectedAreas.includes(area)) {
@@ -98,7 +112,7 @@ export function VolunteerAndPartnerships() {
     setVolError('');
 
     if (!volName.trim() || !volEmail.trim() || !volPhone.trim() || !volCity.trim() || !volMotivation.trim()) {
-      setVolError('Por favor, preencha todos os campos obrigatórios (*).');
+      setVolError(tr('Por favor, preencha todos os campos obrigatórios (*).', 'Please fill in all required fields (*).'));
       return;
     }
 
@@ -151,7 +165,7 @@ export function VolunteerAndPartnerships() {
     setPartError('');
 
     if (!companyName.trim() || !contactPerson.trim() || !corporateEmail.trim() || !corporatePhone.trim() || !proposalDetails.trim()) {
-      setPartError('Por favor, preencha todos os campos corporativos obrigatórios (*).');
+      setPartError(tr('Por favor, preencha todos os campos corporativos obrigatórios (*).', 'Please fill in all required corporate fields (*).'));
       return;
     }
 
@@ -199,8 +213,11 @@ export function VolunteerAndPartnerships() {
   return (
     <div className="min-w-0 bg-white">
       <SEO 
-        title="Voluntariado & Parcerias Empresariais | YAH Hope" 
-        description="Junte-se à nossa missão no Brasil ou em Moçambique. Seja voluntário ou torne sua empresa uma parceira doadora investindo em um Brasil e em um mundo melhor."
+        title={tr('Voluntariado & Parcerias Empresariais | YAH Hope', 'Volunteering & Corporate Partnerships | YAH Hope')} 
+        description={tr(
+          'Junte-se à nossa missão no Brasil ou em Moçambique. Seja voluntário ou torne sua empresa uma parceira doadora investindo em um Brasil e em um mundo melhor.',
+          'Join our mission in Brazil or Mozambique. Volunteer or make your company a partner investing in a better Brazil and a better world.'
+        )}
         keywords="voluntariado, voluntariado Moçambique, voluntariado África, empresas parceiras, investimento social privado, doação corporativa, ESG ONG, doar para ONG, YAH Hope"
         canonical="https://yahhope.com/voluntariado-e-parcerias"
         ogImage="https://yahhope.com/voluntariado_hero.jpg"
@@ -230,11 +247,11 @@ export function VolunteerAndPartnerships() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto font-gotham-bold">
-            Una seu talento pessoal ou <span className="text-[#F49853]">sua empresa</span> à missão de transformar vidas.
+            {tr('Una seu talento pessoal ou ', 'Unite your personal talent or ')}<span className="text-[#F49853]">{tr('sua empresa', 'your company')}</span>{tr(' à missão de transformar vidas.', ' with the mission to transform lives.')}
           </h1>
 
           <p className="mt-5 text-base sm:text-lg text-slate-200 max-w-2xl mx-auto font-gotham-light leading-relaxed">
-            Seja atuando diretamente como voluntário no <strong className="font-gotham-bold text-white">Brasil</strong> ou em <strong className="font-gotham-bold text-white">Moçambique</strong>, ou conectando sua empresa para doar recursos e construir um futuro com dignidade.
+            {tr('Seja atuando diretamente como voluntário no ', 'Whether serving directly as a volunteer in ')}<strong className="font-gotham-bold text-white">{tr('Brasil', 'Brazil')}</strong>{tr(' ou em ', ' or ')}<strong className="font-gotham-bold text-white">{tr('Moçambique', 'Mozambique')}</strong>{tr(', ou conectando sua empresa para doar recursos e construir um futuro com dignidade.', ', or connecting your company to donate resources and build a future with dignity.')}
           </p>
 
           {/* Abas Alternadoras no Topo */}
@@ -249,7 +266,7 @@ export function VolunteerAndPartnerships() {
               )}
             >
               <Users size={18} />
-              <span>Quero Ser Voluntário</span>
+              <span>{tr('Quero Ser Voluntário', 'Become a Volunteer')}</span>
             </button>
 
             <button
@@ -262,7 +279,7 @@ export function VolunteerAndPartnerships() {
               )}
             >
               <Building2 size={18} />
-              <span>Empresas Parceiras</span>
+              <span>{tr('Empresas Parceiras', 'Corporate Partners')}</span>
             </button>
           </div>
 
@@ -280,10 +297,10 @@ export function VolunteerAndPartnerships() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="text-center max-w-2xl mx-auto mb-12">
                 <span className="text-xs uppercase font-gotham-bold text-[#F49853] tracking-wider block mb-2">
-                  Duas Frentes de Missão
+                  {tr('Duas Frentes de Missão', 'Two Mission Fronts')}
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 font-gotham-bold">
-                  Onde você deseja servir com seu tempo e vocação?
+                  {tr('Onde você deseja servir com seu tempo e vocação?', 'Where would you like to serve with your time and calling?')}
                 </h2>
               </div>
 
@@ -296,35 +313,38 @@ export function VolunteerAndPartnerships() {
                         <MapPin size={24} />
                       </div>
                       <span className="text-[11px] font-gotham-bold bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-full uppercase tracking-wider">
-                        Sede & Expansão
+                        {tr('Sede & Expansão', 'HQ & Expansion')}
                       </span>
                     </div>
 
                     <h3 className="text-xl font-black text-slate-900 font-gotham-bold mb-3">
-                      Voluntariado no Brasil
+                      {tr('Voluntariado no Brasil', 'Volunteering in Brazil')}
                     </h3>
                     <p className="text-sm text-slate-600 font-gotham-light leading-relaxed mb-6">
-                      Atue na retaguarda estratégica, mobilização social, comunicação, design, captação, eventos e suporte comunitário em território nacional.
+                      {tr(
+                        'Atue na retaguarda estratégica, mobilização social, comunicação, design, captação, eventos e suporte comunitário em território nacional.',
+                        'Serve in strategic operations, social mobilization, communications, design, fundraising, events, and community support in Brazil.'
+                      )}
                     </p>
 
                     <ul className="space-y-2.5 text-xs text-slate-700 font-gotham-regular">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
-                        <span>Formato remoto e presencial (São Paulo e polos)</span>
+                        <span>{tr('Formato remoto e presencial (São Paulo e polos)', 'Remote and in-person options (São Paulo and hubs)')}</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
-                        <span>Mobilização social, tecnologia, captação e mentoria</span>
+                        <span>{tr('Mobilização social, tecnologia, captação e mentoria', 'Social mobilization, technology, fundraising, and mentoring')}</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
-                        <span>Horários flexíveis adaptados à sua rotina</span>
+                        <span>{tr('Horários flexíveis adaptados à sua rotina', 'Flexible hours adapted to your schedule')}</span>
                       </li>
                     </ul>
                   </div>
 
                   <div className="mt-8 pt-6 border-t border-slate-200 text-xs text-slate-500 font-gotham-light">
-                    Ideal para quem deseja impactar vidas diretamente sem sair da sua cidade.
+                    {tr('Ideal para quem deseja impactar vidas diretamente sem sair da sua cidade.', 'Ideal for those who want to impact lives directly from their own city.')}
                   </div>
                 </div>
 
@@ -336,35 +356,38 @@ export function VolunteerAndPartnerships() {
                         <Globe2 size={24} />
                       </div>
                       <span className="text-[11px] font-gotham-bold bg-orange-100/70 text-orange-900 border border-orange-300 px-3 py-1 rounded-full uppercase tracking-wider">
-                        Ação Humanitária de Campo
+                        {tr('Ação Humanitária de Campo', 'Humanitarian Field Action')}
                       </span>
                     </div>
 
                     <h3 className="text-xl font-black text-slate-900 font-gotham-bold mb-3">
-                      Voluntariado em Moçambique (Nampula)
+                      {tr('Voluntariado em Moçambique (Nampula)', 'Volunteering in Mozambique (Nampula)')}
                     </h3>
                     <p className="text-sm text-slate-600 font-gotham-light leading-relaxed mb-6">
-                      Atuação direta na linha de frente: Casa Nutri, triagens médicas infantis, expedições clínicas nos vilarejos do interior e apoio logístico de campo.
+                      {tr(
+                        'Atuação direta na linha de frente: Casa Nutri, triagens médicas infantis, expedições clínicas nos vilarejos do interior e apoio logístico de campo.',
+                        'Direct frontline service: Casa Nutri, pediatric medical screenings, clinical expeditions in rural villages, and field logistics support.'
+                      )}
                     </p>
 
                     <ul className="space-y-2.5 text-xs text-slate-700 font-gotham-regular">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-[#F49853] shrink-0" />
-                        <span>Missões de curto, médio ou longo prazo</span>
+                        <span>{tr('Missões de curto, médio ou longo prazo', 'Short, medium, or long-term missions')}</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-[#F49853] shrink-0" />
-                        <span>Foco em saúde, nutrição, educação e estrutura básica</span>
+                        <span>{tr('Foco em saúde, nutrição, educação e estrutura básica', 'Focus on health, nutrition, education, and basic infrastructure')}</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={16} className="text-[#F49853] shrink-0" />
-                        <span>Capacitação prévia e acolhimento da equipe local</span>
+                        <span>{tr('Capacitação prévia e acolhimento da equipe local', 'Pre-mission training and local team support')}</span>
                       </li>
                     </ul>
                   </div>
 
                   <div className="mt-8 pt-6 border-t border-orange-200 text-xs text-slate-500 font-gotham-light">
-                    Requer disponibilidade para deslocamento internacional e processo seletivo detalhado.
+                    {tr('Requer disponibilidade para deslocamento internacional e processo seletivo detalhado.', 'Requires availability for international travel and a thorough selection process.')}
                   </div>
                 </div>
               </div>
@@ -383,10 +406,13 @@ export function VolunteerAndPartnerships() {
                       <Check size={32} />
                     </div>
                     <h3 className="text-2xl font-black text-slate-900 font-gotham-bold mb-2">
-                      Inscrição Recebida com Sucesso!
+                      {tr('Inscrição Recebida com Sucesso!', 'Application Received Successfully!')}
                     </h3>
                     <p className="text-slate-600 font-gotham-light max-w-md mx-auto text-sm leading-relaxed mb-6">
-                      Muito obrigado pela sua disposição em servir com a YAH Hope. Nossa equipe de voluntariado analisará suas informações e entrará em contato com os próximos passos.
+                      {tr(
+                        'Muito obrigado pela sua disposição em servir com a YAH Hope. Nossa equipe de voluntariado analisará suas informações e entrará em contato com os próximos passos.',
+                        'Thank you very much for your willingness to serve with YAH Hope. Our volunteer team will review your information and reach out with next steps.'
+                      )}
                     </p>
                     <button
                       onClick={() => {
@@ -401,7 +427,7 @@ export function VolunteerAndPartnerships() {
                       }}
                       className="bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-2.5 rounded-full font-gotham-bold text-xs transition-colors cursor-pointer"
                     >
-                      Enviar Outra Inscrição
+                      {tr('Enviar Outra Inscrição', 'Submit Another Application')}
                     </button>
                   </div>
                 ) : (
@@ -409,13 +435,13 @@ export function VolunteerAndPartnerships() {
                     <div className="mb-8 border-b border-slate-100 pb-5">
                       <div className="flex items-center gap-2 text-[#F49853] font-gotham-bold text-xs uppercase tracking-wider mb-1">
                         <Users size={16} />
-                        <span>Formulário de Inscrição de Voluntário</span>
+                        <span>{tr('Formulário de Inscrição de Voluntário', 'Volunteer Application Form')}</span>
                       </div>
                       <h2 className="text-xl sm:text-2xl font-black text-slate-900 font-gotham-bold">
-                        Conte-nos sobre você e sua disponibilidade
+                        {tr('Conte-nos sobre você e sua disponibilidade', 'Tell us about yourself and your availability')}
                       </h2>
                       <p className="text-xs text-slate-500 font-gotham-light mt-1">
-                        Preenchimento rápido em menos de 3 minutos.
+                        {tr('Preenchimento rápido em menos de 3 minutos.', 'Quick form—takes less than 3 minutes.')}
                       </p>
                     </div>
 
@@ -431,10 +457,10 @@ export function VolunteerAndPartnerships() {
                       {/* Onde tem vontade de ser voluntário? */}
                       <div className="p-4 sm:p-5 rounded-2xl bg-orange-50/60 border border-orange-200">
                         <label className="block text-xs sm:text-sm font-gotham-bold text-slate-900 mb-2">
-                          Em qual local você tem vontade de ser um(a) voluntário(a)? *
+                          {tr('Em qual local você tem vontade de ser um(a) voluntário(a)? *', 'Where would you like to volunteer? *')}
                         </label>
                         <p className="text-[11px] text-slate-500 font-gotham-light mb-4">
-                          Indique se você prefere atuar no Brasil, no campo em Moçambique ou em ambos:
+                          {tr('Indique se você prefere atuar no Brasil, no campo em Moçambique ou em ambos:', 'Select whether you prefer to serve in Brazil, on the field in Mozambique, or both:')}
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -449,11 +475,11 @@ export function VolunteerAndPartnerships() {
                           >
                             <div className="flex items-center justify-center mb-1">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
-                                🇧🇷 No Brasil
+                                {tr('🇧🇷 No Brasil', '🇧🇷 In Brazil')}
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Sede, remoto ou apoio nacional
+                              {tr('Sede, remoto ou apoio nacional', 'HQ, remote, or national support')}
                             </span>
                           </label>
 
@@ -468,11 +494,11 @@ export function VolunteerAndPartnerships() {
                           >
                             <div className="flex items-center justify-center mb-1">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
-                                🇲🇿 Em Moçambique
+                                {tr('🇲🇿 Em Moçambique', '🇲🇿 In Mozambique')}
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Casa Nutri em Nampula e vilarejos
+                              {tr('Casa Nutri em Nampula e vilarejos', 'Casa Nutri in Nampula & villages')}
                             </span>
                           </label>
 
@@ -487,11 +513,11 @@ export function VolunteerAndPartnerships() {
                           >
                             <div className="flex items-center justify-center mb-1">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
-                                🌍 Em Ambos
+                                {tr('🌍 Em Ambos', '🌍 Both')}
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Disponível para qualquer frente
+                              {tr('Disponível para qualquer frente', 'Available for either front')}
                             </span>
                           </label>
                         </div>
@@ -501,28 +527,28 @@ export function VolunteerAndPartnerships() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Nome Completo *
+                            {tr('Nome Completo *', 'Full Name *')}
                           </label>
                           <input 
                             type="text" 
                             required
                             value={volName}
                             onChange={e => setVolName(e.target.value)}
-                            placeholder="Ex: Mariana Silva Santos"
+                            placeholder={tr('Ex: Mariana Silva Santos', 'e.g. Jane Doe')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            E-mail de Contato *
+                            {tr('E-mail de Contato *', 'Contact Email *')}
                           </label>
                           <input 
                             type="email" 
                             required
                             value={volEmail}
                             onChange={e => setVolEmail(e.target.value)}
-                            placeholder="seuemail@exemplo.com"
+                            placeholder={tr('seuemail@exemplo.com', 'youremail@example.com')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                           />
                         </div>
@@ -531,41 +557,41 @@ export function VolunteerAndPartnerships() {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            WhatsApp / Telefone *
+                            {tr('WhatsApp / Telefone *', 'WhatsApp / Phone *')}
                           </label>
                           <input 
                             type="tel" 
                             required
                             value={volPhone}
                             onChange={e => setVolPhone(e.target.value)}
-                            placeholder="(11) 99999-9999"
+                            placeholder={tr('(11) 99999-9999', '+1 (555) 123-4567')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Cidade Onde Mora *
+                            {tr('Cidade Onde Mora *', 'City *')}
                           </label>
                           <input 
                             type="text" 
                             required
                             value={volCity}
                             onChange={e => setVolCity(e.target.value)}
-                            placeholder="Ex: São Paulo"
+                            placeholder={tr('Ex: São Paulo', 'e.g. New York')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Estado / País
+                            {tr('Estado / País', 'State / Country')}
                           </label>
                           <input 
                             type="text" 
                             value={volStateCountry}
                             onChange={e => setVolStateCountry(e.target.value)}
-                            placeholder="Ex: SP - Brasil"
+                            placeholder={tr('Ex: SP - Brasil', 'e.g. NY - USA')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                           />
                         </div>
@@ -574,25 +600,25 @@ export function VolunteerAndPartnerships() {
                       {/* Disponibilidade */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                          Qual é a sua disponibilidade de tempo?
+                          {tr('Qual é a sua disponibilidade de tempo?', 'What is your availability?')}
                         </label>
                         <select
                           value={volAvailability}
                           onChange={e => setVolAvailability(e.target.value)}
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular bg-white"
                         >
-                          <option value="Semanal (algumas horas por semana)">Semanal (algumas horas por semana no tempo livre)</option>
-                          <option value="Fins de semana e feriados">Fins de semana e eventos pontuais</option>
-                          <option value="Período integral em missões pontuais (1 a 4 semanas)">Expedições pontuais de 1 a 4 semanas (ex: Moçambique)</option>
-                          <option value="Longo prazo (acima de 3 meses)">Longo prazo (acima de 3 meses)</option>
-                          <option value="Outro formato flexível">Outro formato flexível</option>
+                          <option value="Semanal (algumas horas por semana)">{tr('Semanal (algumas horas por semana no tempo livre)', 'Weekly (a few hours per week in my free time)')}</option>
+                          <option value="Fins de semana e feriados">{tr('Fins de semana e eventos pontuais', 'Weekends and special events')}</option>
+                          <option value="Período integral em missões pontuais (1 a 4 semanas)">{tr('Expedições pontuais de 1 a 4 semanas (ex: Moçambique)', 'Short-term expeditions of 1–4 weeks (e.g. Mozambique)')}</option>
+                          <option value="Longo prazo (acima de 3 meses)">{tr('Longo prazo (acima de 3 meses)', 'Long-term (over 3 months)')}</option>
+                          <option value="Outro formato flexível">{tr('Outro formato flexível', 'Other flexible schedule')}</option>
                         </select>
                       </div>
 
                       {/* Áreas de Habilidade */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                          Quais áreas combinam mais com você? (Pode selecionar mais de uma)
+                          {tr('Quais áreas combinam mais com você? (Pode selecionar mais de uma)', 'Which areas best match your skills? (Select all that apply)')}
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                           {AREAS_OPTIONS.map((area) => {
@@ -624,13 +650,13 @@ export function VolunteerAndPartnerships() {
                       {/* Experiência / Formação */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                          Profissão, formação acadêmica ou experiência prática
+                          {tr('Profissão, formação acadêmica ou experiência prática', 'Profession, academic background, or practical experience')}
                         </label>
                         <input 
                           type="text" 
                           value={volExperience}
                           onChange={e => setVolExperience(e.target.value)}
-                          placeholder="Ex: Enfermeira pediátrica / Designer gráfico / Estudante / Logística"
+                          placeholder={tr('Ex: Enfermeira pediátrica / Designer gráfico / Estudante / Logística', 'e.g. Pediatric nurse / Graphic designer / Student / Logistics')}
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular"
                         />
                       </div>
@@ -638,14 +664,14 @@ export function VolunteerAndPartnerships() {
                       {/* Motivação */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                          Por que você quer ser um voluntário da YAH Hope? *
+                          {tr('Por que você quer ser um voluntário da YAH Hope? *', 'Why do you want to volunteer with YAH Hope? *')}
                         </label>
                         <textarea 
                           required
                           rows={3}
                           value={volMotivation}
                           onChange={e => setVolMotivation(e.target.value)}
-                          placeholder="Conte-nos brevemente o que move o seu coração para apoiar as crianças e famílias atendidas..."
+                          placeholder={tr('Conte-nos brevemente o que move o seu coração para apoiar as crianças e famílias atendidas...', 'Briefly share what moves your heart to support the children and families we serve...')}
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#F49853] font-gotham-regular resize-none"
                         />
                       </div>
@@ -656,17 +682,17 @@ export function VolunteerAndPartnerships() {
                         className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white py-3.5 rounded-xl font-gotham-bold text-sm tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {volLoading ? (
-                          <span>Enviando sua inscrição...</span>
+                          <span>{tr('Enviando sua inscrição...', 'Submitting your application...')}</span>
                         ) : (
                           <>
-                            <span>Enviar Inscrição de Voluntário</span>
+                            <span>{tr('Enviar Inscrição de Voluntário', 'Submit Volunteer Application')}</span>
                             <Send size={16} />
                           </>
                         )}
                       </button>
 
                       <p className="text-[11px] text-slate-400 text-center font-gotham-light">
-                        Ao enviar, você autoriza a equipe da YAH Hope a entrar em contato sobre oportunidades voluntárias.
+                        {tr('Ao enviar, você autoriza a equipe da YAH Hope a entrar em contato sobre oportunidades voluntárias.', 'By submitting, you authorize the YAH Hope team to contact you regarding volunteer opportunities.')}
                       </p>
 
                     </form>
@@ -689,20 +715,23 @@ export function VolunteerAndPartnerships() {
               
               <div className="text-center max-w-3xl mx-auto mb-14">
                 <span className="text-xs uppercase font-gotham-bold text-[#F49853] tracking-wider block mb-2">
-                  Parcerias Corporativas com Propósito
+                  {tr('Parcerias Corporativas com Propósito', 'Purpose-Driven Corporate Partnerships')}
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-black text-slate-900 font-gotham-bold tracking-tight">
-                  Investindo em um Brasil melhor
+                  {tr('Investindo em um Brasil melhor', 'Investing in a better world')}
                 </h2>
                 <p className="mt-4 text-base text-slate-600 font-gotham-light leading-relaxed">
-                  Convidamos empresas e marcas conscientes a unirem suas forças com a YAH Hope. Seja investindo diretamente em nossas frentes de combate à desnutrição ou doando produtos e serviços que aceleram a nossa operação, sua empresa transforma vidas com total transparência e governança.
+                  {tr(
+                    'Convidamos empresas e marcas conscientes a unirem suas forças com a YAH Hope. Seja investindo diretamente em nossas frentes de combate à desnutrição ou doando produtos e serviços que aceleram a nossa operação, sua empresa transforma vidas com total transparência e governança.',
+                    'We invite purpose-driven companies and brands to join forces with YAH Hope. Whether by investing directly in our fight against malnutrition or donating products and services that accelerate our operations, your company transforms lives with full transparency and governance.'
+                  )}
                 </p>
               </div>
 
               {/* Como a empresa pode servir: 3 Formas */}
               <div className="mb-6 text-center">
                 <h3 className="text-lg font-black text-slate-900 font-gotham-bold">
-                  Como a sua empresa pode servir:
+                  {tr('Como a sua empresa pode servir:', 'How your company can serve:')}
                 </h3>
               </div>
 
@@ -715,18 +744,21 @@ export function VolunteerAndPartnerships() {
                       <DollarSign size={24} />
                     </div>
                     <span className="text-[11px] font-gotham-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit mb-3">
-                      Aporte Financeiro
+                      {tr('Aporte Financeiro', 'Financial Contribution')}
                     </span>
                     <h4 className="text-xl font-black text-slate-900 font-gotham-bold mb-3">
-                      Investimento
+                      {tr('Investimento', 'Investment')}
                     </h4>
                     <p className="text-xs sm:text-sm text-slate-600 font-gotham-light leading-relaxed">
-                      Aportes institucionais e repasses corporativos (pontuais ou mensais) que financiam poços artesianos, reforma de centros de nutrição, compra de leite terapêutico e manutenção das frentes de expansão no Brasil.
+                      {tr(
+                        'Aportes institucionais e repasses corporativos (pontuais ou mensais) que financiam poços artesianos, reforma de centros de nutrição, compra de leite terapêutico e manutenção das frentes de expansão no Brasil.',
+                        'Institutional grants and corporate contributions (one-time or monthly) that fund artesian wells, nutrition center upgrades, therapeutic milk purchases, and expansion initiatives.'
+                      )}
                     </p>
                   </div>
                   <div className="mt-6 pt-5 border-t border-slate-200 text-xs text-slate-500 font-gotham-light flex items-center gap-1.5">
                     <FileCheck2 size={15} className="text-emerald-600 shrink-0" />
-                    <span>Recibo de doação institucional & prestação de contas</span>
+                    <span>{tr('Recibo de doação institucional & prestação de contas', 'Institutional donation receipt & accountability report')}</span>
                   </div>
                 </div>
 
@@ -737,18 +769,21 @@ export function VolunteerAndPartnerships() {
                       <Package size={24} />
                     </div>
                     <span className="text-[11px] font-gotham-bold text-blue-800 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit mb-3">
-                      Bens e Insumos
+                      {tr('Bens e Insumos', 'Goods & Supplies')}
                     </span>
                     <h4 className="text-xl font-black text-slate-900 font-gotham-bold mb-3">
-                      Doação de Produto
+                      {tr('Doação de Produto', 'Product Donation')}
                     </h4>
                     <p className="text-xs sm:text-sm text-slate-600 font-gotham-light leading-relaxed">
-                      Doação direta de fórmulas nutricionais, alimentos não perecíveis, medicamentos essenciais, materiais escolares, uniformes, equipamentos médicos e materiais de construção.
+                      {tr(
+                        'Doação direta de fórmulas nutricionais, alimentos não perecíveis, medicamentos essenciais, materiais escolares, uniformes, equipamentos médicos e materiais de construção.',
+                        'Direct donation of nutritional formulas, non-perishable food, essential medicines, school supplies, uniforms, medical equipment, and construction materials.'
+                      )}
                     </p>
                   </div>
                   <div className="mt-6 pt-5 border-t border-slate-200 text-xs text-slate-500 font-gotham-light flex items-center gap-1.5">
                     <FileCheck2 size={15} className="text-blue-600 shrink-0" />
-                    <span>Rastreio de entrega e distribuição nas bases</span>
+                    <span>{tr('Rastreio de entrega e distribuição nas bases', 'Delivery tracking and distribution at field hubs')}</span>
                   </div>
                 </div>
 
@@ -759,18 +794,21 @@ export function VolunteerAndPartnerships() {
                       <Wrench size={24} />
                     </div>
                     <span className="text-[11px] font-gotham-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit mb-3">
-                      Pro Bono & Estrutura
+                      {tr('Pro Bono & Estrutura', 'Pro Bono & Infrastructure')}
                     </span>
                     <h4 className="text-xl font-black text-slate-900 font-gotham-bold mb-3">
-                      Doação de Serviço
+                      {tr('Doação de Serviço', 'Service Donation')}
                     </h4>
                     <p className="text-xs sm:text-sm text-slate-600 font-gotham-light leading-relaxed">
-                      Serviços de transporte e frete de cargas, consultorias contábeis e jurídicas, tecnologia, desenvolvimento, marketing, saúde ocupacional ou treinamento especializado de equipes.
+                      {tr(
+                        'Serviços de transporte e frete de cargas, consultorias contábeis e jurídicas, tecnologia, desenvolvimento, marketing, saúde ocupacional ou treinamento especializado de equipes.',
+                        'Freight and cargo transport services, accounting and legal consulting, technology, software development, marketing, occupational health, or specialized team training.'
+                      )}
                     </p>
                   </div>
                   <div className="mt-6 pt-5 border-t border-slate-200 text-xs text-slate-500 font-gotham-light flex items-center gap-1.5">
                     <FileCheck2 size={15} className="text-[#F49853] shrink-0" />
-                    <span>Potencialização direta da eficiência operacional</span>
+                    <span>{tr('Potencialização direta da eficiência operacional', 'Direct boost to operational efficiency')}</span>
                   </div>
                 </div>
 
@@ -791,10 +829,13 @@ export function VolunteerAndPartnerships() {
                       <Check size={32} />
                     </div>
                     <h3 className="text-2xl font-black text-slate-900 font-gotham-bold mb-2">
-                      Proposta Corporativa Enviada com Sucesso!
+                      {tr('Proposta Corporativa Enviada com Sucesso!', 'Corporate Proposal Sent Successfully!')}
                     </h3>
                     <p className="text-slate-600 font-gotham-light max-w-md mx-auto text-sm leading-relaxed mb-6">
-                      Agradecemos pela visão de sua empresa em investir em um Brasil e em um mundo melhor. Nossa diretoria de relações institucionais entrará em contato para agendarmos uma apresentação e desenhar o acordo de parceria.
+                      {tr(
+                        'Agradecemos pela visão de sua empresa em investir em um Brasil e em um mundo melhor. Nossa diretoria de relações institucionais entrará em contato para agendarmos uma apresentação e desenhar o acordo de parceria.',
+                        'Thank you for your company’s vision to invest in a better Brazil and a better world. Our institutional relations team will reach out to schedule a meeting and design the partnership agreement.'
+                      )}
                     </p>
                     <button
                       onClick={() => {
@@ -810,7 +851,7 @@ export function VolunteerAndPartnerships() {
                       }}
                       className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-full font-gotham-bold text-xs transition-colors cursor-pointer"
                     >
-                      Enviar Outra Proposta de Parceria
+                      {tr('Enviar Outra Proposta de Parceria', 'Submit Another Partnership Proposal')}
                     </button>
                   </div>
                 ) : (
@@ -818,13 +859,13 @@ export function VolunteerAndPartnerships() {
                     <div className="mb-8 border-b border-slate-100 pb-5">
                       <div className="flex items-center gap-2 text-slate-900 font-gotham-bold text-xs uppercase tracking-wider mb-1">
                         <Building2 size={16} className="text-[#F49853]" />
-                        <span>Formulário de Parceria Empresarial</span>
+                        <span>{tr('Formulário de Parceria Empresarial', 'Corporate Partnership Form')}</span>
                       </div>
                       <h2 className="text-xl sm:text-2xl font-black text-slate-900 font-gotham-bold">
-                        Cadastre sua empresa e faça parte deste impacto
+                        {tr('Cadastre sua empresa e faça parte deste impacto', 'Register your company and be part of this impact')}
                       </h2>
                       <p className="text-xs text-slate-500 font-gotham-light mt-1">
-                        Preencha as informações para nossa coordenação institucional retornar o contato.
+                        {tr('Preencha as informações para nossa coordenação institucional retornar o contato.', 'Fill in the details so our institutional coordination team can get back to you.')}
                       </p>
                     </div>
 
@@ -840,10 +881,10 @@ export function VolunteerAndPartnerships() {
                       {/* Seleção do Tipo de Parceria (Como a empresa pode servir) */}
                       <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200">
                         <label className="block text-xs sm:text-sm font-gotham-bold text-slate-900 mb-1">
-                          Como a sua empresa deseja servir? *
+                          {tr('Como a sua empresa deseja servir? *', 'How would your company like to serve? *')}
                         </label>
                         <p className="text-[11px] text-slate-500 font-gotham-light mb-4">
-                          Escolha o formato principal de colaboração que sua organização tem interesse em realizar:
+                          {tr('Escolha o formato principal de colaboração que sua organização tem interesse em realizar:', 'Select the primary collaboration format your organization is interested in:')}
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -861,7 +902,7 @@ export function VolunteerAndPartnerships() {
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
                                 <DollarSign size={15} className="text-emerald-600" />
-                                Investimento
+                                {tr('Investimento', 'Investment')}
                               </span>
                               <input 
                                 type="radio" 
@@ -872,7 +913,7 @@ export function VolunteerAndPartnerships() {
                               />
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Aporte financeiro para projetos e infraestrutura
+                              {tr('Aporte financeiro para projetos e infraestrutura', 'Financial contribution for projects and infrastructure')}
                             </span>
                           </label>
 
@@ -889,7 +930,7 @@ export function VolunteerAndPartnerships() {
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
                                 <Package size={15} className="text-blue-600" />
-                                Doação de Produto
+                                {tr('Doação de Produto', 'Product Donation')}
                               </span>
                               <input 
                                 type="radio" 
@@ -900,7 +941,7 @@ export function VolunteerAndPartnerships() {
                               />
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Alimentos, fórmulas, insumos, maquinário
+                              {tr('Alimentos, fórmulas, insumos, maquinário', 'Food, formulas, supplies, equipment')}
                             </span>
                           </label>
 
@@ -917,7 +958,7 @@ export function VolunteerAndPartnerships() {
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="font-gotham-bold text-xs text-slate-900 flex items-center gap-1.5">
                                 <Wrench size={15} className="text-[#F49853]" />
-                                Doação de Serviço
+                                {tr('Doação de Serviço', 'Service Donation')}
                               </span>
                               <input 
                                 type="radio" 
@@ -928,7 +969,7 @@ export function VolunteerAndPartnerships() {
                               />
                             </div>
                             <span className="text-[10px] text-slate-500 font-gotham-light">
-                              Frete, consultoria, tecnologia, auditoria pro bono
+                              {tr('Frete, consultoria, tecnologia, auditoria pro bono', 'Freight, consulting, tech, pro bono audit')}
                             </span>
                           </label>
 
@@ -939,21 +980,21 @@ export function VolunteerAndPartnerships() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Razão Social ou Nome Fantasia da Empresa *
+                            {tr('Razão Social ou Nome Fantasia da Empresa *', 'Company Legal or Trade Name *')}
                           </label>
                           <input 
                             type="text" 
                             required
                             value={companyName}
                             onChange={e => setCompanyName(e.target.value)}
-                            placeholder="Ex: Minha Empresa S.A."
+                            placeholder={tr('Ex: Minha Empresa S.A.', 'e.g. Acme Corp')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            CNPJ (opcional)
+                            {tr('CNPJ (opcional)', 'Tax ID / EIN / CNPJ (optional)')}
                           </label>
                           <input 
                             type="text" 
@@ -969,27 +1010,27 @@ export function VolunteerAndPartnerships() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Nome do(a) Responsável pelo Contato *
+                            {tr('Nome do(a) Responsável pelo Contato *', 'Contact Person Name *')}
                           </label>
                           <input 
                             type="text" 
                             required
                             value={contactPerson}
                             onChange={e => setContactPerson(e.target.value)}
-                            placeholder="Ex: Rodrigo Albuquerque"
+                            placeholder={tr('Ex: Rodrigo Albuquerque', 'e.g. John Smith')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Cargo / Área de Atuação
+                            {tr('Cargo / Área de Atuação', 'Role / Department')}
                           </label>
                           <input 
                             type="text" 
                             value={contactRole}
                             onChange={e => setContactRole(e.target.value)}
-                            placeholder="Ex: Diretor de ESG / Gerente de RH / Sócio"
+                            placeholder={tr('Ex: Diretor de ESG / Gerente de RH / Sócio', 'e.g. ESG Director / HR Manager / Partner')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular"
                           />
                         </div>
@@ -998,28 +1039,28 @@ export function VolunteerAndPartnerships() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            E-mail Corporativo *
+                            {tr('E-mail Corporativo *', 'Corporate Email *')}
                           </label>
                           <input 
                             type="email" 
                             required
                             value={corporateEmail}
                             onChange={e => setCorporateEmail(e.target.value)}
-                            placeholder="contato@empresa.com.br"
+                            placeholder={tr('contato@empresa.com.br', 'contact@company.com')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular"
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                            Telefone / WhatsApp Comercial *
+                            {tr('Telefone / WhatsApp Comercial *', 'Business Phone / WhatsApp *')}
                           </label>
                           <input 
                             type="tel" 
                             required
                             value={corporatePhone}
                             onChange={e => setCorporatePhone(e.target.value)}
-                            placeholder="(11) 99999-9999"
+                            placeholder={tr('(11) 99999-9999', '+1 (555) 123-4567')}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular"
                           />
                         </div>
@@ -1028,7 +1069,7 @@ export function VolunteerAndPartnerships() {
                       {/* Site ou Redes da Empresa */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                          Website da Empresa ou LinkedIn (opcional)
+                          {tr('Website da Empresa ou LinkedIn (opcional)', 'Company Website or LinkedIn (optional)')}
                         </label>
                         <input 
                           type="text" 
@@ -1042,14 +1083,17 @@ export function VolunteerAndPartnerships() {
                       {/* Detalhes da Doação / Proposta */}
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1">
-                          Como sua empresa gostaria de doar ou colaborar? *
+                          {tr('Como sua empresa gostaria de doar ou colaborar? *', 'How would your company like to donate or collaborate? *')}
                         </label>
                         <textarea 
                           required
                           rows={4}
                           value={proposalDetails}
                           onChange={e => setProposalDetails(e.target.value)}
-                          placeholder="Ex: Gostaríamos de fazer uma doação financeira de investimento para a expansão no Brasil, doar lotes de suplementos/produtos ou oferecer nosso serviço de transporte pro bono..."
+                          placeholder={tr(
+                            'Ex: Gostaríamos de fazer uma doação financeira de investimento para a expansão no Brasil, doar lotes de suplementos/produtos ou oferecer nosso serviço de transporte pro bono...',
+                            'e.g. We would like to make a financial investment donation, donate batches of supplements/products, or offer our freight service pro bono...'
+                          )}
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-900 font-gotham-regular resize-none"
                         />
                       </div>
@@ -1060,17 +1104,20 @@ export function VolunteerAndPartnerships() {
                         className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-xl font-gotham-bold text-sm tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {partLoading ? (
-                          <span>Enviando proposta corporativa...</span>
+                          <span>{tr('Enviando proposta corporativa...', 'Submitting corporate proposal...')}</span>
                         ) : (
                           <>
-                            <span>Enviar Proposta de Parceria Empresarial</span>
+                            <span>{tr('Enviar Proposta de Parceria Empresarial', 'Submit Corporate Partnership Proposal')}</span>
                             <Send size={16} />
                           </>
                         )}
                       </button>
 
                       <p className="text-[11px] text-slate-400 text-center font-gotham-light">
-                        Nossa equipe institucional entrará em contato em até 48 horas para alinhar a reunião e os detalhes da doação.
+                        {tr(
+                          'Nossa equipe institucional entrará em contato em até 48 horas para alinhar a reunião e os detalhes da doação.',
+                          'Our institutional team will reach out within 48 hours to schedule a meeting and align donation details.'
+                        )}
                       </p>
 
                     </form>
@@ -1090,18 +1137,18 @@ export function VolunteerAndPartnerships() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="flex flex-col items-center p-4">
               <ShieldCheck size={28} className="text-[#F49853] mb-2" />
-              <h4 className="font-gotham-bold text-slate-900 text-sm">Transparência & Auditoria</h4>
-              <p className="text-xs text-slate-500 font-gotham-light mt-1">Prestações de contas formais para cada empresa e doador parceiro.</p>
+              <h4 className="font-gotham-bold text-slate-900 text-sm">{tr('Transparência & Auditoria', 'Transparency & Auditing')}</h4>
+              <p className="text-xs text-slate-500 font-gotham-light mt-1">{tr('Prestações de contas formais para cada empresa e doador parceiro.', 'Formal accountability reports for every partner company and donor.')}</p>
             </div>
             <div className="flex flex-col items-center p-4">
               <Heart size={28} className="text-[#92BF78] mb-2" />
-              <h4 className="font-gotham-bold text-slate-900 text-sm">Vidas Transformadas</h4>
-              <p className="text-xs text-slate-500 font-gotham-light mt-1">Sua empresa ligada a um propósito real de combate à desnutrição e dignidade.</p>
+              <h4 className="font-gotham-bold text-slate-900 text-sm">{tr('Vidas Transformadas', 'Transformed Lives')}</h4>
+              <p className="text-xs text-slate-500 font-gotham-light mt-1">{tr('Sua empresa ligada a um propósito real de combate à desnutrição e dignidade.', 'Your company connected to a real purpose of fighting malnutrition and restoring dignity.')}</p>
             </div>
             <div className="flex flex-col items-center p-4">
               <Clock size={28} className="text-[#88A1F2] mb-2" />
-              <h4 className="font-gotham-bold text-slate-900 text-sm">Agilidade de Contato</h4>
-              <p className="text-xs text-slate-500 font-gotham-light mt-1">Nossa equipe retornará rapidamente para formalizar o apoio.</p>
+              <h4 className="font-gotham-bold text-slate-900 text-sm">{tr('Agilidade de Contato', 'Fast Response')}</h4>
+              <p className="text-xs text-slate-500 font-gotham-light mt-1">{tr('Nossa equipe retornará rapidamente para formalizar o apoio.', 'Our team will get back to you promptly to formalize your support.')}</p>
             </div>
           </div>
         </div>

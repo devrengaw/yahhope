@@ -18,6 +18,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { sponsorshipService, SponsorshipMetrics } from '../../services/sponsorshipService';
 import { submitCampaignLead, recordCampaignClick, getClientLocation, isHotsiteRoute } from '../../services/campaignTrackingService';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface HomeDonationCardProps {
   onClose?: () => void;
@@ -35,6 +36,7 @@ export function HomeDonationCard({
   initialQuotas
 }: HomeDonationCardProps) {
   const { user } = useAuth();
+  const { tr } = useLanguage();
 
   // Estados do Card de Doação / Apoio (Idêntico à Página Inicial)
   const [headerTab, setHeaderTab] = useState<'sponsorship' | 'general'>(initialTab);
@@ -131,15 +133,15 @@ export function HomeDonationCard({
     // Apenas exige preenchimento se o usuário NÃO estiver logado
     if (!user) {
       if (!finalDonorName) {
-        setDonorFormError('Por favor, informe seu nome completo.');
+        setDonorFormError(tr('Por favor, informe seu nome completo.', 'Please enter your full name.'));
         return;
       }
       if (!finalDonorEmail || !finalDonorEmail.includes('@')) {
-        setDonorFormError('Por favor, informe um e-mail válido.');
+        setDonorFormError(tr('Por favor, informe um e-mail válido.', 'Please enter a valid email address.'));
         return;
       }
       if (!finalDonorWhatsapp || finalDonorWhatsapp.replace(/\D/g, '').length < 10) {
-        setDonorFormError('Por favor, informe seu WhatsApp com DDD.');
+        setDonorFormError(tr('Por favor, informe seu WhatsApp com DDD.', 'Please enter your WhatsApp / phone number.'));
         return;
       }
     }
@@ -264,7 +266,7 @@ export function HomeDonationCard({
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-20 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-          aria-label="Fechar"
+          aria-label={tr('Fechar', 'Close')}
         >
           <X size={18} />
         </button>
@@ -275,13 +277,13 @@ export function HomeDonationCard({
         <div className="mb-4 pr-8">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 text-[#F49853] text-[10px] font-gotham-bold uppercase tracking-wider mb-1.5">
             <Sparkles size={11} />
-            <span>Apoio Humanitário YAH Hope</span>
+            <span>{tr('Apoio Humanitário YAH Hope', 'YAH Hope Humanitarian Support')}</span>
           </div>
           <h3 className="text-xl font-heading font-black text-slate-900 leading-tight">
-            Faça a Diferença Agora
+            {tr('Faça a Diferença Agora', 'Make a Difference Now')}
           </h3>
           <p className="text-xs text-slate-500 font-gotham-regular mt-0.5">
-            Nutrição infantil, apadrinhamento e dignidade em Moçambique.
+            {tr('Nutrição infantil, apadrinhamento e dignidade em Moçambique.', 'Child nutrition, sponsorship, and dignity in Mozambique.')}
           </p>
         </div>
       )}
@@ -302,7 +304,7 @@ export function HomeDonationCard({
           )}
         >
           <Heart size={13} fill={headerTab === 'sponsorship' ? "currentColor" : "none"} />
-          <span>Apadrinhamento</span>
+          <span>{tr('Apadrinhamento', 'Sponsorship')}</span>
         </button>
 
         <button
@@ -320,17 +322,17 @@ export function HomeDonationCard({
           )}
         >
           <Users size={13} />
-          <span>Mantenedor</span>
+          <span>{tr('Mantenedor', 'Supporter')}</span>
         </button>
       </div>
 
       <p className="text-center text-[11px] text-slate-500 mb-3 font-gotham-regular min-h-[1.25rem] flex items-center justify-center">
         {headerTab === 'sponsorship' ? (
-          <span>Cotas de R$ {quotaCost}/mês • <strong className="font-gotham-bold text-[#F49853]">Alocação justa e perfil por e-mail</strong></span>
+          <span>{tr(`Cotas de R$ ${quotaCost}/mês • `, `Shares of R$ ${quotaCost}/mo • `)}<strong className="font-gotham-bold text-[#F49853]">{tr('Alocação justa e perfil por e-mail', 'Fair allocation & profile via email')}</strong></span>
         ) : isSingleDonation ? (
-          <span>Doação pontual sem mensalidade que impulsiona a <strong className="font-gotham-bold text-[#F49853]">régua de arrecadação</strong></span>
+          <span>{tr('Doação pontual sem mensalidade que impulsiona a ', 'One-time donation with no subscription that boosts the ')}<strong className="font-gotham-bold text-[#F49853]">{tr('régua de arrecadação', 'fundraising tracker')}</strong></span>
         ) : (
-          <span>Recorrência mensal que sustenta o <strong className="font-gotham-bold text-slate-900">custo global do projeto</strong></span>
+          <span>{tr('Recorrência mensal que sustenta o ', 'Monthly recurring support that sustains the ')}<strong className="font-gotham-bold text-slate-900">{tr('custo global do projeto', 'overall project cost')}</strong></span>
         )}
       </p>
 
@@ -339,20 +341,20 @@ export function HomeDonationCard({
         <div className="space-y-2.5 mb-3 animate-fade-in">
           {sponsorshipMetrics?.isFullySponsored ? (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs text-emerald-800">
-              🎉 Todas as crianças estão 100% apadrinhadas!
+              {tr('🎉 Todas as crianças estão 100% apadrinhadas!', '🎉 All children are 100% sponsored!')}
               <button
                 type="button"
                 onClick={() => setHeaderTab('general')}
                 className="mt-1 block mx-auto text-[11px] font-gotham-bold underline text-emerald-950 cursor-pointer"
               >
-                Seja um Mantenedor Geral do Projeto →
+                {tr('Seja um Mantenedor Geral do Projeto →', 'Become a General Project Supporter →')}
               </button>
             </div>
           ) : (
             <>
               <div className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-                <span>Quantas crianças apadrinhar:</span>
-                <span className="text-[#F49853]">R$ {quotaCost}/mês por cota</span>
+                <span>{tr('Quantas crianças apadrinhar:', 'How many children to sponsor:')}</span>
+                <span className="text-[#F49853]">{tr(`R$ ${quotaCost}/mês por cota`, `R$ ${quotaCost}/mo per share`)}</span>
               </div>
 
               <div className="grid grid-cols-4 gap-1.5">
@@ -372,7 +374,7 @@ export function HomeDonationCard({
                       )}
                     >
                       <span className="text-[10px] font-gotham-bold uppercase leading-tight">
-                        {q} {q === 1 ? 'Criança' : 'Crianças'}
+                        {q} {q === 1 ? tr('Criança', 'Child') : tr('Crianças', 'Children')}
                       </span>
                       <span className="text-xs font-black text-slate-900 mt-0.5">
                         R$ {total}
@@ -396,7 +398,7 @@ export function HomeDonationCard({
                     )}
                   >
                     <CreditCard size={11} />
-                    <span>Cartão Mensal</span>
+                    <span>{tr('Cartão Mensal', 'Monthly Card')}</span>
                   </button>
                   <button
                     type="button"
@@ -409,15 +411,15 @@ export function HomeDonationCard({
                     )}
                   >
                     <QrCode size={11} />
-                    <span>PIX (3, 6 ou 12m)</span>
+                    <span>{tr('PIX (3, 6 ou 12m)', 'PIX (3, 6 or 12m)')}</span>
                   </button>
                 </div>
 
                 {sponsorshipPayMethod === 'pix' && (
                   <div className="space-y-1.5 animate-fade-in">
                     <div className="text-[10px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-                      <span>Pacote de meses no PIX:</span>
-                      <span className="text-emerald-600">Acesso garantido no período</span>
+                      <span>{tr('Pacote de meses no PIX:', 'PIX month package:')}</span>
+                      <span className="text-emerald-600">{tr('Acesso garantido no período', 'Guaranteed access for period')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([3, 6, 12] as const).map((m) => {
@@ -436,7 +438,7 @@ export function HomeDonationCard({
                             )}
                           >
                             <span className="text-[10px] font-gotham-bold uppercase leading-tight">
-                              {m} Meses
+                              {m} {tr('Meses', 'Months')}
                             </span>
                             <span className="text-xs font-black text-slate-900 mt-0.5">
                               R$ {pkgTotal}
@@ -453,8 +455,8 @@ export function HomeDonationCard({
                 <Sparkles size={14} className="text-[#F49853] shrink-0" />
                 <span>
                   {sponsorshipPayMethod === 'pix'
-                    ? `Acesso e apadrinhamento garantidos por ${sponsorshipPixMonths} meses completos.`
-                    : 'Distribuição justa: o perfil do afilhado é enviado após a confirmação.'}
+                    ? tr(`Acesso e apadrinhamento garantidos por ${sponsorshipPixMonths} meses completos.`, `Access and sponsorship guaranteed for ${sponsorshipPixMonths} full months.`)
+                    : tr('Distribuição justa: o perfil do afilhado é enviado após a confirmação.', 'Fair distribution: your sponsored child’s profile is sent after confirmation.')}
                 </span>
               </div>
             </>
@@ -478,7 +480,7 @@ export function HomeDonationCard({
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              Mensal (Recorrente)
+              {tr('Mensal (Recorrente)', 'Monthly (Recurring)')}
             </button>
             <button
               type="button"
@@ -491,16 +493,16 @@ export function HomeDonationCard({
               )}
             >
               <CreditCard size={11} />
-              <span>Doação Pontual</span>
+              <span>{tr('Doação Pontual', 'One-Time Gift')}</span>
             </button>
           </div>
 
           {/* Lista de Valores */}
           <div className="space-y-1.5">
             {[
-              { amount: 50, label: isSingleDonation ? 'Cesta Alimentar Emergencial' : 'Nutrição Essencial • R$ 1,66/dia', icon: Heart },
-              { amount: 100, label: isSingleDonation ? 'Tratamento & Insumos Médicos' : 'Guardião da Vida • R$ 3,33/dia', icon: Target },
-              { amount: 200, label: isSingleDonation ? 'Apoio Comunitário Intensivo' : 'Transformação Integral + Bolsas', icon: TrendingUp },
+              { amount: 50, label: isSingleDonation ? tr('Cesta Alimentar Emergencial', 'Emergency Food Basket') : tr('Nutrição Essencial • R$ 1,66/dia', 'Essential Nutrition • R$ 1.66/day'), icon: Heart },
+              { amount: 100, label: isSingleDonation ? tr('Tratamento & Insumos Médicos', 'Medical Treatment & Supplies') : tr('Guardião da Vida • R$ 3,33/dia', 'Guardian of Life • R$ 3.33/day'), icon: Target },
+              { amount: 200, label: isSingleDonation ? tr('Apoio Comunitário Intensivo', 'Intensive Community Support') : tr('Transformação Integral + Bolsas', 'Full Transformation + Scholarships'), icon: TrendingUp },
             ].map((plan) => {
               const isSelected = !isCustom && selectedAmount === plan.amount;
               const IconComp = plan.icon;
@@ -532,7 +534,7 @@ export function HomeDonationCard({
                     </div>
                     <div className="text-left">
                       <span className="text-xs font-gotham-bold text-slate-900 block leading-tight">
-                        R$ {plan.amount} {isSingleDonation ? '(Única)' : '/mês'}
+                        R$ {plan.amount} {isSingleDonation ? tr('(Única)', '(One-time)') : tr('/mês', '/mo')}
                       </span>
                       <span className="text-[10px] text-slate-500 font-gotham-regular">
                         {plan.label}
@@ -574,7 +576,7 @@ export function HomeDonationCard({
                   <Sparkles size={13} />
                 </div>
                 <span className="text-xs font-gotham-bold text-slate-900">
-                  {isSingleDonation ? 'Outro Valor Pontual' : 'Outro Valor Mensal'}
+                  {isSingleDonation ? tr('Outro Valor Pontual', 'Other One-Time Amount') : tr('Outro Valor Mensal', 'Other Monthly Amount')}
                 </span>
               </div>
               <div className={cn(
@@ -625,7 +627,7 @@ export function HomeDonationCard({
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-gotham-bold text-slate-800 truncate leading-tight">
-                  {user.name || 'Usuário Conectado'}
+                  {user.name || tr('Usuário Conectado', 'Connected User')}
                 </p>
                 <p className="text-[10px] text-slate-500 truncate font-medium">
                   {user.email}
@@ -633,20 +635,20 @@ export function HomeDonationCard({
               </div>
             </div>
             <span className="text-[9px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-              Logado ✓
+              {tr('Logado ✓', 'Signed In ✓')}
             </span>
           </div>
         ) : (
           <>
             <p className="text-[10px] font-gotham-bold text-slate-500 uppercase tracking-wider">
-              Seus Dados para Identificação
+              {tr('Seus Dados para Identificação', 'Your Identification Details')}
             </p>
 
             <div className="relative">
               <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Nome completo"
+                placeholder={tr('Nome completo', 'Full name')}
                 value={donorName}
                 onChange={(e) => {
                   setDonorName(e.target.value);
@@ -660,7 +662,7 @@ export function HomeDonationCard({
               <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="email"
-                placeholder="Seu melhor e-mail"
+                placeholder={tr('Seu melhor e-mail', 'Your best email')}
                 value={donorEmail}
                 onChange={(e) => {
                   setDonorEmail(e.target.value);
@@ -674,7 +676,7 @@ export function HomeDonationCard({
               <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="tel"
-                placeholder="WhatsApp (DDD + Número)"
+                placeholder={tr('WhatsApp (DDD + Número)', 'WhatsApp / Phone')}
                 value={donorWhatsapp}
                 onChange={(e) => {
                   handleWhatsappChange(e.target.value);
@@ -689,19 +691,19 @@ export function HomeDonationCard({
               <select
                 value={donorAgeRange}
                 onChange={(e) => setDonorAgeRange(e.target.value)}
-                aria-label="Faixa de idade"
+                aria-label={tr('Faixa de idade', 'Age range')}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-[11px] font-gotham-regular text-slate-700 bg-slate-50/70 focus:bg-white transition-all"
               >
-                <option value="18-24">Idade: 18 a 24 anos</option>
-                <option value="25-34">Idade: 25 a 34 anos</option>
-                <option value="35-44">Idade: 35 a 44 anos</option>
-                <option value="45-54">Idade: 45 a 54 anos</option>
-                <option value="55+">Idade: 55+ anos</option>
+                <option value="18-24">{tr('Idade: 18 a 24 anos', 'Age: 18–24')}</option>
+                <option value="25-34">{tr('Idade: 25 a 34 anos', 'Age: 25–34')}</option>
+                <option value="35-44">{tr('Idade: 35 a 44 anos', 'Age: 35–44')}</option>
+                <option value="45-54">{tr('Idade: 45 a 54 anos', 'Age: 45–54')}</option>
+                <option value="55+">{tr('Idade: 55+ anos', 'Age: 55+')}</option>
               </select>
 
               <input
                 type="text"
-                placeholder="Sua Cidade"
+                placeholder={tr('Sua Cidade', 'Your City')}
                 value={donorCity}
                 onChange={(e) => setDonorCity(e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#F49853] text-[11px] font-gotham-regular text-slate-800 bg-slate-50/70 focus:bg-white transition-all placeholder:text-slate-400"
@@ -726,26 +728,26 @@ export function HomeDonationCard({
         {isCheckingOut ? (
           <>
             <Loader2 size={15} className="animate-spin" />
-            <span>Conectando...</span>
+            <span>{tr('Conectando...', 'Connecting...')}</span>
           </>
         ) : headerTab === 'sponsorship' ? (
           <>
             <Heart size={15} fill="currentColor" />
             <span>
               {sponsorshipPayMethod === 'pix'
-                ? `APADRINHAR VIA PIX (${sponsorshipPixMonths} MESES • R$ ${sponsorshipTotal})`
-                : `APADRINHAR (${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'CRIANÇA' : 'CRIANÇAS'} • R$ ${sponsorshipTotal}/mês)`}
+                ? tr(`APADRINHAR VIA PIX (${sponsorshipPixMonths} MESES • R$ ${sponsorshipTotal})`, `SPONSOR VIA PIX (${sponsorshipPixMonths} MONTHS • R$ ${sponsorshipTotal})`)
+                : tr(`APADRINHAR (${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'CRIANÇA' : 'CRIANÇAS'} • R$ ${sponsorshipTotal}/mês)`, `SPONSOR (${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'CHILD' : 'CHILDREN'} • R$ ${sponsorshipTotal}/mo)`)}
             </span>
           </>
         ) : isSingleDonation ? (
           <>
             <CreditCard size={15} />
-            <span>DOAR R$ {currentTotalAmount} PARA A RÉGUA</span>
+            <span>{tr(`DOAR R$ ${currentTotalAmount} PARA A RÉGUA`, `DONATE R$ ${currentTotalAmount} TO THE TRACKER`)}</span>
           </>
         ) : (
           <>
             <Users size={15} />
-            <span>SER MANTENEDOR MENSAL (R$ {currentTotalAmount}/mês)</span>
+            <span>{tr(`SER MANTENEDOR MENSAL (R$ ${currentTotalAmount}/mês)`, `BECOME MONTHLY SUPPORTER (R$ ${currentTotalAmount}/mo)`)}</span>
           </>
         )}
       </button>
@@ -754,7 +756,7 @@ export function HomeDonationCard({
       <div className="mt-3 flex items-center justify-center text-[11px] text-slate-400 px-1 font-gotham-regular">
         <div className="flex items-center gap-1.5">
           <Lock size={12} className="text-emerald-600" />
-          <span>Pagamento Seguro SSL</span>
+          <span>{tr('Pagamento Seguro SSL', 'SSL Secure Payment')}</span>
         </div>
       </div>
 

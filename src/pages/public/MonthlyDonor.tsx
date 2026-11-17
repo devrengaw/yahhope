@@ -32,6 +32,7 @@ import { cn } from '../../lib/utils';
 import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
 import { getUniqueMonthlySupportersCount } from '../../services/monthlySupportersService';
 import { submitCampaignLead } from '../../services/campaignTrackingService';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface PlanOption {
   id: string;
@@ -129,6 +130,7 @@ const FAQS = [
 ];
 
 export function MonthlyDonor() {
+  const { tr, isEn } = useLanguage();
   const [searchParams] = useSearchParams();
   const urlAmount = searchParams.get('amount');
   const urlMode = searchParams.get('mode');
@@ -289,12 +291,12 @@ export function MonthlyDonor() {
     const finalPhone = donorPhone.trim() || user?.phone || '';
 
     if (!user && (!finalName || !finalEmail)) {
-      alert('Por favor, preencha seu nome e e-mail.');
+      alert(tr('Por favor, preencha seu nome e e-mail.', 'Please fill in your name and email.'));
       return;
     }
 
     if (currentAmount < 10) {
-      alert('O valor mínimo de contribuição mensal é de R$ 10,00.');
+      alert(tr('O valor mínimo de contribuição mensal é de R$ 10,00.', 'The minimum monthly contribution amount is R$ 10.00.'));
       return;
     }
 
@@ -360,7 +362,7 @@ export function MonthlyDonor() {
           setIsSuccess(true);
           return;
         } else {
-          alert(result.message || result.error || 'Erro ao processar apadrinhamento');
+          alert(result.message || result.error || tr('Erro ao processar apadrinhamento', 'Error processing sponsorship'));
           setIsLoading(false);
           return;
         }
@@ -457,18 +459,109 @@ export function MonthlyDonor() {
     }
   };
 
+  const localizedPlans = isEn
+    ? [
+        {
+          id: 'essencial',
+          amount: 50,
+          dailyEstimate: 'R$ 1.66 / day',
+          title: 'Essential Nutrition',
+          tagline: 'The basic lifeline that keeps a child safe from acute hunger.',
+          impact: [
+            'Provides daily nutritional formulas (therapeutic milk and supplements)',
+            'Weekly medical checkups at Casa Nutri in Nampula',
+            'Monthly medical progress reports in the Supporter Portal'
+          ]
+        },
+        {
+          id: 'guardiao',
+          amount: 100,
+          dailyEstimate: 'R$ 3.33 / day',
+          popular: true,
+          badge: 'Most Popular',
+          title: 'Guardian of Life',
+          tagline: 'Intensive treatment that rescues and sustains the whole family.',
+          impact: [
+            'Complete intensive treatment for recovery from severe malnutrition',
+            'Food basket and continuous nutritional support for the child’s mother',
+            'Access to essential medicines, lab tests, and regular weigh-ins',
+            'VIP access to the Supporter Portal with letters and firsthand updates'
+          ]
+        },
+        {
+          id: 'integral',
+          amount: 200,
+          dailyEstimate: 'R$ 6.66 / day',
+          title: 'Full Transformation',
+          tagline: 'Nutritional rescue + University Scholarship Fund for youth.',
+          impact: [
+            'Sustains clinical nutritional rescue for up to 2 children per month',
+            'Directly contributes to the University Scholarship Fund in Mozambique',
+            'Self-reliance and agricultural training workshops for community mothers',
+            'Official digital certificate of YAH Hope Strategic Supporter'
+          ]
+        },
+        {
+          id: 'alianca',
+          amount: 500,
+          dailyEstimate: 'R$ 16.60 / day',
+          badge: 'Community Impact',
+          title: 'Alliance of Hope',
+          tagline: 'Vital infrastructure, clean water well drilling, and expansion.',
+          impact: [
+            'Funds imported clinical supplies for Casa Nutri (F-75, F-100, Plumpy\'Nut)',
+            'Preventive maintenance and drilling of clean water wells in villages',
+            'Care for extreme medical emergencies and hospitalizations',
+            'Direct channel with field leadership and exclusive accountability briefings'
+          ]
+        }
+      ]
+    : PLANS;
+
+  const localizedFaqs = isEn
+    ? [
+        {
+          question: 'Why is monthly support more transformative than a one-time donation?',
+          answer: 'Children suffering from severe acute malnutrition require a clinical protocol lasting 45 to 90 continuous days. If we relied solely on one-off donations, we would not know if we had therapeutic formulas for the following week. Your monthly commitment is the lifeline that keeps our medical team’s doors open every day, allowing us to plan supplies and never turn away a desperate mother.'
+        },
+        {
+          question: 'How does monthly Credit Card billing work?',
+          answer: 'Billing is automatic and 100% secure each month. The amount is charged as a monthly subscription without tying up your credit card’s total limit (only the monthly installment is charged).'
+        },
+        {
+          question: 'Can I become a monthly supporter using PIX?',
+          answer: 'Yes! You can make your monthly contribution via PIX using our official key (contato@yahhope.org) or by scanning the QR Code generated on this page. We recommend enabling recurring scheduled PIX in your banking app so your gift happens automatically every month.'
+        },
+        {
+          question: 'How can I track where my contribution goes?',
+          answer: 'Transparency is a non-negotiable value at YAH Hope. As a supporter, you receive access to the Supporter Portal, where you can follow children’s progress reports, field photos, impact statements, and exclusive news. We also send periodic updates via email and WhatsApp.'
+        },
+        {
+          question: 'Can I cancel, pause, or change my contribution amount anytime?',
+          answer: 'Absolutely. No forced lock-in, no bureaucracy, and no hassle. You can adjust the amount or cancel your monthly subscription anytime with one click in the Supporter Portal or by emailing our team at contato@yahhope.org.'
+        },
+        {
+          question: 'Can my company become a corporate supporter?',
+          answer: 'Yes! We have a dedicated program for companies and corporate alliances, issuing institutional receipts and ESG / corporate social responsibility reports. Contact us at contato@yahhope.org to learn about our corporate projects.'
+        }
+      ]
+    : FAQS;
+
   return (
     <div className="min-h-screen bg-white font-gotham-regular text-slate-800">
       <SEO 
-        title="Seja um Mantenedor Mensal e Apadrinhe | YAH Hope"
-        description="Junte-se à família de mantenedores mensais da YAH Hope. Sua fidelidade salva vidas todos os dias, combate a desnutrição infantil e constrói futuro em Moçambique e no Brasil."
+        title={tr('Seja um Mantenedor Mensal e Apadrinhe | YAH Hope', 'Become a Monthly Supporter & Sponsor | YAH Hope')}
+        description={tr(
+          'Junte-se à família de mantenedores mensais da YAH Hope. Sua fidelidade salva vidas todos os dias, combate a desnutrição infantil e constrói futuro em Moçambique e no Brasil.',
+          'Join the YAH Hope family of monthly supporters. Your faithfulness saves lives every day, fights child malnutrition, and builds a future in Mozambique and Brazil.'
+        )}
         keywords="mantenedor mensal YAH Hope, doar mensalmente ONG, combater desnutrição Moçambique, apadrinhar criança, doação recorrente"
         canonical="https://yahhope.com/mantenedor"
         ogImage="https://yahhope.com/mantenedor_hero_novo.jpg"
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "FAQPage",
-          "mainEntity": FAQS.map(faq => ({
+          "mainEntity": localizedFaqs.map(faq => ({
             "@type": "Question",
             "name": faq.question,
             "acceptedAnswer": {
@@ -500,14 +593,17 @@ export function MonthlyDonor() {
           {/* Cabeçalho Unificado: Proposta de Valor e Emoção */}
           <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block drop-shadow-md">
-              Comunidade de Mantenedores • Transforme Vidas Mensalmente
+              {tr('Comunidade de Mantenedores • Transforme Vidas Mensalmente', 'Supporters Community • Transform Lives Monthly')}
             </span>
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-heading font-black tracking-tight text-white leading-[1.12] drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
-              Sua doação <br className="hidden sm:inline" />
-              <span className="text-[#F49853]">mantém a esperança viva</span>.
+              {tr('Sua doação ', 'Your gift ')}<br className="hidden sm:inline" />
+              <span className="text-[#F49853]">{tr('mantém a esperança viva', 'keeps hope alive')}</span>.
             </h1>
             <p className="text-base sm:text-lg text-slate-100 font-gotham-light leading-relaxed max-w-2xl mx-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-              A esperança ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você garante nutrição diária, atendimento médico e um novo futuro para crianças e famílias em Moçambique e no Brasil.
+              {tr(
+                'A esperança ganha forma através de cada gesto de amor contínuo. Ao se tornar um mantenedor, você garante nutrição diária, atendimento médico e um novo futuro para crianças e famílias em Moçambique e no Brasil.',
+                'Hope takes shape through every act of ongoing love. By becoming a monthly supporter, you provide daily nutrition, medical care, and a new future for children and families in Mozambique and Brazil.'
+              )}
             </p>
 
             {/* Métricas Rápidas de Impacto e Confiança */}
@@ -516,15 +612,15 @@ export function MonthlyDonor() {
                 <p className="text-xl sm:text-3xl font-black text-white drop-shadow-md">
                   {uniqueSupportersCount !== null ? uniqueSupportersCount : '...'}
                 </p>
-                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Apoiadores Mensais</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">{tr('Apoiadores Mensais', 'Monthly Supporters')}</p>
               </div>
               <div>
                 <p className="text-xl sm:text-3xl font-black text-[#92BF78] drop-shadow-md">100%</p>
-                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Gestão Auditada</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">{tr('Gestão Auditada', 'Audited Stewardship')}</p>
               </div>
               <div>
                 <p className="text-xl sm:text-3xl font-black text-[#F49853] drop-shadow-md">R$ 1,66</p>
-                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">Ao dia para mudar tudo</p>
+                <p className="text-[11px] sm:text-xs text-slate-200 font-gotham-medium mt-0.5 drop-shadow-sm">{tr('Ao dia para mudar tudo', 'A day to change everything')}</p>
               </div>
             </div>
 
@@ -541,10 +637,10 @@ export function MonthlyDonor() {
                 )}
               >
                 <Heart size={16} className={donationType === 'sponsorship' ? "fill-white" : ""} />
-                <span>Apadrinhar Criança</span>
+                <span>{tr('Apadrinhar Criança', 'Sponsor a Child')}</span>
                 {sponsorshipMetrics?.isFullySponsored && (
                   <span className="ml-1 text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                    100% Acolhidas
+                    {tr('100% Acolhidas', '100% Sponsored')}
                   </span>
                 )}
               </button>
@@ -560,7 +656,7 @@ export function MonthlyDonor() {
                 )}
               >
                 <Users size={16} />
-                <span>Mantenedor Geral (Projeto)</span>
+                <span>{tr('Mantenedor Geral (Projeto)', 'General Supporter (Project)')}</span>
               </button>
             </div>
           </div>
@@ -573,20 +669,20 @@ export function MonthlyDonor() {
               </div>
               
               <span className="text-xs font-gotham-bold text-emerald-600 uppercase tracking-widest block mb-2">
-                Gratidão Imensa • Aliança Firmada
+                {tr('Gratidão Imensa • Aliança Firmada', 'Deepest Gratitude • Covenant Established')}
               </span>
               <h3 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 mb-3">
-                Bem-vindo à Família YAH Hope, {donorName || urlName || 'Apoiador'}!
+                {tr(`Bem-vindo à Família YAH Hope, ${donorName || urlName || 'Apoiador'}!`, `Welcome to the YAH Hope Family, ${donorName || urlName || 'Supporter'}!`)}
               </h3>
               
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
                 {donationType === 'sponsorship' && paymentMethod === 'pix' ? (
                   <>
-                    O seu pacote de apadrinhamento de <strong>{pixPackageMonths} meses (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</strong> já está registrado! Você tem acesso garantido ao acompanhamento da criança durante todos os {pixPackageMonths} meses.
+                    {tr('O seu pacote de apadrinhamento de ', 'Your sponsorship package of ')}<strong>{pixPackageMonths} {tr('meses', 'months')} (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>{tr(' já está registrado! Você tem acesso garantido ao acompanhamento da criança durante todos os ', ' is now registered! You have guaranteed access to your child’s updates for all ')}{pixPackageMonths}{tr(' meses.', ' months.')}
                   </>
                 ) : (
                   <>
-                    O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo alimentação e atendimento clínico de qualidade.
+                    {tr('O seu compromisso mensal de ', 'Your monthly commitment of ')}<strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>{tr(' já está transformando vidas na Casa Nutri e garantindo alimentação e atendimento clínico de qualidade.', ' is already transforming lives at Casa Nutri, providing nutrition and quality clinical care.')}
                   </>
                 )}
               </p>
@@ -597,16 +693,16 @@ export function MonthlyDonor() {
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-gotham-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles size={14} className="text-[#F49853]" />
-                      Sua(s) Criança(s) Apadrinhada(s)
+                      {tr('Sua(s) Criança(s) Apadrinhada(s)', 'Your Sponsored Child(ren)')}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {paymentMethod === 'pix' && (
                         <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-black">
-                          Pacote PIX {pixPackageMonths} Meses {confirmedExpiresAt ? `• Até ${new Date(confirmedExpiresAt).toLocaleDateString('pt-BR')}` : ''}
+                          {tr(`Pacote PIX ${pixPackageMonths} Meses`, `PIX ${pixPackageMonths}-Month Package`)} {confirmedExpiresAt ? `• ${tr('Até', 'Until')} ${new Date(confirmedExpiresAt).toLocaleDateString(isEn ? 'en-US' : 'pt-BR')}` : ''}
                         </span>
                       )}
                       <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black">
-                        {assignedChildren.length} {assignedChildren.length === 1 ? 'Cota Atribuída' : 'Cotas Atribuídas'}
+                        {assignedChildren.length} {assignedChildren.length === 1 ? tr('Cota Atribuída', 'Share Assigned') : tr('Cotas Atribuídas', 'Shares Assigned')}
                       </span>
                     </div>
                   </div>
@@ -629,7 +725,7 @@ export function MonthlyDonor() {
                   </div>
 
                   <div className="bg-white/80 p-3.5 rounded-xl border border-amber-200/60 text-xs text-amber-950 font-medium">
-                    ✉️ <strong>Perfil Completo Enviado:</strong> Enviamos para <strong>{donorEmail}</strong> o e-mail oficial com a história detalhada, dados médicos e fotos de cada criança!
+                    ✉️ <strong>{tr('Perfil Completo Enviado:', 'Full Profile Sent:')}</strong> {tr('Enviamos para', 'We sent to')} <strong>{donorEmail}</strong> {tr('o e-mail oficial com a história detalhada, dados médicos e fotos de cada criança!', 'the official email with the detailed story, medical updates, and photos of each child!')}
                   </div>
                 </div>
               )}
@@ -638,10 +734,10 @@ export function MonthlyDonor() {
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left mb-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="font-gotham-bold text-sm text-slate-800">
-                      Próximo Passo: Concluir seu PIX {donationType === 'sponsorship' ? `(${pixPackageMonths} Meses)` : ''}
+                      {tr('Próximo Passo: Concluir seu PIX', 'Next Step: Complete your PIX')} {donationType === 'sponsorship' ? `(${pixPackageMonths} ${tr('Meses', 'Months')})` : ''}
                     </span>
                     <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded font-gotham-bold">
-                      Total: R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      Total: R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
@@ -653,7 +749,7 @@ export function MonthlyDonor() {
                     />
                     <div className="flex-1 w-full space-y-2.5">
                       <p className="text-xs text-slate-500">
-                        Escaneie o QR Code no aplicativo do seu banco ou copie a chave PIX abaixo para transferir <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>:
+                        {tr('Escaneie o QR Code no aplicativo do seu banco ou copie a chave PIX abaixo para transferir ', 'Scan the QR Code in your banking app or copy the PIX key below to transfer ')}<strong>R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
                       </p>
                       <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                         <span className="text-xs sm:text-sm font-mono text-slate-700 font-bold truncate mr-2">{pixKey}</span>
@@ -663,7 +759,7 @@ export function MonthlyDonor() {
                           className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 shrink-0 cursor-pointer"
                         >
                           {pixCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                          <span>{pixCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
+                          <span>{pixCopied ? tr('Chave Copiada!', 'Key Copied!') : tr('Copiar Chave', 'Copy Key')}</span>
                         </button>
                       </div>
                     </div>
@@ -672,15 +768,18 @@ export function MonthlyDonor() {
                   <div className="text-xs text-slate-500 space-y-1">
                     {donationType === 'sponsorship' ? (
                       <>
-                        <p className="font-gotham-bold text-slate-700">Como funciona a vigência do seu pacote ({pixPackageMonths} meses):</p>
+                        <p className="font-gotham-bold text-slate-700">{tr(`Como funciona a vigência do seu pacote (${pixPackageMonths} meses):`, `How your ${pixPackageMonths}-month package works:`)}</p>
                         <p>
-                          Você <strong>não perde acesso na virada de cada mês</strong>. Seu apadrinhamento fica ativo durante todos os {pixPackageMonths} meses. Ao final do período, você receberá um aviso caso queira renovar; se optar por não continuar com a criança, você continuará tendo acesso normal ao sistema e às atualizações gerais do projeto!
+                          {tr(
+                            `Você não perde acesso na virada de cada mês. Seu apadrinhamento fica ativo durante todos os ${pixPackageMonths} meses. Ao final do período, você receberá um aviso caso queira renovar; se optar por não continuar com a criança, você continuará tendo acesso normal ao sistema e às atualizações gerais do projeto!`,
+                            `You do not lose access at the turn of each month. Your sponsorship remains active for all ${pixPackageMonths} months. At the end of the period, you will receive a reminder to renew; if you choose not to continue, you will still keep access to the portal and general project updates.`
+                          )}
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="font-gotham-bold text-slate-700">Dica para doação automática:</p>
-                        <p>No aplicativo do seu banco, ative o <strong>Agendamento Mensal</strong> ou repita este PIX todo mês no dia que preferir.</p>
+                        <p className="font-gotham-bold text-slate-700">{tr('Dica para doação automática:', 'Tip for automatic monthly giving:')}</p>
+                        <p>{tr('No aplicativo do seu banco, ative o Agendamento Mensal ou repita este PIX todo mês no dia que preferir.', 'In your banking app, enable Monthly Scheduling to repeat this PIX automatically each month.')}</p>
                       </>
                     )}
                   </div>
@@ -692,13 +791,16 @@ export function MonthlyDonor() {
                 <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-6 mb-6 text-left">
                   <div className="flex items-center gap-2 text-orange-800 font-gotham-bold text-xs uppercase tracking-wider mb-1.5">
                     <Heart size={14} className="fill-[#F49853] text-[#F49853]" />
-                    <span>Portal do Mantenedor</span>
+                    <span>{tr('Portal do Mantenedor', 'Supporter Portal')}</span>
                   </div>
                   <h3 className="font-heading font-black text-slate-900 text-lg mb-1">
-                    Deseja criar seu acesso agora?
+                    {tr('Deseja criar seu acesso agora?', 'Would you like to create your account now?')}
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed mb-4 font-gotham-light">
-                    No portal você acompanha em tempo real as novidades exclusivas da sua criança apadrinhada, fotos de campo e relatórios nutricionais.
+                    {tr(
+                      'No portal você acompanha em tempo real as novidades exclusivas da sua criança apadrinhada, fotos de campo e relatórios nutricionais.',
+                      'In the portal, you can follow real-time updates on your sponsored child, field photos, and nutritional reports.'
+                    )}
                   </p>
 
                   <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -707,13 +809,13 @@ export function MonthlyDonor() {
                       className="w-full sm:w-auto flex-1 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md text-center flex items-center justify-center gap-2"
                     >
                       <Users size={16} />
-                      <span>Sim, Quero Criar Minha Senha</span>
+                      <span>{tr('Sim, Quero Criar Minha Senha', 'Yes, Create My Password')}</span>
                     </Link>
                     <Link
                       to="/"
                       className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-600 text-xs font-gotham-medium py-3.5 px-6 rounded-xl border border-slate-200 text-center transition-colors"
                     >
-                      Não, continuar sem cadastro
+                      {tr('Não, continuar sem cadastro', 'No, continue without an account')}
                     </Link>
                   </div>
                 </div>
@@ -724,13 +826,13 @@ export function MonthlyDonor() {
                     className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-8 py-3.5 rounded-full font-gotham-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
                   >
                     <Users size={16} />
-                    <span>Acessar Portal do Mantenedor</span>
+                    <span>{tr('Acessar Portal do Mantenedor', 'Access Supporter Portal')}</span>
                   </Link>
                   <Link
                     to="/"
                     className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3.5 rounded-full font-gotham-medium text-sm transition-all text-center"
                   >
-                    Voltar ao Início
+                    {tr('Voltar ao Início', 'Back to Home')}
                   </Link>
                 </div>
               )}
@@ -759,23 +861,29 @@ export function MonthlyDonor() {
                       
                       <div className="space-y-2">
                         <span className="text-[11px] font-black uppercase tracking-widest text-emerald-200 bg-white/10 px-3.5 py-1.5 rounded-full inline-block">
-                          Meta de Cuidado Atingida • 100% Acolhidas!
+                          {tr('Meta de Cuidado Atingida • 100% Acolhidas!', 'Care Goal Reached • 100% Sponsored!')}
                         </span>
                         <h3 className="text-2xl sm:text-3xl font-heading font-black text-white">
-                          Todas as Nossas Crianças Foram Apadrinhadas! 🎉
+                          {tr('Todas as Nossas Crianças Foram Apadrinhadas! 🎉', 'All Our Children Have Been Sponsored! 🎉')}
                         </h3>
                       </div>
 
                       <p className="text-emerald-100 text-sm sm:text-base leading-relaxed font-gotham-light max-w-lg mx-auto">
-                        Graças a padrinhos fiéis, todas as crianças atualmente acolhidas na Casa Nutri atingiram sua rede completa de cotas mensais.
+                        {tr(
+                          'Graças a padrinhos fiéis, todas as crianças atualmente acolhidas na Casa Nutri atingiram sua rede completa de cotas mensais.',
+                          'Thanks to faithful sponsors, all children currently cared for at Casa Nutri have reached their full monthly support network.'
+                        )}
                       </p>
 
                       <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-left space-y-3">
                         <h4 className="font-gotham-bold text-sm text-yellow-300">
-                          Como você pode ajudar agora?
+                          {tr('Como você pode ajudar agora?', 'How can you help right now?')}
                         </h4>
                         <p className="text-xs text-white/90 leading-relaxed font-gotham-light">
-                          Temos uma longa <strong>fila de espera</strong> de aldeias vizinhas precisando de resgate. Ao se tornar um <strong>Mantenedor Mensal Global</strong>, você financia a abertura de novas vagas, expansão da equipe médica e compra de novos leites terapêuticos.
+                          {tr(
+                            'Temos uma longa fila de espera de aldeias vizinhas precisando de resgate. Ao se tornar um Mantenedor Mensal Global, você financia a abertura de novas vagas, expansão da equipe médica e compra de novos leites terapêuticos.',
+                            'We have a long waiting list from neighboring villages in need of rescue. By becoming a Global Monthly Supporter, you fund new spots, medical team expansion, and therapeutic milk supplies.'
+                          )}
                         </p>
                       </div>
 
@@ -785,7 +893,7 @@ export function MonthlyDonor() {
                         className="bg-white text-emerald-900 hover:bg-emerald-50 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-black/20 flex items-center justify-center gap-2 mx-auto cursor-pointer"
                       >
                         <Heart size={18} className="fill-emerald-900" />
-                        <span>Quero Ser Mantenedor Mensal Global</span>
+                        <span>{tr('Quero Ser Mantenedor Mensal Global', 'Become a Global Monthly Supporter')}</span>
                       </button>
                     </div>
                   ) : (
@@ -795,16 +903,19 @@ export function MonthlyDonor() {
                       <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-amber-600/10 border-2 border-[#F49853]/40 rounded-3xl p-6 text-slate-200 space-y-3">
                         <div className="flex items-center gap-2 text-[#F49853] font-gotham-bold text-xs uppercase tracking-wider">
                           <Sparkles size={16} />
-                          <span>Distribuição Solidária e Justa</span>
+                          <span>{tr('Distribuição Solidária e Justa', 'Fair & Solidarity-Based Distribution')}</span>
                         </div>
                         <h4 className="text-lg font-heading font-black text-white">
-                          Como funciona a alocação do seu afilhado?
+                          {tr('Como funciona a alocação do seu afilhado?', 'How is your sponsored child assigned?')}
                         </h4>
                         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-gotham-light">
-                          Para garantir que <strong>nenhuma criança fique desassistida</strong> e que todas recebam apoio de forma homogênea, nossa equipe médica distribui os novos padrinhos priorizando as crianças com menor rede de apoio ativa. 
+                          {tr(
+                            'Para garantir que nenhuma criança fique desassistida e que todas recebam apoio de forma homogênea, nossa equipe médica distribui os novos padrinhos priorizando as crianças com menor rede de apoio ativa.',
+                            'To ensure no child is left behind and that every child receives balanced support, our medical team assigns new sponsors by prioritizing children with the smallest active support network.'
+                          )}
                         </p>
                         <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-700/60 text-xs text-amber-200 font-medium">
-                          💌 <strong>Surpresa Especial:</strong> Logo após a confirmação, você receberá por e-mail a <strong>foto, história e o perfil completo</strong> da criança que seu coração acaba de acolher!
+                          💌 <strong>{tr('Surpresa Especial:', 'Special Surprise:')}</strong> {tr('Logo após a confirmação, você receberá por e-mail a foto, história e o perfil completo da criança que seu coração acaba de acolher!', 'Right after confirmation, you will receive by email the photo, story, and full profile of the child you have just welcomed!')}
                         </div>
                       </div>
                     </div>
@@ -813,11 +924,11 @@ export function MonthlyDonor() {
                   /* CENÁRIO B: MANTENEDOR DO PROJETO (DOAÇÃO GERAL) */
                   <div className="space-y-4">
                     <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 mb-2">
-                      1. Selecione o Plano de Mantenedor Mensal Global
+                      {tr('1. Selecione o Plano de Mantenedor Mensal Global', '1. Select Your Global Monthly Supporter Plan')}
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {PLANS.map((plan) => {
+                      {localizedPlans.map((plan) => {
                         const isSelected = !isCustom && selectedPlanId === plan.id;
                         return (
                           <div
@@ -848,7 +959,7 @@ export function MonthlyDonor() {
                                   <span className="text-2xl font-black text-white">
                                     R$ {plan.amount}
                                   </span>
-                                  <span className="text-xs text-slate-400 font-gotham-light"> / mês</span>
+                                  <span className="text-xs text-slate-400 font-gotham-light"> {tr('/ mês', '/ mo')}</span>
                                 </div>
                                 <span className="text-[11px] font-gotham-bold text-slate-400 bg-slate-700/60 px-2 py-0.5 rounded">
                                   {plan.dailyEstimate}
@@ -895,8 +1006,8 @@ export function MonthlyDonor() {
                             {isCustom && <div className="w-2.5 h-2.5 bg-[#F49853] rounded-full" />}
                           </div>
                           <div>
-                            <span className="font-gotham-bold text-white text-sm block">Definir Outro Valor Mensal</span>
-                            <span className="text-xs text-slate-400 font-gotham-light">Qualquer contribuição mensal gera impacto imediato</span>
+                            <span className="font-gotham-bold text-white text-sm block">{tr('Definir Outro Valor Mensal', 'Set Another Monthly Amount')}</span>
+                            <span className="text-xs text-slate-400 font-gotham-light">{tr('Qualquer contribuição mensal gera impacto imediato', 'Any monthly contribution creates immediate impact')}</span>
                           </div>
                         </div>
 
@@ -921,10 +1032,10 @@ export function MonthlyDonor() {
                     <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 text-xs text-slate-300">
                       <span className="font-gotham-bold text-white uppercase tracking-wider block mb-2 flex items-center gap-1.5">
                         <ShieldCheck size={14} className="text-[#92BF78]" />
-                        Compromisso de Transparência YAH Hope:
+                        {tr('Compromisso de Transparência YAH Hope:', 'YAH Hope Transparency Commitment:')}
                       </span>
                       <p className="leading-relaxed font-gotham-light">
-                        Sua contribuição mensal de <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> financia a equipe médica, compra de insumos clínicos, perfuração de poços e sustentação da Casa Nutri.
+                        {tr('Sua contribuição mensal de ', 'Your monthly contribution of ')}<strong>R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>{tr(' financia a equipe médica, compra de insumos clínicos, perfuração de poços e sustentação da Casa Nutri.', ' funds our medical team, clinical supplies, water well drilling, and Casa Nutri operations.')}
                       </p>
                     </div>
                   </div>
@@ -947,7 +1058,7 @@ export function MonthlyDonor() {
                     )}
                   >
                     <Heart size={13} fill={donationType === 'sponsorship' ? "currentColor" : "none"} />
-                    <span>Apadrinhamento</span>
+                    <span>{tr('Apadrinhamento', 'Sponsorship')}</span>
                   </button>
 
                   <button
@@ -961,15 +1072,15 @@ export function MonthlyDonor() {
                     )}
                   >
                     <Users size={13} />
-                    <span>Mantenedor</span>
+                    <span>{tr('Mantenedor', 'Supporter')}</span>
                   </button>
                 </div>
 
                 <p className="text-center text-[11px] text-slate-500 mb-3 font-gotham-regular min-h-[1.25rem] flex items-center justify-center">
                   {donationType === 'sponsorship' ? (
-                    <span>Cotas de R$ {quotaCost}/mês • <strong className="font-gotham-bold text-[#F49853]">Alocação justa e perfil por e-mail</strong></span>
+                    <span>{tr(`Cotas de R$ ${quotaCost}/mês • `, `Shares of R$ ${quotaCost}/mo • `)}<strong className="font-gotham-bold text-[#F49853]">{tr('Alocação justa e perfil por e-mail', 'Fair allocation & profile via email')}</strong></span>
                   ) : (
-                    <span>Recorrência mensal que sustenta o <strong className="font-gotham-bold text-slate-900">custo global do projeto</strong></span>
+                    <span>{tr('Recorrência mensal que sustenta o ', 'Monthly recurring support that sustains the ')}<strong className="font-gotham-bold text-slate-900">{tr('custo global do projeto', 'overall project cost')}</strong></span>
                   )}
                 </p>
 
@@ -978,20 +1089,20 @@ export function MonthlyDonor() {
                   <div className="space-y-2.5 mb-4 animate-fade-in">
                     {sponsorshipMetrics?.isFullySponsored ? (
                       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs text-emerald-800">
-                        🎉 Todas as crianças estão 100% apadrinhadas!
+                        {tr('🎉 Todas as crianças estão 100% apadrinhadas!', '🎉 All children are 100% sponsored!')}
                         <button
                           type="button"
                           onClick={() => setDonationType('general')}
                           className="mt-1 block mx-auto text-[11px] font-gotham-bold underline text-emerald-950 cursor-pointer"
                         >
-                          Seja um Mantenedor Geral do Projeto →
+                          {tr('Seja um Mantenedor Geral do Projeto →', 'Become a General Project Supporter →')}
                         </button>
                       </div>
                     ) : (
                       <>
                         <div className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
-                          <span>Quantas crianças apadrinhar:</span>
-                          <span className="text-[#F49853]">R$ {quotaCost}/mês por cota</span>
+                          <span>{tr('Quantas crianças apadrinhar:', 'How many children to sponsor:')}</span>
+                          <span className="text-[#F49853]">{tr(`R$ ${quotaCost}/mês por cota`, `R$ ${quotaCost}/mo per share`)}</span>
                         </div>
 
                         <div className="grid grid-cols-4 gap-1.5">
@@ -1011,7 +1122,7 @@ export function MonthlyDonor() {
                                 )}
                               >
                                 <span className="text-[10px] font-gotham-bold uppercase leading-tight">
-                                  {q} {q === 1 ? 'Criança' : 'Crianças'}
+                                  {q} {q === 1 ? tr('Criança', 'Child') : tr('Crianças', 'Children')}
                                 </span>
                                 <span className="text-xs font-black text-slate-900 mt-0.5">
                                   R$ {total}
@@ -1023,7 +1134,7 @@ export function MonthlyDonor() {
 
                         <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-900 leading-snug flex items-center gap-2">
                           <Sparkles size={14} className="text-[#F49853] shrink-0" />
-                          <span>Distribuição justa: o perfil do afilhado é enviado após a confirmação.</span>
+                          <span>{tr('Distribuição justa: o perfil do afilhado é enviado após a confirmação.', 'Fair distribution: your sponsored child’s profile is sent after confirmation.')}</span>
                         </div>
                       </>
                     )}
@@ -1032,42 +1143,45 @@ export function MonthlyDonor() {
 
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-gotham-bold uppercase tracking-wider text-[#F49853]">Passo Final</span>
+                    <span className="text-xs font-gotham-bold uppercase tracking-wider text-[#F49853]">{tr('Passo Final', 'Final Step')}</span>
                     <span className="text-xs font-gotham-medium text-slate-400 flex items-center gap-1">
-                      <Lock size={12} /> Seguro & Criptografado
+                      <Lock size={12} /> {tr('Seguro & Criptografado', 'Secure & Encrypted')}
                     </span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-heading font-black text-slate-900">
-                    {donationType === 'sponsorship' ? 'Seus Dados de Padrinho' : 'Dados do Mantenedor'}
+                    {donationType === 'sponsorship' ? tr('Seus Dados de Padrinho', 'Your Sponsor Details') : tr('Dados do Mantenedor', 'Supporter Details')}
                   </h3>
                   <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-200/80 flex items-center justify-between">
                     <div>
                       <span className="text-xs font-gotham-bold text-amber-900 block">
                         {donationType === 'sponsorship' 
                           ? (paymentMethod === 'pix'
-                            ? `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Pacote ${pixPackageMonths} Meses`
-                            : `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Mensal`)
+                            ? tr(`${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Pacote ${pixPackageMonths} Meses`, `${quotasCount} Sponsored ${quotasCount === 1 ? 'Child' : 'Children'} • ${pixPackageMonths}-Month Package`)
+                            : tr(`${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Mensal`, `${quotasCount} Sponsored ${quotasCount === 1 ? 'Child' : 'Children'} • Monthly`))
                           : Math.floor(currentAmount / 90) >= 1 
-                            ? `Mantenedor • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Criança Acolhida' : 'Crianças Acolhidas'}` 
-                            : 'Total Mensal (Fundo Geral):'}
+                            ? tr(`Mantenedor • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Criança Acolhida' : 'Crianças Acolhidas'}`, `Supporter • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Child Supported' : 'Children Supported'}`) 
+                            : tr('Total Mensal (Fundo Geral):', 'Monthly Total (General Fund):')}
                       </span>
                       {donationType === 'sponsorship' && paymentMethod === 'pix' && (
                         <span className="text-[10px] text-emerald-700 font-gotham-bold flex items-center gap-1 mt-0.5">
                           <Calendar size={10} className="text-emerald-600" />
-                          Equivale a R$ {sponsorshipMonthlyTotal}/mês • Acesso garantido por {pixPackageMonths} meses!
+                          {tr(`Equivale a R$ ${sponsorshipMonthlyTotal}/mês • Acesso garantido por ${pixPackageMonths} meses!`, `Equals R$ ${sponsorshipMonthlyTotal}/mo • Access guaranteed for ${pixPackageMonths} months!`)}
                         </span>
                       )}
                       {donationType !== 'sponsorship' && currentAmount >= 90 && currentAmount % 90 !== 0 && (
                         <span className="text-[10px] text-amber-700 font-gotham-bold flex items-center gap-1 mt-0.5">
                           <Sparkles size={10} className="text-[#F49853]" />
-                          R$ {Math.floor(currentAmount / 90) * 90} para {Math.floor(currentAmount / 90) === 1 ? 'a criança' : `${Math.floor(currentAmount / 90)} crianças`} e R$ {currentAmount % 90} para o projeto geral!
+                          {tr(
+                            `R$ ${Math.floor(currentAmount / 90) * 90} para ${Math.floor(currentAmount / 90) === 1 ? 'a criança' : `${Math.floor(currentAmount / 90)} crianças`} e R$ ${currentAmount % 90} para o projeto geral!`,
+                            `R$ ${Math.floor(currentAmount / 90) * 90} for ${Math.floor(currentAmount / 90) === 1 ? 'the child' : `${Math.floor(currentAmount / 90)} children`} and R$ ${currentAmount % 90} for the general project!`
+                          )}
                         </span>
                       )}
                     </div>
                     <span className="text-xl font-heading font-black text-amber-900">
-                      R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}{' '}
+                      R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}{' '}
                       <span className="text-xs font-normal text-amber-800">
-                        {donationType === 'sponsorship' && paymentMethod === 'pix' ? `/ ${pixPackageMonths}m` : '/ mês'}
+                        {donationType === 'sponsorship' && paymentMethod === 'pix' ? `/ ${pixPackageMonths}m` : tr('/ mês', '/ mo')}
                       </span>
                     </span>
                   </div>
@@ -1083,10 +1197,10 @@ export function MonthlyDonor() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-gotham-bold text-slate-900 truncate">
-                              {user.name || 'Usuário Conectado'}
+                              {user.name || tr('Usuário Conectado', 'Connected User')}
                             </p>
                             <span className="text-[10px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                              Conectado ✓
+                              {tr('Conectado ✓', 'Signed In ✓')}
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 truncate font-medium mt-0.5">
@@ -1099,44 +1213,44 @@ export function MonthlyDonor() {
                     <>
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                          Nome Completo *
+                          {tr('Nome Completo *', 'Full Name *')}
                         </label>
                         <input
                           type="text"
                           required
                           value={donorName}
                           onChange={(e) => setDonorName(e.target.value)}
-                          placeholder="Ex: Lucas Ferreira Silva"
+                          placeholder={tr('Ex: Lucas Ferreira Silva', 'e.g. John Smith')}
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
                         />
                       </div>
 
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                          E-mail *
+                          {tr('E-mail *', 'Email *')}
                         </label>
                         <input
                           type="email"
                           required
                           value={donorEmail}
                           onChange={(e) => setDonorEmail(e.target.value)}
-                          placeholder="lucas@exemplo.com"
+                          placeholder={tr('lucas@exemplo.com', 'john@example.com')}
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
-                          {donationType === 'sponsorship' ? 'O perfil da sua criança apadrinhada será enviado para este e-mail.' : 'Enviaremos os recibos mensais para este e-mail.'}
+                          {donationType === 'sponsorship' ? tr('O perfil da sua criança apadrinhada será enviado para este e-mail.', 'Your sponsored child’s profile will be sent to this email.') : tr('Enviaremos os recibos mensais para este e-mail.', 'We will send monthly receipts to this email.')}
                         </p>
                       </div>
 
                       <div>
                         <label className="block text-xs font-gotham-bold text-slate-700 mb-1.5">
-                          WhatsApp com DDD (opcional)
+                          {tr('WhatsApp com DDD (opcional)', 'WhatsApp / Phone (optional)')}
                         </label>
                         <input
                           type="tel"
                           value={donorPhone}
                           onChange={(e) => setDonorPhone(e.target.value)}
-                          placeholder="(11) 99999-9999"
+                          placeholder={tr('(11) 99999-9999', '+1 (555) 123-4567')}
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-[#F49853] text-sm font-medium bg-slate-50 focus:bg-white transition-colors"
                         />
                       </div>
@@ -1145,7 +1259,7 @@ export function MonthlyDonor() {
 
                   <div className="space-y-3">
                     <label className="block text-xs font-gotham-bold text-slate-700">
-                      Forma de Pagamento
+                      {tr('Forma de Pagamento', 'Payment Method')}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
@@ -1159,7 +1273,7 @@ export function MonthlyDonor() {
                         )}
                       >
                         <CreditCard size={16} />
-                        <span>Cartão Mensal</span>
+                        <span>{tr('Cartão Mensal', 'Monthly Card')}</span>
                       </button>
 
                       <button
@@ -1173,7 +1287,7 @@ export function MonthlyDonor() {
                         )}
                       >
                         <QrCode size={16} />
-                        <span>{donationType === 'sponsorship' ? 'PIX (3, 6 ou 12m)' : 'PIX Mensal'}</span>
+                        <span>{donationType === 'sponsorship' ? tr('PIX (3, 6 ou 12m)', 'PIX (3, 6 or 12m)') : tr('PIX Mensal', 'Monthly PIX')}</span>
                       </button>
                     </div>
 
@@ -1182,18 +1296,18 @@ export function MonthlyDonor() {
                       <div className="p-3.5 bg-orange-50/60 border border-orange-200/80 rounded-2xl space-y-2.5 animate-fade-in">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-700">
-                            Escolha o Pacote de Meses (PIX):
+                            {tr('Escolha o Pacote de Meses (PIX):', 'Choose Months Package (PIX):')}
                           </span>
                           <span className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            Acesso contínuo garantido
+                            {tr('Acesso contínuo garantido', 'Guaranteed continuous access')}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
                           {([
-                            { months: 3 as const, label: '3 Meses', sub: 'Trimestral' },
-                            { months: 6 as const, label: '6 Meses', sub: 'Semestral', badge: 'Ideal' },
-                            { months: 12 as const, label: '12 Meses', sub: '1 Ano Completo' },
+                            { months: 3 as const, label: tr('3 Meses', '3 Months'), sub: tr('Trimestral', 'Quarterly') },
+                            { months: 6 as const, label: tr('6 Meses', '6 Months'), sub: tr('Semestral', 'Half-Year'), badge: tr('Ideal', 'Best') },
+                            { months: 12 as const, label: tr('12 Meses', '12 Months'), sub: tr('1 Ano Completo', 'Full Year') },
                           ]).map((pkg) => {
                             const isSelected = pixPackageMonths === pkg.months;
                             const pkgVal = sponsorshipMonthlyTotal * pkg.months;
@@ -1229,7 +1343,10 @@ export function MonthlyDonor() {
                         </div>
 
                         <p className="text-[11px] text-slate-600 leading-snug bg-white/80 p-2.5 rounded-xl border border-orange-100">
-                          💡 Você paga <strong>{pixPackageMonths} meses</strong> de uma vez e mantém seu apadrinhamento e acesso ao acompanhamento da criança durante todo o período (sem perder acesso no fim do mês). Ao terminar o ciclo, você escolhe se deseja renovar ou manter apenas o acesso às atualizações gerais do projeto.
+                          {tr(
+                            `💡 Você paga ${pixPackageMonths} meses de uma vez e mantém seu apadrinhamento e acesso ao acompanhamento da criança durante todo o período (sem perder acesso no fim do mês). Ao terminar o ciclo, você escolhe se deseja renovar ou manter apenas o acesso às atualizações gerais do projeto.`,
+                            `💡 You pay for ${pixPackageMonths} months upfront and keep your sponsorship and access to your child’s updates for the entire period (no monthly cutoff). At the end of the cycle, you choose whether to renew or keep general project updates.`
+                          )}
                         </p>
                       </div>
                     )}
@@ -1243,7 +1360,7 @@ export function MonthlyDonor() {
                     {isLoading ? (
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Processando...</span>
+                        <span>{tr('Processando...', 'Processing...')}</span>
                       </div>
                     ) : (
                       <>
@@ -1251,16 +1368,16 @@ export function MonthlyDonor() {
                         <span>
                           {donationType === 'sponsorship' 
                             ? (paymentMethod === 'pix'
-                              ? `Confirmar Pacote PIX de ${pixPackageMonths} Meses (R$ ${currentAmount.toFixed(2)})`
-                              : `Confirmar Apadrinhamento (R$ ${currentAmount.toFixed(2)}/mês)`)
-                            : `Confirmar Doação Mensal (R$ ${currentAmount.toFixed(2)}/mês)`}
+                              ? tr(`Confirmar Pacote PIX de ${pixPackageMonths} Meses (R$ ${currentAmount.toFixed(2)})`, `Confirm ${pixPackageMonths}-Month PIX Package (R$ ${currentAmount.toFixed(2)})`)
+                              : tr(`Confirmar Apadrinhamento (R$ ${currentAmount.toFixed(2)}/mês)`, `Confirm Sponsorship (R$ ${currentAmount.toFixed(2)}/mo)`))
+                            : tr(`Confirmar Doação Mensal (R$ ${currentAmount.toFixed(2)}/mês)`, `Confirm Monthly Gift (R$ ${currentAmount.toFixed(2)}/mo)`)}
                         </span>
                       </>
                     )}
                   </button>
 
                   <p className="text-[10px] text-center text-slate-400 font-gotham-light">
-                    Cancelamento fácil a qualquer momento • 100% Seguro
+                    {tr('Cancelamento fácil a qualquer momento • 100% Seguro', 'Easy cancellation anytime • 100% Secure')}
                   </p>
                 </form>
               </div>
@@ -1275,8 +1392,8 @@ export function MonthlyDonor() {
                 <CheckCircle2 size={20} className="text-[#92BF78]" />
               </div>
               <div>
-                <strong className="text-white block font-gotham-medium text-sm">Previsibilidade que Salva</strong>
-                <span className="text-xs text-slate-300 font-gotham-light">Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.</span>
+                <strong className="text-white block font-gotham-medium text-sm">{tr('Previsibilidade que Salva', 'Predictability That Saves Lives')}</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">{tr('Garante a nutrição diária de cada criança e mantém todos os nossos projetos humanitários ativos e contínuos.', 'Ensures daily nutrition for every child and keeps all our humanitarian projects active and continuous.')}</span>
               </div>
             </div>
 
@@ -1285,8 +1402,8 @@ export function MonthlyDonor() {
                 <CheckCircle2 size={20} className="text-[#92BF78]" />
               </div>
               <div>
-                <strong className="text-white block font-gotham-medium text-sm">Relatórios Diretos de Campo</strong>
-                <span className="text-xs text-slate-300 font-gotham-light">Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.</span>
+                <strong className="text-white block font-gotham-medium text-sm">{tr('Relatórios Diretos de Campo', 'Direct Field Reports')}</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">{tr('Acompanhe a recuperação de peso, fotos e boletins das crianças assistidas pelo seu compromisso.', 'Follow weight recovery, photos, and updates of the children cared for through your commitment.')}</span>
               </div>
             </div>
 
@@ -1295,8 +1412,8 @@ export function MonthlyDonor() {
                 <ShieldCheck size={20} className="text-[#92BF78]" />
               </div>
               <div>
-                <strong className="text-white block font-gotham-medium text-sm">100% Flexível e Seguro</strong>
-                <span className="text-xs text-slate-300 font-gotham-light">Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e criptografia SSL 256-bit.</span>
+                <strong className="text-white block font-gotham-medium text-sm">{tr('100% Flexível e Seguro', '100% Flexible & Secure')}</strong>
+                <span className="text-xs text-slate-300 font-gotham-light">{tr('Cancele, pause ou ajuste o valor a qualquer momento com total autonomia e criptografia SSL 256-bit.', 'Cancel, pause, or adjust your amount anytime with full autonomy and 256-bit SSL encryption.')}</span>
               </div>
             </div>
           </div>
@@ -1310,13 +1427,16 @@ export function MonthlyDonor() {
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              A Diferença Entre Sobreviver e Prosperar
+              {tr('A Diferença Entre Sobreviver e Prosperar', 'The Difference Between Surviving and Thriving')}
             </span>
             <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-              Por que nossos projetos dependem da sua constância mensal?
+              {tr('Por que nossos projetos dependem da sua constância mensal?', 'Why do our projects depend on your monthly consistency?')}
             </h2>
             <p className="text-base sm:text-lg text-slate-600 font-gotham-light mt-4">
-              Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza duradoura que mantém todas as nossas frentes humanitárias ativas todos os dias.
+              {tr(
+                'Uma doação esporádica apaga um incêndio. O mantenedor mensal constrói uma fortaleza duradoura que mantém todas as nossas frentes humanitárias ativas todos os dias.',
+                'A sporadic donation puts out a fire. A monthly supporter builds a lasting foundation that keeps all our humanitarian fronts active every day.'
+              )}
             </p>
           </div>
 
@@ -1328,20 +1448,20 @@ export function MonthlyDonor() {
                 <Clock size={24} />
               </div>
               <h3 className="text-xl font-heading font-black text-slate-900 mb-3">
-                Quando dependemos apenas de doações pontuais:
+                {tr('Quando dependemos apenas de doações pontuais:', 'When we rely only on one-time donations:')}
               </h3>
               <ul className="space-y-4 text-slate-600 text-sm">
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Incerteza para planejar novas perfurações de poços de água potável e manter a manutenção das bombas ativas.</span>
+                  <span>{tr('Incerteza para planejar novas perfurações de poços de água potável e manter a manutenção das bombas ativas.', 'Uncertainty in planning new clean water wells and keeping existing pumps maintained.')}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Risco de interrupção no tratamento clínico de crianças desnutridas e nas bolsas de estudo de jovens universitários.</span>
+                  <span>{tr('Risco de interrupção no tratamento clínico de crianças desnutridas e nas bolsas de estudo de jovens universitários.', 'Risk of interruption in clinical treatment for malnourished children and university scholarships.')}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✕</span>
-                  <span>Dificuldade para estruturar novas frentes comunitárias e comprar insumos essenciais com antecedência e economia.</span>
+                  <span>{tr('Dificuldade para estruturar novas frentes comunitárias e comprar insumos essenciais com antecedência e economia.', 'Difficulty structuring new community initiatives and purchasing essential supplies in advance.')}</span>
                 </li>
               </ul>
             </div>
@@ -1354,20 +1474,20 @@ export function MonthlyDonor() {
                 <Sparkles size={24} />
               </div>
               <h3 className="text-xl font-heading font-black text-white mb-3">
-                Quando você se torna um Mantenedor Mensal:
+                {tr('Quando você se torna um Mantenedor Mensal:', 'When you become a Monthly Supporter:')}
               </h3>
               <ul className="space-y-4 text-slate-200 text-sm">
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Todas as Portas Abertas:</strong> Acolhimento médico ininterrupto, clínicas móveis nos vilarejos e atendimento digno para cada família.</span>
+                  <span><strong>{tr('Todas as Portas Abertas:', 'All Doors Open:')}</strong> {tr('Acolhimento médico ininterrupto, clínicas móveis nos vilarejos e atendimento digno para cada família.', 'Uninterrupted medical care, mobile clinics in villages, and dignified support for every family.')}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Água, Nutrição e Saúde Plena:</strong> Poços artesianos operando sem parar e ciclo integral de recuperação para erradicar a desnutrição.</span>
+                  <span><strong>{tr('Água, Nutrição e Saúde Plena:', 'Water, Nutrition & Full Health:')}</strong> {tr('Poços artesianos operando sem parar e ciclo integral de recuperação para erradicar a desnutrição.', 'Artesian wells running reliably and a full recovery cycle to eradicate malnutrition.')}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-[#92BF78] text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
-                  <span><strong>Futuro, Educação e Autonomia:</strong> Continuidade de bolsas universitárias, capacitação profissional de mães e hortas comunitárias sustentáveis.</span>
+                  <span><strong>{tr('Futuro, Educação e Autonomia:', 'Future, Education & Self-Reliance:')}</strong> {tr('Continuidade de bolsas universitárias, capacitação profissional de mães e hortas comunitárias sustentáveis.', 'Ongoing university scholarships, vocational training for mothers, and sustainable community gardens.')}</span>
                 </li>
               </ul>
             </div>
@@ -1395,13 +1515,13 @@ export function MonthlyDonor() {
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2 drop-shadow-md">
-              Destinação Real e Auditada
+              {tr('Destinação Real e Auditada', 'Real & Audited Allocation')}
             </span>
             <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
-              Para onde vai a sua contribuição todo mês?
+              {tr('Para onde vai a sua contribuição todo mês?', 'Where does your monthly contribution go?')}
             </h2>
             <p className="text-base sm:text-lg text-slate-100 font-gotham-light mt-4 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-              Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.
+              {tr('Cada centavo confiado à YAH Hope possui endereço certo, auditoria contínua e impacto mensurável.', 'Every cent entrusted to YAH Hope has a clear destination, continuous auditing, and measurable impact.')}
             </p>
           </div>
 
@@ -1417,12 +1537,15 @@ export function MonthlyDonor() {
                   Casa Nutri (Nampula)
                 </h3>
                 <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
-                  Compra de fórmulas terapêuticas (F-75, F-100 e Plumpy'Nut), insumos hospitalares, remuneração de nutricionistas locais e monitoramento pediátrico intensivo para erradicar a desnutrição infantil.
+                  {tr(
+                    "Compra de fórmulas terapêuticas (F-75, F-100 e Plumpy'Nut), insumos hospitalares, remuneração de nutricionistas locais e monitoramento pediátrico intensivo para erradicar a desnutrição infantil.",
+                    "Purchase of therapeutic formulas (F-75, F-100, and Plumpy'Nut), medical supplies, local nutritionists' salaries, and intensive pediatric monitoring to eradicate child malnutrition."
+                  )}
                 </p>
               </div>
               <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-[#F49853] flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
-                <span>Salva vidas em risco iminente</span>
+                <span>{tr('Salva vidas em risco iminente', 'Saves lives in imminent danger')}</span>
               </div>
             </div>
 
@@ -1433,15 +1556,18 @@ export function MonthlyDonor() {
                   <GraduationCap size={28} />
                 </div>
                 <h3 className="text-xl font-heading font-black text-white mb-3">
-                  Educação & Bolsas Universitárias
+                  {tr('Educação & Bolsas Universitárias', 'Education & University Scholarships')}
                 </h3>
                 <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
-                  Financiamento de bolsas universitárias integrais para jovens órfãos ou em extrema vulnerabilidade se formarem médicos, enfermeiros, professores e engenheiros da sua própria nação.
+                  {tr(
+                    'Financiamento de bolsas universitárias integrais para jovens órfãos ou em extrema vulnerabilidade se formarem médicos, enfermeiros, professores e engenheiros da sua própria nação.',
+                    'Funding full university scholarships for orphaned or highly vulnerable youth to graduate as doctors, nurses, teachers, and engineers in their own nation.'
+                  )}
                 </p>
               </div>
               <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-blue-400 flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
-                <span>Quebra o ciclo geracional da pobreza</span>
+                <span>{tr('Quebra o ciclo geracional da pobreza', 'Breaks the generational cycle of poverty')}</span>
               </div>
             </div>
 
@@ -1452,15 +1578,18 @@ export function MonthlyDonor() {
                   <Droplets size={28} />
                 </div>
                 <h3 className="text-xl font-heading font-black text-white mb-3">
-                  Água Potável & Autonomia Comunitária
+                  {tr('Água Potável & Autonomia Comunitária', 'Clean Water & Community Self-Reliance')}
                 </h3>
                 <p className="text-sm text-slate-300 leading-relaxed font-gotham-light mb-4">
-                  Perfuração de poços artesianos nas aldeias, saneamento, oficinas de agricultura sustentável para mães e hortas que alimentam centenas de famílias de forma autônoma.
+                  {tr(
+                    'Perfuração de poços artesianos nas aldeias, saneamento, oficinas de agricultura sustentável para mães e hortas que alimentam centenas de famílias de forma autônoma.',
+                    'Drilling artesian wells in villages, sanitation, sustainable agriculture workshops for mothers, and community gardens that feed hundreds of families independently.'
+                  )}
                 </p>
               </div>
               <div className="pt-4 border-t border-slate-700/80 text-xs font-gotham-bold text-[#92BF78] flex items-center gap-1.5">
                 <CheckCircle2 size={14} />
-                <span>Saúde preventiva e dignidade básica</span>
+                <span>{tr('Saúde preventiva e dignidade básica', 'Preventive health and basic dignity')}</span>
               </div>
             </div>
 
@@ -1485,24 +1614,33 @@ export function MonthlyDonor() {
 
             <div className="lg:col-span-6 space-y-6">
               <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block">
-                Prova Viva da Generosidade
+                {tr('Prova Viva da Generosidade', 'Living Proof of Generosity')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-                Você não está enviando um valor abstrato. <br />
-                <span className="text-[#F49853]">Você está reescrevendo um destino.</span>
+                {tr('Você não está enviando um valor abstrato.', 'You are not sending an abstract amount.')} <br />
+                <span className="text-[#F49853]">{tr('Você está reescrevendo um destino.', 'You are rewriting a destiny.')}</span>
               </h2>
 
               <p className="text-base sm:text-lg text-slate-600 font-gotham-light leading-relaxed">
-                Quando uma mãe chega caminhando 15 km debaixo do sol escaldante de Moçambique carregando nos braços um filho desfalecido pela desnutrição severa, ela não procura promessas. Ela procura socorro real.
+                {tr(
+                  'Quando uma mãe chega caminhando 15 km debaixo do sol escaldante de Moçambique carregando nos braços um filho desfalecido pela desnutrição severa, ela não procura promessas. Ela procura socorro real.',
+                  'When a mother arrives after walking 15 km under the scorching Mozambican sun carrying a child weakened by severe malnutrition, she is not looking for promises. She is looking for real help.'
+                )}
               </p>
 
               <p className="text-base text-slate-600 font-gotham-light leading-relaxed">
-                Na Casa Nutri da YAH Hope, essa criança recebe imediatamente a fórmula <strong>F-75</strong>, que estabiliza seus órgãos vitais. Em seguida, progride para o leite <strong>F-100</strong> e a pasta hipercalórica <strong>Plumpy'Nut</strong>. Em 42 dias, o olhar opaco dá lugar a sorrisos radiantes.
+                {tr(
+                  "Na Casa Nutri da YAH Hope, essa criança recebe imediatamente a fórmula F-75, que estabiliza seus órgãos vitais. Em seguida, progride para o leite F-100 e a pasta hipercalórica Plumpy'Nut. Em 42 dias, o olhar opaco dá lugar a sorrisos radiantes.",
+                  "At YAH Hope’s Casa Nutri, that child immediately receives F-75 therapeutic formula to stabilize vital organs, then progresses to F-100 milk and Plumpy'Nut. Within 42 days, lifeless eyes give way to radiant smiles."
+                )}
               </p>
 
               <blockquote className="p-4 bg-orange-50 border-l-4 border-[#F49853] rounded-r-2xl text-slate-700 italic text-sm">
-                "Nada disso aconteceria se tivéssemos que parar para fazer uma 'vaquinha' a cada criança que bate à nossa porta. Os mantenedores mensais são os anjos silenciosos por trás de cada respiração salva."
-                <span className="block not-italic font-gotham-bold text-xs text-slate-900 mt-2">— Equipe de Saúde YAH Hope, Nampula</span>
+                {tr(
+                  '"Nada disso aconteceria se tivéssemos que parar para fazer uma \'vaquinha\' a cada criança que bate à nossa porta. Os mantenedores mensais são os anjos silenciosos por trás de cada respiração salva."',
+                  '"None of this would happen if we had to pause and run a fundraiser for every child who knocks on our door. Monthly supporters are the quiet angels behind every breath saved."'
+                )}
+                <span className="block not-italic font-gotham-bold text-xs text-slate-900 mt-2">{tr('— Equipe de Saúde YAH Hope, Nampula', '— YAH Hope Medical Team, Nampula')}</span>
               </blockquote>
 
               <div className="pt-2">
@@ -1511,7 +1649,7 @@ export function MonthlyDonor() {
                   className="bg-[#0F172A] hover:bg-slate-800 text-white px-8 py-4 rounded-full font-gotham-bold text-sm tracking-wide transition-all shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   <Heart size={16} className="text-[#F49853] fill-[#F49853]" />
-                  <span>Seja o Mantenedor Desta Transformação</span>
+                  <span>{tr('Seja o Mantenedor Desta Transformação', 'Be the Supporter Behind This Transformation')}</span>
                 </button>
               </div>
             </div>
@@ -1526,13 +1664,16 @@ export function MonthlyDonor() {
           
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              Conexão e Integridade
+              {tr('Conexão e Integridade', 'Connection & Integrity')}
             </span>
             <h2 className="text-3xl sm:text-4xl font-heading font-black text-white leading-tight">
-              O Que Você Recebe Como Nosso Parceiro Mensal
+              {tr('O Que Você Recebe Como Nosso Parceiro Mensal', 'What You Receive as Our Monthly Partner')}
             </h2>
             <p className="text-base sm:text-lg text-slate-300 font-gotham-light mt-4">
-              Não tratamos doações como caixas-pretas. Criamos uma ponte direta entre a sua generosidade e a realidade das famílias assistidas.
+              {tr(
+                'Não tratamos doações como caixas-pretas. Criamos uma ponte direta entre a sua generosidade e a realidade das famílias assistidas.',
+                'We do not treat donations as black boxes. We build a direct bridge between your generosity and the reality of the families we serve.'
+              )}
             </p>
           </div>
 
@@ -1542,9 +1683,12 @@ export function MonthlyDonor() {
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-[#F49853] flex items-center justify-center font-bold">
                 <Users size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-white">Portal do Mantenedor</h3>
+              <h3 className="font-gotham-bold text-base text-white">{tr('Portal do Mantenedor', 'Supporter Portal')}</h3>
               <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                Login exclusivo para acompanhar métricas de impacto em tempo real, evolução das crianças e histórico das suas doações.
+                {tr(
+                  'Login exclusivo para acompanhar métricas de impacto em tempo real, evolução das crianças e histórico das suas doações.',
+                  'Exclusive login to track real-time impact metrics, children’s progress, and your donation history.'
+                )}
               </p>
             </div>
 
@@ -1552,9 +1696,12 @@ export function MonthlyDonor() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-[#92BF78] flex items-center justify-center font-bold">
                 <FileText size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-white">Relatórios Auditados</h3>
+              <h3 className="font-gotham-bold text-base text-white">{tr('Relatórios Auditados', 'Audited Reports')}</h3>
               <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                Demonstrativos claros e públicos sobre onde cada real foi investido no terreno, com laudos médicos e notas fiscais.
+                {tr(
+                  'Demonstrativos claros e públicos sobre onde cada real foi investido no terreno, com laudos médicos e notas fiscais.',
+                  'Clear, public statements showing where every contribution was invested in the field, with medical reports and receipts.'
+                )}
               </p>
             </div>
 
@@ -1562,9 +1709,12 @@ export function MonthlyDonor() {
               <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
                 <Calendar size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-white">Boletins Periódicos</h3>
+              <h3 className="font-gotham-bold text-base text-white">{tr('Boletins Periódicos', 'Periodic Bulletins')}</h3>
               <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                Atualizações periódicas no seu e-mail ou WhatsApp com histórias, vídeos e fotos diretamente da base de Moçambique.
+                {tr(
+                  'Atualizações periódicas no seu e-mail ou WhatsApp com histórias, vídeos e fotos diretamente da base de Moçambique.',
+                  'Regular updates via email or WhatsApp with stories, videos, and photos straight from our hub in Mozambique.'
+                )}
               </p>
             </div>
 
@@ -1572,9 +1722,12 @@ export function MonthlyDonor() {
               <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
                 <Award size={22} />
               </div>
-              <h3 className="font-gotham-bold text-base text-white">Certificado Oficial</h3>
+              <h3 className="font-gotham-bold text-base text-white">{tr('Certificado Oficial', 'Official Certificate')}</h3>
               <p className="text-xs text-slate-300 font-gotham-light leading-relaxed">
-                Certificado digital de mantenedor solidário para atestar seu compromisso com a transformação social e humanitária.
+                {tr(
+                  'Certificado digital de mantenedor solidário para atestar seu compromisso com a transformação social e humanitária.',
+                  'Digital supporter certificate recognizing your commitment to social and humanitarian transformation.'
+                )}
               </p>
             </div>
 
@@ -1588,18 +1741,18 @@ export function MonthlyDonor() {
           
           <div className="text-center mb-16">
             <span className="text-xs font-gotham-bold uppercase tracking-widest text-[#F49853] block mb-2">
-              Tire Suas Dúvidas
+              {tr('Tire Suas Dúvidas', 'Get Your Answers')}
             </span>
             <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 leading-tight">
-              Perguntas Frequentes
+              {tr('Perguntas Frequentes', 'Frequently Asked Questions')}
             </h2>
             <p className="text-slate-600 text-sm font-gotham-light mt-3">
-              Tudo o que você precisa saber sobre o programa de mantenedores da YAH Hope.
+              {tr('Tudo o que você precisa saber sobre o programa de mantenedores da YAH Hope.', 'Everything you need to know about the YAH Hope monthly supporter program.')}
             </p>
           </div>
 
           <div className="space-y-4">
-            {FAQS.map((faq, index) => {
+            {localizedFaqs.map((faq, index) => {
               const isOpen = expandedFaq === index;
               return (
                 <div 
@@ -1634,11 +1787,11 @@ export function MonthlyDonor() {
 
           <div className="mt-12 text-center p-6 bg-slate-50 rounded-2xl border border-slate-200/70">
             <p className="text-xs text-slate-600 font-gotham-regular">
-              Ainda tem alguma dúvida específica? Fale diretamente conosco pelo e-mail{' '}
+              {tr('Ainda tem alguma dúvida específica? Fale diretamente conosco pelo e-mail ', 'Still have a specific question? Reach out directly to us at ')}
               <a href="mailto:contato@yahhope.org" className="text-[#F49853] font-gotham-bold hover:underline">
                 contato@yahhope.org
               </a>{' '}
-              ou através dos nossos canais de atendimento.
+              {tr('ou através dos nossos canais de atendimento.', 'or through our support channels.')}
             </p>
           </div>
 
@@ -1657,15 +1810,18 @@ export function MonthlyDonor() {
         <div className="relative z-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="inline-flex items-center gap-2 bg-[#F49853]/20 border border-[#F49853]/40 px-4 py-1.5 rounded-full text-xs font-gotham-bold text-[#F49853] uppercase tracking-wider">
             <Heart size={14} className="fill-[#F49853]" />
-            <span>O Próximo Sorriso Depende de Você</span>
+            <span>{tr('O Próximo Sorriso Depende de Você', 'The Next Smile Depends on You')}</span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-heading font-black text-white leading-tight">
-            Não adie o resgate de quem não pode esperar.
+            {tr('Não adie o resgate de quem não pode esperar.', 'Do not delay the rescue of those who cannot wait.')}
           </h2>
 
           <p className="text-base sm:text-lg text-slate-300 font-gotham-light max-w-2xl mx-auto leading-relaxed">
-            Neste exato instante, uma criança em Moçambique dá seus primeiros passos rumo à recuperação na Casa Nutri porque alguém decidiu não fechar os olhos. Seja você essa pessoa.
+            {tr(
+              'Neste exato instante, uma criança em Moçambique dá seus primeiros passos rumo à recuperação na Casa Nutri porque alguém decidiu não fechar os olhos. Seja você essa pessoa.',
+              'At this very moment, a child in Mozambique is taking their first steps toward recovery at Casa Nutri because someone decided not to look away. Be that person.'
+            )}
           </p>
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -1674,14 +1830,14 @@ export function MonthlyDonor() {
               className="w-full sm:w-auto bg-[#F49853] hover:bg-[#e0853d] text-white px-9 py-4 rounded-full font-gotham-bold text-sm tracking-wide shadow-xl shadow-[#F49853]/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles size={18} />
-              <span>Quero Ser um Mantenedor Mensal Agora</span>
+              <span>{tr('Quero Ser um Mantenedor Mensal Agora', 'Become a Monthly Supporter Now')}</span>
             </button>
             
             <Link
               to="/projetos"
               className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-full font-gotham-medium text-sm transition-all"
             >
-              Conhecer Nossas Frentes
+              {tr('Conhecer Nossas Frentes', 'Explore Our Fronts')}
             </Link>
           </div>
         </div>

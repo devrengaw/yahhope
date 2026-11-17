@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Heart, Sparkles, CheckCircle2, TrendingUp, ShieldCheck } from 'lucide-react';
 import { getUniqueMonthlySupportersCount } from '../../services/monthlySupportersService';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface MonthlySupporterCounterCardProps {
   theme?: 'dark' | 'light';
@@ -14,6 +15,7 @@ export function MonthlySupporterCounterCard({
   className = '',
   showDetails = true
 }: MonthlySupporterCounterCardProps) {
+  const { tr, isEn } = useLanguage();
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,7 +63,7 @@ export function MonthlySupporterCounterCard({
           )}
         >
           <span className="w-2 h-2 rounded-full bg-[#F49853] animate-pulse" />
-          <span>Rede de Mantenedores</span>
+          <span>{tr('Rede de Mantenedores', 'Supporters Network')}</span>
         </span>
       </div>
 
@@ -77,20 +79,23 @@ export function MonthlySupporterCounterCard({
             {loading ? (
               <span className="inline-block w-20 h-12 bg-white/10 rounded-xl animate-pulse" />
             ) : (
-              (count ?? 0).toLocaleString('pt-BR')
+              (count ?? 0).toLocaleString(isEn ? 'en-US' : 'pt-BR')
             )}
           </span>
           <span className="text-base sm:text-lg font-bold text-[#F49853]">
-            pessoas
+            {tr('pessoas', 'people')}
           </span>
         </div>
 
         <h3 className={cn("text-base sm:text-lg font-bold leading-snug", isDark ? "text-slate-200" : "text-slate-800")}>
-          Já sustentam a esperança todos os meses
+          {tr('Já sustentam a esperança todos os meses', 'Already sustain hope every single month')}
         </h3>
 
         <p className={cn("text-xs sm:text-sm leading-relaxed", isDark ? "text-slate-400" : "text-slate-500")}>
-          Padrinhos e mantenedores unidos em um compromisso contínuo com a dignidade e o futuro de vidas preciosas.
+          {tr(
+            'Padrinhos e mantenedores unidos em um compromisso contínuo com a dignidade e o futuro de vidas preciosas.',
+            'Sponsors and monthly supporters united in an ongoing commitment to the dignity and future of precious lives.'
+          )}
         </p>
       </div>
     </div>

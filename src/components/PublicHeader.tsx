@@ -13,11 +13,14 @@ import { useTopBanner } from '../contexts/TopBannerContext';
 import { useWebsiteProjects } from '../contexts/WebsiteProjectsContext';
 import { useDonationModal } from '../contexts/DonationModalContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageSwitcher } from './common/LanguageSwitcher';
 
 export function PublicHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { tr } = useLanguage();
   const { banner: topBanner } = useTopBanner();
   const { projects: websiteProjects } = useWebsiteProjects();
   const { openDonationModal } = useDonationModal();
@@ -65,8 +68,11 @@ export function PublicHeader() {
     ? topBanner.tagColor
     : '#F49853';
 
-  const bannerMessage = topBanner?.message || (topBanner as any)?.text || 'Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional';
-  const bannerButtonText = topBanner?.buttonText || (topBanner as any)?.linkText || 'Apoiar Agora';
+  const bannerMessage = topBanner?.message || (topBanner as any)?.text || tr(
+    'Moçambique & Casa Nutri: Apoio emergencial a 9 crianças e famílias em risco nutricional',
+    'Mozambique & Casa Nutri: Emergency support for 9 children and families at nutritional risk'
+  );
+  const bannerButtonText = topBanner?.buttonText || (topBanner as any)?.linkText || tr('Apoiar Agora', 'Support Now');
   const bannerButtonLink = topBanner?.buttonLink || (topBanner as any)?.link || '/campanha';
 
   return (
@@ -74,7 +80,7 @@ export function PublicHeader() {
       {/* 1. Global Alert Banner */}
       {topBanner?.enabled && alertVisible && (
         <aside 
-          aria-label="Alerta Humanitário Urgente"
+          aria-label={tr('Alerta Humanitário Urgente', 'Urgent Humanitarian Alert')}
           style={{ backgroundColor: bannerBg }}
           className="text-white text-xs md:text-sm py-2.5 px-4 sticky top-0 z-50 border-b border-white/10 shadow-md transition-all duration-300 pt-[calc(0.625rem+env(safe-area-inset-top,0px))]"
         >
@@ -129,7 +135,7 @@ export function PublicHeader() {
               <button 
                 onClick={() => setAlertVisible(false)}
                 className="text-white/60 hover:text-white p-1 transition-colors cursor-pointer"
-                aria-label="Fechar alerta"
+                aria-label={tr('Fechar alerta', 'Close alert')}
               >
                 <X size={16} />
               </button>
@@ -155,21 +161,21 @@ export function PublicHeader() {
             <nav className="hidden lg:flex items-center gap-3.5 xl:gap-6 text-xs xl:text-sm font-gotham-bold text-slate-800 shrink-0">
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
-                  <span>Sobre Nós</span>
+                  <span>{tr('Sobre Nós', 'About Us')}</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
                 <div className="absolute top-full left-0 w-80 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider mb-3">Conheça a YAH Hope</p>
+                  <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider mb-3">{tr('Conheça a YAH Hope', 'Discover YAH Hope')}</p>
                   <div className="space-y-1.5">
                     <Link 
                       to="/sobre-nos" 
                       className="block p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors group/item"
                     >
                       <p className="font-gotham-bold text-slate-900 group-hover/item:text-[#F49853] text-xs transition-colors">
-                        Sobre Nós & Manifesto
+                        {tr('Sobre Nós & Manifesto', 'About Us & Manifesto')}
                       </p>
                       <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5 leading-relaxed">
-                        Nossa história, propósito e a leitura do Manifesto oficial.
+                        {tr('Nossa história, propósito e a leitura do Manifesto oficial.', 'Our story, purpose, and the official YAH Hope Manifesto.')}
                       </p>
                     </Link>
 
@@ -178,10 +184,10 @@ export function PublicHeader() {
                       className="block p-2.5 rounded-xl hover:bg-orange-50/70 transition-colors group/item"
                     >
                       <p className="font-gotham-bold text-slate-900 group-hover/item:text-[#F49853] text-xs transition-colors">
-                        Missão, Visão e Valores
+                        {tr('Missão, Visão e Valores', 'Mission, Vision & Values')}
                       </p>
                       <p className="text-[11px] text-slate-500 font-gotham-light mt-0.5 leading-relaxed">
-                        Os princípios fundamentais que regem nossas decisões e ações.
+                        {tr('Os princípios fundamentais que regem nossas decisões e ações.', 'The core principles guiding our decisions and actions.')}
                       </p>
                     </Link>
                   </div>
@@ -190,14 +196,14 @@ export function PublicHeader() {
 
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
-                  <span>Nossas Soluções</span>
+                  <span>{tr('Nossas Soluções', 'Our Solutions')}</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
                 <div className="absolute top-full left-0 w-84 bg-white shadow-xl rounded-2xl p-5 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-                    <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider">Projetos Locais</p>
+                    <p className="text-[11px] text-[#F49853] font-gotham-bold uppercase tracking-wider">{tr('Projetos Locais', 'Local Projects')}</p>
                     <Link to="/projetos" className="text-[10px] text-slate-400 hover:text-[#F49853] font-medium transition-colors">
-                      Ver todos ({localProjects.length})
+                      {tr(`Ver todos (${localProjects.length})`, `View all (${localProjects.length})`)}
                     </Link>
                   </div>
                   <div className="space-y-2.5 font-gotham-regular max-h-[360px] overflow-y-auto pr-1">
@@ -229,7 +235,7 @@ export function PublicHeader() {
                       to="/projetos" 
                       className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center justify-between transition-colors"
                     >
-                      <span>Conhecer Todos os Projetos</span>
+                      <span>{tr('Conhecer Todos os Projetos', 'Explore All Projects')}</span>
                       <ArrowRight size={13} />
                     </Link>
                   </div>
@@ -238,26 +244,26 @@ export function PublicHeader() {
 
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
-                  <span>Alcance Global</span>
+                  <span>{tr('Alcance Global', 'Global Reach')}</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
                 <div className="absolute top-full left-0 w-64 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
                     <li>
                       <Link to="/projetos?regiao=mocambique" className="flex items-center justify-between hover:text-[#F49853] hover:translate-x-1 transition-all">
-                        <span>Nampula (Moçambique)</span>
-                        <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-gotham-medium">Campo</span>
+                        <span>{tr('Nampula (Moçambique)', 'Nampula (Mozambique)')}</span>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-gotham-medium">{tr('Campo', 'Field')}</span>
                       </Link>
                     </li>
                     <li>
                       <Link to="/projetos?regiao=brasil" className="flex items-center justify-between hover:text-[#F49853] hover:translate-x-1 transition-all">
-                        <span>Brasil (Sede & Expansão)</span>
-                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-gotham-medium">Base</span>
+                        <span>{tr('Brasil (Sede & Expansão)', 'Brazil (HQ & Expansion)')}</span>
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-gotham-medium">{tr('Base', 'HQ')}</span>
                       </Link>
                     </li>
                     <li className="pt-2 border-t border-slate-100">
                       <Link to="/projetos" className="block text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] transition-colors">
-                        Ver Visão Geral & Frentes →
+                        {tr('Ver Visão Geral & Frentes →', 'View Overview & Fronts →')}
                       </Link>
                     </li>
                   </ul>
@@ -265,29 +271,29 @@ export function PublicHeader() {
               </div>
 
               <Link to="/blog" className="hover:text-[#F49853] transition-colors">
-                Notícias & Histórias
+                {tr('Notícias & Histórias', 'News & Stories')}
               </Link>
 
               <div className="relative group py-2">
                 <button className="flex items-center gap-1 hover:text-[#F49853] transition-colors cursor-pointer">
-                  <span>Como Ajudar</span>
+                  <span>{tr('Como Ajudar', 'How to Help')}</span>
                   <ChevronDown size={14} className="text-slate-400 group-hover:text-[#F49853] transition-transform group-hover:rotate-180" />
                 </button>
                 <div className="absolute top-full right-0 w-72 bg-white shadow-xl rounded-2xl p-4 border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <ul className="space-y-2 text-sm font-gotham-regular text-slate-700">
                     <li>
                       <Link to="/hotsite" className="block font-gotham-bold text-amber-600 hover:translate-x-1 transition-all py-1">
-                        Faça Parte do Projeto (Hotsite)
+                        {tr('Faça Parte do Projeto (Hotsite)', 'Join the Project (Hotsite)')}
                       </Link>
                     </li>
                     <li>
                       <Link to="/mantenedor" className="block font-gotham-bold text-[#F49853] hover:translate-x-1 transition-all py-1">
-                        Seja um Mantenedor Mensal/Apadrinhamento
+                        {tr('Seja um Mantenedor Mensal/Apadrinhamento', 'Become a Monthly Supporter / Sponsor')}
                       </Link>
                     </li>
-                    <li><Link to="/campanha" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Campanhas em Andamento</Link></li>
-                    <li><Link to="/loja" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Loja Solidária</Link></li>
-                    <li><Link to="/voluntariado-e-parcerias" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">Voluntariado & Parcerias</Link></li>
+                    <li><Link to="/campanha" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">{tr('Campanhas em Andamento', 'Active Campaigns')}</Link></li>
+                    <li><Link to="/loja" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">{tr('Loja Solidária', 'Solidarity Store')}</Link></li>
+                    <li><Link to="/voluntariado-e-parcerias" className="block hover:text-[#F49853] hover:translate-x-1 transition-all">{tr('Voluntariado & Parcerias', 'Volunteering & Partnerships')}</Link></li>
                   </ul>
                 </div>
               </div>
@@ -299,7 +305,7 @@ export function PublicHeader() {
               <button 
                 onClick={() => setSearchOpen(!searchOpen)}
                 className="p-2 text-slate-600 hover:text-[#F49853] transition-colors cursor-pointer"
-                aria-label="Buscar no site"
+                aria-label={tr('Buscar no site', 'Search site')}
               >
                 <Search size={19} />
               </button>
@@ -309,7 +315,7 @@ export function PublicHeader() {
                 to={user ? "/portal/dashboard" : "/login"}
                 className="hidden md:inline-flex lg:hidden xl:inline-flex items-center gap-1.5 text-xs lg:text-sm font-gotham-bold text-slate-700 hover:text-[#F49853] px-3 py-2 rounded-full hover:bg-orange-50/80 transition-colors whitespace-nowrap"
               >
-                <span>{user ? 'Meu Portal' : 'Entrar / Mantenedor'}</span>
+                <span>{user ? tr('Meu Portal', 'My Portal') : tr('Entrar / Mantenedor', 'Sign In / Supporter')}</span>
                 <ArrowRight size={13} className="text-[#F49853]" />
               </Link>
 
@@ -318,15 +324,18 @@ export function PublicHeader() {
                 onClick={handleDonateAction}
                 className="bg-[#F49853] hover:bg-[#e0853d] text-white px-4 lg:px-5 py-2.5 rounded-full font-gotham-bold text-xs lg:text-sm tracking-wide transition-all shadow-md flex items-center gap-2 shrink-0 whitespace-nowrap cursor-pointer"
               >
-                <span>Apoiar Agora</span>
+                <span>{tr('Apoiar Agora', 'Support Now')}</span>
                 <Heart size={15} className="fill-white" />
               </button>
+
+              {/* Language Switcher (Brazil / USA flags) */}
+              <LanguageSwitcher theme="light" className="shrink-0" />
 
               {/* Mobile Hamburger Toggle */}
               <button
                 onClick={() => setMobileMenuOpen(true)}
                 className="lg:hidden p-2 text-slate-700 hover:text-[#F49853] transition-colors cursor-pointer"
-                aria-label="Abrir Menu"
+                aria-label={tr('Abrir Menu', 'Open Menu')}
               >
                 <Menu size={24} />
               </button>
@@ -341,7 +350,7 @@ export function PublicHeader() {
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar matérias, projetos ou palavras-chave..."
+                placeholder={tr('Buscar matérias, projetos ou palavras-chave...', 'Search stories, projects, or keywords...')}
                 className="w-full text-sm bg-transparent border-none focus:outline-hidden text-slate-800 placeholder-slate-400 font-gotham-regular"
                 autoFocus
               />
@@ -349,14 +358,14 @@ export function PublicHeader() {
                 type="submit"
                 className="text-xs bg-[#F49853] hover:bg-[#e0853d] text-white px-3 py-1.5 rounded-lg font-gotham-bold cursor-pointer"
               >
-                Buscar
+                {tr('Buscar', 'Search')}
               </button>
               <button 
                 type="button"
                 onClick={() => setSearchOpen(false)}
                 className="text-xs text-slate-400 hover:text-slate-600 font-gotham-bold cursor-pointer"
               >
-                Fechar
+                {tr('Fechar', 'Close')}
               </button>
             </form>
           )}
@@ -386,21 +395,28 @@ export function PublicHeader() {
             </div>
 
             <div className="p-5 flex-1 space-y-5 text-sm font-gotham-bold text-slate-800">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400">
+                  {tr('Idioma', 'Language')}
+                </span>
+                <LanguageSwitcher theme="light" showLabels />
+              </div>
+
               <div>
                 <button 
                   onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'about' ? null : 'about')}
                   className="flex items-center justify-between w-full py-2 hover:text-[#F49853] cursor-pointer"
                 >
-                  <span>Sobre Nós</span>
+                  <span>{tr('Sobre Nós', 'About Us')}</span>
                   <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'about' ? 'rotate-180' : ''}`} />
                 </button>
                 {activeMobileSubmenu === 'about' && (
                   <div className="pl-4 py-2 space-y-2 text-xs font-gotham-regular text-slate-600 border-l-2 border-[#F49853]/30 ml-2">
                     <Link to="/sobre-nos" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">
-                      Sobre Nós & Manifesto
+                      {tr('Sobre Nós & Manifesto', 'About Us & Manifesto')}
                     </Link>
                     <Link to="/missao-visao-valores" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">
-                      Missão, Visão e Valores
+                      {tr('Missão, Visão e Valores', 'Mission, Vision & Values')}
                     </Link>
                   </div>
                 )}
@@ -411,7 +427,7 @@ export function PublicHeader() {
                   onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'solutions' ? null : 'solutions')}
                   className="flex items-center justify-between w-full py-2 hover:text-[#F49853] cursor-pointer"
                 >
-                  <span>Nossas Soluções (Projetos Locais)</span>
+                  <span>{tr('Nossas Soluções (Projetos Locais)', 'Our Solutions (Local Projects)')}</span>
                   <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'solutions' ? 'rotate-180' : ''}`} />
                 </button>
                 {activeMobileSubmenu === 'solutions' && (
@@ -431,7 +447,7 @@ export function PublicHeader() {
                       onClick={() => setMobileMenuOpen(false)} 
                       className="block pt-1 font-gotham-bold text-[#F49853] hover:underline"
                     >
-                      Ver todos os projetos →
+                      {tr('Ver todos os projetos →', 'View all projects →')}
                     </Link>
                   </div>
                 )}
@@ -442,21 +458,21 @@ export function PublicHeader() {
                   onClick={() => setActiveMobileSubmenu(activeMobileSubmenu === 'reach' ? null : 'reach')}
                   className="flex items-center justify-between w-full py-2 hover:text-[#F49853] cursor-pointer"
                 >
-                  <span>Alcance Global</span>
+                  <span>{tr('Alcance Global', 'Global Reach')}</span>
                   <ChevronDown size={16} className={`transition-transform ${activeMobileSubmenu === 'reach' ? 'rotate-180' : ''}`} />
                 </button>
                 {activeMobileSubmenu === 'reach' && (
                   <div className="pl-4 py-2 space-y-2 text-xs font-gotham-regular text-slate-600 border-l-2 border-[#F49853]/30 ml-2">
-                    <Link to="/projetos?regiao=mocambique" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Nampula (Moçambique)</Link>
-                    <Link to="/projetos?regiao=brasil" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">Brasil (Sede & Expansão)</Link>
-                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 font-gotham-bold text-[#F49853]">Ver Todos os Projetos →</Link>
+                    <Link to="/projetos?regiao=mocambique" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">{tr('Nampula (Moçambique)', 'Nampula (Mozambique)')}</Link>
+                    <Link to="/projetos?regiao=brasil" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#F49853]">{tr('Brasil (Sede & Expansão)', 'Brazil (HQ & Expansion)')}</Link>
+                    <Link to="/projetos" onClick={() => setMobileMenuOpen(false)} className="block py-1 font-gotham-bold text-[#F49853]">{tr('Ver Todos os Projetos →', 'View All Projects →')}</Link>
                   </div>
                 )}
               </div>
 
               <div>
                 <Link to="/blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-[#F49853]">
-                  Notícias & Histórias
+                  {tr('Notícias & Histórias', 'News & Stories')}
                 </Link>
               </div>
 
@@ -466,14 +482,14 @@ export function PublicHeader() {
                   onClick={() => setMobileMenuOpen(false)} 
                   className="block py-2 text-amber-600 font-gotham-bold hover:translate-x-1 transition-all"
                 >
-                  Faça Parte do Projeto (Hotsite)
+                  {tr('Faça Parte do Projeto (Hotsite)', 'Join the Project (Hotsite)')}
                 </Link>
                 <Link 
                   to="/mantenedor" 
                   onClick={() => setMobileMenuOpen(false)} 
                   className="block py-2 text-[#F49853] font-gotham-bold hover:translate-x-1 transition-all"
                 >
-                  Seja um Mantenedor Mensal/Apadrinhamento
+                  {tr('Seja um Mantenedor Mensal/Apadrinhamento', 'Become a Monthly Supporter / Sponsor')}
                 </Link>
                 <div className="pl-3 border-l-2 border-slate-100 space-y-1.5 py-1">
                   <Link 
@@ -481,21 +497,21 @@ export function PublicHeader() {
                     onClick={() => setMobileMenuOpen(false)} 
                     className="block text-xs text-slate-600 hover:text-[#F49853] py-0.5"
                   >
-                    Campanhas em Andamento
+                    {tr('Campanhas em Andamento', 'Active Campaigns')}
                   </Link>
                   <Link 
                     to="/loja" 
                     onClick={() => setMobileMenuOpen(false)} 
                     className="block text-xs text-slate-600 hover:text-[#F49853] py-0.5"
                   >
-                    Loja Solidária
+                    {tr('Loja Solidária', 'Solidarity Store')}
                   </Link>
                   <Link 
                     to="/voluntariado-e-parcerias" 
                     onClick={() => setMobileMenuOpen(false)} 
                     className="block text-xs text-slate-600 hover:text-[#F49853] py-0.5"
                   >
-                    Voluntariado & Parcerias
+                    {tr('Voluntariado & Parcerias', 'Volunteering & Partnerships')}
                   </Link>
                 </div>
               </div>
@@ -506,7 +522,7 @@ export function PublicHeader() {
                   onClick={() => setMobileMenuOpen(false)}
                   className="block text-center py-2.5 px-4 rounded-xl bg-slate-100 text-slate-700 font-gotham-bold hover:bg-slate-200"
                 >
-                  {user ? 'Meu Portal do Mantenedor' : 'Entrar / Área do Mantenedor'}
+                  {user ? tr('Meu Portal do Mantenedor', 'My Supporter Portal') : tr('Entrar / Área do Mantenedor', 'Sign In / Supporter Area')}
                 </Link>
                 <button
                   onClick={() => {
@@ -516,7 +532,7 @@ export function PublicHeader() {
                   className="w-full text-center py-3 px-4 rounded-xl bg-[#F49853] text-white font-gotham-bold hover:bg-[#e0853d] shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Heart size={16} fill="currentColor" />
-                  Apoiar Agora
+                  {tr('Apoiar Agora', 'Support Now')}
                 </button>
               </div>
             </div>
@@ -525,13 +541,13 @@ export function PublicHeader() {
       )}
 
       {/* 4. Sticky Floating Donate Button in Brand Orange */}
-      <aside aria-label="Acesso Rápido para Doação" className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-5 sm:right-6 z-40">
+      <aside aria-label={tr('Acesso Rápido para Doação', 'Quick Donation Access')} className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-5 sm:right-6 z-40">
         <button
           onClick={handleDonateAction}
           className="bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-3.5 rounded-full font-gotham-bold text-sm tracking-wide shadow-2xl hover:shadow-[#F49853]/40 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer"
-          title="Fazer uma doação"
+          title={tr('Fazer uma doação', 'Make a donation')}
         >
-          <span className="uppercase text-xs tracking-wider">Apoiar</span>
+          <span className="uppercase text-xs tracking-wider">{tr('Apoiar', 'Support')}</span>
           <Heart size={18} className="fill-white group-hover:scale-110 transition-transform" />
         </button>
       </aside>

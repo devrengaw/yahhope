@@ -7,6 +7,7 @@ import {
 import { YAHHopeProject } from '../../lib/mockData';
 import { useDonationModal } from '../../contexts/DonationModalContext';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ProjectDetailModalProps {
   project: YAHHopeProject | null;
@@ -15,6 +16,7 @@ interface ProjectDetailModalProps {
 }
 
 export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailModalProps) {
+  const { tr } = useLanguage();
   const { openDonationModal } = useDonationModal();
   const [copiedLink, setCopiedLink] = useState(false);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
@@ -123,17 +125,17 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
               )}
               {project.status === 'active' && (
                 <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
-                  <Heart size={12} /> Em Andamento
+                  <Heart size={12} /> {tr('Em Andamento', 'Active')}
                 </span>
               )}
               {project.status === 'planned' && (
                 <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
-                  <Clock size={12} /> Planejado
+                  <Clock size={12} /> {tr('Planejado', 'Planned')}
                 </span>
               )}
               {project.status === 'completed' && (
                 <span className="bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
-                  <CheckCircle size={12} /> Concluído
+                  <CheckCircle size={12} /> {tr('Concluído', 'Completed')}
                 </span>
               )}
             </div>
@@ -141,7 +143,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
             <button 
               onClick={onClose}
               className="w-10 h-10 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-md transition-transform hover:scale-110 cursor-pointer shadow-lg"
-              title="Fechar (Esc)"
+              title={tr('Fechar (Esc)', 'Close (Esc)')}
             >
               <X size={20} />
             </button>
@@ -173,7 +175,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
                     <MapPin size={18} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Polo / Região</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{tr('Polo / Região', 'Hub / Region')}</span>
                     <span className="text-xs font-bold text-slate-800 leading-tight">{project.location}</span>
                   </div>
                 </div>
@@ -185,7 +187,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
                     <Target size={18} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Impacto Direto</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{tr('Impacto Direto', 'Direct Impact')}</span>
                     <span className="text-xs font-bold text-slate-800 leading-tight">
                       {project.beneficiaries_reached || project.beneficiaries_target}
                     </span>
@@ -199,7 +201,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
                     <User size={18} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Coordenação Local</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{tr('Coordenação Local', 'Local Coordination')}</span>
                     <span className="text-xs font-bold text-slate-800 leading-tight">{project.coordinator}</span>
                   </div>
                 </div>
@@ -232,7 +234,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
               <div className="flex items-center gap-2">
                 <ImageIcon size={18} className="text-[#F49853]" />
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                  Registros & Ações no Campo ({project.gallery_images.length})
+                  {tr(`Registros & Ações no Campo (${project.gallery_images.length})`, `Field Records & Actions (${project.gallery_images.length})`)}
                 </h4>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -267,13 +269,16 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
               <div className="max-w-md">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#F49853] block mb-1">
-                  Faça Parte da Transformação
+                  {tr('Faça Parte da Transformação', 'Be Part of the Transformation')}
                 </span>
                 <h4 className="text-xl font-black text-white leading-snug">
-                  Sua contribuição sustenta a {project.title}
+                  {tr(`Sua contribuição sustenta a ${project.title}`, `Your contribution sustains ${project.title}`)}
                 </h4>
                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  Cada doação chega diretamente às famílias e crianças assistidas por este projeto com máxima transparência e amor.
+                  {tr(
+                    'Cada doação chega diretamente às famílias e crianças assistidas por este projeto com máxima transparência e amor.',
+                    'Every donation directly reaches the families and children assisted by this project with maximum transparency and love.'
+                  )}
                 </p>
               </div>
 
@@ -284,7 +289,7 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
                   className="bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/30 cursor-pointer active:scale-95 flex-1 sm:flex-initial"
                 >
                   <Heart size={16} fill="white" />
-                  <span>Apoiar Este Projeto</span>
+                  <span>{tr('Apoiar Este Projeto', 'Support This Project')}</span>
                 </button>
 
                 <button
@@ -296,10 +301,10 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
                       ? "bg-emerald-600 text-white border-emerald-500"
                       : "bg-white/10 hover:bg-white/20 text-white border-white/15"
                   )}
-                  title="Compartilhar projeto"
+                  title={tr('Compartilhar projeto', 'Share project')}
                 >
                   {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
-                  <span className="hidden sm:inline">{copiedLink ? 'Link Copiado!' : 'Compartilhar'}</span>
+                  <span className="hidden sm:inline">{copiedLink ? tr('Link Copiado!', 'Link Copied!') : tr('Compartilhar', 'Share')}</span>
                 </button>
               </div>
             </div>
@@ -310,14 +315,14 @@ export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailMo
         {/* Footer with Close Button */}
         <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs">
           <span className="text-slate-400 font-medium">
-            YAH Hope International • Amor que Transforma Realidades
+            {tr('YAH Hope International • Amor que Transforma Realidades', 'YAH Hope International • Love that Transforms Realities')}
           </span>
           <button 
             type="button" 
             onClick={onClose} 
             className="px-4 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
           >
-            Fechar
+            {tr('Fechar', 'Close')}
           </button>
         </div>
 

@@ -4,8 +4,10 @@ import { supabase } from '../../lib/supabase';
 import { KeyRound, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { SEO } from '../../components/common/SEO';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function SetPassword() {
+  const { tr } = useLanguage();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -20,12 +22,12 @@ export function SetPassword() {
     e.preventDefault();
     
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem. Tente novamente.');
+      setError(tr('As senhas não coincidem. Tente novamente.', 'Passwords do not match. Please try again.'));
       return;
     }
     
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+      setError(tr('A senha deve ter pelo menos 6 caracteres.', 'Password must be at least 6 characters long.'));
       return;
     }
 
@@ -48,7 +50,7 @@ export function SetPassword() {
       
     } catch (err: any) {
       console.error('Error updating password:', err);
-      setError(err.message || 'Ocorreu um erro ao definir sua senha. O link de convite pode ter expirado.');
+      setError(err.message || tr('Ocorreu um erro ao definir sua senha. O link de convite pode ter expirado.', 'An error occurred while setting your password. The invite link may have expired.'));
     } finally {
       setIsLoading(false);
     }
@@ -57,8 +59,8 @@ export function SetPassword() {
   return (
     <div className="relative flex-1 min-h-[calc(100vh-140px)] flex items-center justify-center font-gotham-regular py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <SEO
-        title="Configurar Senha | YAH Hope"
-        description="Configure sua senha de acesso à plataforma YAH Hope."
+        title={tr('Configurar Senha | YAH Hope', 'Set Password | YAH Hope')}
+        description={tr('Configure sua senha de acesso à plataforma YAH Hope.', 'Set your password to access the YAH Hope platform.')}
         canonical="https://yahhope.com/set-password"
         noIndex={true}
       />
@@ -85,10 +87,13 @@ export function SetPassword() {
             <ShieldCheck size={32} />
           </div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-            Configure seu Acesso
+            {tr('Configure seu Acesso', 'Set Up Your Access')}
           </h2>
           <p className="mt-3 text-sm text-slate-500 font-medium px-2 leading-relaxed">
-            Bem-vindo(a) à plataforma YAH Hope! Defina uma senha segura para começar a utilizar o sistema.
+            {tr(
+              'Bem-vindo(a) à plataforma YAH Hope! Defina uma senha segura para começar a utilizar o sistema.',
+              'Welcome to the YAH Hope platform! Set a secure password to start using your account.'
+            )}
           </p>
 
           <form className="mt-8 space-y-5 w-full text-left" onSubmit={handleSubmit}>
@@ -99,7 +104,7 @@ export function SetPassword() {
             )}
             
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Nova Senha</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('Nova Senha', 'New Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <KeyRound size={18} />
@@ -110,13 +115,13 @@ export function SetPassword() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="Mínimo de 6 caracteres"
+                  placeholder={tr('Mínimo de 6 caracteres', 'Minimum 6 characters')}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">Confirmar Senha</label>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 px-1">{tr('Confirmar Senha', 'Confirm Password')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <Lock size={18} />
@@ -127,7 +132,7 @@ export function SetPassword() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 sm:text-sm transition-all`}
-                  placeholder="Repita sua nova senha"
+                  placeholder={tr('Repita sua nova senha', 'Repeat your new password')}
                 />
               </div>
             </div>
@@ -138,7 +143,7 @@ export function SetPassword() {
                 disabled={isLoading || !password || !confirmPassword}
                 className={`group relative w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-${themeColor}-600 hover:bg-${themeColor}-700 focus:outline-none focus:ring-4 focus:ring-${themeColor}-500/20 transition-all shadow-lg shadow-${themeColor}-500/20 active:scale-[0.98] disabled:opacity-70`}
               >
-                {isLoading ? 'Salvando...' : 'Acessar o Sistema'}
+                {isLoading ? tr('Salvando...', 'Saving...') : tr('Acessar o Sistema', 'Access Platform')}
                 {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
               </button>
             </div>
