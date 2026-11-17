@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Send, DollarSign, Calendar, Wallet, Layers, FileText, CheckCircle2, Building2, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Send, DollarSign, Calendar, Wallet, Layers, FileText, CheckCircle2, Building2, RefreshCw, ArrowRightLeft, Sparkles, TrendingUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { TransactionCategory } from '../../../pages/admin/Finance';
+import { Transaction, TransactionCategory } from '../../../pages/admin/Finance';
 import { Project } from '../../../lib/mockData';
 import { getMznToBrlRate, ExchangeRateResult } from '../../../services/currencyService';
 
@@ -24,8 +24,11 @@ interface ProjectRepasseModalProps {
   onClose: () => void;
   onSave: (repasse: RepassePayload) => Promise<void> | void;
   defaultModule?: 'nutrition' | 'communication' | 'global' | string;
+  defaultAmount?: number;
   categories?: TransactionCategory[];
   projects?: Project[];
+  transactions?: Transaction[];
+  availableCentralCash?: number;
   lockModule?: boolean;
 }
 
@@ -34,8 +37,11 @@ export function ProjectRepasseModal({
   onClose,
   onSave,
   defaultModule = 'nutrition',
+  defaultAmount,
   categories = [],
   projects = [],
+  transactions = [],
+  availableCentralCash,
   lockModule = false
 }: ProjectRepasseModalProps) {
   const [selectedModule, setSelectedModule] = useState<string>(defaultModule);
@@ -62,6 +68,84 @@ export function ProjectRepasseModal({
     return mod;
   };
 
+  // Cálculo automático de cobertura e sugestão inteligente para o projeto selecionado no mês vigente
+  const moduleSummary = useMemo(() => {
+    const now = new Date();
+    const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const modNameLower = getModuleDisplayName(selectedModule).toLowerCase();
+
+    // Repasses enviados a este módulo no mês atual
+    const repassedMonth = transactions
+      .filter(t => {
+        if (t.type !== 'income') return false;
+        const tMod = (t.module || '').toLowerCase();
+        const tDesc = (t.description || '').toLowerCase();
+        const isRep = (tMod !== 'global' && tMod !== '') || tDesc.includes('repasse');
+        if (!isRep) return false;
+        const matchesMod = tMod === selectedModule.toLowerCase() || tDesc.includes(modNameLower);
+        return matchesMod && (t.date || '').startsWith(curMonthKey);
+      })
+      .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+    // Custos fixos (amortizados) + variáveis do mês deste módulo
+    const moduleExpenses = transactions.filter(t => {
+      if (t.type !== 'expense') return false;
+      const tMod = (t.module || '').toLowerCase();
+      return tMod === selectedModule.toLowerCase();
+    });
+
+    const fixedMonthlyCost = moduleExpenses
+      .filter(t => t.expense_type === 'fixed')
+      .reduce((acc, t) => {
+        const rec = t.recurrence || 'monthly';
+        if (rec === 'bimonthly') return acc + t.amount / 2;
+        if (rec === 'quarterly') return acc + t.amount / 3;
+        if (rec === 'semiannual') return acc + t.amount / 6;
+        if (rec === 'yearly') return acc + t.amount / 12;
+        return acc + t.amount;
+      }, 0);
+
+    const variableMonthCost = moduleExpenses
+      .filter(t => t.expense_type !== 'fixed' && (t.date || '').startsWith(curMonthKey))
+      .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+    const matchedProj = projects.find(p => {
+      const n = (p.name || '').toLowerCase();
+      if (selectedModule === 'nutrition') return n.includes('nutri');
+      if (selectedModule === 'communication') return n.includes('comunica') || p.module === 'communication';
+      return p.id === selectedModule || n === modNameLower;
+    });
+
+    const projectBudget = Number(matchedProj?.budget || 0);
+    const calculatedMonthExpenses = fixedMonthlyCost + variableMonthCost;
+    const targetMonthlyNeed = Math.max(calculatedMonthExpenses, projectBudget);
+    const remainingToCover = Math.max(0, Number((targetMonthlyNeed - repassedMonth).toFixed(2)));
+
+    return {
+      targetMonthlyNeed,
+      calculatedMonthExpenses,
+      projectBudget,
+      repassedMonth,
+      remainingToCover
+    };
+  }, [selectedModule, transactions, projects]);
+
+  const applySuggestedBrlAmount = (brlVal: number) => {
+    if (brlVal <= 0) return;
+    if (currency === 'BRL') {
+      setAmount(brlVal.toFixed(2));
+      if (exchangeRate > 0) {
+        setAmountSecondary((brlVal / exchangeRate).toFixed(2));
+      }
+    } else {
+      // Se estiver em modo MZN, preenche o BRL secundário e converte o MT primário
+      setAmountSecondary(brlVal.toFixed(2));
+      if (exchangeRate > 0) {
+        setAmount((brlVal / exchangeRate).toFixed(2));
+      }
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       const mod = defaultModule || 'nutrition';
@@ -69,7 +153,7 @@ export function ProjectRepasseModal({
       const name = getModuleDisplayName(mod);
       setDescription(`Repasse Orçamentário - ${name}`);
       setDate(new Date().toISOString().split('T')[0]);
-      setAmount('');
+      setAmount(defaultAmount && defaultAmount > 0 ? defaultAmount.toFixed(2) : '');
       setAmountSecondary('');
       setIsCustomConversion(false);
       setCurrency('BRL');
@@ -85,7 +169,7 @@ export function ProjectRepasseModal({
         .catch(() => {})
         .finally(() => setIsLoadingRate(false));
     }
-  }, [isOpen, defaultModule]);
+  }, [isOpen, defaultModule, defaultAmount]);
 
   if (!isOpen) return null;
 
@@ -308,6 +392,71 @@ export function ProjectRepasseModal({
                       </option>
                     ))}
                   </select>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card de Diagnóstico Mensal & Sugestão Inteligente de Repasse */}
+          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                <Sparkles size={13} className="text-emerald-600" />
+                Resumo do Mês: {getModuleDisplayName(selectedModule)}
+              </span>
+              {availableCentralCash !== undefined && (
+                <span className="text-[10px] font-bold bg-white/90 text-slate-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  Caixa Livre: <strong>R$ {availableCentralCash.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center bg-white/90 p-2.5 rounded-xl border border-emerald-100">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Demanda Mês</p>
+                <p className="text-xs font-black text-slate-900 mt-0.5">
+                  R$ {moduleSummary.targetMonthlyNeed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="border-x border-slate-100">
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Já Repassado</p>
+                <p className="text-xs font-black text-emerald-700 mt-0.5">
+                  R$ {moduleSummary.repassedMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Falta Cobrir</p>
+                <p className={cn(
+                  "text-xs font-black mt-0.5",
+                  moduleSummary.remainingToCover > 0 ? "text-amber-700" : "text-emerald-600"
+                )}>
+                  {moduleSummary.remainingToCover > 0
+                    ? `R$ ${moduleSummary.remainingToCover.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : '100% Coberto ✓'}
+                </p>
+              </div>
+            </div>
+
+            {(moduleSummary.remainingToCover > 0 || moduleSummary.targetMonthlyNeed > 0) && (
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <span className="text-[10px] font-bold text-emerald-800">Preencher rápido:</span>
+                {moduleSummary.remainingToCover > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => applySuggestedBrlAmount(moduleSummary.remainingToCover)}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black transition-all cursor-pointer shadow-2xs"
+                  >
+                    Sugerir Restante: R$ {moduleSummary.remainingToCover.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </button>
+                )}
+                {moduleSummary.targetMonthlyNeed > 0 && moduleSummary.targetMonthlyNeed !== moduleSummary.remainingToCover && (
+                  <button
+                    type="button"
+                    onClick={() => applySuggestedBrlAmount(moduleSummary.targetMonthlyNeed)}
+                    className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                  >
+                    Custo Total Mês: R$ {moduleSummary.targetMonthlyNeed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </button>
                 )}
               </div>
             )}

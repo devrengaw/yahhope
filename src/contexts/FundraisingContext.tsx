@@ -91,6 +91,48 @@ interface FundraisingContextType {
   deleteDonation: (id: string) => Promise<{ success: boolean; error?: any }>;
   clearTestDonationsAndResetRuler: () => Promise<{ success: boolean; error?: any }>;
   calculateCampaignProgress: (camp: Campaign) => CampaignProgressStats;
+  syncRulerWithFinance: () => Promise<{ success: boolean; syncedAmount: number; message: string }>;
+  setTransactionRulerLink: (txId: string, target: 'auto' | 'excluded' | string, currentNotes?: string) => Promise<void>;
+  getTransactionRulerStatus: (tx: { id: string; notes?: string }) => { included: boolean; campaignId?: string };
+  refreshFundraising: () => Promise<void>;
+}
+
+const RULER_LINKS_STORAGE_KEY = 'yahhope_finance_ruler_links_v1';
+
+export function getStoredRulerLinks(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(RULER_LINKS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveStoredRulerLink(txId: string, target: string) {
+  try {
+    const existing = getStoredRulerLinks();
+    existing[txId] = target;
+    localStorage.setItem(RULER_LINKS_STORAGE_KEY, JSON.stringify(existing));
+  } catch {}
+}
+
+export function parseTransactionRulerMetadata(tx: { id: string; notes?: string }): { included: boolean; campaignId?: string } {
+  const stored = getStoredRulerLinks()[tx.id];
+  const notes = tx.notes || '';
+
+  if (stored === 'excluded' || notes.includes('[FORA_DA_REGUA]')) {
+    return { included: false };
+  }
+
+  const campMatch = notes.match(/\[CAMPANHA:([^\]]+)\]/);
+  if (stored && stored !== 'auto') {
+    return { included: true, campaignId: stored };
+  }
+  if (campMatch && campMatch[1]) {
+    return { included: true, campaignId: campMatch[1] };
+  }
+
+  return { included: true, campaignId: undefined };
 }
 
 const FundraisingContext = createContext<FundraisingContextType | undefined>(undefined);
@@ -376,13 +418,19 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             return;
           }
 
+          // Verifica se esta transação financeira foi marcada como fora da régua
+          const rulerMeta = parseTransactionRulerMetadata(ft);
+          if (!rulerMeta.included) {
+            return;
+          }
+
           const ftAmount = Number(ft.amount || 0);
           if (ftAmount <= 0) return;
           const ftDateStr = (ft.date || '').slice(0, 10);
           const ftMonth = ftDateStr.slice(0, 7);
 
           // Verifica se já existe em formattedDonations para evitar duplicar
-          const alreadyExists = formattedDonations.some(d => {
+          const matchingExisting = formattedDonations.find(d => {
             const dDateStr = (d.paid_at || d.date || '').slice(0, 10);
             const dMonth = (d.paid_at || d.date || '').slice(0, 7);
             const isSameAmount = Math.abs(d.amount - ftAmount) < 0.01;
@@ -397,16 +445,21 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             return false;
           });
 
-          if (!alreadyExists) {
+          if (matchingExisting) {
+            // Se o usuário vinculou explicitamente uma campanha a esta entrada financeira, respeita o vínculo
+            if (rulerMeta.campaignId) {
+              matchingExisting.campaign_id = rulerMeta.campaignId;
+            }
+          } else {
             formattedDonations.push({
               id: `ft_${ft.id}`,
-              campaign_id: undefined, // Direciona para a fase ativa da régua (Casa Nutri)
+              campaign_id: rulerMeta.campaignId || undefined, // Direciona para a campanha escolhida ou fase ativa da régua
               campaign_title: ft.description || 'Doação / Entrada Financeira',
               donor_name: ft.description?.replace(/^(Apadrinhamento Mensal|Mantenedor Mensal|Doação Mensal|Recorrência Mensal)[^-\n]*-\s*/i, '') || 'Apoiador YAH Hope',
               donor_email: '',
               amount: ftAmount,
               status: 'paid',
-              payment_method: ft.account?.toLowerCase().includes('pix') ? 'pix' : 'credit_card',
+              payment_method: ft.account?.toLowerCase().includes('pix') ? 'pix' : ft.account?.toLowerCase().includes('infinite') ? 'infinitepay' : 'credit_card',
               date: ft.date || new Date().toISOString(),
               paid_at: ft.date || new Date().toISOString(),
               is_sponsorship: ftDescLower.includes('apadrinh') || ftDescLower.includes('padrinho') || ft.category_id === 'cat_sponsorship'
@@ -889,6 +942,12 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         if (spErr) {
           console.warn('Aviso ao deletar apadrinhamento:', spErr);
         }
+      } else if (id.startsWith('ft_')) {
+        const rawFtId = id.replace('ft_', '');
+        const { error: ftErr } = await supabase.from('finance_transactions').delete().eq('id', rawFtId);
+        if (ftErr) {
+          console.warn('Aviso ao deletar lançamento financeiro:', ftErr);
+        }
       } else {
         const { error } = await supabase.from('donations').delete().eq('id', id);
         if (error) {
@@ -963,6 +1022,85 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const setTransactionRulerLink = async (
+    txId: string,
+    target: 'auto' | 'excluded' | string,
+    currentNotes?: string
+  ) => {
+    saveStoredRulerLink(txId, target);
+
+    // Atualiza também no campo notes do lançamento financeiro para persistência em banco
+    const cleanBaseNotes = (currentNotes || '')
+      .replace(/\[FORA_DA_REGUA\]/g, '')
+      .replace(/\[CAMPANHA:[^\]]+\]/g, '')
+      .trim();
+
+    let nextNotes = cleanBaseNotes;
+    if (target === 'excluded') {
+      nextNotes = [cleanBaseNotes, '[FORA_DA_REGUA]'].filter(Boolean).join(' ');
+    } else if (target && target !== 'auto') {
+      nextNotes = [cleanBaseNotes, `[CAMPANHA:${target}]`].filter(Boolean).join(' ');
+    }
+
+    try {
+      await supabase
+        .from('finance_transactions')
+        .update({ notes: nextNotes || null })
+        .eq('id', txId);
+    } catch (err) {
+      console.warn('Aviso ao salvar vínculo da régua no Supabase (mantido localmente):', err);
+    }
+
+    await fetchCampaignData();
+  };
+
+  const getTransactionRulerStatus = useCallback(
+    (tx: { id: string; notes?: string }) => {
+      return parseTransactionRulerMetadata(tx);
+    },
+    []
+  );
+
+  // Sincroniza os valores de current_amount de todas as campanhas no Supabase com a arrecadação real calculada
+  const syncRulerWithFinance = async () => {
+    try {
+      await fetchCampaignData();
+
+      let totalSynced = 0;
+      for (const camp of campaigns) {
+        const stats = calculateCampaignProgress(camp);
+        totalSynced += stats.currentAmount;
+
+        if (camp.id !== '1') {
+          await supabase
+            .from('campaigns')
+            .update({ current_amount: stats.currentAmount })
+            .eq('id', camp.id);
+        }
+      }
+
+      setCampaigns(prev =>
+        prev.map(c => {
+          const st = calculateCampaignProgress(c);
+          return { ...c, current_amount: st.currentAmount };
+        })
+      );
+
+      return {
+        success: true,
+        syncedAmount: totalSynced,
+        message: `Régua sincronizada com sucesso! Total ativo na régua: R$ ${totalSynced.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      };
+    } catch (err: any) {
+      console.error('Erro ao sincronizar régua com financeiro:', err);
+      return {
+        success: false,
+        syncedAmount: 0,
+        message: err?.message || 'Erro ao sincronizar régua'
+      };
+    }
+  };
+
   return (
     <FundraisingContext.Provider value={{
       campaign: selectedCampaign,
@@ -989,7 +1127,11 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
       approveDonation,
       deleteDonation,
       clearTestDonationsAndResetRuler,
-      calculateCampaignProgress
+      calculateCampaignProgress,
+      syncRulerWithFinance,
+      setTransactionRulerLink,
+      getTransactionRulerStatus,
+      refreshFundraising: fetchCampaignData
     }}>
       {children}
     </FundraisingContext.Provider>

@@ -1,21 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { X, RefreshCw, ArrowRightLeft, Heart, Repeat, DollarSign } from 'lucide-react';
+import { X, RefreshCw, ArrowRightLeft, Heart, Repeat, DollarSign, Target, EyeOff } from 'lucide-react';
 import { Transaction, TransactionCategory, TransactionType } from '../../../lib/mockData';
 import { CategorySelectWithCreate } from './CategorySelectWithCreate';
 import { getMznToBrlRate, ExchangeRateResult } from '../../../services/currencyService';
+import { Campaign } from '../../../contexts/FundraisingContext';
 import { cn } from '../../../lib/utils';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (transaction: Omit<Transaction, 'id'>) => void;
+  onSave: (transaction: Omit<Transaction, 'id'> & { rulerTarget?: 'auto' | 'excluded' | string }) => void;
   categories: TransactionCategory[];
   onAddCategory?: (category: TransactionCategory) => void;
+  defaultType?: TransactionType;
+  campaigns?: Campaign[];
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCategory }: TransactionModalProps) {
-  const [type, setType] = useState<TransactionType>('income');
+export function TransactionModal({
+  isOpen,
+  onClose,
+  onSave,
+  categories,
+  onAddCategory,
+  defaultType = 'income',
+  campaigns = []
+}: TransactionModalProps) {
+  const [type, setType] = useState<TransactionType>(defaultType);
   const [incomeOrigin, setIncomeOrigin] = useState<'doacao' | 'padrinho' | 'mantenedor'>('doacao');
+  const [rulerTarget, setRulerTarget] = useState<'auto' | 'excluded' | string>('auto');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState(''); // Valor principal na moeda selecionada (ou MT quando MZN)
   const [amountBrl, setAmountBrl] = useState(''); // Valor em Reais (R$) editável quando já convertido
@@ -35,6 +47,8 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
 
   useEffect(() => {
     if (isOpen) {
+      setType(defaultType);
+      setRulerTarget('auto');
       setIsLoadingRate(true);
       getMznToBrlRate()
         .then(info => {
@@ -47,7 +61,7 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
         .catch(err => console.warn('Erro ao obter cotação:', err))
         .finally(() => setIsLoadingRate(false));
     }
-  }, [isOpen]);
+  }, [isOpen, defaultType]);
 
   const handleRefreshRate = async () => {
     setIsLoadingRate(true);
@@ -216,6 +230,21 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
 
     const inverseRate = finalExchangeRate > 0 ? (1 / finalExchangeRate).toFixed(2) : '0.00';
 
+    const mznNote = hasMznConversion
+      ? `[Moçambique] Valor em Meticais: ${formattedOriginalMzn} MT | Valor em Reais: R$ ${finalAmountInBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Cotação efetiva: 1 MZN = R$ ${finalExchangeRate.toFixed(4)} • 1 BRL = ${inverseRate} MT${isCustomConversion ? ' - Cotação Negociada' : ''})`
+      : '';
+
+    const rulerNote =
+      type === 'income'
+        ? rulerTarget === 'excluded'
+          ? '[FORA_DA_REGUA]'
+          : rulerTarget && rulerTarget !== 'auto'
+          ? `[CAMPANHA:${rulerTarget}]`
+          : ''
+        : '';
+
+    const combinedNotes = [mznNote, rulerNote].filter(Boolean).join(' ') || undefined;
+
     onSave({
       description: baseDesc + currencySuffix,
       amount: finalAmountInBrl,
@@ -229,9 +258,8 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
       currency: hasMznConversion ? 'MZN' : 'BRL',
       original_amount: hasMznConversion ? finalOriginalAmountMzn : undefined,
       exchange_rate: hasMznConversion ? finalExchangeRate : 1,
-      notes: hasMznConversion
-        ? `[Moçambique] Valor em Meticais: ${formattedOriginalMzn} MT | Valor em Reais: R$ ${finalAmountInBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Cotação efetiva: 1 MZN = R$ ${finalExchangeRate.toFixed(4)} • 1 BRL = ${inverseRate} MT${isCustomConversion ? ' - Cotação Negociada' : ''})`
-        : undefined
+      notes: combinedNotes,
+      rulerTarget: type === 'income' ? rulerTarget : undefined
     });
     
     // Reset form
@@ -242,6 +270,7 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
     setIsCustomConversion(false);
     setCurrency('BRL');
     setCategoryId('');
+    setRulerTarget('auto');
     setDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
@@ -641,20 +670,66 @@ export function TransactionModal({ isOpen, onClose, onSave, categories, onAddCat
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Conta</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Conta / Origem</label>
                 <select
                   value={account}
                   onChange={e => setAccount(e.target.value)}
                   className="w-full border-2 border-slate-100 rounded-2xl px-5 py-3.5 focus:outline-none focus:ring-4 focus:ring-slate-500/10 focus:border-slate-300 transition-all font-medium appearance-none bg-white"
                   required
                 >
-                  <option value="Conta Principal">Conta Principal</option>
+                  <option value="Conta Principal">Conta Principal (PIX / Banco)</option>
+                  <option value="Stripe">Stripe (Cartão / Assinatura)</option>
+                  <option value="InfinitePay">InfinitePay (Link / PIX / Cartão)</option>
                   <option value="Conta Doações & Padrinhos">Conta Doações & Padrinhos</option>
                   <option value="Conta Projetos">Conta Projetos</option>
                   <option value="Fundo de Reserva">Fundo de Reserva</option>
                 </select>
               </div>
             </div>
+
+            {/* Vínculo Direto com a Régua de Campanhas (apenas para Entradas) */}
+            {type === 'income' && (
+              <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <Target size={14} className="text-emerald-600" />
+                    Conexão com a Régua de Campanhas
+                  </label>
+                  <span className={cn(
+                    "text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider",
+                    rulerTarget === 'excluded'
+                      ? "bg-slate-200 text-slate-700"
+                      : "bg-emerald-600 text-white"
+                  )}>
+                    {rulerTarget === 'excluded' ? 'Fora da Régua' : '✓ Soma na Régua'}
+                  </span>
+                </div>
+
+                <select
+                  value={rulerTarget}
+                  onChange={e => setRulerTarget(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="auto">
+                    ⚡ Somar automaticamente na Campanha Ativa do Mês (Recomendado)
+                  </option>
+                  {campaigns.map((c, idx) => (
+                    <option key={c.id} value={c.id}>
+                      🎯 Direcionar para Estágio #{c.priority ?? idx + 1}: {c.title} (Meta: R$ {Number(c.target_amount || 0).toLocaleString('pt-BR')})
+                    </option>
+                  ))}
+                  <option value="excluded">
+                    🚫 Não somar na régua pública (Receita interna / ajuste institucional)
+                  </option>
+                </select>
+
+                <p className="text-[11px] text-emerald-800/80 font-medium leading-snug">
+                  {rulerTarget === 'excluded'
+                    ? 'Este valor entrará normalmente no Saldo do Caixa Central, mas não alterará a barra da régua pública.'
+                    : 'Assim que salva, esta entrada atualiza automaticamente a régua pública da campanha em tempo real.'}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 flex gap-4">

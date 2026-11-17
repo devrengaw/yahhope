@@ -48,8 +48,11 @@ export function FundraisingManager() {
     deleteDonation,
     clearTestDonationsAndResetRuler,
     currentMonthName,
-    calculateCampaignProgress
+    calculateCampaignProgress,
+    syncRulerWithFinance
   } = useFundraising();
+
+  const [isSyncingFinance, setIsSyncingFinance] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'config' | 'milestones' | 'donations'>('config');
   const [isNewCampaignModalOpen, setIsNewCampaignModalOpen] = useState(false);
@@ -416,6 +419,31 @@ export function FundraisingManager() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            to="/admin/finance?tab=incomes_ruler"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold text-xs hover:bg-emerald-100 transition-colors shadow-xs"
+            title="Ver todas as entradas financeiras que compõem a régua"
+          >
+            <DollarSign size={14} /> Entradas no Financeiro
+          </Link>
+          <button
+            type="button"
+            disabled={isSyncingFinance}
+            onClick={async () => {
+              setIsSyncingFinance(true);
+              try {
+                const res = await syncRulerWithFinance();
+                alert(res.message);
+              } finally {
+                setIsSyncingFinance(false);
+              }
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 font-bold text-xs hover:bg-blue-100 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            title="Sincroniza o valor da régua com as entradas confirmadas no Financeiro"
+          >
+            <RotateCcw size={14} className={isSyncingFinance ? "animate-spin" : ""} />
+            {isSyncingFinance ? 'Sincronizando...' : 'Sincronizar com Financeiro'}
+          </button>
           <button
             type="button"
             onClick={handleClearTestDonations}
