@@ -1,6 +1,6 @@
 import { useState, useMemo, type RefObject } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter } from 'recharts';
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { cn, parseLocalDate } from '../lib/utils';
@@ -214,13 +214,12 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
         dataKey="patientValue"
         name="Paciente"
         stroke={isBoy ? '#3b82f6' : '#ec4899'}
-        strokeWidth={3}
+        strokeWidth={2}
         connectNulls={true}
-        dot={{ r: 6, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }}
-        activeDot={{ r: 8 }}
+        dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
+        activeDot={{ r: 5 }}
         isAnimationActive={false}
       />
-      <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
     </ComposedChart>
   );
 
@@ -259,7 +258,7 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
         <div className="flex items-center gap-1"><div className="w-4 h-1 bg-black"></div> Z +3 / -3</div>
         <div className="flex items-center gap-1"><div className="w-4 h-1 bg-red-500"></div> Z +2 / -2</div>
         <div className="flex items-center gap-1"><div className="w-4 h-1 bg-emerald-500"></div> Mediana (0)</div>
-        <div className="flex items-center gap-1"><div className={cn("w-3 h-3 rounded-full", isBoy ? "bg-blue-900" : "bg-pink-900")}></div> Medições do Paciente</div>
+        <div className="flex items-center gap-1"><div className={cn("w-2.5 h-2.5 rounded-full", isBoy ? "bg-blue-900" : "bg-pink-900")}></div> Medições do Paciente</div>
       </div>
     </div>
   );
@@ -359,12 +358,11 @@ export function GrowthChartsExportView({
               dataKey="patientValue"
               name="Paciente"
               stroke={isBoy ? '#3b82f6' : '#ec4899'}
-              strokeWidth={3}
+              strokeWidth={2}
               connectNulls={true}
-              dot={{ r: 5, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 2 }}
+              dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
               isAnimationActive={false}
             />
-            <Scatter dataKey="patientValue" fill={isBoy ? '#1e3a8a' : '#831843'} isAnimationActive={false} />
           </ComposedChart>
         </div>
       ))}
