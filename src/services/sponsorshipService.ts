@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 import { fetchAndSyncOrgSettings } from './organizationSettingsService';
 import { isGibberishBotName } from '../utils/userCleanup';
 
+export type PixPackageMonths = 3 | 6 | 12;
+
 export interface ChildSponsorshipDetail {
   id: string;
   sponsorshipId?: string;
@@ -16,13 +18,43 @@ export interface ChildSponsorshipDetail {
   sponsorsCount: number;
   maxSponsors: number;
   isFull: boolean;
+  // Metadados do plano / pacote de apadrinhamento (Cartão Mensal vs Pacote PIX 3, 6, 12 meses)
+  paymentMethod?: string;
+  planMonths?: number;
+  packageAmount?: number;
+  startedAt?: string;
+  expiresAt?: string | null;
+  daysRemaining?: number | null;
+  isExpiringSoon?: boolean;
+  isExpired?: boolean;
   sponsors: Array<{
     id: string;
     name: string;
     email: string;
     monthly_amount: number;
+    payment_method?: string;
+    plan_months?: number;
+    package_amount?: number;
+    expires_at?: string | null;
     created_at: string;
   }>;
+}
+
+export interface PendingSponsorshipRenewal {
+  sponsorshipId: string;
+  childId: string;
+  childName: string;
+  childPhoto?: string;
+  childCommunity?: string;
+  childAgeText?: string;
+  planMonths: number;
+  packageAmount: number;
+  monthlyAmount: number;
+  paymentMethod: string;
+  startedAt: string;
+  expiresAt: string;
+  daysRemaining: number; // <= 0 se vencido, 1..15 se prestes a vencer
+  isExpired: boolean;
 }
 
 export interface SupporterGeneralSupport {
@@ -64,6 +96,8 @@ export interface AssignSponsorPayload {
   amountPerQuota?: number;
   amount?: number;
   paymentMethod?: string;
+  planMonths?: number; // 1 = mensal cartão, 3/6/12 = pacote PIX
+  renewChildId?: string; // caso esteja renovando o apadrinhamento de uma criança específica
   sponsorUserId?: string;
 }
 
@@ -71,8 +105,136 @@ export interface AssignSponsorResult {
   success: boolean;
   assignedChildren: ChildSponsorshipDetail[];
   totalAmount: number;
+  planMonths?: number;
+  expiresAt?: string | null;
   message?: string;
   error?: string;
+}
+
+/**
+ * Calcula a data de expiração do pacote de apadrinhamento (ex: 3, 6 ou 12 meses).
+ * Se baseDate for informada e ainda estiver no futuro, soma os meses a partir dela (renovação antecipada).
+ */
+export function calculatePackageExpirationDate(months: number, baseDate?: string | Date | null): string {
+  const now = new Date();
+  const parsedBase = baseDate ? new Date(baseDate) : null;
+  const effectiveStart = parsedBase && !isNaN(parsedBase.getTime()) && parsedBase > now ? new Date(parsedBase) : now;
+  const target = new Date(effectiveStart);
+  target.setMonth(target.getMonth() + months);
+  return target.toISOString();
+}
+
+/**
+ * Lê metadados locais de pacote PIX (fallback caso as colunas ainda não existam no banco)
+ */
+function getLocalPixPackageMeta(email?: string, childId?: string): { planMonths?: number; packageAmount?: number; startedAt?: string; expiresAt?: string; renewalDeclined?: boolean } | null {
+  if (!email) return null;
+  try {
+    const clean = email.toLowerCase().trim();
+    const raw = localStorage.getItem(`yah_pix_package_meta_${clean}`);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    if (childId && map[childId]) return map[childId];
+    return map._default || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalPixPackageMeta(email: string, childId: string, meta: { planMonths: number; packageAmount: number; startedAt: string; expiresAt: string | null; renewalDeclined?: boolean }) {
+  if (!email) return;
+  try {
+    const clean = email.toLowerCase().trim();
+    const key = `yah_pix_package_meta_${clean}`;
+    const existingRaw = localStorage.getItem(key);
+    const map = existingRaw ? JSON.parse(existingRaw) : {};
+    map[childId] = meta;
+    map._default = meta;
+    localStorage.setItem(key, JSON.stringify(map));
+  } catch {}
+}
+
+/**
+ * Avalia a vigência de um registro de apadrinhamento.
+ * Pacotes PIX de 3, 6 e 12 meses permanecem ativos durante todo o período contratado
+ * (não perdem acesso na virada de cada mês) e só expiram ao final do prazo contratado.
+ */
+export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
+  planMonths: number;
+  packageAmount: number;
+  startedAt: string;
+  expiresAt: string | null;
+  daysRemaining: number | null;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
+  renewalDeclined: boolean;
+} {
+  const email = (sp?.donor_email || fallbackEmail || '').toLowerCase().trim();
+  const localMeta = getLocalPixPackageMeta(email, sp?.child_id);
+
+  const isPix = String(sp?.payment_method || '').toLowerCase().includes('pix');
+  const rawPlanMonths = Number(sp?.plan_months || localMeta?.planMonths || 0);
+  const planMonths = rawPlanMonths > 0 ? rawPlanMonths : (isPix ? 3 : 1);
+
+  const monthlyAmt = Math.max(90, Number(sp?.monthly_amount || 90));
+  const packageAmount = Number(sp?.package_amount || localMeta?.packageAmount || (monthlyAmt * planMonths));
+  const startedAt = sp?.started_at || localMeta?.startedAt || sp?.last_sponsored_at || sp?.created_at || new Date().toISOString();
+
+  let expiresAt: string | null = sp?.expires_at || localMeta?.expiresAt || null;
+  if (!expiresAt && (planMonths > 1 || isPix) && (sp?.started_at || sp?.last_sponsored_at || sp?.created_at)) {
+    const startObj = new Date(startedAt);
+    if (!isNaN(startObj.getTime())) {
+      const calcExp = new Date(startObj);
+      calcExp.setMonth(calcExp.getMonth() + planMonths);
+      expiresAt = calcExp.toISOString();
+    }
+  }
+
+  const renewalDeclined = Boolean(sp?.renewal_declined || localMeta?.renewalDeclined || String(sp?.status || '').toLowerCase() === 'expired');
+
+  if (!expiresAt) {
+    return {
+      planMonths,
+      packageAmount,
+      startedAt,
+      expiresAt: null,
+      daysRemaining: null,
+      isExpiringSoon: false,
+      isExpired: renewalDeclined,
+      renewalDeclined
+    };
+  }
+
+  const expDate = new Date(expiresAt);
+  if (isNaN(expDate.getTime())) {
+    return {
+      planMonths,
+      packageAmount,
+      startedAt,
+      expiresAt: null,
+      daysRemaining: null,
+      isExpiringSoon: false,
+      isExpired: renewalDeclined,
+      renewalDeclined
+    };
+  }
+
+  const now = new Date();
+  const diffMs = expDate.getTime() - now.getTime();
+  const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const isExpired = diffMs <= 0 || renewalDeclined;
+  const isExpiringSoon = !isExpired && daysRemaining <= 15;
+
+  return {
+    planMonths,
+    packageAmount,
+    startedAt,
+    expiresAt,
+    daysRemaining,
+    isExpiringSoon,
+    isExpired,
+    renewalDeclined
+  };
 }
 
 /**
@@ -168,14 +330,20 @@ export const sponsorshipService = {
       const allChildren = childrenData || [];
       const allSponsorships = sponsorshipsData || [];
 
-      // Mapeia padrinhos por child_id (resiliente a variações de status e case de ID)
+      // Mapeia padrinhos por child_id (resiliente a variações de status, case de ID e vigência de pacote PIX)
       const sponsorsByChild = new Map<string, any[]>();
       allSponsorships.forEach(sp => {
         if (!sp.child_id) return;
         
-        // Ignora apenas status explicitamente cancelados ou substituídos
+        // Ignora status explicitamente cancelados, substituídos ou expirados
         const st = String(sp.status || 'active').toLowerCase().trim();
-        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced') {
+        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired') {
+          return;
+        }
+
+        // Verifica se o pacote PIX já venceu ou se a renovação foi recusada
+        const validity = evaluateSponsorshipValidity(sp);
+        if (validity.isExpired) {
           return;
         }
 
@@ -195,6 +363,10 @@ export const sponsorshipService = {
           name: sponsorName,
           email: sponsorEmail,
           monthly_amount: effectiveAmt,
+          payment_method: sp.payment_method || 'credit_card',
+          plan_months: validity.planMonths,
+          package_amount: validity.packageAmount,
+          expires_at: validity.expiresAt,
           created_at: sp.created_at
         });
       });
@@ -279,26 +451,42 @@ export const sponsorshipService = {
       donorPhone,
       quotasCount,
       paymentMethod = 'credit_card',
+      renewChildId,
       sponsorUserId
     } = payload;
 
+    const isPix = String(paymentMethod).toLowerCase().includes('pix');
+    const planMonths = payload.planMonths && payload.planMonths > 0
+      ? payload.planMonths
+      : (isPix ? 3 : 1);
+
     const metrics = await this.getMetrics();
-    const quotaCost = payload.amountPerQuota || metrics.quotaCost;
+    const quotaCost = Math.max(90, payload.amountPerQuota || metrics.quotaCost || 90);
     const maxSponsors = metrics.maxSponsorsPerChild;
 
-    // REGRA DE OURO: Cada cota de criança é R$ 90.
-    // 90 = 1 criança, 180 = 2 crianças, 270 = 3 crianças...
-    // Se doar 95, 90 é da criança e 5 é para o projeto geral. Mais crianças apenas em múltiplos inteiros de 90.
-    const totalSupplied = payload.amount || (payload.amountPerQuota && payload.amountPerQuota >= 90 ? payload.amountPerQuota : 0);
+    // REGRA DE OURO:
+    // - Se for Cartão Mensal (planMonths = 1): R$ 90 = 1 criança, R$ 180 = 2 crianças...
+    // - Se for Pacote PIX (planMonths = 3, 6 ou 12): o valor pago é (cotas * R$ 90 * planMonths).
+    //   Portanto, o equivalente mensal é (totalSupplied / planMonths), evitando alocar 3/6/12 crianças
+    //   quando a pessoa está pagando 3/6/12 meses de 1 criança!
+    const totalSupplied = payload.amount || (payload.amountPerQuota && payload.amountPerQuota >= 90 ? payload.amountPerQuota * planMonths : 0);
+    const monthlyEquivalent = planMonths > 1 && totalSupplied >= 90 * planMonths
+      ? totalSupplied / planMonths
+      : totalSupplied;
+
     let effectiveQuotas = quotasCount || 1;
-    if (totalSupplied >= 90) {
-      effectiveQuotas = Math.max(quotasCount || 1, Math.floor(totalSupplied / 90));
-    } else if (quotasCount && quotasCount > 1) {
+    if (quotasCount && quotasCount >= 1) {
       effectiveQuotas = quotasCount;
+    } else if (monthlyEquivalent >= 90) {
+      effectiveQuotas = Math.max(1, Math.floor(monthlyEquivalent / 90));
     }
 
-    // 1. Filtra apenas crianças elegíveis que ainda têm vagas abertas
-    const availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors);
+    // 1. Filtra crianças elegíveis (ou prioriza a criança específica em caso de renovação)
+    let availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors || c.id === renewChildId);
+
+    if (availableChildren.length === 0 && metrics.children.length > 0) {
+      availableChildren = [...metrics.children];
+    }
 
     if (availableChildren.length === 0) {
       return {
@@ -309,8 +497,12 @@ export const sponsorshipService = {
       };
     }
 
-    // 2. Ordena de forma estrita pelo menor número de padrinhos ativos (Least-Sponsored)
+    // 2. Ordena priorizando a criança em renovação (se houver) e depois menor número de padrinhos ativos (Least-Sponsored)
     availableChildren.sort((a, b) => {
+      if (renewChildId) {
+        if (a.id === renewChildId) return -1;
+        if (b.id === renewChildId) return 1;
+      }
       if (a.sponsorsCount !== b.sponsorsCount) {
         return a.sponsorsCount - b.sponsorsCount;
       }
@@ -320,51 +512,101 @@ export const sponsorshipService = {
     // 3. Seleciona as N crianças prioritárias (até o limite de cotas solicitadas)
     const countToAssign = Math.min(effectiveQuotas, availableChildren.length);
     const selectedChildren = availableChildren.slice(0, countToAssign);
-    const totalAmount = totalSupplied > 0 ? totalSupplied : countToAssign * quotaCost;
+    const totalAmount = totalSupplied > 0 ? totalSupplied : countToAssign * quotaCost * planMonths;
+    const perChildPackageAmount = quotaCost * planMonths;
 
     const cleanEmail = donorEmail.toLowerCase().trim();
+    const nowIso = new Date().toISOString();
+    let finalExpiresAt: string | null = planMonths > 1 || isPix
+      ? calculatePackageExpirationDate(planMonths)
+      : null;
 
     try {
       // 4. Cria ou atualiza os registros em 'sponsorships'
       for (const child of selectedChildren) {
-        // Verifica se já existe um apadrinhamento ativo deste usuário
         let queryExisting = supabase
           .from('sponsorships')
-          .select('id, child_id')
-          .ilike('donor_email', cleanEmail)
-          .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
+          .select('*')
+          .ilike('donor_email', cleanEmail);
         
         if (sponsorUserId) {
           queryExisting = queryExisting.or(`sponsor_id.eq.${sponsorUserId},donor_email.ilike.${cleanEmail}`);
         }
         const { data: existingRows } = await queryExisting;
-        
-        // Se já existir uma linha sem child_id, ATUALIZA ela em vez de inserir duplicata:
-        const unassigned = (existingRows || []).find(r => !r.child_id);
-        if (unassigned) {
-          await supabase
+
+        // Verifica se já existe linha para esta mesma criança (inclusive expirada/em renovação)
+        const existingSameChild = (existingRows || []).find(r => r.child_id === child.id);
+        const unassigned = (existingRows || []).find(r => !r.child_id && r.status !== 'canceled');
+
+        const targetRowToUpdate = existingSameChild || unassigned;
+        const computedExpiresAt = planMonths > 1 || isPix
+          ? calculatePackageExpirationDate(planMonths, existingSameChild?.expires_at)
+          : null;
+        finalExpiresAt = computedExpiresAt;
+
+        // Salva metadados no cache local para resiliência imediata
+        saveLocalPixPackageMeta(cleanEmail, child.id, {
+          planMonths,
+          packageAmount: perChildPackageAmount,
+          startedAt: nowIso,
+          expiresAt: computedExpiresAt,
+          renewalDeclined: false
+        });
+
+        // Remove da lista local de renovações recusadas caso estivesse lá
+        try {
+          const decKey = `yah_declined_renewals_${cleanEmail}`;
+          const decRaw = localStorage.getItem(decKey);
+          if (decRaw) {
+            const decArr: string[] = JSON.parse(decRaw);
+            localStorage.setItem(decKey, JSON.stringify(decArr.filter(id => id !== child.id && id !== targetRowToUpdate?.id)));
+          }
+        } catch {}
+
+        if (targetRowToUpdate) {
+          const fullUpdate: any = {
+            child_id: child.id,
+            donor_name: donorName,
+            donor_email: cleanEmail,
+            donor_phone: donorPhone || null,
+            monthly_amount: quotaCost,
+            payment_method: paymentMethod,
+            status: 'active',
+            last_sponsored_at: nowIso,
+            sponsor_id: sponsorUserId || targetRowToUpdate.sponsor_id || null,
+            plan_months: planMonths,
+            package_amount: perChildPackageAmount,
+            started_at: nowIso,
+            expires_at: computedExpiresAt,
+            renewal_declined: false
+          };
+
+          const { error: upErr } = await supabase
             .from('sponsorships')
-            .update({
-              child_id: child.id,
-              last_sponsored_at: new Date().toISOString(),
-              sponsor_id: sponsorUserId || null
-            })
-            .eq('id', unassigned.id);
+            .update(fullUpdate)
+            .eq('id', targetRowToUpdate.id);
+
+          if (upErr) {
+            // Fallback se as colunas de pacote ainda não tiverem sido migradas no banco
+            await supabase
+              .from('sponsorships')
+              .update({
+                child_id: child.id,
+                donor_name: donorName,
+                donor_email: cleanEmail,
+                donor_phone: donorPhone || null,
+                monthly_amount: quotaCost,
+                payment_method: paymentMethod,
+                status: 'active',
+                last_sponsored_at: nowIso,
+                sponsor_id: sponsorUserId || targetRowToUpdate.sponsor_id || null
+              })
+              .eq('id', targetRowToUpdate.id);
+          }
           continue;
         }
 
-        // Se já existir uma linha com ESTA MESMA CRIANÇA, não duplica:
-        const alreadyHasThisChild = (existingRows || []).some(r => r.child_id === child.id);
-        if (alreadyHasThisChild) {
-          continue;
-        }
-
-        // Se a quantidade de cotas já está preenchida, não insere registros adicionais:
-        if (existingRows && existingRows.filter(r => r.child_id).length >= countToAssign) {
-          continue;
-        }
-
-        const sponsorshipRecord: any = {
+        const fullSponsorshipRecord: any = {
           child_id: child.id,
           sponsor_id: sponsorUserId || null,
           donor_name: donorName,
@@ -374,35 +616,71 @@ export const sponsorshipService = {
           quotas_count: 1,
           status: 'active',
           payment_method: paymentMethod,
-          last_sponsored_at: new Date().toISOString()
+          last_sponsored_at: nowIso,
+          plan_months: planMonths,
+          package_amount: perChildPackageAmount,
+          started_at: nowIso,
+          expires_at: computedExpiresAt,
+          renewal_declined: false
         };
 
         const { error: spInsertErr } = await supabase
           .from('sponsorships')
-          .insert([sponsorshipRecord]);
+          .insert([fullSponsorshipRecord]);
 
-        if (spInsertErr && !spInsertErr.message?.includes('duplicate key')) {
-          console.warn('Aviso ao inserir apadrinhamento:', spInsertErr.message);
+        if (spInsertErr) {
+          // Fallback caso as colunas novas ainda não existam no banco
+          const baseSponsorshipRecord: any = {
+            child_id: child.id,
+            sponsor_id: sponsorUserId || null,
+            donor_name: donorName,
+            donor_email: cleanEmail,
+            donor_phone: donorPhone || null,
+            monthly_amount: quotaCost,
+            quotas_count: 1,
+            status: 'active',
+            payment_method: paymentMethod,
+            last_sponsored_at: nowIso
+          };
+          await supabase.from('sponsorships').insert([baseSponsorshipRecord]);
         }
       }
 
+      // Enriquecer selectedChildren com metadados do pacote
+      const enrichedChildren: ChildSponsorshipDetail[] = selectedChildren.map(c => ({
+        ...c,
+        paymentMethod,
+        planMonths,
+        packageAmount: perChildPackageAmount,
+        startedAt: nowIso,
+        expiresAt: finalExpiresAt,
+        daysRemaining: finalExpiresAt ? Math.ceil((new Date(finalExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null,
+        isExpiringSoon: false,
+        isExpired: false
+      }));
+
       // 5. Registra no Módulo Financeiro Global (apenas para apoiadores legítimos)
       if (!isGibberishBotName(donorName)) {
+        const txDescription = planMonths > 1 || isPix
+          ? `Apadrinhamento PIX - Pacote ${planMonths} Meses (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`
+          : `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`;
+
         await supabase.from('finance_transactions').insert({
-          description: `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`,
+          description: txDescription,
           amount: totalAmount,
           type: 'income',
           category_id: 'cat_sponsorship',
           status: 'completed',
-          account: paymentMethod === 'pix' ? 'Pix Recorrente' : 'Cartão de Crédito',
-          date: new Date().toISOString().split('T')[0]
+          account: isPix ? 'Pix Apadrinhamento' : 'Cartão de Crédito',
+          recurrence: planMonths > 1 || isPix ? 'none' : 'monthly',
+          date: nowIso.split('T')[0]
         });
       }
 
-      // 7. Persiste no cache local do padrinho de forma estrita (sem acumular cotas fantasmas)
+      // 7. Persiste no cache local do padrinho de forma estrita
       try {
         const cacheKey = `yah_sponsored_children_${cleanEmail}`;
-        localStorage.setItem(cacheKey, JSON.stringify(selectedChildren));
+        localStorage.setItem(cacheKey, JSON.stringify(enrichedChildren));
       } catch (cacheErr) {
         console.warn('Erro ao salvar apadrinhamento no cache:', cacheErr);
       }
@@ -411,13 +689,17 @@ export const sponsorshipService = {
       const isRegistered = await this.isUserRegistered(cleanEmail);
 
       // 9. Dispara o E-mail de Apresentação da(s) Criança(s) Apadrinhada(s)
-      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, selectedChildren, totalAmount, isRegistered);
+      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, enrichedChildren, totalAmount, isRegistered);
 
       return {
         success: true,
-        assignedChildren: selectedChildren,
+        assignedChildren: enrichedChildren,
         totalAmount,
-        message: `Parabéns! Você apadrinhou ${selectedChildren.length} ${selectedChildren.length === 1 ? 'criança' : 'crianças'}. Enviamos o perfil completo por e-mail!`
+        planMonths,
+        expiresAt: finalExpiresAt,
+        message: planMonths > 1
+          ? `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'} pelo pacote de ${planMonths} meses!`
+          : `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'}. Enviamos o perfil completo por e-mail!`
       };
     } catch (err: any) {
       console.error('Erro ao efetivar apadrinhamento:', err);
@@ -425,6 +707,8 @@ export const sponsorshipService = {
         success: false,
         assignedChildren: selectedChildren,
         totalAmount,
+        planMonths,
+        expiresAt: finalExpiresAt,
         error: err.message || 'Erro ao processar apadrinhamento'
       };
     }
@@ -783,6 +1067,14 @@ export const sponsorshipService = {
       const seenIds = new Set<string>();
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
         if (!seenIds.has(item.id)) {
+          const st = String(item.status || 'active').toLowerCase().trim();
+          if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired') {
+            return;
+          }
+          const validity = evaluateSponsorshipValidity(item, cleanEmail);
+          if (validity.isExpired) {
+            return;
+          }
           seenIds.add(item.id);
           combinedSp.push(item);
         }
@@ -927,9 +1219,13 @@ export const sponsorshipService = {
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
         if (!seenSpIds.has(item.id)) {
           const st = String(item.status || 'active').toLowerCase().trim();
-          if (st !== 'canceled' && st !== 'cancelled' && st !== 'inactive' && st !== 'replaced') {
-            seenSpIds.add(item.id);
-            combinedData.push(item);
+          if (st !== 'canceled' && st !== 'cancelled' && st !== 'inactive' && st !== 'replaced' && st !== 'expired') {
+            const validity = evaluateSponsorshipValidity(item, cleanEmail);
+            // Se o pacote PIX venceu ou o usuário optou por não renovar, ele não acompanha mais a criança ativa
+            if (!validity.isExpired) {
+              seenSpIds.add(item.id);
+              combinedData.push({ ...item, _validity: validity });
+            }
           }
         }
       });
@@ -955,6 +1251,7 @@ export const sponsorshipService = {
 
           const childName = c.name || 'Jesica Afito';
           const childId = c.id || item.child_id;
+          const val = item._validity || evaluateSponsorshipValidity(item, cleanEmail);
 
           return {
             id: childId,
@@ -970,6 +1267,14 @@ export const sponsorshipService = {
             sponsorsCount: 1,
             maxSponsors: 2,
             isFull: false,
+            paymentMethod: item.payment_method || 'credit_card',
+            planMonths: val.planMonths,
+            packageAmount: val.packageAmount,
+            startedAt: val.startedAt,
+            expiresAt: val.expiresAt,
+            daysRemaining: val.daysRemaining,
+            isExpiringSoon: val.isExpiringSoon,
+            isExpired: val.isExpired,
             sponsors: []
           };
         });
@@ -1521,5 +1826,177 @@ export const sponsorshipService = {
         error: err.message
       };
     }
+  },
+
+  /**
+   * Busca avisos de apadrinhamentos via PIX que estão prestes a vencer (<= 15 dias)
+   * ou que já venceram e ainda não tiveram renovação decidida pelo padrinho.
+   */
+  async getPendingRenewalNoticesForUser(
+    userId?: string,
+    userEmail?: string
+  ): Promise<PendingSponsorshipRenewal[]> {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    if (!userId && !cleanEmail) return [];
+
+    // Lista local de renovações recusadas pelo usuário
+    let declinedIds = new Set<string>();
+    try {
+      const rawDec = localStorage.getItem(`yah_declined_renewals_${cleanEmail}`);
+      if (rawDec) {
+        const parsed = JSON.parse(rawDec);
+        if (Array.isArray(parsed)) declinedIds = new Set(parsed);
+      }
+    } catch {}
+
+    try {
+      let queryBySponsorId: any = null;
+      let queryByEmail: any = null;
+
+      if (userId) {
+        queryBySponsorId = await supabase
+          .from('sponsorships')
+          .select('*, children(*)')
+          .eq('sponsor_id', userId);
+      }
+
+      if (cleanEmail) {
+        queryByEmail = await supabase
+          .from('sponsorships')
+          .select('*, children(*)')
+          .ilike('donor_email', cleanEmail);
+      }
+
+      const seenIds = new Set<string>();
+      const rows: any[] = [];
+      [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
+        if (!seenIds.has(item.id) && item.child_id) {
+          seenIds.add(item.id);
+          rows.push(item);
+        }
+      });
+
+      const notices: PendingSponsorshipRenewal[] = [];
+      for (const item of rows) {
+        const st = String(item.status || 'active').toLowerCase().trim();
+        if (st === 'canceled' || st === 'cancelled' || st === 'replaced' || st === 'inactive') continue;
+        if (item.renewal_declined || declinedIds.has(item.id) || declinedIds.has(item.child_id)) continue;
+
+        const val = evaluateSponsorshipValidity(item, cleanEmail);
+        // Exibe aviso se tiver data de expiração (pacote PIX) e estiver vencido ou nos últimos 15 dias
+        if (val.expiresAt && (val.isExpired || val.isExpiringSoon)) {
+          let c = item.children;
+          if (Array.isArray(c)) c = c[0];
+          const childName = c?.name || 'Sua Criança Apadrinhada';
+
+          notices.push({
+            sponsorshipId: item.id,
+            childId: item.child_id,
+            childName,
+            childPhoto: c?.photo_url || '',
+            childCommunity: c?.address || c?.province || 'Casa Nutri',
+            childAgeText: calculateChildAge(c?.dob),
+            planMonths: val.planMonths,
+            packageAmount: val.packageAmount,
+            monthlyAmount: Math.max(90, Number(item.monthly_amount || 90)),
+            paymentMethod: item.payment_method || 'pix',
+            startedAt: val.startedAt,
+            expiresAt: val.expiresAt,
+            daysRemaining: val.daysRemaining ?? 0,
+            isExpired: val.isExpired
+          });
+        }
+      }
+
+      return notices;
+    } catch (err) {
+      console.warn('Erro ao buscar avisos de renovação:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Quando o pacote de apadrinhamento termina e a pessoa opta por NÃO continuar apadrinhando a criança:
+   * - Encerra o vínculo com a criança (liberando a vaga para outro padrinho).
+   * - MANTÉM o acesso completo da pessoa ao sistema/portal para ver as atualizações gerais do projeto.
+   */
+  async declineSponsorshipRenewal(
+    sponsorshipId: string,
+    childId: string,
+    userId?: string,
+    userEmail?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+
+    // 1. Registra recusa no cache local
+    if (cleanEmail) {
+      try {
+        const decKey = `yah_declined_renewals_${cleanEmail}`;
+        const rawDec = localStorage.getItem(decKey);
+        const arr: string[] = rawDec ? JSON.parse(rawDec) : [];
+        if (!arr.includes(sponsorshipId)) arr.push(sponsorshipId);
+        if (childId && !arr.includes(childId)) arr.push(childId);
+        localStorage.setItem(decKey, JSON.stringify(arr));
+
+        const existingMeta = getLocalPixPackageMeta(cleanEmail, childId);
+        if (existingMeta) {
+          saveLocalPixPackageMeta(cleanEmail, childId, {
+            planMonths: existingMeta.planMonths || 3,
+            packageAmount: existingMeta.packageAmount || 270,
+            startedAt: existingMeta.startedAt || new Date().toISOString(),
+            expiresAt: existingMeta.expiresAt || new Date().toISOString(),
+            renewalDeclined: true
+          });
+        }
+
+        // Remove a criança do cache local de crianças acompanhadas
+        const cacheKey = `yah_sponsored_children_${cleanEmail}`;
+        const rawChildren = localStorage.getItem(cacheKey);
+        if (rawChildren) {
+          const parsed = JSON.parse(rawChildren);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(
+              cacheKey,
+              JSON.stringify(parsed.filter(c => c.id !== childId && c.sponsorshipId !== sponsorshipId))
+            );
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Atualiza o banco marcando como expirado/encerrado (liberando a vaga da criança)
+    try {
+      if (sponsorshipId) {
+        const { error } = await supabase
+          .from('sponsorships')
+          .update({ status: 'expired', renewal_declined: true })
+          .eq('id', sponsorshipId);
+
+        if (error) {
+          await supabase
+            .from('sponsorships')
+            .update({ status: 'canceled' })
+            .eq('id', sponsorshipId);
+        }
+      } else if (childId && (userId || cleanEmail)) {
+        let q = supabase.from('sponsorships').update({ status: 'expired', renewal_declined: true }).eq('child_id', childId);
+        if (userId) q = q.eq('sponsor_id', userId);
+        else q = q.ilike('donor_email', cleanEmail);
+        const { error } = await q;
+        if (error) {
+          let qFallback = supabase.from('sponsorships').update({ status: 'canceled' }).eq('child_id', childId);
+          if (userId) qFallback = qFallback.eq('sponsor_id', userId);
+          else qFallback = qFallback.ilike('donor_email', cleanEmail);
+          await qFallback;
+        }
+      }
+    } catch (e) {
+      console.warn('Aviso ao encerrar ciclo de apadrinhamento no banco:', e);
+    }
+
+    return {
+      success: true,
+      message: 'Ciclo de apadrinhamento encerrado. Você continua com acesso completo ao sistema e a todas as atualizações gerais do projeto!'
+    };
   }
 };

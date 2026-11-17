@@ -3,6 +3,7 @@ import {
   Heart, 
   Users, 
   CreditCard, 
+  QrCode,
   Sparkles, 
   User, 
   Mail, 
@@ -39,6 +40,8 @@ export function HomeDonationCard({
   const [headerTab, setHeaderTab] = useState<'sponsorship' | 'general'>(initialTab);
   const [isSingleDonation, setIsSingleDonation] = useState(false);
   const [sponsorshipQuotas, setSponsorshipQuotas] = useState<number>(initialQuotas || 1);
+  const [sponsorshipPayMethod, setSponsorshipPayMethod] = useState<'card' | 'pix'>('card');
+  const [sponsorshipPixMonths, setSponsorshipPixMonths] = useState<3 | 6 | 12>(6);
 
   // Sincroniza aba e cotas quando acionado externamente por botões da página
   useEffect(() => {
@@ -108,7 +111,10 @@ export function HomeDonationCard({
   };
 
   const quotaCost = sponsorshipMetrics?.quotaCost || 90;
-  const sponsorshipTotal = sponsorshipQuotas * quotaCost;
+  const sponsorshipMonthlyTotal = sponsorshipQuotas * quotaCost;
+  const sponsorshipTotal = sponsorshipPayMethod === 'pix'
+    ? sponsorshipMonthlyTotal * sponsorshipPixMonths
+    : sponsorshipMonthlyTotal;
   const currentTotalAmount = headerTab === 'sponsorship'
     ? sponsorshipTotal
     : (isCustom && customAmount ? parseFloat(customAmount) : selectedAmount);
@@ -147,10 +153,13 @@ export function HomeDonationCard({
     setIsCheckingOut(true);
 
     try {
-      const isMonthly = headerTab === 'sponsorship' ? true : !isSingleDonation;
+      const isSponsorshipPix = headerTab === 'sponsorship' && sponsorshipPayMethod === 'pix';
+      const isMonthly = headerTab === 'sponsorship' ? !isSponsorshipPix : !isSingleDonation;
       const interestType = headerTab === 'sponsorship' || isMonthly ? 'sponsor' : 'donor';
       const detailMessage = headerTab === 'sponsorship'
-        ? `Apadrinhamento: ${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'criança' : 'crianças'} (R$ ${finalVal}/mês)`
+        ? (isSponsorshipPix
+          ? `Apadrinhamento PIX (${sponsorshipPixMonths} meses): ${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'criança' : 'crianças'} (R$ ${finalVal})`
+          : `Apadrinhamento: ${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'criança' : 'crianças'} (R$ ${finalVal}/mês)`)
         : isMonthly
           ? `Mantenedor Mensal: R$ ${finalVal}/mês`
           : `Doação Pontual: R$ ${finalVal}`;
@@ -175,10 +184,17 @@ export function HomeDonationCard({
       }
 
       const redirectFallback = headerTab === 'sponsorship'
-        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
+        ? `/mantenedor?mode=sponsorship&method=${sponsorshipPayMethod}&months=${isSponsorshipPix ? sponsorshipPixMonths : 1}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
         : isMonthly
           ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`
           : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}&whatsapp=${encodeURIComponent(finalDonorWhatsapp)}`;
+
+      // Se for Apadrinhamento via PIX (pacote de 3, 6 ou 12 meses), direciona para a finalização PIX em /mantenedor
+      if (isSponsorshipPix) {
+        if (onClose) onClose();
+        window.location.href = redirectFallback;
+        return;
+      }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
@@ -197,14 +213,16 @@ export function HomeDonationCard({
         body: JSON.stringify({
           amount: finalVal,
           isMonthly,
+          paymentMethod: isSponsorshipPix ? 'pix' : 'card',
+          planMonths: isSponsorshipPix ? sponsorshipPixMonths : 1,
           type: headerTab === 'sponsorship' ? 'sponsorship' : 'donation',
           quotasCount: sponsorshipQuotas,
           donorName: finalDonorName,
           donorEmail: finalDonorEmail,
           donorPhone: finalDonorWhatsapp,
           donorWhatsapp: finalDonorWhatsapp,
-          successUrl: isMonthly
-            ? `${window.location.origin}/mantenedor?status=success&mode=${headerTab}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
+          successUrl: headerTab === 'sponsorship' || isMonthly
+            ? `${window.location.origin}/mantenedor?status=success&mode=${headerTab}&months=${isSponsorshipPix ? sponsorshipPixMonths : 1}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
             : `${window.location.origin}/campanha?status=success&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`,
           cancelUrl: `${window.location.origin}${window.location.pathname}?status=cancel`
         })
@@ -223,9 +241,10 @@ export function HomeDonationCard({
     } catch (err) {
       console.error('Checkout error:', err);
       if (onClose) onClose();
-      const isMonthly = headerTab === 'sponsorship' ? true : !isSingleDonation;
+      const isSponsorshipPix = headerTab === 'sponsorship' && sponsorshipPayMethod === 'pix';
+      const isMonthly = headerTab === 'sponsorship' ? !isSponsorshipPix : !isSingleDonation;
       const redirectFallback = headerTab === 'sponsorship'
-        ? `/mantenedor?mode=sponsorship&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
+        ? `/mantenedor?mode=sponsorship&method=${sponsorshipPayMethod}&months=${isSponsorshipPix ? sponsorshipPixMonths : 1}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
         : isMonthly
           ? `/mantenedor?mode=general&amount=${finalVal}&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`
           : `/campanha?amount=${finalVal}&isMonthly=false&method=card&name=${encodeURIComponent(donorName)}&email=${encodeURIComponent(donorEmail)}&whatsapp=${encodeURIComponent(donorWhatsapp)}`;
@@ -363,9 +382,80 @@ export function HomeDonationCard({
                 })}
               </div>
 
+              {/* Seletor de Forma de Pagamento do Apadrinhamento: Cartão Mensal vs Pacote PIX (3, 6 ou 12 meses) */}
+              <div className="pt-1 space-y-2">
+                <div className="flex items-center justify-between bg-slate-50 p-1 rounded-xl border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setSponsorshipPayMethod('card')}
+                    className={cn(
+                      "flex-1 py-1.5 rounded-lg text-[11px] font-gotham-bold transition-all flex items-center justify-center gap-1 cursor-pointer",
+                      sponsorshipPayMethod === 'card'
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <CreditCard size={11} />
+                    <span>Cartão Mensal</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSponsorshipPayMethod('pix')}
+                    className={cn(
+                      "flex-1 py-1.5 rounded-lg text-[11px] font-gotham-bold transition-all flex items-center justify-center gap-1 cursor-pointer",
+                      sponsorshipPayMethod === 'pix'
+                        ? "bg-[#F49853] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <QrCode size={11} />
+                    <span>PIX (3, 6 ou 12m)</span>
+                  </button>
+                </div>
+
+                {sponsorshipPayMethod === 'pix' && (
+                  <div className="space-y-1.5 animate-fade-in">
+                    <div className="text-[10px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                      <span>Pacote de meses no PIX:</span>
+                      <span className="text-emerald-600">Acesso garantido no período</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([3, 6, 12] as const).map((m) => {
+                        const isPkgSelected = sponsorshipPixMonths === m;
+                        const pkgTotal = sponsorshipQuotas * quotaCost * m;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setSponsorshipPixMonths(m)}
+                            className={cn(
+                              "py-1.5 px-1 rounded-xl border-2 transition-all flex flex-col items-center justify-center cursor-pointer relative",
+                              isPkgSelected
+                                ? "border-[#F49853] bg-orange-50 text-[#F49853] ring-1 ring-[#F49853] shadow-xs"
+                                : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
+                            )}
+                          >
+                            <span className="text-[10px] font-gotham-bold uppercase leading-tight">
+                              {m} Meses
+                            </span>
+                            <span className="text-xs font-black text-slate-900 mt-0.5">
+                              R$ {pkgTotal}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-900 leading-snug flex items-center gap-2">
                 <Sparkles size={14} className="text-[#F49853] shrink-0" />
-                <span>Distribuição justa: o perfil do afilhado é enviado após a confirmação.</span>
+                <span>
+                  {sponsorshipPayMethod === 'pix'
+                    ? `Acesso e apadrinhamento garantidos por ${sponsorshipPixMonths} meses completos.`
+                    : 'Distribuição justa: o perfil do afilhado é enviado após a confirmação.'}
+                </span>
               </div>
             </>
           )}
@@ -641,7 +731,11 @@ export function HomeDonationCard({
         ) : headerTab === 'sponsorship' ? (
           <>
             <Heart size={15} fill="currentColor" />
-            <span>APADRINHAR ({sponsorshipQuotas} {sponsorshipQuotas === 1 ? 'CRIANÇA' : 'CRIANÇAS'} • R$ {sponsorshipTotal}/mês)</span>
+            <span>
+              {sponsorshipPayMethod === 'pix'
+                ? `APADRINHAR VIA PIX (${sponsorshipPixMonths} MESES • R$ ${sponsorshipTotal})`
+                : `APADRINHAR (${sponsorshipQuotas} ${sponsorshipQuotas === 1 ? 'CRIANÇA' : 'CRIANÇAS'} • R$ ${sponsorshipTotal}/mês)`}
+            </span>
           </>
         ) : isSingleDonation ? (
           <>

@@ -151,10 +151,12 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const patientData = payload.find((p: any) => p.dataKey === 'patientValue' || p.name === 'Paciente');
+      const xVal = Number(payload[0].payload.x);
+      const formattedX = Number.isFinite(xVal) ? Number(xVal.toFixed(1)) : payload[0].payload.x;
       
       return (
         <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-sm">
-          <p className="font-bold text-slate-800 mb-2">{activeChartData.xAxisLabel}: {payload[0].payload.x}</p>
+          <p className="font-bold text-slate-800 mb-2">{activeChartData.xAxisLabel}: {formattedX}</p>
           {patientData && patientData.value && (
             <div className="mb-2 pb-2 border-b border-slate-100">
               <p className="font-bold text-emerald-600">Paciente: {patientData.value} {activeChartData.yAxisLabel.split(' ')[1]}</p>

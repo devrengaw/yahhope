@@ -23,7 +23,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePatients } from '../../../contexts/PatientContext';
 import { useImpact, isChildSpecificImpactItem, isImpactItemForSponsoredChild } from '../../../contexts/ImpactContext';
-import { sponsorshipService, ChildSponsorshipDetail } from '../../../services/sponsorshipService';
+import { sponsorshipService, ChildSponsorshipDetail, PendingSponsorshipRenewal } from '../../../services/sponsorshipService';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 interface WeightPoint {
@@ -255,6 +255,8 @@ export function MobileDonorChildren() {
   const [zoomedPhoto, setZoomedPhoto] = useState<{ url: string; name: string } | null>(null);
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
+  const [renewalNotices, setRenewalNotices] = useState<PendingSponsorshipRenewal[]>([]);
+  const [declinedNoticeMsg, setDeclinedNoticeMsg] = useState<string | null>(null);
   const [childToCancel, setChildToCancel] = useState<{ id: string; name: string; sponsorshipId?: string } | null>(null);
   const [isCancelingChild, setIsCancelingChild] = useState(false);
   const [celebrationChildren, setCelebrationChildren] = useState<ChildSponsorshipDetail[]>([]);
@@ -279,12 +281,30 @@ export function MobileDonorChildren() {
   const refreshChildren = async () => {
     setIsLoadingChildren(true);
     try {
-      const children = await sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name);
+      const [children, notices] = await Promise.all([
+        sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name),
+        sponsorshipService.getPendingRenewalNoticesForUser(user?.id, user?.email)
+      ]);
       setMyChildren(children);
+      setRenewalNotices(notices);
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoadingChildren(false);
+    }
+  };
+
+  const handleDeclineRenewal = async (notice: PendingSponsorshipRenewal) => {
+    const res = await sponsorshipService.declineSponsorshipRenewal(
+      notice.sponsorshipId,
+      notice.childId,
+      user?.id,
+      user?.email
+    );
+    if (res.success) {
+      setRenewalNotices(prev => prev.filter(n => n.sponsorshipId !== notice.sponsorshipId));
+      setMyChildren(prev => prev.filter(c => c.id !== notice.childId));
+      setDeclinedNoticeMsg(res.message);
     }
   };
 
@@ -579,7 +599,10 @@ export function MobileDonorChildren() {
             guardian_name: fromPt?.guardian_name || '',
             housing_type: fromPt?.housing_type || '',
             sanitation: fromPt?.sanitation || '',
-            story: c.story || fromPt?.story || 'Acompanhada com amor na Casa Nutri.'
+            story: c.story || fromPt?.story || 'Acompanhada com amor na Casa Nutri.',
+            planMonths: c.planMonths,
+            expiresAt: c.expiresAt,
+            paymentMethod: c.paymentMethod
           };
         });
       }
@@ -652,6 +675,77 @@ export function MobileDonorChildren() {
           </div>
         </div>
       </div>
+
+      {/* Avisos de Renovação de Pacote PIX (Expirando ou Vencido) */}
+      {declinedNoticeMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs text-emerald-900">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+            <span>{declinedNoticeMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeclinedNoticeMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 font-bold shrink-0 cursor-pointer"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
+      {renewalNotices.length > 0 && (
+        <div className="space-y-3">
+          {renewalNotices.map(notice => (
+            <div
+              key={notice.sponsorshipId}
+              className="bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 border-2 border-[#F49853]/60 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-[#F49853] text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Calendar size={20} />
+                </div>
+                <div>
+                  <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2.5 py-0.5 rounded-full inline-block mb-1">
+                    {notice.isExpired
+                      ? `Pacote PIX de ${notice.planMonths} meses encerrado`
+                      : `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`}
+                  </span>
+                  <h4 className="font-heading font-black text-slate-900 text-base">
+                    Deseja continuar apadrinhando {notice.childName}?
+                  </h4>
+                  <p className="text-xs text-slate-600 font-gotham-light mt-1 leading-relaxed">
+                    {notice.isExpired
+                      ? `O seu pacote de ${notice.planMonths} meses foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando ${notice.childName} ou mantenha apenas seu acesso às atualizações gerais do projeto.`
+                      : `Seu pacote de ${notice.planMonths} meses vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou optar por manter apenas acesso às novidades do projeto.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/portal/apadrinhar?method=pix&months=${notice.planMonths}&renewChildId=${notice.childId}&childName=${encodeURIComponent(notice.childName)}`
+                    )
+                  }
+                  className="py-3 px-4 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Heart size={14} fill="currentColor" />
+                  <span>Continuar Apadrinhando</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeclineRenewal(notice)}
+                  className="py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Não continuar (Só projeto)
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Barra de Filtros e Busca */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -832,6 +926,14 @@ export function MobileDonorChildren() {
                       <p>
                         <strong>Registro Casa Nutri:</strong> {child.registration_number || 'YAH-2026'}
                       </p>
+                      {(child as any).expiresAt && (
+                        <p className="pt-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-gotham-bold">
+                            <Calendar size={10} />
+                            Pacote {(child as any).planMonths || 3} meses • Vigente até {new Date((child as any).expiresAt).toLocaleDateString('pt-BR')}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

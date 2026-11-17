@@ -4,7 +4,7 @@ import { useImpact, canSupporterViewImpactItem, isChildSpecificImpactItem } from
 import { useFundraising } from '../../../contexts/FundraisingContext';
 import { useBlog } from '../../../contexts/BlogContext';
 import { usePatients } from '../../../contexts/PatientContext';
-import { sponsorshipService, ChildSponsorshipDetail, SupporterCommitmentSummary } from '../../../services/sponsorshipService';
+import { sponsorshipService, ChildSponsorshipDetail, SupporterCommitmentSummary, PendingSponsorshipRenewal } from '../../../services/sponsorshipService';
 import { ManageMonthlyPlanModal } from '../../../components/portal/ManageMonthlyPlanModal';
 import { 
   Heart, 
@@ -47,6 +47,8 @@ export function MobileDonorHome() {
   const [myChildren, setMyChildren] = useState<ChildSponsorshipDetail[]>([]);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
   const [monthlyCommitments, setMonthlyCommitments] = useState<SupporterCommitmentSummary | null>(null);
+  const [renewalNotices, setRenewalNotices] = useState<PendingSponsorshipRenewal[]>([]);
+  const [declinedSuccessMessage, setDeclinedSuccessMessage] = useState<string | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [impactFilter, setImpactFilter] = useState<'all' | 'general' | 'children'>('all');
   const [zoomedImpactPhoto, setZoomedImpactPhoto] = useState<{ url: string; title: string } | null>(null);
@@ -68,6 +70,12 @@ export function MobileDonorHome() {
       .catch(err => console.warn('Erro ao carregar compromissos:', err));
   };
 
+  const loadRenewalNotices = () => {
+    sponsorshipService.getPendingRenewalNoticesForUser(user?.id, user?.email)
+      .then(notices => setRenewalNotices(notices))
+      .catch(err => console.warn('Erro ao verificar renovações:', err));
+  };
+
   useEffect(() => {
     sponsorshipService.getSponsoredChildrenForUser(user?.id, user?.email, user?.name)
       .then(children => {
@@ -80,7 +88,23 @@ export function MobileDonorHome() {
       });
 
     fetchCommitments();
+    loadRenewalNotices();
   }, [user?.id, user?.email, user?.name]);
+
+  const handleDeclineRenewal = async (notice: PendingSponsorshipRenewal) => {
+    const res = await sponsorshipService.declineSponsorshipRenewal(
+      notice.sponsorshipId,
+      notice.childId,
+      user?.id,
+      user?.email
+    );
+    if (res.success) {
+      setRenewalNotices(prev => prev.filter(n => n.sponsorshipId !== notice.sponsorshipId));
+      setMyChildren(prev => prev.filter(c => c.id !== notice.childId));
+      setDeclinedSuccessMessage(res.message);
+      fetchCommitments();
+    }
+  };
 
   // Sincronização idêntica com a Régua da Campanha pública (Home.tsx / Campaign.tsx)
   const availableCampaigns = useMemo(() => {
@@ -554,6 +578,77 @@ export function MobileDonorHome() {
         {/* COLUNA ESQUERDA (7 cols): Crianças da Casa Nutri & Atualizações de Campo */}
         <div className="lg:col-span-7 space-y-8">
           
+          {/* Avisos de Renovação de Pacote PIX (Expirando ou Vencido) */}
+          {declinedSuccessMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs text-emerald-900">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                <span>{declinedSuccessMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeclinedSuccessMessage(null)}
+                className="text-emerald-700 hover:text-emerald-900 font-bold shrink-0 cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
+
+          {renewalNotices.length > 0 && (
+            <div className="space-y-3">
+              {renewalNotices.map(notice => (
+                <div
+                  key={notice.sponsorshipId}
+                  className="bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 border-2 border-[#F49853]/60 rounded-[1.75rem] p-5 sm:p-6 shadow-sm space-y-4"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-[#F49853] text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Calendar size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2.5 py-0.5 rounded-full inline-block mb-1">
+                        {notice.isExpired
+                          ? `Pacote PIX de ${notice.planMonths} meses encerrado`
+                          : `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`}
+                      </span>
+                      <h4 className="font-heading font-black text-slate-900 text-base">
+                        Deseja continuar apadrinhando {notice.childName}?
+                      </h4>
+                      <p className="text-xs text-slate-600 font-gotham-light mt-1 leading-relaxed">
+                        {notice.isExpired
+                          ? `O período de ${notice.planMonths} meses do seu apadrinhamento de ${notice.childName} foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou continuar acessando o portal e todas as atualizações gerais do projeto sem acompanhar uma criança.`
+                          : `Seu pacote de ${notice.planMonths} meses para ${notice.childName} vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando a evolução dela ou opte por manter apenas acesso às atualizações gerais do projeto.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/portal/apadrinhar?method=pix&months=${notice.planMonths}&renewChildId=${notice.childId}&childName=${encodeURIComponent(notice.childName)}`
+                        )
+                      }
+                      className="flex-1 py-3 px-4 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Heart size={14} fill="currentColor" />
+                      <span>Continuar Apadrinhando</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeclineRenewal(notice)}
+                      className="py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Não continuar (Manter acesso ao projeto)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Seção Crianças Atendidas */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -621,7 +716,9 @@ export function MobileDonorHome() {
               )
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {displayedPatients.map((child) => (
+                {displayedPatients.map((child) => {
+                  const spDetail = myChildren.find(mc => mc.id === child.id);
+                  return (
                   <div
                     key={child.id}
                     onClick={() => navigate('/portal/sponsorship')}
@@ -652,12 +749,19 @@ export function MobileDonorHome() {
                       <p className="text-xs text-slate-500 font-gotham-light mt-0.5">
                         {calculateAge(child.dob)} • {child.community || 'Casa Nutri'}
                       </p>
-                      <span className="text-[11px] text-[#F49853] font-gotham-bold mt-2 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      {spDetail?.expiresAt && (
+                        <p className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1.5">
+                          <Calendar size={10} />
+                          Pacote {spDetail.planMonths}m • Até {new Date(spDetail.expiresAt).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                      <span className="text-[11px] text-[#F49853] font-gotham-bold mt-2 block inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                         Acompanhar evolução <ArrowRight size={12} />
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

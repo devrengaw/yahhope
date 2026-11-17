@@ -16,6 +16,7 @@ import { TermsOfService } from './pages/public/TermsOfService';
 import { AboutUs } from './pages/public/AboutUs';
 import { MissionVisionValues } from './pages/public/MissionVisionValues';
 import { CampaignHotsite } from './pages/public/CampaignHotsite';
+import { Accountability2026 } from './pages/public/Accountability2026';
 import { CampaignHotsiteAdmin } from './pages/admin/CampaignHotsiteAdmin';
 
 import { Settings } from './pages/admin/Settings';
@@ -310,6 +311,16 @@ export default function App() {
                                           {/* Se for o subdomínio campanha.yahhope.com, a rota raiz carrega o Hotsite isolado */}
                                           {typeof window !== 'undefined' && (window.location.hostname.startsWith('campanha.') || window.location.hostname === 'campanha.yahhope.com') && (
                                             <Route path="/" element={<CampaignHotsite />} />
+                                          )}
+
+                                          {/* Rotas Dedicadas da Prestação de Contas 2026 (prestacao2026.yahhope.com & QR Code do Cartão de Agradecimento) */}
+                                          <Route path="/prestacao2026" element={<Accountability2026 />} />
+                                          <Route path="/prestacao-de-contas" element={<Accountability2026 />} />
+                                          <Route path="/prestacao-de-contas-2026" element={<Accountability2026 />} />
+
+                                          {/* Se for o subdomínio prestacao2026.yahhope.com, a rota raiz carrega a Prestação de Contas 2026 */}
+                                          {typeof window !== 'undefined' && (window.location.hostname.startsWith('prestacao2026.') || window.location.hostname === 'prestacao2026.yahhope.com') && (
+                                            <Route path="/" element={<Accountability2026 />} />
                                           )}
 
                                           <Route element={<ErrorBoundary fallbackTitle="Falha ao carregar a página pública"><PublicLayout /></ErrorBoundary>}>

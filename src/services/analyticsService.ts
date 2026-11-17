@@ -134,7 +134,12 @@ export function isPublicWebsitePath(path: string): boolean {
   if (!path) return false;
   if (typeof window !== 'undefined') {
     const host = (window.location.hostname || '').toLowerCase();
-    if (host.startsWith('campanha.') || host === 'campanha.yahhope.com') {
+    if (
+      host.startsWith('campanha.') ||
+      host === 'campanha.yahhope.com' ||
+      host.startsWith('prestacao2026.') ||
+      host === 'prestacao2026.yahhope.com'
+    ) {
       return false;
     }
   }

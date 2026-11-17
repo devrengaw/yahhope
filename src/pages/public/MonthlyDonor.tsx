@@ -133,6 +133,9 @@ export function MonthlyDonor() {
   const urlAmount = searchParams.get('amount');
   const urlMode = searchParams.get('mode');
   const urlQuotas = searchParams.get('quotas');
+  const urlMethod = searchParams.get('method');
+  const urlMonths = searchParams.get('months');
+  const urlRenewChildId = searchParams.get('renewChildId') || undefined;
   const isSuccessUrl = searchParams.get('status') === 'success';
   const urlName = searchParams.get('name') || '';
   const urlEmail = searchParams.get('email') || '';
@@ -152,7 +155,12 @@ export function MonthlyDonor() {
   const [quotasCount, setQuotasCount] = useState<number>(
     urlQuotas && !isNaN(parseInt(urlQuotas, 10)) ? Math.max(1, Math.min(4, parseInt(urlQuotas, 10))) : 1
   );
+  const [pixPackageMonths, setPixPackageMonths] = useState<3 | 6 | 12>(() => {
+    const parsedM = urlMonths ? parseInt(urlMonths, 10) : 6;
+    return parsedM === 3 || parsedM === 6 || parsedM === 12 ? parsedM : 6;
+  });
   const [assignedChildren, setAssignedChildren] = useState<ChildSponsorshipDetail[]>([]);
+  const [confirmedExpiresAt, setConfirmedExpiresAt] = useState<string | null>(null);
 
   // Estado do Seletor de Mantenedor Geral
   const [selectedPlanId, setSelectedPlanId] = useState<string>('guardiao');
@@ -178,6 +186,18 @@ export function MonthlyDonor() {
 
   // Sincroniza plano ou valor vindo da URL
   useEffect(() => {
+    if (urlMethod === 'pix') {
+      setPaymentMethod('pix');
+    } else if (urlMethod === 'card') {
+      setPaymentMethod('card');
+    }
+    if (urlMonths) {
+      const m = parseInt(urlMonths, 10);
+      if (m === 3 || m === 6 || m === 12) {
+        setPixPackageMonths(m);
+      }
+    }
+
     if (urlMode === 'sponsorship') {
       setDonationType('sponsorship');
       if (urlQuotas) {
@@ -210,13 +230,13 @@ export function MonthlyDonor() {
         }, 150);
       }
     }
-  }, [urlAmount, urlMode, urlQuotas]);
+  }, [urlAmount, urlMode, urlQuotas, urlMethod, urlMonths]);
 
   // Formulário do Doador / Padrinho
   const [donorName, setDonorName] = useState(urlName || user?.name || '');
   const [donorEmail, setDonorEmail] = useState(urlEmail || user?.email || '');
   const [donorPhone, setDonorPhone] = useState(urlWhatsapp || user?.phone || '');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix'>(urlMethod === 'pix' ? 'pix' : 'card');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
@@ -232,7 +252,10 @@ export function MonthlyDonor() {
 
   // Cálculos de Valor
   const quotaCost = sponsorshipMetrics?.quotaCost || 90;
-  const sponsorshipTotal = quotasCount * quotaCost;
+  const sponsorshipMonthlyTotal = quotasCount * quotaCost;
+  const sponsorshipTotal = paymentMethod === 'pix'
+    ? sponsorshipMonthlyTotal * pixPackageMonths
+    : sponsorshipMonthlyTotal;
   const generalTotal = isCustom 
     ? (parseFloat(customAmount.replace(/\./g, '').replace(',', '.')) || 0)
     : (PLANS.find(p => p.id === selectedPlanId)?.amount || 100);
@@ -278,6 +301,8 @@ export function MonthlyDonor() {
     setIsLoading(true);
 
     try {
+      const effectivePlanMonths = donationType === 'sponsorship' && paymentMethod === 'pix' ? pixPackageMonths : 1;
+
       // Salva/atualiza o lead na tabela de retornos da campanha
       submitCampaignLead({
         name: finalName || 'Mantenedor YAH Hope',
@@ -290,19 +315,21 @@ export function MonthlyDonor() {
         interest_type: 'sponsor',
         status: 'joined',
         message: donationType === 'sponsorship'
-          ? `Apadrinhamento: ${quotasCount} ${quotasCount === 1 ? 'criança' : 'crianças'} (R$ ${currentAmount}/mês)`
+          ? (paymentMethod === 'pix'
+            ? `Apadrinhamento PIX (${pixPackageMonths} meses): ${quotasCount} ${quotasCount === 1 ? 'criança' : 'crianças'} (Total R$ ${currentAmount})`
+            : `Apadrinhamento: ${quotasCount} ${quotasCount === 1 ? 'criança' : 'crianças'} (R$ ${currentAmount}/mês)`)
           : `Mantenedor Mensal (R$ ${currentAmount}/mês)`
       }).catch(() => {});
 
-      // REGRA: Crianças em múltiplos inteiros de R$ 90 (90 = 1 criança, 180 = 2 crianças, 270 = 3 crianças).
-      // Se doar 95, 90 apadrinha a criança e 5 apoia o projeto geral.
+      // REGRA: Crianças em múltiplos inteiros de R$ 90 mensais.
+      // Em pacote PIX de 3, 6 ou 12 meses, usa quotasCount diretamente para não multiplicar as crianças pelos meses!
       const calculatedQuotas = donationType === 'sponsorship'
-        ? (currentAmount >= quotaCost ? Math.floor(currentAmount / quotaCost) : quotasCount)
+        ? quotasCount
         : Math.floor(currentAmount / 90);
 
       const isStripeCheckout = paymentMethod !== 'pix' && Boolean(import.meta.env.VITE_SUPABASE_URL);
 
-      // 1. Caso seja Apadrinhamento de Criança via PIX ou ambiente sem Stripe (no Stripe, o stripe-webhook efetiva após o pagamento)
+      // 1. Caso seja Apadrinhamento de Criança via PIX (Pacotes 3, 6 ou 12 meses) ou ambiente sem Stripe
       if (donationType === 'sponsorship' && !isStripeCheckout) {
         const result = await sponsorshipService.assignChildrenToSponsor({
           donorName: finalName,
@@ -312,11 +339,14 @@ export function MonthlyDonor() {
           amountPerQuota: quotaCost,
           amount: currentAmount,
           paymentMethod,
+          planMonths: effectivePlanMonths,
+          renewChildId: urlRenewChildId,
           sponsorUserId: user?.id
         });
 
         if (result.success) {
           setAssignedChildren(result.assignedChildren);
+          setConfirmedExpiresAt(result.expiresAt || null);
           if (createDonation && currentCampaign) {
             createDonation({
               campaign_id: currentCampaign.id,
@@ -550,20 +580,35 @@ export function MonthlyDonor() {
               </h3>
               
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
-                O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo alimentação e atendimento clínico de qualidade.
+                {donationType === 'sponsorship' && paymentMethod === 'pix' ? (
+                  <>
+                    O seu pacote de apadrinhamento de <strong>{pixPackageMonths} meses (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</strong> já está registrado! Você tem acesso garantido ao acompanhamento da criança durante todos os {pixPackageMonths} meses.
+                  </>
+                ) : (
+                  <>
+                    O seu compromisso mensal de <strong>R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> já está transformando vidas na Casa Nutri e garantindo alimentação e atendimento clínico de qualidade.
+                  </>
+                )}
               </p>
 
               {/* Revelação das Crianças Atribuídas pelo Algoritmo */}
               {assignedChildren.length > 0 && (
                 <div className="my-6 p-6 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-left space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-gotham-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles size={14} className="text-[#F49853]" />
                       Sua(s) Criança(s) Apadrinhada(s)
                     </span>
-                    <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black">
-                      {assignedChildren.length} {assignedChildren.length === 1 ? 'Cota Atribuída' : 'Cotas Atribuídas'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {paymentMethod === 'pix' && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-black">
+                          Pacote PIX {pixPackageMonths} Meses {confirmedExpiresAt ? `• Até ${new Date(confirmedExpiresAt).toLocaleDateString('pt-BR')}` : ''}
+                        </span>
+                      )}
+                      <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-black">
+                        {assignedChildren.length} {assignedChildren.length === 1 ? 'Cota Atribuída' : 'Cotas Atribuídas'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
@@ -592,24 +637,52 @@ export function MonthlyDonor() {
               {paymentMethod === 'pix' && !isSuccessUrl && (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left mb-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-gotham-bold text-sm text-slate-800">Próximo Passo: Concluir seu PIX</span>
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-gotham-bold">Chave E-mail</span>
+                    <span className="font-gotham-bold text-sm text-slate-800">
+                      Próximo Passo: Concluir seu PIX {donationType === 'sponsorship' ? `(${pixPackageMonths} Meses)` : ''}
+                    </span>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded font-gotham-bold">
+                      Total: R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
-                    <span className="text-sm font-mono text-slate-700 font-bold">{pixKey}</span>
-                    <button
-                      onClick={handleCopyPix}
-                      className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 cursor-pointer"
-                    >
-                      {pixCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      <span>{pixCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
-                    </button>
+                  <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pixCopyPaste)}`}
+                      alt="QR Code PIX"
+                      className="w-32 h-32 rounded-xl border border-slate-100 p-1.5 shrink-0"
+                    />
+                    <div className="flex-1 w-full space-y-2.5">
+                      <p className="text-xs text-slate-500">
+                        Escaneie o QR Code no aplicativo do seu banco ou copie a chave PIX abaixo para transferir <strong>R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>:
+                      </p>
+                      <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <span className="text-xs sm:text-sm font-mono text-slate-700 font-bold truncate mr-2">{pixKey}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyPix}
+                          className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 shrink-0 cursor-pointer"
+                        >
+                          {pixCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                          <span>{pixCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="text-xs text-slate-500 space-y-1">
-                    <p className="font-gotham-bold text-slate-700">Dica para doação automática:</p>
-                    <p>No aplicativo do seu banco, ative o <strong>Agendamento Mensal</strong> ou repita este PIX todo mês no dia que preferir.</p>
+                    {donationType === 'sponsorship' ? (
+                      <>
+                        <p className="font-gotham-bold text-slate-700">Como funciona a vigência do seu pacote ({pixPackageMonths} meses):</p>
+                        <p>
+                          Você <strong>não perde acesso na virada de cada mês</strong>. Seu apadrinhamento fica ativo durante todos os {pixPackageMonths} meses. Ao final do período, você receberá um aviso caso queira renovar; se optar por não continuar com a criança, você continuará tendo acesso normal ao sistema e às atualizações gerais do projeto!
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-gotham-bold text-slate-700">Dica para doação automática:</p>
+                        <p>No aplicativo do seu banco, ative o <strong>Agendamento Mensal</strong> ou repita este PIX todo mês no dia que preferir.</p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -971,12 +1044,20 @@ export function MonthlyDonor() {
                     <div>
                       <span className="text-xs font-gotham-bold text-amber-900 block">
                         {donationType === 'sponsorship' 
-                          ? `${Math.floor(currentAmount / 90) >= 1 ? Math.floor(currentAmount / 90) : quotasCount} ${(Math.floor(currentAmount / 90) || quotasCount) === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'}` 
+                          ? (paymentMethod === 'pix'
+                            ? `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Pacote ${pixPackageMonths} Meses`
+                            : `${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Mensal`)
                           : Math.floor(currentAmount / 90) >= 1 
                             ? `Mantenedor • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Criança Acolhida' : 'Crianças Acolhidas'}` 
                             : 'Total Mensal (Fundo Geral):'}
                       </span>
-                      {currentAmount >= 90 && currentAmount % 90 !== 0 && (
+                      {donationType === 'sponsorship' && paymentMethod === 'pix' && (
+                        <span className="text-[10px] text-emerald-700 font-gotham-bold flex items-center gap-1 mt-0.5">
+                          <Calendar size={10} className="text-emerald-600" />
+                          Equivale a R$ {sponsorshipMonthlyTotal}/mês • Acesso garantido por {pixPackageMonths} meses!
+                        </span>
+                      )}
+                      {donationType !== 'sponsorship' && currentAmount >= 90 && currentAmount % 90 !== 0 && (
                         <span className="text-[10px] text-amber-700 font-gotham-bold flex items-center gap-1 mt-0.5">
                           <Sparkles size={10} className="text-[#F49853]" />
                           R$ {Math.floor(currentAmount / 90) * 90} para {Math.floor(currentAmount / 90) === 1 ? 'a criança' : `${Math.floor(currentAmount / 90)} crianças`} e R$ {currentAmount % 90} para o projeto geral!
@@ -984,7 +1065,10 @@ export function MonthlyDonor() {
                       )}
                     </div>
                     <span className="text-xl font-heading font-black text-amber-900">
-                      R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xs font-normal text-amber-800">/ mês</span>
+                      R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}{' '}
+                      <span className="text-xs font-normal text-amber-800">
+                        {donationType === 'sponsorship' && paymentMethod === 'pix' ? `/ ${pixPackageMonths}m` : '/ mês'}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -1059,8 +1143,8 @@ export function MonthlyDonor() {
                     </>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-gotham-bold text-slate-700 mb-2">
+                  <div className="space-y-3">
+                    <label className="block text-xs font-gotham-bold text-slate-700">
                       Forma de Pagamento
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -1075,7 +1159,7 @@ export function MonthlyDonor() {
                         )}
                       >
                         <CreditCard size={16} />
-                        <span>Cartão de Crédito</span>
+                        <span>Cartão Mensal</span>
                       </button>
 
                       <button
@@ -1089,9 +1173,66 @@ export function MonthlyDonor() {
                         )}
                       >
                         <QrCode size={16} />
-                        <span>PIX Mensal</span>
+                        <span>{donationType === 'sponsorship' ? 'PIX (3, 6 ou 12m)' : 'PIX Mensal'}</span>
                       </button>
                     </div>
+
+                    {/* Seletor de Pacote PIX 3, 6 ou 12 meses quando em modo Apadrinhamento */}
+                    {donationType === 'sponsorship' && paymentMethod === 'pix' && (
+                      <div className="p-3.5 bg-orange-50/60 border border-orange-200/80 rounded-2xl space-y-2.5 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-700">
+                            Escolha o Pacote de Meses (PIX):
+                          </span>
+                          <span className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            Acesso contínuo garantido
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            { months: 3 as const, label: '3 Meses', sub: 'Trimestral' },
+                            { months: 6 as const, label: '6 Meses', sub: 'Semestral', badge: 'Ideal' },
+                            { months: 12 as const, label: '12 Meses', sub: '1 Ano Completo' },
+                          ]).map((pkg) => {
+                            const isSelected = pixPackageMonths === pkg.months;
+                            const pkgVal = sponsorshipMonthlyTotal * pkg.months;
+                            return (
+                              <button
+                                key={pkg.months}
+                                type="button"
+                                onClick={() => setPixPackageMonths(pkg.months)}
+                                className={cn(
+                                  "p-2.5 rounded-xl border-2 transition-all flex flex-col items-center justify-center relative cursor-pointer",
+                                  isSelected
+                                    ? "border-[#F49853] bg-white text-[#F49853] ring-1 ring-[#F49853] shadow-xs"
+                                    : "border-slate-200 bg-white/80 hover:border-slate-300 text-slate-700"
+                                )}
+                              >
+                                {pkg.badge && (
+                                  <span className="absolute -top-2 right-2 bg-[#F49853] text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full">
+                                    {pkg.badge}
+                                  </span>
+                                )}
+                                <span className="text-[11px] font-gotham-bold uppercase">
+                                  {pkg.label}
+                                </span>
+                                <span className="text-sm font-black text-slate-900 mt-0.5">
+                                  R$ {pkgVal}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-medium">
+                                  {pkg.sub}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 leading-snug bg-white/80 p-2.5 rounded-xl border border-orange-100">
+                          💡 Você paga <strong>{pixPackageMonths} meses</strong> de uma vez e mantém seu apadrinhamento e acesso ao acompanhamento da criança durante todo o período (sem perder acesso no fim do mês). Ao terminar o ciclo, você escolhe se deseja renovar ou manter apenas o acesso às atualizações gerais do projeto.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1109,7 +1250,9 @@ export function MonthlyDonor() {
                         <Heart size={16} className="fill-white" />
                         <span>
                           {donationType === 'sponsorship' 
-                            ? `Confirmar Apadrinhamento (R$ ${currentAmount.toFixed(2)}/mês)`
+                            ? (paymentMethod === 'pix'
+                              ? `Confirmar Pacote PIX de ${pixPackageMonths} Meses (R$ ${currentAmount.toFixed(2)})`
+                              : `Confirmar Apadrinhamento (R$ ${currentAmount.toFixed(2)}/mês)`)
                             : `Confirmar Doação Mensal (R$ ${currentAmount.toFixed(2)}/mês)`}
                         </span>
                       </>

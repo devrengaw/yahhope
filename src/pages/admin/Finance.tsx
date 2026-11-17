@@ -34,7 +34,8 @@ import {
   Settings2,
   ChevronDown,
   ChevronUp,
-  AlertCircle
+  AlertCircle,
+  QrCode
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TransactionModal } from '../../components/admin/finance/TransactionModal';
@@ -44,6 +45,7 @@ import { SponsorshipQuotasManager } from '../../components/admin/finance/Sponsor
 import { MonthlyExpensesManager } from '../../components/admin/finance/MonthlyExpensesManager';
 import { ExpenseModal, ExpensePayload } from '../../components/admin/finance/ExpenseModal';
 import { ProjectRepasseModal, RepassePayload } from '../../components/admin/finance/ProjectRepasseModal';
+import { Accountability2026Manager } from '../../components/admin/finance/Accountability2026Manager';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useFundraising, saveStoredRulerLink } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
@@ -138,7 +140,7 @@ export function formatTransactionDate(dateStr?: string): string {
   return dateStr;
 }
 
-type FinanceMainTab = 'overview' | 'incomes_ruler' | 'expenses' | 'supporters_quotas' | 'categories';
+type FinanceMainTab = 'overview' | 'incomes_ruler' | 'expenses' | 'supporters_quotas' | 'accountability' | 'categories';
 
 export function Finance() {
   const { confirm } = useConfirm();
@@ -168,6 +170,7 @@ export function Finance() {
     if (raw === 'incomes_ruler' || raw === 'transactions' || raw === 'incomes') return 'incomes_ruler';
     if (raw === 'expenses') return 'expenses';
     if (raw === 'supporters_quotas' || raw === 'supporters' || raw === 'sponsorship') return 'supporters_quotas';
+    if (raw === 'accountability' || raw === 'prestacao' || raw === 'prestacao2026') return 'accountability';
     if (raw === 'categories') return 'categories';
     return 'overview';
   };
@@ -1155,6 +1158,15 @@ export function Finance() {
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
               Finanças & Captação Integradas
             </span>
+            <button
+              type="button"
+              onClick={() => handleChangeTab('accountability')}
+              className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+              title="Abrir página e QR Code da Prestação de Contas 2026"
+            >
+              <QrCode size={11} />
+              prestacao2026.yahhope.com
+            </button>
             <span className="text-xs font-bold text-slate-400">
               • Stripe, InfinitePay, Padrinhos, Projetos e Régua Conectados
             </span>
@@ -1519,6 +1531,20 @@ export function Finance() {
             >
               <Heart size={16} className={activeTab === 'supporters_quotas' ? "text-rose-500 fill-rose-500" : "text-slate-400"} />
               <span>4. Padrinhos, Mantenedores & Cotas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleChangeTab('accountability')}
+              className={cn(
+                "px-4 sm:px-5 py-3.5 font-black text-xs sm:text-sm transition-all relative flex items-center gap-2 rounded-t-2xl cursor-pointer",
+                activeTab === 'accountability'
+                  ? "bg-white text-slate-900 shadow-xs border-t border-x border-slate-200/80 -mb-px"
+                  : "text-slate-500 hover:text-slate-900"
+              )}
+            >
+              <QrCode size={16} className={activeTab === 'accountability' ? "text-emerald-600" : "text-slate-400"} />
+              <span>5. Prestação de Contas 2026 (QR Code)</span>
             </button>
           </div>
         </div>
@@ -2722,7 +2748,26 @@ export function Finance() {
         )}
 
         {/* ===================================================================
-            ABA 5: CATEGORIAS FINANCEIRAS
+            ABA 5: PRESTAÇÃO DE CONTAS 2026 & QR CODE DO CARTÃO DE AGRADECIMENTO
+        =================================================================== */}
+        {activeTab === 'accountability' && (
+          <Accountability2026Manager
+            selectedPeriodLabel={selectedPeriodLabel}
+            incomeTotal={flowStats.periodIncomeTotal}
+            padrinhosIncome={flowStats.padrinhosIncome}
+            mantenedoresIncome={flowStats.mantenedoresIncome}
+            doacoesIncome={flowStats.doacoesIncome}
+            expenseTotal={flowStats.periodCompletedExpenses}
+            repassedTotal={flowStats.periodRepassedTotal}
+            centralCash={flowStats.centralAvailableCash}
+            projectsCash={flowStats.projectsInternalBalance}
+            consolidatedCash={flowStats.consolidatedCashBalance}
+            projectCards={projectCardsData.cards}
+          />
+        )}
+
+        {/* ===================================================================
+            ABA 6: CATEGORIAS FINANCEIRAS
         =================================================================== */}
         {activeTab === 'categories' && (
           <div className="p-6 sm:p-8 space-y-6">
