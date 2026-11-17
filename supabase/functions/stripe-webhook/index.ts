@@ -242,8 +242,55 @@ async function syncMaintainerProfile(data: {
 }
 
 /**
+ * Obtém o Valor Líquido Real (net) e a Taxa (fee) diretamente do balance_transaction da Stripe.
+ * Caso o objeto já venha expandido, lê direto; caso contrário, consulta na API ou aplica a taxa padrão da Stripe Brasil.
+ */
+async function resolveStripeNetAndFee(params: {
+  grossAmount: number;
+  paymentMethod?: 'pix' | 'credit_card' | string;
+  balanceTx?: any;
+  chargeId?: string | null;
+  paymentIntentId?: string | null;
+}): Promise<{ grossAmount: number; feeAmount: number; netAmount: number; noteTag: string }> {
+  const gross = Number(params.grossAmount.toFixed(2));
+  let btObj: any = typeof params.balanceTx === 'object' && params.balanceTx !== null ? params.balanceTx : null;
+
+  try {
+    if (!btObj && typeof params.balanceTx === 'string' && params.balanceTx.startsWith('txn_')) {
+      btObj = await stripe.balanceTransactions.retrieve(params.balanceTx);
+    } else if (!btObj && params.chargeId && typeof params.chargeId === 'string' && params.chargeId.startsWith('ch_')) {
+      const ch = await stripe.charges.retrieve(params.chargeId, { expand: ['balance_transaction'] });
+      btObj = ch?.balance_transaction;
+    } else if (!btObj && params.paymentIntentId && typeof params.paymentIntentId === 'string' && params.paymentIntentId.startsWith('pi_')) {
+      const pi = await stripe.paymentIntents.retrieve(params.paymentIntentId, { expand: ['latest_charge.balance_transaction'] });
+      const latestCh: any = pi?.latest_charge;
+      btObj = latestCh?.balance_transaction;
+    }
+  } catch (err) {
+    console.warn('Aviso ao consultar balance_transaction na Stripe:', err);
+  }
+
+  if (btObj && typeof btObj === 'object' && typeof btObj.net === 'number' && typeof btObj.fee === 'number') {
+    const netAmount = Number((btObj.net / 100).toFixed(2));
+    const feeAmount = Number((btObj.fee / 100).toFixed(2));
+    const noteTag = `[STRIPE_NET:gross=${gross.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
+    return { grossAmount: gross, feeAmount, netAmount, noteTag };
+  }
+
+  // Fallback caso o balance_transaction ainda esteja pendente de liquidação no segundo exato do webhook:
+  // Taxas padrão Stripe Brasil: PIX = 1.19%, Cartão = 3.99% + R$ 0.39
+  const isPix = params.paymentMethod === 'pix';
+  const feeAmount = isPix
+    ? Number((gross * 0.0119).toFixed(2))
+    : Number((gross * 0.0399 + (gross > 0 ? 0.39 : 0)).toFixed(2));
+  const netAmount = Number(Math.max(0, gross - feeAmount).toFixed(2));
+  const noteTag = `[STRIPE_NET:gross=${gross.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
+  return { grossAmount: gross, feeAmount, netAmount, noteTag };
+}
+
+/**
  * Busca direta no Stripe: consulta assinaturas, clientes e cobranças
- * e sincroniza todos os mantenedores reais no banco.
+ * e sincroniza todos os mantenedores reais e valores LÍQUIDOS no banco.
  */
 async function handleStripeSync(filterEmail?: string) {
   const results = {
@@ -374,10 +421,11 @@ async function handleStripeSync(filterEmail?: string) {
       .limit(1)
       .maybeSingle();
 
-    // 4. Busca faturas pagas (invoices) das assinaturas
+    // 4. Busca faturas pagas (invoices) das assinaturas com balance_transaction expandido
     const invoices = await stripe.invoices.list({
       status: 'paid',
-      limit: 100
+      limit: 100,
+      expand: ['data.charge.balance_transaction']
     });
 
     for (const inv of invoices.data) {
@@ -393,6 +441,15 @@ async function handleStripeSync(filterEmail?: string) {
       const donorName = inv.customer_name || email.split('@')[0];
       const isPadrinhoInv = !CONFIRMED_STRIPE_MANTENEDORES.has(email) && (CONFIRMED_STRIPE_PADRINHOS.has(email) || amount >= 90);
 
+      const invChargeObj: any = typeof inv.charge === 'object' ? inv.charge : null;
+      const { netAmount: invNet, grossAmount: invGross, noteTag: invNoteTag } = await resolveStripeNetAndFee({
+        grossAmount: amount,
+        paymentMethod: 'credit_card',
+        balanceTx: invChargeObj?.balance_transaction,
+        chargeId: typeof inv.charge === 'string' ? inv.charge : invChargeObj?.id,
+        paymentIntentId: typeof inv.payment_intent === 'string' ? inv.payment_intent : null
+      });
+
       const { data: existingDonation } = await supabase
         .from('donations')
         .select('id')
@@ -405,7 +462,7 @@ async function handleStripeSync(filterEmail?: string) {
           donor_name: donorName,
           donor_email: email,
           donor_phone: inv.customer_phone || null,
-          amount,
+          amount: invGross, // No histórico do apoiador preserva o valor doado por ele
           status: 'paid',
           payment_method: 'credit_card',
           created_at: invDateIso,
@@ -415,38 +472,46 @@ async function handleStripeSync(filterEmail?: string) {
           is_sponsorship: isPadrinhoInv
         });
         results.synced_donations++;
-        results.total_amount += amount;
+        results.total_amount += invNet;
       }
 
-      // Garante que a entrada também exista em finance_transactions (ex: faturas de Novembro)
+      // Garante que a entrada em finance_transactions reflita o VALOR LÍQUIDO repassado pela Stripe
       const invDayPrefix = invDateIso.slice(0, 10);
-      const { data: existingFinTx } = await supabase
+      const { data: sameDayInvTxs } = await supabase
         .from('finance_transactions')
-        .select('id')
+        .select('id, description, amount, notes')
         .eq('type', 'income')
-        .eq('amount', amount)
         .gte('date', `${invDayPrefix}T00:00:00`)
         .lte('date', `${invDayPrefix}T23:59:59`)
-        .ilike('description', `%${donorName}%`)
-        .limit(1)
-        .maybeSingle();
+        .ilike('description', `%${donorName}%`);
+
+      const existingFinTx = (sameDayInvTxs || [])[0];
 
       if (!existingFinTx) {
         await supabase.from('finance_transactions').insert({
           description: `${isPadrinhoInv ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${donorName}`,
-          amount,
+          amount: invNet,
+          original_amount: invGross,
           type: 'income',
           category_id: isPadrinhoInv ? 'cat_sponsorship' : 'cat_donations',
           status: 'completed',
           account: 'Stripe',
-          date: invDateIso
+          date: invDateIso,
+          notes: invNoteTag
         });
+      } else if (Math.abs(Number(existingFinTx.amount) - invNet) > 0.01 || !String(existingFinTx.notes || '').includes('[STRIPE_NET:')) {
+        await supabase.from('finance_transactions').update({
+          amount: invNet,
+          original_amount: invGross,
+          notes: [existingFinTx.notes, invNoteTag].filter(Boolean).join(' ')
+        }).eq('id', existingFinTx.id);
       }
     }
 
-    // 5. Busca cobranças avulsas aprovadas na Stripe (exclui faturas de assinatura já processadas acima)
+    // 5. Busca cobranças avulsas aprovadas na Stripe (com balance_transaction expandido)
     const charges = await stripe.charges.list({
-      limit: 100
+      limit: 100,
+      expand: ['data.balance_transaction']
     });
 
     for (const charge of charges.data) {
@@ -458,15 +523,40 @@ async function handleStripeSync(filterEmail?: string) {
 
       const amount = charge.amount / 100;
       const paymentDate = new Date(charge.created * 1000).toISOString();
+      const dayPrefix = paymentDate.slice(0, 10);
       const paymentMethod = charge.payment_method_details?.type === 'pix' ? 'pix' : 'credit_card';
-      const paymentId = charge.id;
-      const donorName = charge.billing_details?.name || email.split('@')[0];
+      const chargeId = charge.id;
+      const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+      const paymentId = paymentIntentId || chargeId;
+      const emailPrefix = email.split('@')[0];
 
-      const { data: existingDonation } = await supabase
+      const { netAmount: chNet, grossAmount: chGross, noteTag: chNoteTag } = await resolveStripeNetAndFee({
+        grossAmount: amount,
+        paymentMethod,
+        balanceTx: charge.balance_transaction,
+        chargeId,
+        paymentIntentId
+      });
+
+      // Verifica se já existe a doação por payment_intent (pi_), charge.id (ch_) ou pelo mesmo e-mail + valor no mesmo dia
+      const { data: sameDayDonations } = await supabase
         .from('donations')
-        .select('id')
-        .eq('stripe_payment_id', paymentId)
-        .maybeSingle();
+        .select('id, donor_name, stripe_payment_id, paid_at, created_at')
+        .ilike('donor_email', email);
+
+      const existingDonation = (sameDayDonations || []).find((d: any) => {
+        if (d.stripe_payment_id === chargeId || (paymentIntentId && d.stripe_payment_id === paymentIntentId)) {
+          return true;
+        }
+        const dDay = String(d.paid_at || d.created_at || '').slice(0, 10);
+        return dDay === dayPrefix;
+      });
+
+      const donorName =
+        (existingDonation?.donor_name && /\s/.test(existingDonation.donor_name) ? existingDonation.donor_name : null) ||
+        charge.billing_details?.name ||
+        existingDonation?.donor_name ||
+        emailPrefix;
 
       if (!existingDonation) {
         await supabase.from('donations').insert({
@@ -474,7 +564,7 @@ async function handleStripeSync(filterEmail?: string) {
           donor_name: donorName,
           donor_email: email,
           donor_phone: charge.billing_details?.phone || null,
-          amount,
+          amount: chGross,
           status: 'paid',
           payment_method: paymentMethod,
           created_at: paymentDate,
@@ -483,31 +573,44 @@ async function handleStripeSync(filterEmail?: string) {
           is_sponsorship: false
         });
         results.synced_donations++;
-        results.total_amount += amount;
+        results.total_amount += chNet;
       }
 
-      const dayPrefix = paymentDate.slice(0, 10);
-      const { data: existingFinTx } = await supabase
+      const firstWord = donorName.split(/\s+/)[0] || emailPrefix;
+      const { data: sameDayFinTxs } = await supabase
         .from('finance_transactions')
-        .select('id')
+        .select('id, description, amount, notes')
         .eq('type', 'income')
-        .eq('amount', amount)
         .gte('date', `${dayPrefix}T00:00:00`)
-        .lte('date', `${dayPrefix}T23:59:59`)
-        .ilike('description', `%${donorName}%`)
-        .limit(1)
-        .maybeSingle();
+        .lte('date', `${dayPrefix}T23:59:59`);
+
+      const existingFinTx = (sameDayFinTxs || []).find((ft: any) => {
+        const descLower = String(ft.description || '').toLowerCase();
+        return (
+          descLower.includes(donorName.toLowerCase()) ||
+          descLower.includes(emailPrefix.toLowerCase()) ||
+          (firstWord.length >= 3 && descLower.includes(firstWord.toLowerCase()))
+        );
+      });
 
       if (!existingFinTx) {
         await supabase.from('finance_transactions').insert({
           description: `Doação via Stripe (${paymentMethod === 'pix' ? 'PIX' : 'Cartão'}) - ${donorName}`,
-          amount,
+          amount: chNet,
+          original_amount: chGross,
           type: 'income',
           category_id: 'cat_donation',
           status: 'completed',
           account: 'Stripe',
-          date: paymentDate
+          date: paymentDate,
+          notes: chNoteTag
         });
+      } else if (Math.abs(Number(existingFinTx.amount) - chNet) > 0.01 || !String(existingFinTx.notes || '').includes('[STRIPE_NET:')) {
+        await supabase.from('finance_transactions').update({
+          amount: chNet,
+          original_amount: chGross,
+          notes: [existingFinTx.notes, chNoteTag].filter(Boolean).join(' ')
+        }).eq('id', existingFinTx.id);
       }
     }
 
@@ -680,7 +783,13 @@ serve(async (req) => {
         })
 
         if (!isSponsorship && !isMonthly && campaignId) {
-          const newTotal = Number(campaigns[0].current_amount || 0) + amount
+          const { netAmount: sessNet, grossAmount: sessGross, noteTag: sessNoteTag } = await resolveStripeNetAndFee({
+            grossAmount: amount,
+            paymentMethod,
+            paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null
+          })
+
+          const newTotal = Number(campaigns[0].current_amount || 0) + sessNet
           await supabase.from('campaigns').update({
             current_amount: newTotal,
             last_reset_at: null
@@ -688,12 +797,14 @@ serve(async (req) => {
 
           await supabase.from('finance_transactions').insert({
             description: `Doação via Stripe (${isPix ? 'PIX' : 'Cartão'}) - ${donorName}`,
-            amount: amount,
+            amount: sessNet,
+            original_amount: sessGross,
             type: 'income',
             category_id: 'cat_donation',
             status: 'completed',
             account: 'Stripe',
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            notes: sessNoteTag
           })
         }
       }
@@ -789,11 +900,18 @@ serve(async (req) => {
           .maybeSingle()
 
         if (!existingDonation) {
+          const { netAmount: invNet, grossAmount: invGross, noteTag: invNoteTag } = await resolveStripeNetAndFee({
+            grossAmount: amount,
+            paymentMethod: 'credit_card',
+            chargeId: typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id,
+            paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : null
+          })
+
           await supabase.from('donations').insert({
             donor_name: name,
             donor_email: email,
             donor_phone: phone,
-            amount: amount,
+            amount: invGross,
             status: 'paid',
             payment_method: 'credit_card',
             paid_at: new Date().toISOString(),
@@ -805,12 +923,14 @@ serve(async (req) => {
 
           await supabase.from('finance_transactions').insert({
             description: `${isPadrinho ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${name}`,
-            amount: amount,
+            amount: invNet,
+            original_amount: invGross,
             type: 'income',
             category_id: isPadrinho ? 'cat_sponsorship' : 'cat_donations',
             status: 'completed',
             account: 'Stripe',
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            notes: invNoteTag
           })
         }
       }

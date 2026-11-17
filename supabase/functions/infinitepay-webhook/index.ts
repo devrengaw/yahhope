@@ -32,15 +32,23 @@ serve(async (req) => {
        return new Response('Ignored - not an approved transaction', { status: 200 })
     }
 
-    // Identifica o valor (amount)
+    // Identifica o valor bruto (amount) e o valor líquido repassado (net_amount)
     let rawAmount = payload.amount || payload.value || payload.net_amount || payload.transaction?.amount || payload.transaction?.value || 0
     let amount = Number(rawAmount);
-    
-    // Muitas plataformas (incluindo InfinitePay) enviam o valor em centavos (ex: 1000 = R$ 10,00).
-    // A regra abaixo converte para reais caso não venha formatado.
     if (Number.isInteger(amount) && amount > 0 && !String(rawAmount).includes('.')) {
        amount = amount / 100;
     }
+
+    let rawNetAmount = payload.net_amount || payload.liquid_amount || payload.transaction?.net_amount || payload.transaction?.liquid_amount || 0;
+    let netAmount = Number(rawNetAmount);
+    if (Number.isInteger(netAmount) && netAmount > 0 && !String(rawNetAmount).includes('.')) {
+       netAmount = netAmount / 100;
+    }
+    const effectiveFinanceAmount = netAmount > 0 && netAmount <= amount ? netAmount : amount;
+    const feeAmount = Number(Math.max(0, amount - effectiveFinanceAmount).toFixed(2));
+    const netNote = feeAmount > 0
+      ? `[STRIPE_NET:gross=${amount.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${effectiveFinanceAmount.toFixed(2)}]`
+      : undefined;
 
     const donorName = payload.customer?.name || payload.metadata?.donor_name || payload.transaction?.customer_name || 'Doador InfinitePay'
     const rawDonorEmail = payload.customer?.email || payload.metadata?.donor_email || payload.transaction?.customer_email || ''
@@ -98,15 +106,17 @@ serve(async (req) => {
         user_id: resolvedUserId
       })
 
-      // 3. Registra no Painel Financeiro Geral
+      // 3. Registra no Painel Financeiro Geral usando o valor líquido repassado
       await supabase.from('finance_transactions').insert({
         description: `Doação via InfinitePay - ${donorName}`,
-        amount: amount,
+        amount: effectiveFinanceAmount,
+        original_amount: amount,
         type: 'income',
         category_id: 'cat_donation',
         status: 'completed',
         account: 'InfinitePay',
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        notes: netNote
       })
       
       // Envia e-mail de agradecimento da primeira doação com botão de finalização de cadastro

@@ -26,7 +26,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
-import { isSpamOrMockUser, purgeSpamUsersFromDatabase } from '../../../utils/userCleanup';
+import {
+  isSpamOrMockUser,
+  purgeSpamUsersFromDatabase,
+  isEmailPrefixOrHandle,
+  isSameDonorNameAndHandle
+} from '../../../utils/userCleanup';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
 import { sponsorshipService } from '../../../services/sponsorshipService';
 
@@ -133,8 +138,11 @@ export function SupportersList() {
           ...(sponsorshipsByEmail.get(email) || [])
         ];
 
-        // 1. Deduplicação inteligente de doações brutas (elimina retentativas de webhook, cliques múltiplos ou duplicatas com mesmo stripe_payment_id)
+        // 1. Deduplicação inteligente de doações brutas (elimina retentativas de webhook, cliques múltiplos ou duplicatas com mesmo stripe_payment_id / pi_ vs ch_)
         rawUserDonations.sort((a, b) => {
+          const aIsHandle = isEmailPrefixOrHandle(a.donor_name) ? 1 : 0;
+          const bIsHandle = isEmailPrefixOrHandle(b.donor_name) ? 1 : 0;
+          if (aIsHandle !== bIsHandle) return aIsHandle - bIsHandle;
           const tA = new Date(a.paid_at || a.created_at || 0).getTime();
           const tB = new Date(b.paid_at || b.created_at || 0).getTime();
           return tB - tA;
@@ -155,20 +163,37 @@ export function SupportersList() {
 
           // B) Checagem de duplicidade estrita (Protege doações legítimas de quem realmente doou mais de uma vez)
           // Só deduplica automaticamente se for rajada técnica (duplo-clique / webhook retentando no mesmo minuto)
-          // ou caso confirmado de importação repetida
+          // ou caso confirmado de sync duplicado (pi_ vs ch_ ou nome completo vs prefixo de e-mail no mesmo dia)
           const dAmount = Number(d.amount) || 0;
           const dStripeId = typeof d.stripe_payment_id === 'string' ? d.stripe_payment_id.trim() : '';
           const dTime = new Date(d.paid_at || d.created_at || 0).getTime();
           const dEmail = (email || '').toLowerCase().trim();
+          const dDateStr = (d.paid_at || d.created_at || '').slice(0, 10);
 
           const isDuplicate = userDonations.some((prev: any) => {
             const prevAmount = Number(prev.amount) || 0;
             if (Math.abs(prevAmount - dAmount) > 0.01) return false;
             if ((prev.status || 'paid') !== (d.status || 'paid')) return false;
+
+            const prevDateStr = (prev.paid_at || prev.created_at || '').slice(0, 10);
+            const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
+
+            // Mesmo dia e mesmo valor para o mesmo doador onde um veio com Nome Completo (pi_) e outro com prefixo de e-mail (ch_)
+            if (dDateStr && prevDateStr && dDateStr === prevDateStr) {
+              if (isSameDonorNameAndHandle(prev.donor_name, d.donor_name)) {
+                return true;
+              }
+              const oneIsPiOtherIsCh =
+                (dStripeId.startsWith('pi_') && prevStripeId.startsWith('ch_')) ||
+                (dStripeId.startsWith('ch_') && prevStripeId.startsWith('pi_'));
+              if (oneIsPiOtherIsCh) {
+                return true;
+              }
+            }
+
             if ((prev.payment_method || '') !== (d.payment_method || '')) return false;
 
-            // Se ambos tiverem IDs reais distintos do Stripe, são duas transações comprovadas
-            const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
+            // Se ambos tiverem IDs reais distintos do Stripe (ex: duas cobranças pi_ diferentes), são duas transações comprovadas
             if (dStripeId && prevStripeId && dStripeId !== prevStripeId) {
               return false;
             }
@@ -180,8 +205,6 @@ export function SupportersList() {
             }
 
             // Caso 2: Duplicata confirmada de importação em 06/06/2026 para Ricardo Sanches (1x R$ 1.000)
-            const dDateStr = (d.paid_at || d.created_at || '').slice(0, 10);
-            const prevDateStr = (prev.paid_at || prev.created_at || '').slice(0, 10);
             if (dEmail === 'ridossantos@gmail.com' && dDateStr === '2026-06-06' && prevDateStr === '2026-06-06') {
               return true;
             }
@@ -193,6 +216,12 @@ export function SupportersList() {
           if (!isDuplicate) {
             userDonations.push(d);
           }
+        });
+
+        userDonations.sort((a: any, b: any) => {
+          const tA = new Date(a.paid_at || a.created_at || 0).getTime();
+          const tB = new Date(b.paid_at || b.created_at || 0).getTime();
+          return tB - tA;
         });
 
         // 2. Elimina eventuais duplicatas de apadrinhamentos (mesmo ID ou mesma criança ou mesma assinatura)
@@ -393,7 +422,13 @@ export function SupportersList() {
         const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
-        const donorName = user?.name || uniqueSponsorships[0]?.donor_name || lastDonation?.donor_name || email.split('@')[0];
+        const candidateNames = [
+          user?.name,
+          ...uniqueSponsorships.map((s: any) => s.donor_name),
+          ...userDonations.map((d: any) => d.donor_name)
+        ].filter(Boolean);
+        const fullProperName = candidateNames.find((n: string) => !isEmailPrefixOrHandle(n));
+        const donorName = fullProperName || candidateNames[0] || email.split('@')[0];
 
         const primaryChild = assignedChildrenList[0] || null;
         const childName = assignedChildrenList.map(c => c.name).join(', ') || undefined;

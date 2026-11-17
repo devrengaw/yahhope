@@ -47,7 +47,7 @@ import { ProjectRepasseModal, RepassePayload } from '../../components/admin/fina
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useFundraising, saveStoredRulerLink } from '../../contexts/FundraisingContext';
 import { cn } from '../../lib/utils';
-import { isSpamFinanceTransaction, purgeSpamFinanceTransactions } from '../../utils/userCleanup';
+import { isSpamFinanceTransaction, purgeSpamFinanceTransactions, deduplicateFinanceTransactions } from '../../utils/userCleanup';
 import { ensureCurrentMonthRecurringTransactions } from '../../services/financeTransactionService';
 import { Project } from '../../lib/mockData';
 import { 
@@ -56,6 +56,13 @@ import {
   saveCategory as persistCategory, 
   deleteCategory as removePersistedCategory 
 } from '../../services/financeCategoryService';
+import {
+  GatewayFeeConfig,
+  getGatewayFeeConfig,
+  saveGatewayFeeConfig,
+  resolveTransactionGatewayAmounts,
+  buildStripeNetNoteTag
+} from '../../services/gatewayFeeService';
 
 export interface Transaction {
   id: string;
@@ -222,6 +229,11 @@ export function Finance() {
 
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthKey);
 
+  // Configuração de Taxas de Gateway (Stripe / InfinitePay)
+  const [gatewayFeeConfig, setGatewayFeeConfig] = useState<GatewayFeeConfig>(() => getGatewayFeeConfig());
+  const [isFeeConfigModalOpen, setIsFeeConfigModalOpen] = useState(false);
+  const [isSyncingStripeApi, setIsSyncingStripeApi] = useState(false);
+
   // Estado de edição rápida da Régua dentro do Financeiro
   const [isQuickRulerConfigOpen, setIsQuickRulerConfigOpen] = useState(false);
   const [isSyncingRuler, setIsSyncingRuler] = useState(false);
@@ -245,12 +257,13 @@ export function Finance() {
     if (isInternalRepasse(t)) return 'repasses';
 
     const desc = (t.description || '').toLowerCase();
+    const referenceGross = Number(t.original_amount || t.amount || 0);
     if (
       desc.includes('mantenedor') ||
       desc.includes('apoio geral') ||
       desc.includes('fundo casa nutri') ||
       t.category_id === 'cat_monthly_maintainer' ||
-      (desc.includes('recorrência mensal') && t.amount < 90)
+      (desc.includes('recorrência mensal') && referenceGross < 80)
     ) {
       return 'mantenedores';
     }
@@ -271,7 +284,8 @@ export function Finance() {
     return 'doacoes';
   };
 
-  const fetchData = async () => {
+  const fetchData = async (customFeeCfg?: GatewayFeeConfig) => {
+    const activeFeeCfg = customFeeCfg || gatewayFeeConfig;
     try {
       purgeSpamFinanceTransactions();
       const [txRes, syncedCategories, projRes] = await Promise.all([
@@ -280,7 +294,7 @@ export function Finance() {
         supabase.from('projects').select('*').order('created_at', { ascending: false })
       ]);
       if (txRes.data) {
-        const cleanTxs = txRes.data
+        const nonSpamTxs = txRes.data
           .filter(t => !isSpamFinanceTransaction(t))
           .map(t => {
             const desc = (t.description || '').toLowerCase();
@@ -289,14 +303,54 @@ export function Finance() {
               desc.includes('apadrinh') ||
               desc.includes('padrinho')
             );
-            // REGRA DE OURO: Apadrinhamento de criança tem valor mínimo de R$ 90,00 por cota
-            if (isPadrinhoTx && t.amount > 0 && t.amount < 90) {
+            // REGRA DE OURO: Corrige apenas mocks legados <= R$ 35, preservando valores líquidos descontados de taxa Stripe (ex: R$ 86,02)
+            if (isPadrinhoTx && t.amount > 0 && t.amount <= 35 && (!t.original_amount || t.original_amount <= 35)) {
               return { ...t, amount: 90 };
             }
             return t;
           });
+        const { cleanList: cleanTxs, duplicateIds } = deduplicateFinanceTransactions(nonSpamTxs);
+        if (duplicateIds.length > 0) {
+          supabase.from('finance_transactions').delete().in('id', duplicateIds).then(() => {}, () => {});
+        }
         const updatedTxs = await ensureCurrentMonthRecurringTransactions(cleanTxs);
-        setTransactions(updatedTxs);
+
+        // Aplica o cálculo do Valor Líquido Repassado (descontando taxas Stripe) nas transações de entrada
+        const netNormalizedTxs = updatedTxs.map(t => {
+          if (t.type !== 'income' || isInternalRepasse(t)) return t;
+          const gw = resolveTransactionGatewayAmounts(t, activeFeeCfg);
+          if (!gw.isGatewayTx || gw.feeAmount <= 0) return t;
+
+          const effectiveAmt = activeFeeCfg.useNetAmountInFinance ? gw.netAmount : gw.grossAmount;
+          const nextNotes = buildStripeNetNoteTag(gw.grossAmount, gw.feeAmount, gw.netAmount, t.notes);
+
+          // Se no banco ainda estava salvo com o valor bruto (sem tag STRIPE_NET), persiste o valor líquido no Supabase
+          if (
+            activeFeeCfg.useNetAmountInFinance &&
+            (!gw.isExactFromApi || Math.abs(Number(t.amount) - gw.netAmount) > 0.01) &&
+            t.id &&
+            !t.id.startsWith('local_')
+          ) {
+            supabase
+              .from('finance_transactions')
+              .update({
+                amount: gw.netAmount,
+                original_amount: gw.grossAmount,
+                notes: nextNotes
+              })
+              .eq('id', t.id)
+              .then(() => {}, () => {});
+          }
+
+          return {
+            ...t,
+            amount: effectiveAmt,
+            original_amount: gw.grossAmount,
+            notes: nextNotes
+          };
+        });
+
+        setTransactions(netNormalizedTxs);
       }
       if (syncedCategories) setCategories(syncedCategories);
       if (projRes.data && projRes.data.length > 0) {
@@ -379,6 +433,12 @@ export function Finance() {
     const currentMonthExternalIncomes = allExternalIncomes.filter(t => matchesCurrentMonth(t.date));
 
     const periodIncomeTotal = periodExternalIncomes.reduce((acc, t) => acc + t.amount, 0);
+    const periodGrossIncomeTotal = periodExternalIncomes.reduce((acc, t) => {
+      const gw = resolveTransactionGatewayAmounts(t, gatewayFeeConfig);
+      return acc + (gw.isGatewayTx ? gw.grossAmount : t.amount);
+    }, 0);
+    const periodGatewayFeesTotal = Number(Math.max(0, periodGrossIncomeTotal - periodIncomeTotal).toFixed(2));
+
     const historicalIncomeTotal = allExternalIncomes.reduce((acc, t) => acc + t.amount, 0);
     const currentMonthIncomeTotal = currentMonthExternalIncomes.reduce((acc, t) => acc + t.amount, 0);
 
@@ -461,6 +521,8 @@ export function Finance() {
 
     return {
       periodIncomeTotal,
+      periodGrossIncomeTotal,
+      periodGatewayFeesTotal,
       historicalIncomeTotal,
       currentMonthIncomeTotal,
       padrinhosIncome,
@@ -483,7 +545,7 @@ export function Finance() {
       fixedExpense,
       projectsFixedCost
     };
-  }, [transactions, projects, selectedMonth, currentMonthKey]);
+  }, [transactions, projects, selectedMonth, currentMonthKey, gatewayFeeConfig]);
 
   // ============================================================================
   // PAINEL DE PROJETOS E REPASSES (CASA NUTRI, COMUNICAÇÃO E PROJETOS ATIVOS)
@@ -1222,11 +1284,19 @@ export function Finance() {
               </span>
             </div>
             <p className="text-slate-400 text-[11px] font-black uppercase tracking-wider">
-              Arrecadação Externa
+              {gatewayFeeConfig.useNetAmountInFinance ? 'Arrecadação Líquida (Pós-Taxas)' : 'Arrecadação Bruta Externa'}
             </p>
             <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               R$ {flowStats.periodIncomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
+            {flowStats.periodGatewayFeesTotal > 0 && (
+              <p className="text-[11px] font-bold text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                <span>Bruto: R$ {flowStats.periodGrossIncomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded text-[10px] font-black">
+                  Taxas Stripe: -R$ {flowStats.periodGatewayFeesTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Divisão Clara: Padrinhos + Mantenedores + Doações */}
@@ -1899,6 +1969,22 @@ export function Finance() {
 
                   <button
                     type="button"
+                    onClick={() => setIsFeeConfigModalOpen(prev => !prev)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-2.5 border rounded-xl text-xs font-bold transition-all cursor-pointer",
+                      isFeeConfigModalOpen
+                        ? "bg-amber-50 border-amber-300 text-amber-900"
+                        : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                    )}
+                    title="Configurar taxas da Stripe e sincronizar valores líquidos repassados"
+                  >
+                    <CreditCard size={14} className="text-amber-600" />
+                    Taxas Stripe (Líquido)
+                    {isFeeConfigModalOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setIsQuickRulerConfigOpen(prev => !prev)}
                     className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
@@ -2048,6 +2134,128 @@ export function Finance() {
                     </div>
                   </div>
                 </form>
+              )}
+
+              {/* Painel Expansível: Taxas da Stripe & Valor Líquido Repassado */}
+              {isFeeConfigModalOpen && (
+                <div className="bg-white p-5 rounded-2xl border-2 border-amber-200 shadow-md space-y-4 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                        <CreditCard size={16} className="text-amber-600" />
+                        Cálculo do Valor Líquido Repassado pela Stripe (Desconto de Taxas)
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        O caixa contabiliza o <strong>valor líquido efetivamente repassado</strong> pela Stripe (sem afetar a cota de R$ 90 dos Padrinhos). Ao clicar em sincronizar com a Stripe, o sistema busca o <code>balance_transaction.net</code> exato de cada pagamento na API.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSyncingStripeApi}
+                      onClick={async () => {
+                        setIsSyncingStripeApi(true);
+                        try {
+                          await supabase.functions.invoke('stripe-webhook', { body: { action: 'sync_stripe' } });
+                          await fetchData(gatewayFeeConfig);
+                          await refreshFundraising();
+                          setRulerFeedback('Valores líquidos da Stripe sincronizados com sucesso!');
+                          setTimeout(() => setRulerFeedback(null), 5000);
+                        } catch {
+                          await fetchData(gatewayFeeConfig);
+                        } finally {
+                          setIsSyncingStripeApi(false);
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw size={13} className={isSyncingStripeApi ? "animate-spin text-amber-400" : "text-amber-400"} />
+                      {isSyncingStripeApi ? 'Consultando Stripe...' : 'Buscar Líquido Exato na API Stripe'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end pt-2 border-t border-slate-100">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">
+                        Taxa Stripe PIX (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={gatewayFeeConfig.stripePixPercent}
+                        onChange={e => {
+                          const next = { ...gatewayFeeConfig, stripePixPercent: parseFloat(e.target.value) || 0 };
+                          setGatewayFeeConfig(next);
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">
+                        Taxa Stripe Cartão (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={gatewayFeeConfig.stripeCardPercent}
+                        onChange={e => {
+                          const next = { ...gatewayFeeConfig, stripeCardPercent: parseFloat(e.target.value) || 0 };
+                          setGatewayFeeConfig(next);
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">
+                        Tarifa Fixa Cartão (R$)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={gatewayFeeConfig.stripeCardFixedBrl}
+                        onChange={e => {
+                          const next = { ...gatewayFeeConfig, stripeCardFixedBrl: parseFloat(e.target.value) || 0 };
+                          setGatewayFeeConfig(next);
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          saveGatewayFeeConfig(gatewayFeeConfig);
+                          // Limpa tags calculadas localmente para recalcular com a nova taxa e atualizar no banco
+                          const recalculated = transactions.map(t => {
+                            if (t.type !== 'income' || isInternalRepasse(t)) return t;
+                            const cleanTx = { ...t, amount: t.original_amount || t.amount, notes: (t.notes || '').replace(/\[STRIPE_NET:[^\]]+\]/g, '').trim() };
+                            const gw = resolveTransactionGatewayAmounts(cleanTx, gatewayFeeConfig);
+                            if (!gw.isGatewayTx) return t;
+                            const nextNotes = buildStripeNetNoteTag(gw.grossAmount, gw.feeAmount, gw.netAmount, cleanTx.notes);
+                            if (t.id && !t.id.startsWith('local_')) {
+                              supabase.from('finance_transactions').update({
+                                amount: gw.netAmount,
+                                original_amount: gw.grossAmount,
+                                notes: nextNotes
+                              }).eq('id', t.id).then(() => {}, () => {});
+                            }
+                            return { ...t, amount: gw.netAmount, original_amount: gw.grossAmount, notes: nextNotes };
+                          });
+                          setTransactions(recalculated);
+                          await refreshFundraising();
+                          setRulerFeedback('Taxas Stripe aplicadas e salvas no caixa!');
+                          setTimeout(() => setRulerFeedback(null), 4000);
+                          setIsFeeConfigModalOpen(false);
+                        }}
+                        className="flex-1 py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer"
+                      >
+                        Aplicar Taxas no Caixa
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Alerta de Doações Pendentes vindas do site para aprovação em 1 clique */}
@@ -2377,17 +2585,30 @@ export function Finance() {
                                 </td>
 
                                 <td className="px-6 py-4 text-right whitespace-nowrap">
-                                  <p className={cn(
-                                    "text-sm sm:text-base font-black",
-                                    t.type === 'income' ? "text-emerald-600" : "text-rose-600"
-                                  )}>
-                                    {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                  </p>
-                                  {t.currency === 'MZN' && t.original_amount && (
-                                    <p className="text-[10px] font-bold text-slate-400">
-                                      {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
-                                    </p>
-                                  )}
+                                  {(() => {
+                                    const gw = isExternalIncome ? resolveTransactionGatewayAmounts(t, gatewayFeeConfig) : null;
+                                    return (
+                                      <>
+                                        <p className={cn(
+                                          "text-sm sm:text-base font-black",
+                                          t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                                        )}>
+                                          {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </p>
+                                        {gw && gw.isGatewayTx && gw.feeAmount > 0 && (
+                                          <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                            Bruto: R$ {gw.grossAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} •{' '}
+                                            <span className="text-amber-600">Taxa: -R$ {gw.feeAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                          </p>
+                                        )}
+                                        {t.currency === 'MZN' && t.original_amount && (
+                                          <p className="text-[10px] font-bold text-slate-400">
+                                            {t.original_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} MT
+                                          </p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </td>
 
                                 <td className="px-6 py-4 text-center">

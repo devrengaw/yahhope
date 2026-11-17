@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { isSpamFinanceTransaction } from '../utils/userCleanup';
+import {
+  isSpamFinanceTransaction,
+  deduplicateFinanceTransactions,
+  isEmailPrefixOrHandle,
+  isSameDonorNameAndHandle,
+  splitFinanceDescription
+} from '../utils/userCleanup';
 
 export interface CampaignMilestone {
   id: string;
@@ -289,9 +295,17 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         };
       });
 
-      // Deduplicação inteligente de doações brutas para eliminar retentativas de webhook ou cliques duplicados
+      // Deduplicação inteligente de doações brutas para eliminar retentativas de webhook, cliques duplicados ou sync de pi_ vs ch_ (nome vs prefixo de e-mail)
       const formattedDonations: Donation[] = [];
       const seenStripePaymentIds = new Set<string>();
+
+      // Ordena para que registros com Nome Completo venham ANTES de registros com apenas prefixo de e-mail
+      rawFormattedDonations.sort((a, b) => {
+        const aIsHandle = isEmailPrefixOrHandle(a.donor_name) ? 1 : 0;
+        const bIsHandle = isEmailPrefixOrHandle(b.donor_name) ? 1 : 0;
+        if (aIsHandle !== bIsHandle) return aIsHandle - bIsHandle;
+        return 0;
+      });
 
       rawFormattedDonations.forEach(donation => {
         if (donation.stripe_payment_id && typeof donation.stripe_payment_id === 'string' && donation.stripe_payment_id.trim()) {
@@ -303,13 +317,30 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         const dTime = new Date(donation.paid_at || donation.date).getTime();
         const dStripeId = typeof donation.stripe_payment_id === 'string' ? donation.stripe_payment_id.trim() : '';
         const dEmail = (donation.donor_email || '').toLowerCase().trim();
+        const dDateStr = (donation.paid_at || donation.date || '').slice(0, 10);
 
         const isDuplicate = formattedDonations.some(prev => {
-          if (prev.donor_email !== donation.donor_email) return false;
           if (Math.abs(prev.amount - donation.amount) > 0.01) return false;
+
+          const prevDateStr = (prev.paid_at || prev.date || '').slice(0, 10);
+          const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
+
+          // Mesmo dia e mesmo valor onde um entrou com Nome Completo e outro entrou com prefixo do e-mail (ex: Willian junqueiropolis -SP vs willian.alves.will)
+          if (dDateStr && prevDateStr && dDateStr === prevDateStr) {
+            if (isSameDonorNameAndHandle(prev.donor_name, donation.donor_name)) {
+              return true;
+            }
+            if (dEmail && prev.donor_email === dEmail) {
+              const oneIsPiOtherIsCh =
+                (dStripeId.startsWith('pi_') && prevStripeId.startsWith('ch_')) ||
+                (dStripeId.startsWith('ch_') && prevStripeId.startsWith('pi_'));
+              if (oneIsPiOtherIsCh) return true;
+            }
+          }
+
+          if (prev.donor_email !== donation.donor_email) return false;
           if (prev.payment_method !== donation.payment_method) return false;
 
-          const prevStripeId = typeof prev.stripe_payment_id === 'string' ? prev.stripe_payment_id.trim() : '';
           if (dStripeId && prevStripeId && dStripeId !== prevStripeId) {
             return false;
           }
@@ -321,8 +352,6 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           }
 
           // Caso 2: Ricardo Sanches em 06/06/2026 (1x R$ 1.000)
-          const dDateStr = (donation.paid_at || donation.date || '').slice(0, 10);
-          const prevDateStr = (prev.paid_at || prev.date || '').slice(0, 10);
           if (dEmail === 'ridossantos@gmail.com' && dDateStr === '2026-06-06' && prevDateStr === '2026-06-06') {
             return true;
           }
@@ -409,8 +438,11 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
         .eq('status', 'completed');
 
       if (financeIncomeData && financeIncomeData.length > 0) {
-        financeIncomeData.forEach(ft => {
-          if (isSpamFinanceTransaction(ft)) return;
+        const { cleanList: cleanFinanceIncomes } = deduplicateFinanceTransactions(
+          financeIncomeData.filter(ft => !isSpamFinanceTransaction(ft))
+        );
+
+        cleanFinanceIncomes.forEach(ft => {
           // Exclui repasses internos entre caixa central e projetos para nunca duplicar arrecadação
           const ftModule = (ft.module || 'global').toLowerCase();
           const ftDescLower = (ft.description || '').toLowerCase();
@@ -428,6 +460,7 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           if (ftAmount <= 0) return;
           const ftDateStr = (ft.date || '').slice(0, 10);
           const ftMonth = ftDateStr.slice(0, 7);
+          const ftParts = splitFinanceDescription(ft.description);
 
           // Verifica se já existe em formattedDonations para evitar duplicar
           const matchingExisting = formattedDonations.find(d => {
@@ -438,6 +471,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             if (isSameAmount && dDateStr === ftDateStr) return true;
             if (isSameAmount && dMonth && ftMonth && dMonth === ftMonth) {
               if (d.donor_name && ft.description && ft.description.toLowerCase().includes(d.donor_name.toLowerCase())) {
+                return true;
+              }
+              if (ftParts.donor && d.donor_name && isSameDonorNameAndHandle(ftParts.donor, d.donor_name)) {
                 return true;
               }
             }

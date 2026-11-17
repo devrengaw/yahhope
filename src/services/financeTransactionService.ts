@@ -434,8 +434,9 @@ export async function ensureCurrentMonthRecurringTransactions(
           const isSp = template.category_id === 'cat_sponsorship' ||
             (template.description || '').toLowerCase().includes('apadrinh') ||
             (template.description || '').toLowerCase().includes('padrinho');
-          // REGRA DE OURO: Apadrinhamento de criança tem valor mínimo de R$ 90,00 por cota (nunca R$ 30)
-          const finalAmt = isSp ? Math.max(90, Number(template.amount) || 90) : Number(template.amount);
+          // REGRA DE OURO: Apadrinhamento de criança tem valor nominal mínimo de R$ 90,00 por cota (corrige apenas mocks legados <= 35, preservando valores líquidos descontados de taxa Stripe ex: R$ 86,02)
+          const rawTemplateAmt = Number(template.amount) || 0;
+          const finalAmt = isSp ? (rawTemplateAmt > 0 && rawTemplateAmt <= 35 ? 90 : (rawTemplateAmt || 90)) : rawTemplateAmt;
 
           const basePayload: any = {
             description: template.description,
@@ -448,10 +449,12 @@ export async function ensureCurrentMonthRecurringTransactions(
             module: template.module || 'global'
           };
 
+          const existingStripeNetTag = (template.notes || '').match(/\[STRIPE_NET:[^\]]+\]/)?.[0] || '';
           const fullPayload: any = {
             ...basePayload,
+            ...(template.original_amount !== undefined ? { original_amount: template.original_amount } : {}),
             recurrence: 'monthly',
-            notes: `[Recorrência mensal automática para ${currentMonthKey}]`
+            notes: [`[Recorrência mensal automática para ${currentMonthKey}]`, existingStripeNetTag].filter(Boolean).join(' ')
           };
 
           let createdTx: Transaction | null = null;
