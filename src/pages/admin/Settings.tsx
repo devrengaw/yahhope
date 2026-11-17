@@ -41,6 +41,7 @@ import {
   OrganizationSettings 
 } from '../../services/organizationSettingsService';
 import { isInternalTeamUser, isSpamOrMockUser, purgeSpamUsersFromDatabase } from '../../utils/userCleanup';
+import { fetchUserAccessOverrides, findUserAccessOverride, saveUserAccessOverride } from '../../lib/universityPermissions';
 import { Loader2, Check } from 'lucide-react';
 
 type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-categories';
@@ -95,12 +96,17 @@ export function Settings() {
       // Remove silenciosamente do banco eventuais registros falsos/bots
       purgeSpamUsersFromDatabase();
 
-      const { data, error } = await supabase.from('users').select('*');
+      const [{ data, error }, overridesMap] = await Promise.all([
+        supabase.from('users').select('*'),
+        fetchUserAccessOverrides()
+      ]);
       if (error) throw error;
       if (data) {
         const validUsers = data.filter(u => !isSpamOrMockUser(u));
         const mappedMembers = validUsers.map(u => {
-          const upperRole = String(u.role || 'USER').trim().toUpperCase();
+          const savedOverride = findUserAccessOverride(overridesMap, { id: u.id, email: u.email });
+          const rawRole = savedOverride?.role || u.role || 'USER';
+          const upperRole = String(rawRole).trim().toUpperCase();
           let normalizedRole: TeamMember['role'] = 'USER';
           if (upperRole === 'SPONSOR' || upperRole === 'PADRINHO') normalizedRole = 'SPONSOR';
           else if (upperRole === 'MANTENEDOR') normalizedRole = 'MANTENEDOR';
@@ -108,21 +114,25 @@ export function Settings() {
           else if (upperRole === 'MASTER') normalizedRole = 'admin';
           else if (upperRole === 'COORDENADOR') normalizedRole = 'coordinator';
           else if (upperRole === 'VOLUNTARIO') normalizedRole = 'volunteer';
-          else normalizedRole = (u.role || 'USER').toLowerCase() as TeamMember['role'];
+          else normalizedRole = String(rawRole).toLowerCase() as TeamMember['role'];
 
           const isSiteAccount = ['SPONSOR', 'MANTENEDOR', 'USER'].includes(normalizedRole);
 
+          const resolvedPerms = Array.isArray(savedOverride?.permissions) && savedOverride!.permissions!.length > 0
+            ? savedOverride!.permissions!
+            : (Array.isArray(u.permissions) ? u.permissions : []);
+
           return {
             id: u.id,
-            name: u.name || 'Sem Nome',
+            name: savedOverride?.name || u.name || 'Sem Nome',
             email: u.email || '',
             role: normalizedRole,
-            phone: u.phone || '-', 
-            department: u.department || (isSiteAccount ? 'Cadastro pelo Site' : '-'),
+            phone: savedOverride?.phone || u.phone || '-', 
+            department: savedOverride?.department || u.department || (isSiteAccount ? 'Cadastro pelo Site' : '-'),
             join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            status: u.status || 'active',
-            category_id: u.category_id || undefined,
-            permissions: u.permissions || []
+            status: (savedOverride?.status as TeamMember['status']) || u.status || 'active',
+            category_id: savedOverride?.category_id || u.category_id || undefined,
+            permissions: resolvedPerms
           } as TeamMember;
         });
         
@@ -178,29 +188,49 @@ export function Settings() {
     if (selectedMember) {
       // Update existing
       try {
-        const { error } = await supabase.from('users').update({
-          name: newMember.name,
+        const targetId = selectedMember.id;
+        await saveUserAccessOverride({
+          id: targetId,
           email: newMember.email,
+          name: newMember.name,
           role: newMember.role,
-          permissions: newMember.permissions,
-        }).eq('id', selectedMember.id);
+          permissions: newMember.permissions || [],
+          phone: newMember.phone,
+          department: newMember.department,
+          status: newMember.status,
+          category_id: newMember.category_id,
+        });
         
-        if (error) throw error;
-        
-        const updated = members.map(m => m.id === selectedMember.id ? { ...newMember, id: selectedMember.id } : m);
+        const updated = members.map(m => m.id === targetId ? { ...newMember, id: targetId } : m);
         setMembers(updated);
         setSelectedMember(null);
         setIsUserModalOpen(false);
+        addNotification({
+          title: 'Acessos Salvos',
+          message: `As permissões e informações de ${newMember.name} foram gravadas com sucesso.`,
+          type: 'success'
+        });
       } catch (err: any) {
         console.error('Error updating user:', err);
         alert('Erro ao atualizar usuário: ' + err.message);
       }
     } else {
-      // Create new - Let Edge Function handle creation in Auth & public.users
+      // Create new - Save access override immediately and let Edge Function handle creation in Auth & public.users
       const member: TeamMember = {
         ...newMember,
         id: Math.random().toString(36).substring(2, 9),
       };
+      await saveUserAccessOverride({
+        email: member.email,
+        name: member.name,
+        role: member.role,
+        permissions: member.permissions || [],
+        phone: member.phone,
+        department: member.department,
+        status: member.status,
+        category_id: member.category_id,
+      });
+
       const updated = [member, ...members].sort((a, b) => 
         new Date(b.join_date).getTime() - new Date(a.join_date).getTime()
       );
@@ -212,7 +242,16 @@ export function Settings() {
       
       try {
         const { error } = await supabase.functions.invoke('invite-user', {
-          body: { email: member.email, name: member.name, role: member.role }
+          body: {
+            email: member.email,
+            name: member.name,
+            role: member.role,
+            permissions: member.permissions || [],
+            phone: member.phone,
+            department: member.department,
+            status: member.status,
+            category_id: member.category_id
+          }
         });
         
         if (error) throw error;
@@ -250,12 +289,17 @@ export function Settings() {
 
   const handleQuickRoleChange = async (member: TeamMember, newRole: TeamMember['role']) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', member.id);
-
-      if (error) throw error;
+      await saveUserAccessOverride({
+        id: member.id,
+        email: member.email,
+        name: member.name,
+        role: newRole,
+        permissions: member.permissions,
+        phone: member.phone,
+        department: member.department,
+        status: member.status,
+        category_id: member.category_id,
+      });
 
       setMembers(prev => prev.map(m => (m.id === member.id ? { ...m, role: newRole } : m)));
       const label = newRole === 'SPONSOR' ? 'Padrinho' : newRole === 'MANTENEDOR' ? 'Mantenedor' : 'Conta do Site';
@@ -274,7 +318,16 @@ export function Settings() {
     if (await confirm({ title: 'Reenviar Convite', message: `Deseja reenviar o e-mail de convite para ${member.name} (${member.email})?`, type: 'info' })) {
       try {
         const { error } = await supabase.functions.invoke('invite-user', {
-          body: { email: member.email, name: member.name, role: member.role }
+          body: {
+            email: member.email,
+            name: member.name,
+            role: member.role,
+            permissions: member.permissions || [],
+            phone: member.phone,
+            department: member.department,
+            status: member.status,
+            category_id: member.category_id
+          }
         });
         
         if (error) throw error;

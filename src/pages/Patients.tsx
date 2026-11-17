@@ -664,7 +664,7 @@ export function Patients() {
                       <div className="flex items-center justify-end gap-2">
                         {(() => {
                           const ret = getNextReturnDate(patient);
-                          if (ret.isHospitalized && viewMode !== 'historico') {
+                          if (ret.isHospitalized && viewMode !== 'historico' && user?.role !== 'OBSERVER') {
                             return (
                               <button 
                                 type="button"

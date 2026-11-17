@@ -112,7 +112,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'ADMIN' || user?.email?.toLowerCase() === 'contato@yahhope.com';
 
   const {
     hasWorkspace,
@@ -121,6 +121,9 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     hasAdmin,
     hasUniversity,
   } = getUserAuthorizedModules(user);
+
+  const authorizedModulesCount = [hasWorkspace, hasNutrition, hasUniversity, hasCommunication, hasAdmin].filter(Boolean).length;
+  const canAccessSupporterPortal = isAdmin || user?.role === 'SPONSOR' || user?.role === 'MANTENEDOR' || Boolean(user?.permissions?.includes('portal'));
 
   const initialNavItems = 
     module === 'nutrition' ? nutritionNavItems : 
@@ -135,8 +138,21 @@ export function Layout({ children, module }: { children: React.ReactNode, module
     // Admin has access to all items unconditionally
     if (isAdmin) return true;
 
-    // Supporter and Workspace items are available to all authorized users
-    if (module === 'supporter' || module === 'workspace') return true;
+    // Supporter items are available to all authorized supporters
+    if (module === 'supporter') return true;
+
+    const perms = Array.isArray(user?.permissions) ? user.permissions : [];
+    if (perms.includes('all')) return true;
+
+    if (module === 'workspace') {
+      const workspaceSpecificKeys = ['my-tasks', 'erp-projects', 'calendar', 'inbox'];
+      const hasGranularWorkspacePerms = perms.some(p => workspaceSpecificKeys.includes(p));
+      if (!hasGranularWorkspacePerms || perms.includes('workspace')) return true;
+      const wKey = item.path.split('/').pop() || 'inicio';
+      if (wKey === 'inicio') return true;
+      if (wKey === 'projects') return perms.includes('erp-projects') || perms.includes('projects');
+      return perms.includes(wKey) || perms.includes(item.path);
+    }
 
     // Futuro Universitário: filtra pelas permissões internas do módulo
     if (module === 'university') {
@@ -145,17 +161,18 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       return hasUniversityPermission(user, reqPerm);
     }
 
-    // If permissions array is empty or includes 'all', allow all items for this module
-    if (!user?.permissions || user.permissions.length === 0 || user.permissions.includes('all')) return true;
+    if (perms.length === 0) return false;
 
     // Check if the path or a part of it is in user's permissions
     const permissionKey = item.path.split('/').pop() || 'dashboard';
-    const isDashboard = item.path === '/nutrition' || item.path === '/admin' || item.path === '/communication' || permissionKey === 'analytics';
-    if (isDashboard) {
-      if (user?.role === 'OBSERVER' && item.path === '/nutrition') {
-        return user.permissions.includes('dashboard') || user.permissions.includes('/nutrition');
-      }
-      return true;
+    if (item.path === '/nutrition') {
+      return perms.includes('dashboard') || perms.includes('nutrition-dashboard') || perms.includes('/nutrition');
+    }
+    if (item.path === '/communication') {
+      return perms.includes('comm-dashboard') || perms.includes('dashboard') || perms.includes('/communication');
+    }
+    if (item.path === '/admin' || permissionKey === 'analytics') {
+      return perms.includes('analytics') || perms.includes('admin-dashboard') || perms.includes('dashboard') || perms.includes('/admin/analytics');
     }
 
     const mappedKey = 
@@ -172,7 +189,19 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       (module === 'communication' && (mappedKey === 'costs' || mappedKey === 'finance')) ? 'communication-finance' : 
       mappedKey;
 
-    return user.permissions.includes(actualKey) || user.permissions.includes(permissionKey) || user.permissions.includes(item.path);
+    const moduleSpecificAltKey =
+      (module === 'admin' && permissionKey === 'projects') ? 'admin-projects' :
+      (module === 'admin' && permissionKey === 'finance') ? 'admin-finance' :
+      (module === 'communication' && permissionKey === 'projects') ? 'comm-projects' :
+      (module === 'communication' && permissionKey === 'management') ? 'comm-management' :
+      null;
+
+    return (
+      perms.includes(actualKey) ||
+      perms.includes(permissionKey) ||
+      perms.includes(item.path) ||
+      Boolean(moduleSpecificAltKey && perms.includes(moduleSpecificAltKey))
+    );
   });
 
   const moduleName = 
@@ -284,44 +313,32 @@ export function Layout({ children, module }: { children: React.ReactNode, module
   };
 
   const getMobileBottomNavItems = () => {
-    switch (module) {
-      case 'nutrition':
-        return [
-          { name: 'Início', path: '/nutrition', icon: LayoutDashboard },
-          { name: 'Crianças', path: '/nutrition/patients', icon: Users },
-          { name: 'Atendimento', path: '/nutrition/atendimento', icon: Stethoscope },
-          { name: 'Fila', path: '/nutrition/waiting-list', icon: ClipboardList },
-        ];
-      case 'workspace':
-        return [
-          { name: 'Início', path: '/workspace/inicio', icon: Home },
-          { name: 'Tarefas', path: '/workspace/my-tasks', icon: ClipboardList },
-          { name: 'Projetos', path: '/workspace/projects', icon: Briefcase },
-          { name: 'Agenda', path: '/workspace/calendar', icon: Calendar },
-        ];
-      case 'communication':
-        return [
-          { name: 'Início', path: '/communication', icon: LayoutDashboard },
-          { name: 'Projetos', path: '/communication/projects', icon: Briefcase },
-          { name: 'Chat', path: '/communication/chat', icon: MessageSquare },
-          { name: 'Disparos', path: '/communication/campaigns', icon: Send },
-        ];
-      case 'university':
-        return [
-          { name: 'Início', path: '/futuro-universitario', icon: LayoutDashboard },
-          { name: 'Estudantes', path: '/futuro-universitario/students', icon: Users },
-          { name: 'Bolsas', path: '/futuro-universitario/scholarships', icon: Award },
-          { name: 'Mentoria', path: '/futuro-universitario/mentors', icon: UserCheck },
-        ];
-      case 'admin':
-      default:
-        return [
-          { name: 'Acessos', path: '/admin/analytics', icon: BarChart3 },
-          { name: 'Captação', path: '/admin/fundraising', icon: Target },
-          { name: 'Financeiro', path: '/admin/finance', icon: DollarSign },
-          { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
-        ];
-    }
+    const shortLabelsByPath: Record<string, string> = {
+      '/nutrition': 'Início',
+      '/nutrition/waiting-list': 'Fila',
+      '/nutrition/updates': 'Apoiador',
+      '/workspace/inicio': 'Início',
+      '/workspace/my-tasks': 'Tarefas',
+      '/workspace/inbox': 'Entrada',
+      '/communication': 'Início',
+      '/communication/campaigns': 'Disparos',
+      '/communication/email-templates': 'Templates',
+      '/communication/newsletter': 'Newsletter',
+      '/communication/costs': 'Custos',
+      '/futuro-universitario': 'Início',
+      '/futuro-universitario/scholarships': 'Bolsas',
+      '/futuro-universitario/mentors': 'Mentoria',
+      '/admin/analytics': 'Acessos',
+      '/admin/impact-feed': 'Impacto',
+      '/admin/local-projects': 'Locais',
+      '/admin/store': 'Loja',
+    };
+
+    // Retorna apenas os itens para os quais o usuário realmente tem permissão (filtrados em navItems)
+    return navItems.slice(0, 4).map(item => ({
+      ...item,
+      name: shortLabelsByPath[item.path] || item.name,
+    }));
   };
 
   const theme = getThemeClasses();
@@ -499,8 +516,8 @@ export function Layout({ children, module }: { children: React.ReactNode, module
             <p className={cn("text-xs mt-1 font-medium tracking-wider uppercase", theme.moduleName)}>{moduleName}</p>
           </div>
 
-          {/* Seletor de Módulos (Apenas Mobile - no PC fica apenas na barra lateral cinza) */}
-          {module !== 'supporter' && user?.role !== 'OBSERVER' && (
+          {/* Seletor de Módulos (Apenas Mobile - exibido apenas se o usuário tiver acesso a mais de 1 módulo) */}
+          {module !== 'supporter' && user?.role !== 'OBSERVER' && authorizedModulesCount > 1 && (
             <div className={cn("md:hidden p-3 border-b shrink-0", theme.borderTop)}>
               <div className="flex items-center justify-between mb-2 px-1">
                 <p className={cn("text-[10px] font-black uppercase tracking-wider", theme.roleText)}>
@@ -639,7 +656,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
                 <div>
                   <p className={cn("px-2 text-xs font-bold uppercase tracking-wider mb-2", theme.roleText)}>Atalhos do Workspace</p>
                   <ul className="space-y-1">
-                    {workspaceNavItems.map(item => (
+                    {navItems.map(item => (
                       <li key={item.path}>
                         <Link
                           to={item.path}
@@ -703,17 +720,19 @@ export function Layout({ children, module }: { children: React.ReactNode, module
               </div>
             </Link>
 
-            {/* Atalho para o Portal do Mantenedor */}
-            <div className="pt-2 pb-1">
-              <Link
-                to="/portal/dashboard"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-orange-500/10 hover:bg-[#F49853] text-[#F49853] hover:text-white text-xs font-bold transition-all border border-orange-500/20 shadow-xs"
-              >
-                <Heart size={14} fill="currentColor" />
-                <span>Portal do Mantenedor</span>
-              </Link>
-            </div>
+            {/* Atalho para o Portal do Mantenedor - exibido apenas se o usuário tiver permissão */}
+            {canAccessSupporterPortal && (
+              <div className="pt-2 pb-1">
+                <Link
+                  to="/portal/dashboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-orange-500/10 hover:bg-[#F49853] text-[#F49853] hover:text-white text-xs font-bold transition-all border border-orange-500/20 shadow-xs"
+                >
+                  <Heart size={14} fill="currentColor" />
+                  <span>Portal do Mantenedor</span>
+                </Link>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button

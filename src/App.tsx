@@ -114,7 +114,7 @@ import { MobileDonorSponsor } from './pages/portal/mobile/MobileDonorSponsor';
 import { PortalMyDonations } from './pages/portal/PortalMyDonations';
 import { PortalUniversityProgram } from './pages/portal/PortalUniversityProgram';
 import { UniversityProvider } from './contexts/UniversityContext';
-import { getUserAuthorizedModules, getDefaultAuthorizedRouteForUser } from './lib/universityPermissions';
+import { getUserAuthorizedModules, getDefaultAuthorizedRouteForUser, getFirstAuthorizedNutritionRoute, getFirstAuthorizedAdminRoute } from './lib/universityPermissions';
 import { UniversityPermissionGuard } from './pages/university/UniversityPermissionGuard';
 import { UniversityDashboard } from './pages/university/UniversityDashboard';
 import { UniversityStudents } from './pages/university/UniversityStudents';
@@ -204,10 +204,33 @@ function ProtectedRoute({
 
 function ObserverRestricted({ children, requiredPermission }: { children: React.ReactNode; requiredPermission?: string }) {
   const { user } = useAuth();
-  if (user?.role === 'OBSERVER') {
-    const hasPermission = requiredPermission && Array.isArray(user.permissions) && user.permissions.includes(requiredPermission);
-    if (!hasPermission) {
-      return <Navigate to="/nutrition/patients" replace />;
+  const location = useLocation();
+  if (!user) return <>{children}</>;
+
+  const isAdmin = user.role === 'ADMIN' || user.email?.toLowerCase() === 'contato@yahhope.com';
+  if (isAdmin) return <>{children}</>;
+
+  // Para rotas exclusivas de escrita (ex: /patients/new) onde requiredPermission não é informado, bloqueia OBSERVER
+  if (!requiredPermission) {
+    if (user.role === 'OBSERVER') {
+      return <Navigate to={getFirstAuthorizedNutritionRoute(user)} replace />;
+    }
+    return <>{children}</>;
+  }
+
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  if (perms.includes('all')) return <>{children}</>;
+
+  const hasPermission =
+    perms.includes(requiredPermission) ||
+    (requiredPermission === 'dashboard' && (perms.includes('nutrition-dashboard') || perms.includes('/nutrition'))) ||
+    (requiredPermission === 'attendance' && (perms.includes('atendimento') || perms.includes('/nutrition/atendimento'))) ||
+    (requiredPermission === 'inventory' && (perms.includes('estoque') || perms.includes('/nutrition/inventory')));
+
+  if (!hasPermission) {
+    const targetRoute = getFirstAuthorizedNutritionRoute(user);
+    if (location.pathname !== targetRoute) {
+      return <Navigate to={targetRoute} replace />;
     }
   }
   return <>{children}</>;
@@ -319,7 +342,7 @@ export default function App() {
                                           </Route>
 
                                           <Route path="/admin/*" element={
-                                            <ProtectedRoute allowedRoles={['ADMIN', 'USER']} requiredModule="admin">
+                                            <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'VOLUNTEER', 'VOLUNTARIO', 'STAFF', 'SOCIAL_WORKER', 'NURSE', 'DOCTOR', 'ACS', 'COORDINATOR']} requiredModule="admin">
                                               <Layout module="admin">
                                                 <Routes>
                                                   <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
@@ -394,16 +417,16 @@ export default function App() {
                                             <Layout module="nutrition">
                                               <Routes>
                                                 <Route path="/" element={<ObserverRestricted requiredPermission="dashboard"><Dashboard /></ObserverRestricted>} />
-                                                <Route path="/patients" element={<Patients />} />
+                                                <Route path="/patients" element={<ObserverRestricted requiredPermission="patients"><Patients /></ObserverRestricted>} />
                                                 <Route path="/patients/new" element={<ObserverRestricted><NewPatient /></ObserverRestricted>} />
-                                                <Route path="/patients/:id" element={<PatientDetails />} />
-                                                <Route path="/waiting-list" element={<ObserverRestricted><WaitingList /></ObserverRestricted>} />
-                                                <Route path="/updates" element={<ObserverRestricted><NutritionSupporterUpdates /></ObserverRestricted>} />
-                                                <Route path="/inventory" element={<ObserverRestricted><Inventory /></ObserverRestricted>} />
-                                                <Route path="/management" element={<ObserverRestricted><Management /></ObserverRestricted>} />
-                                                <Route path="/finance" element={<ObserverRestricted><ErrorBoundary fallbackTitle="Falha ao carregar Finanças da Nutrição"><NutritionFinance /></ErrorBoundary></ObserverRestricted>} />
-                                                <Route path="/atendimento" element={<ObserverRestricted><Atendimentos /></ObserverRestricted>} />
-                                                <Route path="/visits" element={<ObserverRestricted><HomeVisits /></ObserverRestricted>} />
+                                                <Route path="/patients/:id" element={<ObserverRestricted requiredPermission="patients"><PatientDetails /></ObserverRestricted>} />
+                                                <Route path="/waiting-list" element={<ObserverRestricted requiredPermission="waiting-list"><WaitingList /></ObserverRestricted>} />
+                                                <Route path="/updates" element={<ObserverRestricted requiredPermission="updates"><NutritionSupporterUpdates /></ObserverRestricted>} />
+                                                <Route path="/inventory" element={<ObserverRestricted requiredPermission="inventory"><Inventory /></ObserverRestricted>} />
+                                                <Route path="/management" element={<ObserverRestricted requiredPermission="management"><Management /></ObserverRestricted>} />
+                                                <Route path="/finance" element={<ObserverRestricted requiredPermission="nutrition-finance"><ErrorBoundary fallbackTitle="Falha ao carregar Finanças da Nutrição"><NutritionFinance /></ErrorBoundary></ObserverRestricted>} />
+                                                <Route path="/atendimento" element={<ObserverRestricted requiredPermission="attendance"><Atendimentos /></ObserverRestricted>} />
+                                                <Route path="/visits" element={<ObserverRestricted requiredPermission="visits"><HomeVisits /></ObserverRestricted>} />
                                                 <Route path="*" element={<div className="p-8 text-center text-slate-500">Módulo em desenvolvimento...</div>} />
                                               </Routes>
                                             </Layout>

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { isSpamOrMockUser } from '../utils/userCleanup';
+import { fetchUserAccessOverrides, findUserAccessOverride } from '../lib/universityPermissions';
 
-export type Role = 'ADMIN' | 'USER' | 'SPONSOR' | 'OBSERVER';
+export type Role = 'ADMIN' | 'USER' | 'SPONSOR' | 'OBSERVER' | string;
 
 export interface User {
   id: string;
@@ -74,14 +75,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Sincroniza automaticamente permissões/acessos quando o usuário volta para a aba/app no celular ou computador
+  useEffect(() => {
+    if (!user?.id && !user?.email) return;
+
+    const refreshAccessFromSettings = async () => {
+      try {
+        const overridesMap = await fetchUserAccessOverrides();
+        const savedOverride = findUserAccessOverride(overridesMap, { id: user.id, email: user.email });
+        if (savedOverride && Array.isArray(savedOverride.permissions)) {
+          const nextRole = savedOverride.role ? (String(savedOverride.role).trim().toUpperCase() as Role) : user.role;
+          const nextPerms = savedOverride.permissions.length > 0 ? savedOverride.permissions : getPermissionsForRole(nextRole);
+          setUser(prev => {
+            if (!prev) return prev;
+            const sameRole = prev.role === nextRole;
+            const samePerms = JSON.stringify(prev.permissions) === JSON.stringify(nextPerms);
+            if (sameRole && samePerms) return prev;
+            return {
+              ...prev,
+              role: nextRole,
+              permissions: nextPerms,
+            };
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAccessFromSettings();
+      }
+    };
+
+    window.addEventListener('focus', refreshAccessFromSettings);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', refreshAccessFromSettings);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user?.id, user?.email]);
+
   const handleSessionUser = async (authUser: any) => {
     try {
-      // 1. Fetch user from our public.users table (case insensitive)
-      const { data: publicUser, error } = await supabase
-        .from('users')
-        .select('*')
-        .ilike('email', authUser.email)
-        .maybeSingle();
+      // 1. Fetch user from our public.users table (case insensitive) + overrides from site_settings
+      const [{ data: publicUsersRows }, overridesMap] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*')
+          .ilike('email', authUser.email),
+        fetchUserAccessOverrides()
+      ]);
+
+      const publicUser = Array.isArray(publicUsersRows) && publicUsersRows.length > 0
+        ? (publicUsersRows.find(u => u.id === authUser.id) || publicUsersRows[0])
+        : null;
 
       let finalUser = publicUser;
 
@@ -97,12 +146,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Special case: if the email is the admin email, give them ADMIN role automatically
         const isMasterAdmin = authUser.email.toLowerCase() === 'contato@yahhope.com';
+        const preSavedOverride = findUserAccessOverride(overridesMap, { id: authUser.id, email: authUser.email });
         
         const newUser = {
           id: authUser.id,
-          name: candidateName,
+          name: preSavedOverride?.name || candidateName,
           email: authUser.email,
-          role: isMasterAdmin ? 'ADMIN' : 'SPONSOR'
+          role: isMasterAdmin ? 'ADMIN' : (preSavedOverride?.role || authUser.user_metadata?.role || 'SPONSOR')
         };
 
         const { data: insertedUser, error: insertError } = await supabase
@@ -113,11 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (insertError) {
           console.error("Error creating public user:", insertError);
-          alert(`Erro ao vincular perfil de usuário: ${insertError.message}`);
-          setLoading(false);
-          return;
+          finalUser = newUser;
+        } else {
+          finalUser = insertedUser;
         }
-        finalUser = insertedUser;
       } else if (publicUser.id !== authUser.id) {
         // If the email exists but the ID is different (e.g. they deleted and recreated auth user)
         // We should update the public.users record with the new auth ID
@@ -126,12 +175,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .update({ id: authUser.id })
           .eq('email', publicUser.email)
           .select()
-          .single();
+          .maybeSingle();
           
-        if (updateError) {
-          console.error("Error updating public user ID:", updateError);
-          // If we can't update, we just continue with publicUser to at least allow login
-        } else {
+        if (!updateError && updatedUser) {
           finalUser = updatedUser;
         }
       }
@@ -153,21 +199,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]).catch(linkErr => console.warn('Aviso ao sincronizar doações do apoiador:', linkErr));
       }
 
-      // 3. Build the User object for context (with fallback to auth metadata if table columns aren't populated yet)
-      const roleStr = (finalUser.role || 'SPONSOR').toUpperCase() as Role;
-      const avatarImg = finalUser.avatar_url || finalUser.avatar || authUser.user_metadata?.avatar_url;
-      const phoneVal = finalUser.phone || authUser.user_metadata?.phone;
-      const aboutVal = finalUser.about || authUser.user_metadata?.about;
+      // 3. Build the User object for context (merging site_settings overrides + public.users + auth metadata)
+      const savedOverride = findUserAccessOverride(overridesMap, {
+        id: finalUser?.id || authUser.id,
+        email: finalUser?.email || authUser.email,
+      });
+
+      const rawRole = savedOverride?.role || finalUser?.role || authUser.user_metadata?.role || 'SPONSOR';
+      const roleStr = String(rawRole).trim().toUpperCase() as Role;
+      const avatarImg = finalUser?.avatar_url || finalUser?.avatar || authUser.user_metadata?.avatar_url;
+      const phoneVal = savedOverride?.phone || finalUser?.phone || authUser.user_metadata?.phone;
+      const aboutVal = finalUser?.about || authUser.user_metadata?.about;
+
+      const overridePerms = Array.isArray(savedOverride?.permissions) && savedOverride!.permissions!.length > 0
+        ? savedOverride!.permissions!
+        : null;
+      const dbPerms = Array.isArray(finalUser?.permissions) && finalUser.permissions.length > 0
+        ? finalUser.permissions
+        : null;
+      const metaPerms = Array.isArray(authUser?.user_metadata?.permissions) && authUser.user_metadata.permissions.length > 0
+        ? authUser.user_metadata.permissions
+        : null;
+
+      const resolvedPermissions = overridePerms || dbPerms || metaPerms || getPermissionsForRole(roleStr);
 
       const contextUser: User = {
-        id: finalUser.id,
-        name: finalUser.name,
-        email: finalUser.email,
+        id: finalUser?.id || authUser.id,
+        name: savedOverride?.name || finalUser?.name || authUser.user_metadata?.full_name || authUser.email,
+        email: finalUser?.email || authUser.email,
         role: roleStr,
-        permissions: (finalUser.permissions && Array.isArray(finalUser.permissions) && (roleStr !== 'OBSERVER' || finalUser.permissions.length > 0))
-          ? finalUser.permissions
-          : getPermissionsForRole(roleStr),
-        avatar: avatarImg || (finalUser.name ? finalUser.name[0].toUpperCase() : 'U'),
+        permissions: resolvedPermissions,
+        avatar: avatarImg || (finalUser?.name ? finalUser.name[0].toUpperCase() : 'U'),
         avatar_url: avatarImg || undefined,
         phone: phoneVal || undefined,
         about: aboutVal || undefined

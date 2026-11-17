@@ -17,7 +17,54 @@ serve(async (req) => {
   }
 
   try {
-    const { email, name, role } = await req.json()
+    const bodyPayload = await req.json()
+    const { action, id, email, name, role, permissions, phone, department, status, category_id } = bodyPayload
+
+    // Action para atualizar permissões/dados de usuário com Service Role (ignora RLS e sincroniza Auth Metadata)
+    if (action === 'update_user') {
+      const cleanEmail = (email || '').trim().toLowerCase()
+      const permsArray = Array.isArray(permissions) ? permissions : []
+
+      const fullDbUpdate: Record<string, any> = {}
+      if (name !== undefined) fullDbUpdate.name = name
+      if (cleanEmail) fullDbUpdate.email = cleanEmail
+      if (role !== undefined) fullDbUpdate.role = role
+      if (permissions !== undefined) fullDbUpdate.permissions = permsArray
+      if (phone !== undefined) fullDbUpdate.phone = phone
+
+      const minDbUpdate: Record<string, any> = {}
+      if (name !== undefined) minDbUpdate.name = name
+      if (cleanEmail) minDbUpdate.email = cleanEmail
+      if (role !== undefined) minDbUpdate.role = role
+
+      if (id) {
+        const { error: errFull } = await supabase.from('users').update(fullDbUpdate).eq('id', id)
+        if (errFull) {
+          await supabase.from('users').update(minDbUpdate).eq('id', id)
+        }
+        await supabase.auth.admin.updateUserById(id, {
+          user_metadata: {
+            full_name: name,
+            role: role,
+            permissions: permsArray,
+            phone: phone,
+            department: department,
+            status: status,
+            category_id: category_id,
+          }
+        }).catch(() => {})
+      } else if (cleanEmail) {
+        const { error: errFull } = await supabase.from('users').update(fullDbUpdate).ilike('email', cleanEmail)
+        if (errFull) {
+          await supabase.from('users').update(minDbUpdate).ilike('email', cleanEmail)
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
 
     if (!email) {
       throw new Error("E-mail é obrigatório")
@@ -32,7 +79,12 @@ serve(async (req) => {
       type: 'invite',
       email: email,
       options: {
-        data: { full_name: name, role: role || 'USER' },
+        data: {
+          full_name: name,
+          role: role || 'USER',
+          permissions: Array.isArray(permissions) ? permissions : undefined,
+          phone: phone || undefined,
+        },
         redirectTo: 'https://yahhope.com/set-password'
       }
     });
@@ -49,10 +101,16 @@ serve(async (req) => {
         id: linkData.user.id,
         name: name,
         email: email,
-        role: role || 'USER'
+        role: role || 'USER',
+        ...(Array.isArray(permissions) ? { permissions } : {})
       });
       if (dbError) {
-        console.error('Erro ao salvar em public.users:', dbError);
+        await supabase.from('users').upsert({
+          id: linkData.user.id,
+          name: name,
+          email: email,
+          role: role || 'USER'
+        });
       }
     }
 

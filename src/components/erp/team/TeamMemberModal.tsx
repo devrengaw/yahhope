@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabase';
 interface TeamMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (member: Omit<TeamMember, 'id'>) => void;
+  onSave: (member: Omit<TeamMember, 'id'>) => Promise<void> | void;
   editingMember?: TeamMember | null;
 }
 
@@ -21,6 +21,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
   const [categoryId, setCategoryId] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['dashboard']);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,13 +35,20 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
     if (editingMember) {
       setName(editingMember.name);
       setEmail(editingMember.email);
-      setPhone(editingMember.phone);
+      setPhone(editingMember.phone === '-' ? '' : (editingMember.phone || ''));
       setRole(editingMember.role);
       setStatus(editingMember.status);
       setJoinDate(editingMember.join_date);
       setDepartment(editingMember.department || '');
       setCategoryId(editingMember.category_id || '');
-      setSelectedPermissions(editingMember.permissions || ['dashboard']);
+      const existingPerms = Array.isArray(editingMember.permissions) ? editingMember.permissions : [];
+      if (existingPerms.length > 0) {
+        setSelectedPermissions(existingPerms);
+      } else if (String(editingMember.role).toLowerCase() === 'observer') {
+        setSelectedPermissions(['patients']);
+      } else {
+        setSelectedPermissions(['dashboard']);
+      }
     } else {
       setName('');
       setEmail('');
@@ -58,14 +66,15 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
     {
       name: 'Gestão YAH Hope (Admin)',
       modules: [
-        { id: 'dashboard', label: 'Dashboard de Acessos' },
+        { id: 'analytics', label: 'Dashboard de Acessos' },
+        { id: 'hotsite', label: 'Hotsite da Campanha' },
         { id: 'impact-feed', label: 'Feed de Impacto' },
         { id: 'messages', label: 'Mensagens' },
         { id: 'fundraising', label: 'Financeiro (Captação)' },
-        { id: 'projects', label: 'Projetos Globais' },
+        { id: 'admin-projects', label: 'Projetos Globais' },
         { id: 'local-projects', label: 'Projetos Locais' },
         { id: 'users', label: 'Usuários' },
-        { id: 'finance', label: 'Financeiro' },
+        { id: 'admin-finance', label: 'Financeiro' },
         { id: 'gifts', label: 'Presentes' },
         { id: 'store', label: 'Gestão da Loja' },
         { id: 'settings', label: 'Configurações' },
@@ -74,12 +83,18 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
     {
       name: 'Comunicação',
       modules: [
-        { id: 'projects', label: 'Projetos' },
+        { id: 'comm-dashboard', label: 'Dashboard' },
+        { id: 'top-banner', label: 'Aviso do Topo' },
+        { id: 'home-highlights', label: 'Destaques Home' },
+        { id: 'impact-metrics', label: 'Cards de Impacto' },
+        { id: 'comm-projects', label: 'Projetos' },
         { id: 'chat', label: 'Chat' },
         { id: 'blog', label: 'Blog' },
+        { id: 'campaigns', label: 'Disparo de E-mails' },
         { id: 'email-templates', label: 'Templates de email' },
+        { id: 'newsletter', label: 'Inscritos na Newsletter' },
         { id: 'communication-finance', label: 'Custos Fixos e Variados' },
-        { id: 'management', label: 'Gestão' },
+        { id: 'comm-management', label: 'Gestão' },
       ]
     },
     {
@@ -121,49 +136,43 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
       ]
     },
     {
-      name: 'Gestão de Projetos (ERP)',
+      name: 'Gestão de Projetos (ERP / Workspace)',
       modules: [
-        { id: 'dashboard', label: 'Dashboard' },
-        { id: 'projects', label: 'Projetos' },
-        { id: 'finance', label: 'Financeiro' },
-        { id: 'team', label: 'Equipe' },
+        { id: 'workspace', label: 'Meu Workspace / Início' },
+        { id: 'my-tasks', label: 'Minhas Tarefas' },
+        { id: 'erp-projects', label: 'Projetos' },
         { id: 'calendar', label: 'Agenda' },
+        { id: 'inbox', label: 'Caixa de Entrada' },
+        { id: 'team', label: 'Equipe' },
       ]
     }
   ];
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !email || !phone || !joinDate) return;
+    if (!name || !email || !joinDate) return;
 
-    onSave({
-      name,
-      email,
-      phone,
-      role,
-      status,
-      join_date: joinDate,
-      department,
-      category_id: categoryId || undefined,
-      permissions: role === 'observer'
-        ? (selectedPermissions.length > 0 ? selectedPermissions : ['patients'])
-        : selectedPermissions
-    });
-    
-    // Reset form
-    setName('');
-    setEmail('');
-    setPhone('');
-    setRole('volunteer');
-    setStatus('active');
-    setJoinDate(new Date().toISOString().split('T')[0]);
-    setDepartment('');
-    setCategoryId('');
-    setSelectedPermissions(['dashboard']);
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSave({
+        name,
+        email,
+        phone: phone.trim() || '-',
+        role,
+        status,
+        join_date: joinDate,
+        department,
+        category_id: categoryId || undefined,
+        permissions: role === 'observer'
+          ? (selectedPermissions.length > 0 ? selectedPermissions : ['patients'])
+          : selectedPermissions
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -300,12 +309,40 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
           </div>
 
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">Acessos Permitidos (Módulos)</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">Acessos Permitidos (Módulos)</label>
+              <button
+                type="button"
+                onClick={() => setSelectedPermissions([])}
+                className="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+              >
+                Desmarcar todos
+              </button>
+            </div>
             
             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-              {moduleGroups.map((group) => (
+              {moduleGroups.map((group) => {
+                const groupIds = group.modules.map(m => m.id);
+                const allGroupSelected = groupIds.every(id => selectedPermissions.includes(id));
+
+                return (
                 <div key={group.name} className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                  <h4 className="font-semibold text-slate-800 text-sm">{group.name}</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-slate-800 text-sm">{group.name}</h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (allGroupSelected) {
+                          setSelectedPermissions(prev => prev.filter(p => !groupIds.includes(p)));
+                        } else {
+                          setSelectedPermissions(prev => Array.from(new Set([...prev, ...groupIds])));
+                        }
+                      }}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                    >
+                      {allGroupSelected ? 'Limpar grupo' : 'Marcar todos'}
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {group.modules.map(module => (
                       <label key={module.id} className="flex items-center gap-2 cursor-pointer group">
@@ -315,9 +352,9 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
                             checked={selectedPermissions.includes(module.id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedPermissions([...selectedPermissions, module.id]);
+                                setSelectedPermissions(prev => Array.from(new Set([...prev, module.id])));
                               } else {
-                                setSelectedPermissions(selectedPermissions.filter(p => p !== module.id));
+                                setSelectedPermissions(prev => prev.filter(p => p !== module.id));
                               }
                             }}
                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20"
@@ -330,25 +367,28 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             
-            <p className="text-[10px] text-slate-500 italic mt-2">Usuários verão apenas os módulos selecionados acima.</p>
+            <p className="text-[10px] text-slate-500 italic mt-2">Usuários verão apenas os módulos e botões selecionados acima (no computador e no celular).</p>
           </div>
           
           <div className="pt-4 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-colors"
+              disabled={isSaving}
+              className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+              disabled={isSaving}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
             >
-              {editingMember ? 'Salvar Alterações' : 'Adicionar Membro'}
+              {isSaving ? 'Salvando...' : editingMember ? 'Salvar Alterações' : 'Adicionar Membro'}
             </button>
           </div>
         </form>

@@ -16,6 +16,7 @@ import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../contexts/AuthContext';
 import { isInternalTeamUser } from '../../../utils/userCleanup';
+import { fetchUserAccessOverrides, findUserAccessOverride, saveUserAccessOverride } from '../../../lib/universityPermissions';
 
 interface UserRecord {
   id: string;
@@ -53,9 +54,22 @@ export function ManageCostsAccessModal({
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('users').select('*').order('name');
+      const [{ data }, overridesMap] = await Promise.all([
+        supabase.from('users').select('*').order('name'),
+        fetchUserAccessOverrides()
+      ]);
       if (data) {
-        setUsers((data as UserRecord[]).filter(u => isInternalTeamUser(u)));
+        const merged = (data as UserRecord[]).map(u => {
+          const ov = findUserAccessOverride(overridesMap, { id: u.id, email: u.email });
+          return {
+            ...u,
+            role: ov?.role || u.role,
+            permissions: Array.isArray(ov?.permissions) && ov!.permissions!.length > 0
+              ? ov!.permissions!
+              : (Array.isArray(u.permissions) ? u.permissions : []),
+          };
+        });
+        setUsers(merged.filter(u => isInternalTeamUser(u)));
       }
     } catch (err) {
       console.error('Erro ao buscar usuários:', err);
@@ -80,12 +94,13 @@ export function ManageCostsAccessModal({
         ? currentPerms.filter(p => p !== permKey)
         : [...currentPerms, permKey];
 
-      const { error } = await supabase
-        .from('users')
-        .update({ permissions: newPerms })
-        .eq('id', userToUpdate.id);
-
-      if (error) throw error;
+      await saveUserAccessOverride({
+        id: userToUpdate.id,
+        email: userToUpdate.email,
+        name: userToUpdate.name,
+        role: userToUpdate.role,
+        permissions: newPerms,
+      });
 
       // Atualiza estado local
       setUsers(prev => prev.map(u => u.id === userToUpdate.id ? { ...u, permissions: newPerms } : u));
