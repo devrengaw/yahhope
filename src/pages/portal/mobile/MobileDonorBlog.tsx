@@ -12,8 +12,13 @@ import {
   Clock
 } from 'lucide-react';
 
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTranslatedBlogPosts } from '../../../i18n/blogTranslations';
+
 export function MobileDonorBlog() {
-  const { posts } = useBlog();
+  const { tr, isEn } = useLanguage();
+  const { posts: rawPosts } = useBlog();
+  const posts = useTranslatedBlogPosts(rawPosts, isEn);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -40,7 +45,7 @@ export function MobileDonorBlog() {
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert('Link copiado para a área de transferência!');
+      alert(tr('Link copiado para a área de transferência!', 'Link copied to clipboard!'));
     }
   };
 
@@ -49,10 +54,10 @@ export function MobileDonorBlog() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-          <Newspaper className="text-amber-500" size={24} /> Blog & Notícias
+          <Newspaper className="text-amber-500" size={24} /> {tr('Blog & Notícias', 'Blog & News')}
         </h2>
         <p className="text-xs text-slate-500 mt-1 font-medium">
-          Relatos missionários, avanços nutricionais e testemunhos direto do campo.
+          {tr('Relatos missionários, avanços nutricionais e testemunhos direto do campo.', 'Missionary reports, nutritional breakthroughs, and testimonies straight from the field.')}
         </p>
       </div>
 
@@ -63,7 +68,7 @@ export function MobileDonorBlog() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar artigos e relatos..."
+          placeholder={tr('Buscar artigos e relatos...', 'Search articles and reports...')}
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all shadow-2xs"
         />
       </div>
@@ -80,7 +85,7 @@ export function MobileDonorBlog() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {cat}
+            {cat === 'Todas' ? tr('Todas', 'All') : cat}
           </button>
         ))}
       </div>
@@ -89,7 +94,7 @@ export function MobileDonorBlog() {
       <div className="space-y-4">
         {filteredPosts.length === 0 ? (
           <div className="bg-white p-8 rounded-3xl border border-slate-100 text-center text-xs text-slate-400">
-            Nenhum artigo encontrado.
+            {tr('Nenhum artigo encontrado.', 'No articles found.')}
           </div>
         ) : (
           filteredPosts.map((post) => (
@@ -127,7 +132,7 @@ export function MobileDonorBlog() {
                 </p>
 
                 <div className="pt-2 flex items-center justify-between text-xs font-black text-amber-600">
-                  <span>Ler artigo completo</span>
+                  <span>{tr('Ler artigo completo', 'Read full article')}</span>
                   <ChevronRight size={16} />
                 </div>
               </div>
@@ -146,7 +151,7 @@ export function MobileDonorBlog() {
               className="flex items-center gap-1 text-xs font-black text-slate-700 hover:text-slate-900 p-1"
             >
               <ArrowLeft size={18} />
-              <span>Voltar</span>
+              <span>{tr('Voltar', 'Back')}</span>
             </button>
 
             <button
@@ -202,7 +207,7 @@ export function MobileDonorBlog() {
                 onClick={() => setSelectedPost(null)}
                 className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs rounded-xl transition-all"
               >
-                Voltar para todos os artigos
+                {tr('Voltar para todos os artigos', 'Back to all articles')}
               </button>
             </div>
           </div>

@@ -15,9 +15,13 @@ import { Link } from 'react-router-dom';
 import { useWebsiteProjects } from '../../../contexts/WebsiteProjectsContext';
 import { useDonationModal } from '../../../contexts/DonationModalContext';
 import { YAHHopeProject } from '../../../lib/mockData';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTranslatedProjects } from '../../../i18n/projectTranslations';
 
 export function MobileDonorProjects() {
-  const { projects, loading } = useWebsiteProjects();
+  const { tr, isEn } = useLanguage();
+  const { projects: rawProjects, loading } = useWebsiteProjects();
+  const projects = useTranslatedProjects(rawProjects, isEn);
   const { openDonationModal } = useDonationModal();
   const [selectedProject, setSelectedProject] = useState<YAHHopeProject | null>(null);
 
@@ -31,10 +35,10 @@ export function MobileDonorProjects() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Briefcase className="text-amber-500" size={28} />
-            Projetos YAH Hope
+            {tr('Projetos YAH Hope', 'YAH Hope Projects')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
-            Conheça as frentes missionárias e como suas doações impactam vidas na prática.
+            {tr('Conheça as frentes missionárias e como suas doações impactam vidas na prática.', 'Discover our mission fronts and how your donations impact lives in practice.')}
           </p>
         </div>
 
@@ -43,7 +47,7 @@ export function MobileDonorProjects() {
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black shadow-md shadow-indigo-500/20 transition-all"
         >
           <GraduationCap size={16} />
-          <span>Painel Futuro Universitário</span>
+          <span>{tr('Painel Futuro Universitário', 'University Future Panel')}</span>
           <ArrowRight size={14} />
         </Link>
       </div>
@@ -55,7 +59,7 @@ export function MobileDonorProjects() {
         </div>
       ) : activeProjects.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-xs">
-          <p className="text-slate-500 text-sm font-medium">Nenhum projeto ativo no momento.</p>
+          <p className="text-slate-500 text-sm font-medium">{tr('Nenhum projeto ativo no momento.', 'No active projects at the moment.')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -81,7 +85,7 @@ export function MobileDonorProjects() {
                     className="absolute top-3 left-3 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl shadow-xs"
                     style={{ backgroundColor: project.tag_color || '#F49853' }}
                   >
-                    {project.category || 'Missão'}
+                    {project.category || tr('Missão', 'Mission')}
                   </span>
 
                   <div className="absolute bottom-3 left-4 right-4 text-white">
@@ -126,7 +130,7 @@ export function MobileDonorProjects() {
                     className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Info size={14} />
-                    <span>Detalhes</span>
+                    <span>{tr('Detalhes', 'Details')}</span>
                   </button>
                   <button
                     onClick={() => openDonationModal({
@@ -138,7 +142,7 @@ export function MobileDonorProjects() {
                     className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                   >
                     <Heart size={14} fill="currentColor" />
-                    <span>Apoiar</span>
+                    <span>{tr('Apoiar', 'Support')}</span>
                   </button>
                 </div>
               </div>
@@ -201,7 +205,7 @@ export function MobileDonorProjects() {
                 {selectedProject.beneficiaries_reached && (
                   <div className="bg-emerald-50 p-3 rounded-2xl">
                     <span className="text-[10px] uppercase font-black tracking-wider text-emerald-800 block">
-                      Alcance Atual
+                      {tr('Alcance Atual', 'Current Reach')}
                     </span>
                     <span className="text-xs font-bold text-emerald-950 mt-0.5 block">
                       {selectedProject.beneficiaries_reached}
@@ -211,7 +215,7 @@ export function MobileDonorProjects() {
                 {selectedProject.coordinator && (
                   <div className="bg-amber-50 p-3 rounded-2xl">
                     <span className="text-[10px] uppercase font-black tracking-wider text-amber-800 block">
-                      Coordenação
+                      {tr('Coordenação', 'Coordination')}
                     </span>
                     <span className="text-xs font-bold text-amber-950 mt-0.5 block">
                       {selectedProject.coordinator}
@@ -223,13 +227,13 @@ export function MobileDonorProjects() {
               {/* Gallery Images if available */}
               {selectedProject.gallery_images && selectedProject.gallery_images.length > 0 && (
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-black text-slate-700">Fotos de Campo</span>
+                  <span className="text-xs font-black text-slate-700">{tr('Fotos de Campo', 'Field Photos')}</span>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedProject.gallery_images.map((img, idx) => (
                       <img
                         key={idx}
                         src={img}
-                        alt="Galeria"
+                        alt={tr('Galeria', 'Gallery')}
                         className="w-full h-20 object-cover rounded-xl border border-slate-100"
                       />
                     ))}
@@ -244,7 +248,7 @@ export function MobileDonorProjects() {
                 onClick={() => setSelectedProject(null)}
                 className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 transition-all"
               >
-                Fechar
+                {tr('Fechar', 'Close')}
               </button>
               <button
                 onClick={() => {
@@ -260,7 +264,7 @@ export function MobileDonorProjects() {
                 className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all"
               >
                 <Heart size={14} fill="currentColor" />
-                <span>Apoiar este Projeto</span>
+                <span>{tr('Apoiar este Projeto', 'Support this Project')}</span>
               </button>
             </div>
           </div>

@@ -19,8 +19,10 @@ import {
   Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function PortalMyDonations() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const { allDonations, campaigns, deleteDonation } = useFundraising();
   const { openDonationModal } = useDonationModal();
@@ -49,12 +51,17 @@ export function PortalMyDonations() {
   }, [user?.email, allDonations, campaigns, deleteDonation]);
 
   const handleDeleteDonation = async (id: string, title: string) => {
-    const confirm = window.confirm(`Deseja remover esta doação ("${title}") do seu histórico?`);
+    const confirm = window.confirm(
+      tr(
+        `Deseja remover esta doação ("${title}") do seu histórico?`,
+        `Do you want to remove this donation ("${title}") from your history?`
+      )
+    );
     if (!confirm) return;
 
     const res = await deleteDonation(id);
     if (!res.success) {
-      alert('Não foi possível remover a doação. Tente novamente.');
+      alert(tr('Não foi possível remover a doação. Tente novamente.', 'Could not remove the donation. Please try again.'));
     }
   };
 
@@ -103,7 +110,7 @@ export function PortalMyDonations() {
       const info = getDonationMonthYear(d);
       if (!info) return;
       const dateObj = new Date(info.year, info.month, 1);
-      const rawMonthName = dateObj.toLocaleDateString('pt-BR', { month: 'long' });
+      const rawMonthName = dateObj.toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { month: 'long' });
       const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
       const label = `${monthName} / ${info.year}`;
 
@@ -156,10 +163,10 @@ export function PortalMyDonations() {
 
   const getCampaignTitle = (donation: Donation) => {
     if (donation.campaign_title) return donation.campaign_title;
-    if (donation.is_sponsorship || donation.id?.startsWith('sp_')) return 'Apadrinhamento Mensal (Casa Nutri)';
-    if (!donation.campaign_id) return 'Doação Geral - YAH Hope';
+    if (donation.is_sponsorship || donation.id?.startsWith('sp_')) return tr('Apadrinhamento Mensal (Casa Nutri)', 'Monthly Sponsorship (Casa Nutri)');
+    if (!donation.campaign_id) return tr('Doação Geral - YAH Hope', 'General Donation - YAH Hope');
     const camp = campaigns.find(c => c.id === donation.campaign_id);
-    return camp ? camp.title : 'Campanha Humanitária';
+    return camp ? camp.title : tr('Campanha Humanitária', 'Humanitarian Campaign');
   };
 
   // Filtered list
@@ -179,7 +186,7 @@ export function PortalMyDonations() {
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+      return d.toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -192,10 +199,10 @@ export function PortalMyDonations() {
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Receipt className="text-amber-500" size={32} />
-            Minhas Doações
+            {tr('Minhas Doações', 'My Donations')}
           </h1>
           <p className="text-slate-500 text-sm mt-1 font-medium">
-            Histórico das suas contribuições e o impacto gerado na vida das crianças.
+            {tr('Histórico das suas contribuições e o impacto gerado na vida das crianças.', 'History of your contributions and the impact made in children’s lives.')}
           </p>
         </div>
 
@@ -204,7 +211,7 @@ export function PortalMyDonations() {
           className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black px-5 py-3 rounded-2xl shadow-lg shadow-amber-500/25 flex items-center gap-2 transition-all active:scale-[0.98] text-sm"
         >
           <Plus size={18} />
-          <span>Fazer Nova Doação</span>
+          <span>{tr('Fazer Nova Doação', 'Make a New Donation')}</span>
         </button>
       </div>
 
@@ -215,21 +222,21 @@ export function PortalMyDonations() {
           <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-black uppercase tracking-wider text-amber-100 flex items-center gap-1.5">
-              <DollarSign size={14} /> Total Geral Doado
+              <DollarSign size={14} /> {tr('Total Geral Doado', 'All-Time Total Donated')}
             </span>
             <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 text-white px-2.5 py-0.5 rounded-full backdrop-blur-xs">
-              Geral
+              {tr('Geral', 'Overall')}
             </span>
           </div>
           <div>
             <h2 className="text-3xl font-black mt-2 tracking-tight">
-              R$ {stats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {stats.totalPaid.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h2>
             <div className="mt-2 text-xs text-amber-100/90 font-medium flex items-center justify-between flex-wrap gap-1">
-              <span>{stats.countAllTime} {stats.countAllTime === 1 ? 'doação confirmada' : 'doações confirmadas'}</span>
+              <span>{stats.countAllTime} {stats.countAllTime === 1 ? tr('doação confirmada', 'confirmed donation') : tr('doações confirmadas', 'confirmed donations')}</span>
               {selectedMonth !== 'all' && (
                 <span className="bg-amber-600/70 border border-amber-400/40 px-2 py-0.5 rounded-md font-bold text-white text-[11px]">
-                  Neste mês: R$ {stats.totalPaidMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {tr('Neste mês:', 'This month:')} R$ {stats.totalPaidMonth.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               )}
             </div>
@@ -239,14 +246,14 @@ export function PortalMyDonations() {
         {/* Meals Provided Impact */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-            <Sparkles size={14} /> Impacto Alimentar
+            <Sparkles size={14} /> {tr('Impacto Alimentar', 'Nutritional Impact')}
           </span>
           <div>
             <h3 className="text-3xl font-black text-slate-900 mt-2">
               ~{stats.mealsProvided}
             </h3>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              Refeições nutritivas e suplementos viabilizados
+              {tr('Refeições nutritivas e suplementos viabilizados', 'Nutritious meals and supplements provided')}
             </p>
           </div>
         </div>
@@ -254,14 +261,14 @@ export function PortalMyDonations() {
         {/* Support status */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
-            <Heart size={14} /> Vidas Alcançadas
+            <Heart size={14} /> {tr('Vidas Alcançadas', 'Lives Reached')}
           </span>
           <div>
             <h3 className="text-3xl font-black text-slate-900 mt-2">
-              {stats.medicalKits > 0 ? `${stats.medicalKits} kits` : 'Apoio Ativo'}
+              {stats.medicalKits > 0 ? `${stats.medicalKits} ${tr('kits', 'kits')}` : tr('Apoio Ativo', 'Active Support')}
             </h3>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              Apoio essencial para famílias vulneráveis
+              {tr('Apoio essencial para famílias vulneráveis', 'Essential support for vulnerable families')}
             </p>
           </div>
         </div>
@@ -280,7 +287,7 @@ export function PortalMyDonations() {
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              Todas ({myDonations.length})
+              {tr('Todas', 'All')} ({myDonations.length})
             </button>
             <button
               onClick={() => setStatusFilter('paid')}
@@ -290,7 +297,7 @@ export function PortalMyDonations() {
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              Pagas ({myDonations.filter(d => d.status === 'paid').length})
+              {tr('Pagas', 'Paid')} ({myDonations.filter(d => d.status === 'paid').length})
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
@@ -300,20 +307,20 @@ export function PortalMyDonations() {
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              Pendentes ({myDonations.filter(d => d.status === 'pending').length})
+              {tr('Pendentes', 'Pending')} ({myDonations.filter(d => d.status === 'pending').length})
             </button>
           </div>
 
           {/* Month Filter Selector */}
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-xs">
             <Calendar size={14} className="text-amber-500 shrink-0" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Mês:</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">{tr('Mês:', 'Month:')}</span>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="bg-transparent text-xs font-black text-slate-800 focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all">Todos os Meses</option>
+              <option value="all">{tr('Todos os Meses', 'All Months')}</option>
               {availableMonths.map(m => (
                 <option key={m.key} value={m.key}>
                   {m.label} ({m.count})
@@ -329,7 +336,7 @@ export function PortalMyDonations() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por campanha..."
+            placeholder={tr('Buscar por campanha...', 'Search by campaign...')}
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
           />
         </div>
@@ -341,14 +348,14 @@ export function PortalMyDonations() {
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-amber-600" />
             <span>
-              Filtrando pelo mês: <strong className="font-bold text-amber-900">{availableMonths.find(m => m.key === selectedMonth)?.label}</strong> • {filteredDonations.length} {filteredDonations.length === 1 ? 'doação encontrada' : 'doações encontradas'}
+              {tr('Filtrando pelo mês:', 'Filtering by month:')} <strong className="font-bold text-amber-900">{availableMonths.find(m => m.key === selectedMonth)?.label}</strong> • {filteredDonations.length} {filteredDonations.length === 1 ? tr('doação encontrada', 'donation found') : tr('doações encontradas', 'donations found')}
             </span>
           </div>
           <button
             onClick={() => setSelectedMonth('all')}
             className="text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer text-xs"
           >
-            Limpar filtro de mês
+            {tr('Limpar filtro de mês', 'Clear month filter')}
           </button>
         </div>
       )}
@@ -361,13 +368,13 @@ export function PortalMyDonations() {
               <Receipt size={32} />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-800">Nenhuma doação encontrada</h3>
+              <h3 className="text-lg font-black text-slate-800">{tr('Nenhuma doação encontrada', 'No donations found')}</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-medium">
                 {myDonations.length === 0
-                  ? 'Você ainda não possui doações registradas com este e-mail. Faça sua primeira doação para apoiar os projetos da YAH Hope!'
+                  ? tr('Você ainda não possui doações registradas com este e-mail. Faça sua primeira doação para apoiar os projetos da YAH Hope!', 'You do not have any donations recorded with this email yet. Make your first donation to support YAH Hope projects!')
                   : selectedMonth !== 'all'
-                  ? `Nenhuma doação corresponde ao mês de ${availableMonths.find(m => m.key === selectedMonth)?.label || selectedMonth}.`
-                  : 'Nenhuma doação corresponde aos filtros selecionados.'}
+                  ? tr(`Nenhuma doação corresponde ao mês de ${availableMonths.find(m => m.key === selectedMonth)?.label || selectedMonth}.`, `No donations match ${availableMonths.find(m => m.key === selectedMonth)?.label || selectedMonth}.`)
+                  : tr('Nenhuma doação corresponde aos filtros selecionados.', 'No donations match the selected filters.')}
               </p>
             </div>
             {selectedMonth !== 'all' ? (
@@ -375,14 +382,14 @@ export function PortalMyDonations() {
                 onClick={() => setSelectedMonth('all')}
                 className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer mx-auto"
               >
-                <Calendar size={16} /> Ver Todos os Meses
+                <Calendar size={16} /> {tr('Ver Todos os Meses', 'View All Months')}
               </button>
             ) : (
               <button
                 onClick={() => openDonationModal()}
                 className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer mx-auto"
               >
-                <Heart size={16} /> Fazer uma Doação Agora
+                <Heart size={16} /> {tr('Fazer uma Doação Agora', 'Make a Donation Now')}
               </button>
             )}
           </div>
@@ -422,7 +429,7 @@ export function PortalMyDonations() {
                       </h4>
                       {donation.is_sponsorship && (
                         <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-black uppercase tracking-wider border border-rose-200">
-                          Apadrinhamento
+                          {tr('Apadrinhamento', 'Sponsorship')}
                         </span>
                       )}
                     </div>
@@ -432,7 +439,7 @@ export function PortalMyDonations() {
                       </span>
                       <span>•</span>
                       <span className="uppercase text-[10px] font-bold tracking-wider">
-                        {donation.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}
+                        {donation.payment_method === 'pix' ? 'PIX' : tr('Cartão de Crédito', 'Credit Card')}
                       </span>
                     </div>
                   </div>
@@ -441,7 +448,7 @@ export function PortalMyDonations() {
                 <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <div className="text-left sm:text-right">
                     <span className="text-base sm:text-lg font-black text-slate-900 block">
-                      R$ {donation.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {donation.amount?.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                     <span
                       className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-0.5 ${
@@ -452,7 +459,7 @@ export function PortalMyDonations() {
                           : 'bg-rose-100 text-rose-800'
                       }`}
                     >
-                      {isPaid ? 'Confirmada' : isPending ? 'Pendente' : 'Cancelada'}
+                      {isPaid ? tr('Confirmada', 'Confirmed') : isPending ? tr('Pendente', 'Pending') : tr('Cancelada', 'Canceled')}
                     </span>
                   </div>
 
@@ -462,14 +469,14 @@ export function PortalMyDonations() {
                         onClick={() => openDonationModal({ campaignId: donation.campaign_id, initialAmount: donation.amount })}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition-all"
                       >
-                        Pagar Pix
+                        {tr('Pagar Pix', 'Pay Pix')}
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => handleDeleteDonation(donation.id, getCampaignTitle(donation.campaign_id))}
+                      onClick={() => handleDeleteDonation(donation.id, getCampaignTitle(donation))}
                       className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                      title="Excluir doação do histórico"
+                      title={tr('Excluir doação do histórico', 'Remove donation from history')}
                     >
                       <Trash2 size={16} />
                     </button>

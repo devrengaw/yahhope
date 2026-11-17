@@ -20,8 +20,10 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useFundraising } from '../../../contexts/FundraisingContext';
 import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail, calculateChildAge, calculatePackageExpirationDate } from '../../../services/sponsorshipService';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export function MobileDonorSponsor() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -59,7 +61,7 @@ export function MobileDonorSponsor() {
   const quotaCost = metrics?.quotaCost || 90;
   const monthlyTotal = quotasCount * quotaCost;
   const totalAmount = paymentMethod === 'pix' ? monthlyTotal * pixPackageMonths : monthlyTotal;
-  const previewExpirationDate = new Date(calculatePackageExpirationDate(pixPackageMonths)).toLocaleDateString('pt-BR');
+  const previewExpirationDate = new Date(calculatePackageExpirationDate(pixPackageMonths)).toLocaleDateString(isEn ? 'en-US' : 'pt-BR');
 
   const pixKey = 'contato@yahhope.org';
   const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${totalAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
@@ -82,28 +84,28 @@ export function MobileDonorSponsor() {
   const predefinedQuotas = [
     { 
       count: 1, 
-      label: '1 Cota (1 Criança)', 
+      label: tr('1 Cota (1 Criança)', '1 Quota (1 Child)'), 
       amount: quotaCost, 
-      impact: 'Nutrição plena diária, exames clínicos e relatórios mensais',
-      badge: 'Mais Escolhido' 
+      impact: tr('Nutrição plena diária, exames clínicos e relatórios mensais', 'Full daily nutrition, clinical exams, and monthly reports'),
+      badge: tr('Mais Escolhido', 'Most Popular') 
     },
     { 
       count: 2, 
-      label: '2 Cotas (2 Crianças)', 
+      label: tr('2 Cotas (2 Crianças)', '2 Quotas (2 Children)'), 
       amount: quotaCost * 2, 
-      impact: 'Transformação ampliada para duas vidas com suporte integral' 
+      impact: tr('Transformação ampliada para duas vidas com suporte integral', 'Expanded transformation for two lives with full support') 
     },
     { 
       count: 3, 
-      label: '3 Cotas (3 Crianças)', 
+      label: tr('3 Cotas (3 Crianças)', '3 Quotas (3 Children)'), 
       amount: quotaCost * 3, 
-      impact: 'Guardião de 3 vidas na Casa Nutri com assistência multidisciplinar' 
+      impact: tr('Guardião de 3 vidas na Casa Nutri com assistência multidisciplinar', 'Guardian of 3 lives at Casa Nutri with multidisciplinary care') 
     },
     { 
       count: 4, 
-      label: '4 Cotas (4 Crianças)', 
+      label: tr('4 Cotas (4 Crianças)', '4 Quotas (4 Children)'), 
       amount: quotaCost * 4, 
-      impact: 'Grande impacto comunitário no resgate de desnutrição crônica' 
+      impact: tr('Grande impacto comunitário no resgate de desnutrição crônica', 'Major community impact in rescuing chronic malnutrition') 
     },
   ];
 
@@ -204,11 +206,11 @@ export function MobileDonorSponsor() {
           });
         }
       } else {
-        alert(result.message || 'Todas as crianças já estão apadrinhadas ou ocorreu um erro.');
+        alert(result.message || tr('Todas as crianças já estão apadrinhadas ou ocorreu um erro.', 'All children are already sponsored or an error occurred.'));
       }
     } catch (e: any) {
       console.error(e);
-      alert('Ocorreu um erro ao processar o apadrinhamento.');
+      alert(tr('Ocorreu um erro ao processar o apadrinhamento.', 'An error occurred while processing the sponsorship.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -220,16 +222,16 @@ export function MobileDonorSponsor() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
           <span className="text-xs font-gotham-bold text-[#F49853] uppercase tracking-widest block mb-1">
-            Aliança de Amor • Apadrinhamento
+            {tr('Aliança de Amor • Apadrinhamento', 'Alliance of Love • Sponsorship')}
           </span>
           <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Heart className="text-[#F49853]" size={32} fill="currentColor" /> 
-            {renewChildName ? `Renovar Apadrinhamento (${renewChildName})` : 'Central de Apadrinhamento'}
+            {renewChildName ? tr(`Renovar Apadrinhamento (${renewChildName})`, `Renew Sponsorship (${renewChildName})`) : tr('Central de Apadrinhamento', 'Sponsorship Center')}
           </h2>
           <p className="text-sm text-slate-500 font-gotham-light mt-1">
             {renewChildName
-              ? `Continue acompanhando e sustentando o tratamento nutricional de ${renewChildName} na Casa Nutri.`
-              : 'Apadrinhe uma criança da Casa Nutri via Cartão Mensal ou Pacote PIX (3, 6 ou 12 meses).'}
+              ? tr(`Continue acompanhando e sustentando o tratamento nutricional de ${renewChildName} na Casa Nutri.`, `Continue following and supporting ${renewChildName}’s nutritional treatment at Casa Nutri.`)
+              : tr('Apadrinhe uma criança da Casa Nutri via Cartão Mensal ou Pacote PIX (3, 6 ou 12 meses).', 'Sponsor a child at Casa Nutri via Monthly Card or PIX Package (3, 6, or 12 months).')}
           </p>
         </div>
 
@@ -240,14 +242,14 @@ export function MobileDonorSponsor() {
             className="px-5 py-2.5 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-2 cursor-pointer bg-white text-slate-900 shadow-xs"
           >
             <Heart size={14} fill="currentColor" className="text-[#F49853]" />
-            <span>Apadrinhar Criança</span>
+            <span>{tr('Apadrinhar Criança', 'Sponsor a Child')}</span>
           </button>
           <Link
             to="/portal/sponsorship"
             className="px-5 py-2.5 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-800"
           >
             <Users size={14} className="text-slate-600" />
-            <span>Minhas Crianças</span>
+            <span>{tr('Minhas Crianças', 'My Children')}</span>
           </Link>
         </div>
       </div>
@@ -269,10 +271,10 @@ export function MobileDonorSponsor() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-xs font-gotham-bold text-slate-900 truncate">
-                        {user?.name || 'Padrinho Conectado'}
+                        {user?.name || tr('Padrinho Conectado', 'Connected Sponsor')}
                       </p>
                       <span className="text-[9px] font-gotham-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                        Conta Vinculada ✓
+                        {tr('Conta Vinculada ✓', 'Linked Account ✓')}
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 truncate font-medium">
@@ -290,10 +292,10 @@ export function MobileDonorSponsor() {
                     </div>
                     <div>
                       <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 block">
-                        Renovação de Ciclo Ativa
+                        {tr('Renovação de Ciclo Ativa', 'Active Cycle Renewal')}
                       </span>
                       <p className="text-sm font-heading font-black text-slate-900">
-                        Mantendo o vínculo com {renewChildName}
+                        {tr(`Mantendo o vínculo com ${renewChildName}`, `Continuing sponsorship with ${renewChildName}`)}
                       </p>
                     </div>
                   </div>
@@ -304,10 +306,10 @@ export function MobileDonorSponsor() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500">
-                    Selecione a Quantidade de Cotas
+                    {tr('Selecione a Quantidade de Cotas', 'Select Number of Quotas')}
                   </label>
                   <span className="text-xs text-[#F49853] font-gotham-bold">
-                    R$ {quotaCost},00 / cota mensal
+                    R$ {quotaCost},00 / {tr('cota mensal', 'monthly quota')}
                   </span>
                 </div>
 
@@ -335,7 +337,7 @@ export function MobileDonorSponsor() {
                             R$ {q.amount}
                           </span>
                           <span className="text-xs text-slate-400 font-gotham-medium">
-                            /mês
+                            /{tr('mês', 'mo')}
                           </span>
                         </div>
                         <p className="text-xs font-gotham-bold text-slate-700 mt-1">
@@ -354,13 +356,13 @@ export function MobileDonorSponsor() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500">
-                    Escolha a Modalidade de Pagamento
+                    {tr('Escolha a Modalidade de Pagamento', 'Choose Payment Option')}
                   </label>
                   <span className="text-[11px] font-gotham-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
                     {paymentMethod === 'pix' ? (
-                      <><QrCode size={12} /> Pacote PIX com Vigência Garantida</>
+                      <><QrCode size={12} /> {tr('Pacote PIX com Vigência Garantida', 'PIX Package with Guaranteed Term')}</>
                     ) : (
-                      <><CreditCard size={12} /> Assinatura Recorrente Automática</>
+                      <><CreditCard size={12} /> {tr('Assinatura Recorrente Automática', 'Automatic Recurring Subscription')}</>
                     )}
                   </span>
                 </div>
@@ -382,10 +384,10 @@ export function MobileDonorSponsor() {
                     </div>
                     <div>
                       <h5 className="font-heading font-black text-sm">
-                        Cartão de Crédito
+                        {tr('Cartão de Crédito', 'Credit Card')}
                       </h5>
                       <p className={`text-[11px] ${paymentMethod === 'card' ? 'text-slate-300' : 'text-slate-500'}`}>
-                        Cobrança mensal (R$ {monthlyTotal}/mês)
+                        {tr('Cobrança mensal', 'Monthly billing')} (R$ {monthlyTotal}/{tr('mês', 'mo')})
                       </p>
                     </div>
                   </button>
@@ -406,10 +408,10 @@ export function MobileDonorSponsor() {
                     </div>
                     <div>
                       <h5 className="font-heading font-black text-sm">
-                        PIX (Pacote de Meses)
+                        {tr('PIX (Pacote de Meses)', 'PIX (Multi-Month Package)')}
                       </h5>
                       <p className={`text-[11px] ${paymentMethod === 'pix' ? 'text-orange-50' : 'text-slate-500'}`}>
-                        Pacotes de 3, 6 ou 12 meses
+                        {tr('Pacotes de 3, 6 ou 12 meses', '3, 6, or 12-month packages')}
                       </p>
                     </div>
                   </button>
@@ -419,18 +421,18 @@ export function MobileDonorSponsor() {
                   <div className="p-5 bg-orange-50/60 border border-orange-200/80 rounded-2xl space-y-4 animate-fade-in">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <span className="text-xs font-gotham-bold uppercase tracking-wider text-slate-700">
-                        Selecione o Pacote de Apadrinhamento PIX:
+                        {tr('Selecione o Pacote de Apadrinhamento PIX:', 'Select PIX Sponsorship Package:')}
                       </span>
                       <span className="text-[11px] font-gotham-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                        <Calendar size={12} /> Vigente até {previewExpirationDate}
+                        <Calendar size={12} /> {tr('Vigente até', 'Valid until')} {previewExpirationDate}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {([
-                        { months: 3 as const, title: '3 Meses', subtitle: 'Pacote Trimestral', desc: '3 meses de acompanhamento garantido' },
-                        { months: 6 as const, title: '6 Meses', subtitle: 'Pacote Semestral', desc: '6 meses de acompanhamento garantido', badge: 'Mais Escolhido' },
-                        { months: 12 as const, title: '12 Meses', subtitle: 'Pacote Anual', desc: '1 ano inteiro de apadrinhamento ativo' },
+                        { months: 3 as const, title: tr('3 Meses', '3 Months'), subtitle: tr('Pacote Trimestral', 'Quarterly Package'), desc: tr('3 meses de apadrinhamento', '3 months of sponsorship') },
+                        { months: 6 as const, title: tr('6 Meses', '6 Months'), subtitle: tr('Pacote Semestral', 'Semiannual Package'), desc: tr('6 meses de apadrinhamento', '6 months of sponsorship'), badge: tr('Mais Escolhido', 'Most Popular') },
+                        { months: 12 as const, title: tr('12 Meses', '12 Months'), subtitle: tr('Pacote Anual', 'Annual Package'), desc: tr('1 ano inteiro de apadrinhamento ativo', '1 full year of active sponsorship') },
                       ]).map((pkg) => {
                         const isPkgSelected = pixPackageMonths === pkg.months;
                         const pkgAmount = monthlyTotal * pkg.months;
@@ -459,7 +461,7 @@ export function MobileDonorSponsor() {
                               </span>
                             </div>
                             <p className="text-[10px] text-slate-500 font-medium mt-1">
-                              Equivale a R$ {monthlyTotal}/mês • {pkg.desc}
+                              {tr('Equivale a', 'Equals')} R$ {monthlyTotal}/{tr('mês', 'mo')} • {pkg.desc}
                             </p>
                           </button>
                         );
@@ -469,14 +471,24 @@ export function MobileDonorSponsor() {
                     <div className="p-3.5 bg-white/90 border border-orange-200/70 rounded-xl space-y-1.5 text-xs text-slate-700 leading-relaxed">
                       <p className="font-gotham-bold text-slate-900 flex items-center gap-1.5">
                         <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
-                        Como funciona o seu acesso e o pacote PIX de {pixPackageMonths} meses:
+                        {tr(`Como funciona o seu acesso e o pacote PIX de ${pixPackageMonths} meses:`, `How your access and ${pixPackageMonths}-month PIX package work:`)}
                       </p>
                       <ul className="list-disc pl-5 space-y-1 text-[11px] text-slate-600">
                         <li>
-                          <strong>Acesso contínuo sem interrupção na virada do mês:</strong> Seu apadrinhamento fica registrado pelo período de <strong>{pixPackageMonths} meses</strong> (até <strong>{previewExpirationDate}</strong>).
+                          <strong>{tr('Vigência do pacote:', 'Package validity:')}</strong>{' '}
+                          {isEn ? (
+                            <>Your sponsorship remains active for <strong>{pixPackageMonths} months</strong> (until <strong>{previewExpirationDate}</strong>), without losing your bond at the turn of each month.</>
+                          ) : (
+                            <>Seu apadrinhamento fica registrado pelo período de <strong>{pixPackageMonths} meses</strong> (até <strong>{previewExpirationDate}</strong>), sem perder o vínculo na virada de cada mês.</>
+                          )}
                         </li>
                         <li>
-                          <strong>Liberdade ao final do pacote:</strong> Quando o período estiver chegando ao fim, exibiremos um convite caso deseje renovar. Caso não queira continuar o apadrinhamento, você <strong>continua tendo acesso normal ao sistema e às atualizações gerais do projeto</strong>, deixando apenas de acompanhar a criança individualmente.
+                          <strong>{tr('Liberdade ao final do pacote:', 'Freedom at the end of the package:')}</strong>{' '}
+                          {isEn ? (
+                            <>When the period nears its end, we will show an invitation if you wish to renew. If you choose not to continue sponsoring, you <strong>keep normal access to the portal and all general project updates</strong>, only stopping individual child tracking.</>
+                          ) : (
+                            <>Quando o período estiver chegando ao fim, exibiremos um convite caso deseje renovar. Caso não queira continuar o apadrinhamento, você <strong>continua tendo acesso normal ao sistema e às atualizações gerais do projeto</strong>, deixando apenas de acompanhar a criança individualmente.</>
+                          )}
                         </li>
                       </ul>
                     </div>
@@ -485,14 +497,23 @@ export function MobileDonorSponsor() {
                   <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-2">
                     <div className="flex items-center gap-2 text-blue-900 font-gotham-bold text-xs">
                       <ShieldCheck size={16} className="text-blue-600 shrink-0" />
-                      <span>Como funciona a cobrança no Cartão? Não compromete o seu limite total!</span>
+                      <span>{tr('Como funciona a cobrança no Cartão? Não compromete o seu limite total!', 'How does Card billing work? It does not tie up your full credit limit!')}</span>
                     </div>
                     <ul className="text-xs text-blue-950/80 font-gotham-light space-y-1.5 pl-5 list-disc leading-relaxed">
                       <li>
-                        <strong>Sem bloqueio de limite futuro:</strong> A cada mês é cobrado <strong>apenas o valor da cota do mês (R$ {monthlyTotal.toFixed(2)})</strong>, como uma assinatura mensal.
+                        <strong>{tr('Sem bloqueio de limite futuro:', 'No future limit hold:')}</strong>{' '}
+                        {isEn ? (
+                          <>Each month only <strong>the monthly quota amount (R$ {monthlyTotal.toFixed(2)})</strong> is charged, like a monthly subscription.</>
+                        ) : (
+                          <>A cada mês é cobrado <strong>apenas o valor da cota do mês (R$ {monthlyTotal.toFixed(2)})</strong>, como uma assinatura mensal.</>
+                        )}
                       </li>
                       <li>
-                        <strong>Sem fidelidade forçada:</strong> Você pode pausar, alterar cotas ou cancelar quando quiser. Mesmo se encerrar o apadrinhamento da criança, seu acesso ao portal e às novidades gerais do projeto permanece ativo.
+                        <strong>{tr('Sem fidelidade forçada:', 'No forced lock-in:')}</strong>{' '}
+                        {tr(
+                          'Você pode pausar, alterar cotas ou cancelar quando quiser. Mesmo se encerrar o apadrinhamento da criança, seu acesso ao portal e às novidades gerais do projeto permanece ativo.',
+                          'You can pause, change quotas, or cancel anytime. Even if you end a child sponsorship, your access to the portal and general project news remains active.'
+                        )}
                       </li>
                     </ul>
                   </div>
@@ -504,16 +525,21 @@ export function MobileDonorSponsor() {
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     <Sparkles size={12} className="text-[#F49853]" />
-                    Distribuição Solidária com Amor
+                    {tr('Distribuição Solidária com Amor', 'Compassionate Fair Matching')}
                   </span>
                   <span className="text-xs text-amber-700 font-gotham-bold">
-                    Casa Nutri • Moçambique
+                    {tr('Casa Nutri • Moçambique', 'Casa Nutri • Mozambique')}
                   </span>
                 </div>
                 <div className="p-3 bg-white/90 rounded-xl border border-amber-200/70 text-xs text-amber-950 font-gotham-medium flex items-center gap-2.5">
                   <span className="text-lg shrink-0">💌</span>
                   <span>
-                    <strong>Identificação da sua Criança:</strong> Você conhecerá a foto, o nome, a história e os relatórios de evolução médica da sua criança apadrinhada <strong>logo após a confirmação</strong>!
+                    <strong>{tr('Identificação da sua Criança:', 'Meet Your Child:')}</strong>{' '}
+                    {isEn ? (
+                      <>You will see your sponsored child’s photo, name, story, and medical progress reports <strong>right after confirmation</strong>!</>
+                    ) : (
+                      <>Você conhecerá a foto, o nome, a história e os relatórios de evolução médica da sua criança apadrinhada <strong>logo após a confirmação</strong>!</>
+                    )}
                   </span>
                 </div>
               </div>
@@ -529,8 +555,8 @@ export function MobileDonorSponsor() {
                   {paymentMethod === 'pix' ? <QrCode size={18} /> : <Heart size={18} fill="currentColor" />}
                   <span>
                     {paymentMethod === 'pix'
-                      ? `Confirmar Pacote PIX de ${pixPackageMonths} Meses (R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`
-                      : `Confirmar Apadrinhamento de R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês`}
+                      ? tr(`Confirmar Pacote PIX de ${pixPackageMonths} Meses (R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`, `Confirm ${pixPackageMonths}-Month PIX Package (R$ ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})`)
+                      : tr(`Confirmar Apadrinhamento de R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês`, `Confirm Sponsorship of R$ ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo`)}
                   </span>
                   <ArrowRight size={16} />
                 </button>
@@ -538,7 +564,7 @@ export function MobileDonorSponsor() {
 
               <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-gotham-light">
                 <ShieldCheck size={16} className="text-emerald-500" />
-                <span>Ambiente protegido com criptografia de 256 bits • Acesso garantido ao portal</span>
+                <span>{tr('Ambiente protegido com criptografia de 256 bits', 'Protected environment with 256-bit encryption')}</span>
               </div>
 
             </div>
@@ -552,18 +578,18 @@ export function MobileDonorSponsor() {
               <div>
                 <span className="text-xs font-gotham-bold uppercase tracking-wider text-emerald-600 block mb-1">
                   {assignedResult.paymentMethod === 'pix'
-                    ? `Pacote PIX de ${assignedResult.planMonths} Meses Registrado!`
-                    : 'Apadrinhamento Concluído com Sucesso!'}
+                    ? tr(`Pacote PIX de ${assignedResult.planMonths} Meses Registrado!`, `${assignedResult.planMonths}-Month PIX Package Registered!`)
+                    : tr('Apadrinhamento Concluído com Sucesso!', 'Sponsorship Completed Successfully!')}
                 </span>
                 <h3 className="text-3xl font-heading font-black text-slate-900">
-                  R$ {assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}{' '}
+                  R$ {assignedResult.totalAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}{' '}
                   <span className="text-sm font-normal text-slate-500">
-                    {assignedResult.paymentMethod === 'pix' ? `(${assignedResult.planMonths} meses)` : '/ mês'}
+                    {assignedResult.paymentMethod === 'pix' ? `(${assignedResult.planMonths} ${tr('meses', 'months')})` : `/ ${tr('mês', 'mo')}`}
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-gotham-light">
-                  {assignedResult.assignedChildren.length} {assignedResult.assignedChildren.length === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} com Amor
-                  {assignedResult.expiresAt ? ` • Vigente até ${new Date(assignedResult.expiresAt).toLocaleDateString('pt-BR')}` : ''}
+                  {assignedResult.assignedChildren.length} {assignedResult.assignedChildren.length === 1 ? tr('Criança Apadrinhada com Amor', 'Child Sponsored with Love') : tr('Crianças Apadrinhadas com Amor', 'Children Sponsored with Love')}
+                  {assignedResult.expiresAt ? ` • ${tr('Vigente até', 'Valid until')} ${new Date(assignedResult.expiresAt).toLocaleDateString(isEn ? 'en-US' : 'pt-BR')}` : ''}
                 </p>
               </div>
 
@@ -572,10 +598,10 @@ export function MobileDonorSponsor() {
                 <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl max-w-md mx-auto text-left space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-gotham-bold text-slate-800 uppercase tracking-wider">
-                      Conclua a Transferência PIX
+                      {tr('Conclua a Transferência PIX', 'Complete the PIX Transfer')}
                     </span>
                     <span className="text-[11px] font-gotham-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                      Pacote {assignedResult.planMonths} Meses
+                      {tr('Pacote', 'Package')} {assignedResult.planMonths} {tr('Meses', 'Months')}
                     </span>
                   </div>
 
@@ -587,7 +613,7 @@ export function MobileDonorSponsor() {
                     />
                     <div className="flex-1 w-full space-y-2">
                       <p className="text-xs text-slate-600 leading-snug">
-                        Escaneie o QR Code ou copie a chave PIX abaixo no valor de <strong>R$ {assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>:
+                        {tr('Escaneie o QR Code ou copie a chave PIX abaixo no valor de', 'Scan the QR Code or copy the PIX key below for')} <strong>R$ {assignedResult.totalAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
                       </p>
                       <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                         <span className="text-xs font-mono font-bold text-slate-800 truncate mr-2">{pixKey}</span>
@@ -597,26 +623,35 @@ export function MobileDonorSponsor() {
                           className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 shrink-0 cursor-pointer"
                         >
                           {pixCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                          <span>{pixCopied ? 'Copiado!' : 'Copiar'}</span>
+                          <span>{pixCopied ? tr('Copiado!', 'Copied!') : tr('Copiar', 'Copy')}</span>
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <p className="text-[11px] text-emerald-900 bg-emerald-50 border border-emerald-200 p-3 rounded-xl leading-relaxed">
-                    ✅ <strong>Vigência registrada:</strong> Seu acompanhamento da criança está garantido até <strong>{assignedResult.expiresAt ? new Date(assignedResult.expiresAt).toLocaleDateString('pt-BR') : previewExpirationDate}</strong>. Você não perde acesso na virada de mês!
+                    ✅ <strong>{tr('Vigência registrada:', 'Term registered:')}</strong>{' '}
+                    {isEn ? (
+                      <>Your sponsorship is registered until <strong>{assignedResult.expiresAt ? new Date(assignedResult.expiresAt).toLocaleDateString('en-US') : previewExpirationDate}</strong>. You will not lose your bond at the turn of each month!</>
+                    ) : (
+                      <>Seu apadrinhamento está registrado até <strong>{assignedResult.expiresAt ? new Date(assignedResult.expiresAt).toLocaleDateString('pt-BR') : previewExpirationDate}</strong>. Você não perde o vínculo na virada de mês!</>
+                    )}
                   </p>
                 </div>
               ) : (
                 <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl max-w-md mx-auto text-xs text-emerald-900 font-gotham-light text-left leading-relaxed">
-                  <strong>Assinatura mensal ativa:</strong> A cobrança de R$ {assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ocorrerá mensalmente no seu cartão de crédito, debitando apenas a mensalidade vigente (sem comprometer o limite total do cartão).
+                  <strong>{tr('Assinatura mensal ativa:', 'Active monthly subscription:')}</strong>{' '}
+                  {tr(
+                    `A cobrança de R$ ${assignedResult.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ocorrerá mensalmente no seu cartão de crédito, debitando apenas a mensalidade vigente (sem comprometer o limite total do cartão).`,
+                    `The charge of R$ ${assignedResult.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} will occur monthly on your credit card, billing only the current month (without tying up your total card limit).`
+                  )}
                 </div>
               )}
 
               {/* Crianças Vinculadas */}
               <div className="space-y-3 max-w-md mx-auto text-left">
                 <p className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 text-center">
-                  Sua(s) Criança(s) Apadrinhada(s):
+                  {tr('Sua(s) Criança(s) Apadrinhada(s):', 'Your Sponsored Child(ren):')}
                 </p>
                 {assignedResult.assignedChildren.map(child => (
                   <div key={child.id} className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 flex items-center gap-3">
@@ -646,13 +681,13 @@ export function MobileDonorSponsor() {
                   className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-gotham-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Users size={16} />
-                  <span>Ver em Minhas Crianças</span>
+                  <span>{tr('Ver em Minhas Crianças', 'View in My Children')}</span>
                 </button>
                 <button
                   onClick={() => setAssignedResult(null)}
                   className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
                 >
-                  Apadrinhar Mais Crianças
+                  {tr('Apadrinhar Mais Crianças', 'Sponsor More Children')}
                 </button>
               </div>
 
@@ -668,18 +703,18 @@ export function MobileDonorSponsor() {
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
-                Casa Nutri • Moçambique
+                {tr('Casa Nutri • Moçambique', 'Casa Nutri • Mozambique')}
               </span>
               <span className="text-xs font-gotham-bold text-emerald-400 flex items-center gap-1">
-                <TrendingUp size={14} /> Atendimento Ativo
+                <TrendingUp size={14} /> {tr('Atendimento Ativo', 'Active Care')}
               </span>
             </div>
 
             <h3 className="text-lg font-heading font-black text-white leading-snug">
-              Crianças em Acompanhamento Nutricional
+              {tr('Crianças em Acompanhamento Nutricional', 'Children in Nutritional Care')}
             </h3>
             <p className="text-xs text-slate-300 font-gotham-light">
-              Cada cota garante suplementação, consultas antropométricas e refeições terapêuticas para erradicar a desnutrição infantil severa.
+              {tr('Cada cota garante suplementação, consultas antropométricas e refeições terapêuticas para erradicar a desnutrição infantil severa.', 'Each quota ensures supplementation, anthropometric checkups, and therapeutic meals to eradicate severe child malnutrition.')}
             </p>
 
             {/* Métricas Consolidadas */}
@@ -689,7 +724,7 @@ export function MobileDonorSponsor() {
                   {metrics?.totalChildren || 0}
                 </span>
                 <span className="text-[10px] text-slate-400 font-gotham-light">
-                  Crianças Cadastradas
+                  {tr('Crianças Cadastradas', 'Registered Children')}
                 </span>
               </div>
               <div className="p-2.5 bg-white/5 rounded-2xl">
@@ -697,7 +732,7 @@ export function MobileDonorSponsor() {
                   {metrics?.filledSlots || 0}
                 </span>
                 <span className="text-[10px] text-slate-400 font-gotham-light">
-                  Cotas Ativas
+                  {tr('Cotas Ativas', 'Active Quotas')}
                 </span>
               </div>
               <div className="p-2.5 bg-white/5 rounded-2xl">
@@ -705,7 +740,7 @@ export function MobileDonorSponsor() {
                   {metrics?.availableSlots || 0}
                 </span>
                 <span className="text-[10px] text-slate-400 font-gotham-light">
-                  Vagas Abertas
+                  {tr('Vagas Abertas', 'Open Spots')}
                 </span>
               </div>
             </div>
@@ -714,7 +749,7 @@ export function MobileDonorSponsor() {
             {metrics && (
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between text-xs font-gotham-bold">
-                  <span className="text-slate-400">Taxa de Cobertura</span>
+                  <span className="text-slate-400">{tr('Taxa de Cobertura', 'Coverage Rate')}</span>
                   <span className="text-emerald-400">{metrics.occupancyRate}%</span>
                 </div>
                 <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
@@ -731,25 +766,25 @@ export function MobileDonorSponsor() {
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
             <h4 className="text-sm font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <Sparkles size={16} className="text-[#F49853]" />
-              O Que Seu Apadrinhamento Garante
+              {tr('O Que Seu Apadrinhamento Garante', 'What Your Sponsorship Provides')}
             </h4>
 
             <div className="space-y-3.5 text-xs text-slate-600 font-gotham-light">
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Alimentação Terapêutica:</strong> Refeições diárias com suplementação vitamínica e fórmulas específicas de resgate nutricional.</p>
+                <p><strong>{tr('Alimentação Terapêutica:', 'Therapeutic Nutrition:')}</strong> {tr('Refeições diárias com suplementação vitamínica e fórmulas específicas de resgate nutricional.', 'Daily meals with vitamin supplementation and specialized nutritional recovery formulas.')}</p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Acompanhamento Pediátrico:</strong> Consultas clínicas, pesagem regular e medição antropométrica quinzenal.</p>
+                <p><strong>{tr('Acompanhamento Pediátrico:', 'Pediatric Care:')}</strong> {tr('Consultas clínicas, pesagem regular e medição antropométrica quinzenal.', 'Clinical appointments, regular weigh-ins, and biweekly anthropometric measurements.')}</p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Fotos e Relatórios Mensais:</strong> Acesso a relatórios de evolução exclusivos no seu portal com fotos e curva de peso.</p>
+                <p><strong>{tr('Fotos e Relatórios Mensais:', 'Monthly Photos & Reports:')}</strong> {tr('Acesso a relatórios de evolução exclusivos no seu portal com fotos e curva de peso.', 'Access to exclusive progress reports in your portal with photos and weight curves.')}</p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Vínculo Afetivo:</strong> Possibilidade de enviar mensagens de incentivo e cartinhas para sua criança.</p>
+                <p><strong>{tr('Vínculo Afetivo:', 'Meaningful Connection:')}</strong> {tr('Possibilidade de enviar mensagens de incentivo e cartinhas para sua criança.', 'Opportunity to send encouraging messages and letters to your child.')}</p>
               </div>
             </div>
           </div>
@@ -758,21 +793,21 @@ export function MobileDonorSponsor() {
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
             <h4 className="text-sm font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <Building2 size={16} className="text-[#F49853]" />
-              Compromissos do Padrinho
+              {tr('Compromissos do Padrinho', 'Sponsor Commitments')}
             </h4>
 
             <div className="space-y-3.5 text-xs text-slate-600 font-gotham-light">
               <div className="flex items-start gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>100% Destinado:</strong> Todo o valor vai diretamente para o cuidado das crianças na Casa Nutri.</p>
+                <p><strong>{tr('100% Destinado:', '100% Dedicated:')}</strong> {tr('Todo o valor vai diretamente para o cuidado das crianças na Casa Nutri.', 'Every cent goes directly toward caring for children at Casa Nutri.')}</p>
               </div>
               <div className="flex items-start gap-3">
                 <FileText size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Transparência & Prestação de Contas:</strong> Acompanhe no portal o histórico de contribuições e a prestação de contas periódica da Casa Nutri.</p>
+                <p><strong>{tr('Transparência & Prestação de Contas:', 'Transparency & Accountability:')}</strong> {tr('Acompanhe no portal o histórico de contribuições e a prestação de contas periódica da Casa Nutri.', 'Track your contribution history and Casa Nutri’s periodic accountability reports in your portal.')}</p>
               </div>
               <div className="flex items-start gap-3">
                 <Lock size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong>Sem Burocracia:</strong> Pause, gerencie ou cancele seu apadrinhamento a qualquer momento pelo portal.</p>
+                <p><strong>{tr('Sem Burocracia:', 'No Bureaucracy:')}</strong> {tr('Pause, gerencie ou cancele seu apadrinhamento a qualquer momento pelo portal.', 'Pause, manage, or cancel your sponsorship anytime through the portal.')}</p>
               </div>
             </div>
           </div>

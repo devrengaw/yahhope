@@ -22,8 +22,11 @@ import { useFundraising } from '../../../contexts/FundraisingContext';
 import { sponsorshipService, SupporterCommitmentSummary } from '../../../services/sponsorshipService';
 import { ManageMonthlyPlanModal } from '../../../components/portal/ManageMonthlyPlanModal';
 import { PortalMyDonations } from '../PortalMyDonations';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTranslatedStrings } from '../../../i18n/portalTranslations';
 
 export function MobileDonorDonate() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const { campaigns, activeCampaign, campaign: defaultCamp, createDonation, calculateCampaignProgress } = useFundraising();
   const [activeTab, setActiveTab] = useState<'donate' | 'history'>('donate');
@@ -122,11 +125,16 @@ export function MobileDonorDonate() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const predefinedAmounts = [
-    { value: 50, label: 'R$ 50', impact: 'Plano Essencial • Suplementação vitamínica' },
-    { value: 100, label: 'R$ 100', impact: 'Nutrição Plena • Refeições terapêuticas diárias', badge: 'Mais Escolhido' },
-    { value: 150, label: 'R$ 150', impact: 'Transformador • Tratamento clínico intensivo' },
-    { value: 250, label: 'R$ 250', impact: 'Guardião da Esperança • Resgate nutricional completo' },
+    { value: 50, label: 'R$ 50', impact: tr('Plano Essencial • Suplementação vitamínica', 'Essential Plan • Vitamin supplementation') },
+    { value: 100, label: 'R$ 100', impact: tr('Nutrição Plena • Refeições terapêuticas diárias', 'Full Nutrition • Daily therapeutic meals'), badge: tr('Mais Escolhido', 'Most Popular') },
+    { value: 150, label: 'R$ 150', impact: tr('Transformador • Tratamento clínico intensivo', 'Transformer • Intensive clinical care') },
+    { value: 250, label: 'R$ 250', impact: tr('Guardião da Esperança • Resgate nutricional completo', 'Guardian of Hope • Complete nutritional rescue') },
   ];
+
+  const trDynamic = useTranslatedStrings(
+    [currentCampaign?.title, currentCampaign?.description, ...campaigns.map(c => c.title)],
+    isEn
+  );
 
   const currentAmount = customAmount ? parseFloat(customAmount.replace(/\./g, '').replace(',', '.')) || 0 : selectedAmount;
 
@@ -142,7 +150,7 @@ export function MobileDonorDonate() {
 
   const handleProceedPayment = async () => {
     if (currentAmount < 5) {
-      alert('Por favor, selecione ou digite um valor mínimo de R$ 5,00.');
+      alert(tr('Por favor, selecione ou digite um valor mínimo de R$ 5,00.', 'Please select or enter a minimum amount of R$ 5.00.'));
       return;
     }
 
@@ -214,14 +222,14 @@ export function MobileDonorDonate() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
           <span className="text-xs font-gotham-bold text-[#F49853] uppercase tracking-widest block mb-1">
-            Aliança de Transformação
+            {tr('Aliança de Transformação', 'Alliance of Transformation')}
           </span>
           <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Heart className="text-[#F49853]" size={32} fill="currentColor" /> 
-            Central de Doações
+            {tr('Central de Doações', 'Donation Center')}
           </h2>
           <p className="text-sm text-slate-500 font-gotham-light mt-1">
-            Abençoe vidas na Casa Nutri com Pix instantâneo, cartão ou acompanhe seu histórico de contribuições.
+            {tr('Abençoe vidas na Casa Nutri com Pix instantâneo, cartão ou acompanhe seu histórico de contribuições.', 'Bless lives at Casa Nutri with instant PIX, card, or track your contribution history.')}
           </p>
         </div>
 
@@ -236,7 +244,7 @@ export function MobileDonorDonate() {
             }`}
           >
             <Heart size={14} fill={activeTab === 'donate' ? 'currentColor' : 'none'} className="text-[#F49853]" />
-            <span>Fazer Doação</span>
+            <span>{tr('Fazer Doação', 'Make a Donation')}</span>
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -247,7 +255,7 @@ export function MobileDonorDonate() {
             }`}
           >
             <Receipt size={14} className="text-slate-600" />
-            <span>Histórico de Doações</span>
+            <span>{tr('Histórico de Doações', 'Donation History')}</span>
           </button>
         </div>
       </div>
@@ -270,17 +278,17 @@ export function MobileDonorDonate() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        Apoio Mensal Ativo
+                        {tr('Apoio Mensal Ativo', 'Active Monthly Support')}
                       </span>
                       <span className="text-[11px] text-slate-500 font-gotham-medium">
-                        Regra de Substituição
+                        {tr('Regra de Substituição', 'Replacement Rule')}
                       </span>
                     </div>
                     <h4 className="text-xl font-heading font-black text-slate-900 mt-0.5">
-                      R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}/{tr('mês', 'mo')}
                     </h4>
                     <p className="text-xs text-slate-500 font-gotham-light">
-                      Fundo Geral Casa Nutri • Ao alterar, o novo valor substitui o anterior.
+                      {tr('Fundo Geral Casa Nutri • Ao alterar, o novo valor substitui o anterior.', 'Casa Nutri General Fund • When changed, the new amount replaces the previous one.')}
                     </p>
                   </div>
                 </div>
@@ -291,15 +299,15 @@ export function MobileDonorDonate() {
                     onClick={() => setIsManageModalOpen(true)}
                     className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-all cursor-pointer"
                   >
-                    Alterar / Aumentar
+                    {tr('Alterar / Aumentar', 'Change / Increase')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsManageModalOpen(true)}
                     className="px-3.5 py-2.5 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 rounded-xl text-xs font-gotham-medium transition-all cursor-pointer"
-                    title="Cancelar apoio mensal"
+                    title={tr('Cancelar apoio mensal', 'Cancel monthly support')}
                   >
-                    Cancelar
+                    {tr('Cancelar', 'Cancel')}
                   </button>
                 </div>
               </div>
@@ -316,7 +324,7 @@ export function MobileDonorDonate() {
                 }`}
               >
                 <RefreshCw size={14} />
-                <span>Doação Mensal (Recorrente)</span>
+                <span>{tr('Doação Mensal (Recorrente)', 'Monthly Donation (Recurring)')}</span>
               </button>
               <button
                 onClick={() => setFrequency('single')}
@@ -327,7 +335,7 @@ export function MobileDonorDonate() {
                 }`}
               >
                 <DollarSign size={14} />
-                <span>Doação Única (Pontual)</span>
+                <span>{tr('Doação Única (Pontual)', 'One-Time Donation')}</span>
               </button>
             </div>
 
@@ -339,10 +347,10 @@ export function MobileDonorDonate() {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500">
-                      Escolha o Valor da Contribuição
+                      {tr('Escolha o Valor da Contribuição', 'Choose Contribution Amount')}
                     </label>
                     <span className="text-xs text-[#F49853] font-gotham-bold">
-                      {frequency === 'monthly' ? 'Cobrança Mensal' : 'Contribuição Pontual'}
+                      {frequency === 'monthly' ? tr('Cobrança Mensal', 'Monthly Billing') : tr('Contribuição Pontual', 'One-Time Contribution')}
                     </span>
                   </div>
 
@@ -373,7 +381,7 @@ export function MobileDonorDonate() {
                               {amt.label}
                             </span>
                             <span className="text-xs text-slate-400 font-gotham-medium">
-                              {frequency === 'monthly' ? '/mês' : ''}
+                              {frequency === 'monthly' ? `/${tr('mês', 'mo')}` : ''}
                             </span>
                           </div>
                           <span className="text-xs text-slate-500 font-gotham-light block mt-1 leading-snug">
@@ -392,7 +400,7 @@ export function MobileDonorDonate() {
                       </span>
                       <input
                         type="text"
-                        placeholder="Outro valor personalizado (Ex: 300,00)"
+                        placeholder={tr('Outro valor personalizado (Ex: 300,00)', 'Other custom amount (e.g., 300.00)')}
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value)}
                         className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F49853]/20 focus:border-[#F49853] transition-all"
@@ -405,17 +413,17 @@ export function MobileDonorDonate() {
                 {campaigns.length > 0 && (
                   <div>
                     <label className="block text-xs font-gotham-bold uppercase tracking-wider text-slate-500 mb-2">
-                      Destinar para Campanha da Régua (Opcional)
+                      {tr('Destinar para Campanha da Régua (Opcional)', 'Allocate to Campaign Stage (Optional)')}
                     </label>
                     <select
                       value={selectedCampaignId}
                       onChange={(e) => setSelectedCampaignId(e.target.value)}
                       className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#F49853]/20 focus:border-[#F49853] transition-all"
                     >
-                      <option value="">Fundo Geral YAH Hope • Casa Nutri (Maior Necessidade)</option>
+                      <option value="">{tr('Fundo Geral YAH Hope • Casa Nutri (Maior Necessidade)', 'YAH Hope General Fund • Casa Nutri (Greatest Need)')}</option>
                       {campaigns.map((camp) => (
                         <option key={camp.id} value={camp.id}>
-                          {camp.title} (Meta: R$ {camp.target_amount.toLocaleString('pt-BR')})
+                          {trDynamic(camp.title)} ({tr('Meta:', 'Goal:')} R$ {camp.target_amount.toLocaleString(isEn ? 'en-US' : 'pt-BR')})
                         </option>
                       ))}
                     </select>
@@ -425,7 +433,7 @@ export function MobileDonorDonate() {
                 {/* Método de Pagamento */}
                 <div>
                   <label className="block text-xs font-gotham-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Forma de Pagamento
+                    {tr('Forma de Pagamento', 'Payment Method')}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -438,7 +446,7 @@ export function MobileDonorDonate() {
                       }`}
                     >
                       <QrCode size={18} />
-                      <span>PIX Instantâneo</span>
+                      <span>{tr('PIX Instantâneo', 'Instant PIX')}</span>
                     </button>
                     <button
                       type="button"
@@ -450,13 +458,19 @@ export function MobileDonorDonate() {
                       }`}
                     >
                       <CreditCard size={18} />
-                      <span>Cartão de Crédito</span>
+                      <span>{tr('Cartão de Crédito', 'Credit Card')}</span>
                     </button>
                   </div>
                   {paymentMethod === 'card' && frequency === 'monthly' && (
                     <div className="mt-2.5 p-3 bg-blue-50/70 border border-blue-200/70 rounded-xl text-[11px] text-blue-900 font-gotham-light flex items-center gap-2">
                       <ShieldCheck size={15} className="text-blue-600 shrink-0" />
-                      <span><strong>Cobrança mensal avulsa:</strong> O valor é cobrado a cada 30 dias sem comprometer ou bloquear o limite total do seu cartão de crédito.</span>
+                      <span>
+                        <strong>{tr('Cobrança mensal avulsa:', 'Single monthly charge:')}</strong>{' '}
+                        {tr(
+                          'O valor é cobrado a cada 30 dias sem comprometer ou bloquear o limite total do seu cartão de crédito.',
+                          'The amount is billed every 30 days without tying up or blocking your total credit card limit.'
+                        )}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -472,8 +486,8 @@ export function MobileDonorDonate() {
                     {paymentMethod === 'pix' ? <QrCode size={18} /> : <CreditCard size={18} />}
                     <span>
                       {paymentMethod === 'pix' 
-                        ? `Gerar PIX de R$ ${currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
-                        : `Pagar R$ ${currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no Cartão`}
+                        ? `${tr('Gerar PIX de', 'Generate PIX for')} R$ ${currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}` 
+                        : `${tr('Pagar', 'Pay')} R$ ${currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })} ${tr('no Cartão', 'by Card')}`}
                     </span>
                     <ArrowRight size={16} />
                   </button>
@@ -481,7 +495,7 @@ export function MobileDonorDonate() {
 
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-gotham-light">
                   <ShieldCheck size={16} className="text-emerald-500" />
-                  <span>Ambiente protegido com criptografia de 256 bits</span>
+                  <span>{tr('Ambiente protegido com criptografia de 256 bits', 'Protected environment with 256-bit encryption')}</span>
                 </div>
               </div>
             ) : (
@@ -493,13 +507,13 @@ export function MobileDonorDonate() {
 
                 <div>
                   <span className="text-xs font-gotham-bold uppercase tracking-wider text-emerald-600 block mb-1">
-                    PIX Gerado com Sucesso
+                    {tr('PIX Gerado com Sucesso', 'PIX Generated Successfully')}
                   </span>
                   <h3 className="text-3xl font-heading font-black text-slate-900">
-                    R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1 font-gotham-light">
-                    {frequency === 'monthly' ? 'Compromisso Mensal Recorrente' : 'Doação Única Pontual'}
+                    {frequency === 'monthly' ? tr('Compromisso Mensal Recorrente', 'Recurring Monthly Commitment') : tr('Doação Única Pontual', 'One-Time Donation')}
                   </p>
                 </div>
 
@@ -515,7 +529,7 @@ export function MobileDonorDonate() {
                 {/* Chave Pix Copia e Cola */}
                 <div className="space-y-2 text-left max-w-md mx-auto">
                   <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block">
-                    Chave PIX Oficial (E-mail):
+                    {tr('Chave PIX Oficial (E-mail):', 'Official PIX Key (Email):')}
                   </label>
                   <div className="flex items-center gap-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
                     <span className="text-xs font-mono font-bold text-slate-800 flex-1 truncate">
@@ -527,11 +541,11 @@ export function MobileDonorDonate() {
                     >
                       {isCopied ? (
                         <>
-                          <Check size={14} /> Copiado!
+                          <Check size={14} /> {tr('Copiado!', 'Copied!')}
                         </>
                       ) : (
                         <>
-                          <Copy size={14} /> Copiar Chave
+                          <Copy size={14} /> {tr('Copiar Chave', 'Copy Key')}
                         </>
                       )}
                     </button>
@@ -543,13 +557,13 @@ export function MobileDonorDonate() {
                     onClick={() => setActiveTab('history')}
                     className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
-                    Ver no Histórico
+                    {tr('Ver no Histórico', 'View in History')}
                   </button>
                   <button
                     onClick={() => setPixGenerated(false)}
                     className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
-                    Fazer Outra Doação
+                    {tr('Fazer Outra Doação', 'Make Another Donation')}
                   </button>
                 </div>
               </div>
@@ -564,24 +578,24 @@ export function MobileDonorDonate() {
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
-                    Régua de Arrecadação
+                    {tr('Régua de Arrecadação', 'Fundraising Goal')}
                   </span>
                   <span className="text-xs font-gotham-bold text-emerald-400 flex items-center gap-1">
-                    <TrendingUp size={14} /> {currentActiveStage ? `Fase ${currentActiveStage.stageNumber}` : 'Em Andamento'}
+                    <TrendingUp size={14} /> {currentActiveStage ? `${tr('Fase', 'Stage')} ${currentActiveStage.stageNumber}` : tr('Em Andamento', 'In Progress')}
                   </span>
                 </div>
 
                 <h3 className="text-lg font-heading font-black text-white leading-snug">
-                  {currentCampaign.title}
+                  {trDynamic(currentCampaign.title)}
                 </h3>
                 <p className="text-xs text-slate-300 font-gotham-light line-clamp-2">
-                  {currentCampaign.description}
+                  {trDynamic(currentCampaign.description)}
                 </p>
 
                 {/* Barra de Progresso Real da Fase */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-xs font-gotham-bold">
-                    <span className="text-slate-400">Progresso da Fase</span>
+                    <span className="text-slate-400">{tr('Progresso da Fase', 'Stage Progress')}</span>
                     <span className="text-[#F49853]">
                       {currentStageProgress}%
                     </span>
@@ -593,8 +607,8 @@ export function MobileDonorDonate() {
                     />
                   </div>
                   <div className="flex justify-between text-[11px] text-slate-400 font-gotham-medium pt-0.5">
-                    <span>R$ {currentStageRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-slate-300 font-gotham-bold">Alvo da Fase: R$ {currentStageTarget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {currentStageRaised.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-slate-300 font-gotham-bold">{tr('Alvo da Fase:', 'Stage Goal:')} R$ {currentStageTarget.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>
@@ -604,28 +618,37 @@ export function MobileDonorDonate() {
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-4">
               <h4 className="text-sm font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Building2 size={16} className="text-[#F49853]" />
-                Compromissos do Mantenedor
+                {tr('Compromissos do Mantenedor', 'Supporter Commitments')}
               </h4>
 
               <div className="space-y-3.5 text-xs text-slate-600 font-gotham-light">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <p><strong>100% Destinado:</strong> Todo recurso apoia diretamente alimentação terapêutica, consultas e insumos da Casa Nutri.</p>
+                  <p>
+                    <strong>{tr('100% Destinado:', '100% Dedicated:')}</strong>{' '}
+                    {tr('Todo recurso apoia diretamente alimentação terapêutica, consultas e insumos da Casa Nutri.', 'Every resource directly supports therapeutic feeding, consultations, and supplies at Casa Nutri.')}
+                  </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <FileText size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <p><strong>Transparência & Prestação de Contas:</strong> Acompanhe no portal relatórios periódicos de prestação de contas e a evolução dos atendimentos da Casa Nutri.</p>
+                  <p>
+                    <strong>{tr('Transparência & Prestação de Contas:', 'Transparency & Accountability:')}</strong>{' '}
+                    {tr('Acompanhe no portal relatórios periódicos de prestação de contas e a evolução dos atendimentos da Casa Nutri.', 'Follow periodic accountability reports and Casa Nutri care progress right in your portal.')}
+                  </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <Lock size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p><strong>Sem Burocracia:</strong> Pause, altere ou cancele seu apoio mensal a qualquer momento pelo portal.</p>
+                    <p>
+                      <strong>{tr('Sem Burocracia:', 'No Bureaucracy:')}</strong>{' '}
+                      {tr('Pause, altere ou cancele seu apoio mensal a qualquer momento pelo portal.', 'Pause, update, or cancel your monthly support anytime through the portal.')}
+                    </p>
                     <button
                       type="button"
                       onClick={() => setIsManageModalOpen(true)}
                       className="text-[#F49853] hover:text-[#e0853d] font-gotham-bold text-[11px] underline mt-1 block cursor-pointer"
                     >
-                      Gerenciar meu apoio mensal →
+                      {tr('Gerenciar meu apoio mensal →', 'Manage my monthly support →')}
                     </button>
                   </div>
                 </div>

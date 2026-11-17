@@ -688,8 +688,12 @@ export const sponsorshipService = {
       // 8. Verifica se o padrinho já possui cadastro ativo na plataforma
       const isRegistered = await this.isUserRegistered(cleanEmail);
 
-      // 9. Dispara o E-mail de Apresentação da(s) Criança(s) Apadrinhada(s)
-      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, enrichedChildren, totalAmount, isRegistered);
+      // 9. Dispara o E-mail de Apresentação da(s) Criança(s) Apadrinhada(s) e Acesso ao Portal (inclusive para PIX)
+      await this.sendSponsorshipWelcomeEmail(cleanEmail, donorName, enrichedChildren, totalAmount, isRegistered, false, {
+        paymentMethod,
+        planMonths,
+        expiresAt: finalExpiresAt
+      });
 
       return {
         success: true,
@@ -747,7 +751,8 @@ export const sponsorshipService = {
     children: ChildSponsorshipDetail[],
     monthlyAmount: number,
     isRegistered?: boolean,
-    forceSend: boolean = false
+    forceSend: boolean = false,
+    options?: { paymentMethod?: string; planMonths?: number; expiresAt?: string | null }
   ): Promise<void> {
     const cleanEmail = email.toLowerCase().trim();
     if (isRegistered === undefined) {
@@ -866,16 +871,32 @@ export const sponsorshipService = {
       console.warn('Aviso ao buscar template new_sponsor:', e);
     }
 
-    if (templateData && templateData.is_active === false && !forceSend) {
+    const isPix = String(options?.paymentMethod || '').toLowerCase().includes('pix');
+    const planMonths = options?.planMonths || 1;
+    const expiresAtStr = options?.expiresAt
+      ? new Date(options.expiresAt).toLocaleDateString('pt-BR')
+      : null;
+
+    if (templateData && templateData.is_active === false && !forceSend && !isPix) {
       console.log('Envio de e-mail de padrinho ignorado: template new_sponsor está desativado.');
       return;
     }
 
+    const pixPackageInfoHtml = isPix && planMonths > 1
+      ? `
+        <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 14px; padding: 16px; margin: 18px 0; font-size: 13px; color: #9a3412;">
+          <strong>Pacote PIX de ${planMonths} Meses Registrado</strong><br/>
+          Valor do pacote: <strong>R$ ${monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+          ${expiresAtStr ? ` • Vigente até <strong>${expiresAtStr}</strong>` : ''}
+        </div>
+      `
+      : '';
+
     const childrenNames = children.map(c => c.name).filter(Boolean).join(', ');
     const defaultSubject = 'Bem-vindo à família YAH Hope! 🧡 Finalize seu cadastro';
-    const defaultPreheader = 'Seu apoio mensal como padrinho e mantenedor transforma vidas.';
+    const defaultPreheader = 'Seu apoio como padrinho e mantenedor transforma vidas.';
     const defaultHeading = 'Obrigado por se tornar um padrinho!';
-    const defaultBody = `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio mensal será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`;
+    const defaultBody = `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`;
 
     const emailSubject = (templateData?.subject || defaultSubject)
       .replace(/{{nome_doador}}/gi, name || 'Amigo(a)')
@@ -895,11 +916,15 @@ export const sponsorshipService = {
       .replace(/{{email}}/gi, cleanEmail)
       .replace(/{{nome_crianca}}/gi, childrenNames || 'sua criança apadrinhada');
 
-    const htmlBody = `${rawBody}${childrenCardsHtml ? `<div style="margin-top: 24px;">${childrenCardsHtml}</div>` : ''}`;
+    const htmlBody = `${rawBody}${pixPackageInfoHtml}${childrenCardsHtml ? `<div style="margin-top: 24px;">${childrenCardsHtml}</div>` : ''}`;
 
-    const hasCta = templateData?.has_cta ?? true;
-    const ctaText = templateData?.cta_text || (isRegistered ? 'Acessar Minhas Crianças no Portal' : 'Finalizar Cadastro de Padrinho');
-    const baseCtaUrl = templateData?.cta_url || `${appOrigin}/finalizar-cadastro`;
+    const hasCta = true;
+    const ctaText = isRegistered
+      ? (templateData?.cta_text || 'Acessar Minhas Crianças no Portal')
+      : (templateData?.cta_text || 'Finalizar Cadastro de Padrinho');
+    const baseCtaUrl = isRegistered
+      ? `${appOrigin}/portal/sponsorship`
+      : (templateData?.cta_url || `${appOrigin}/finalizar-cadastro`);
     const sep = baseCtaUrl.includes('?') ? '&' : '?';
     const ctaUrl = (baseCtaUrl.includes('cadastro') || baseCtaUrl.includes('finalizar') || baseCtaUrl.includes('portal') || baseCtaUrl.includes('set-password'))
       ? `${baseCtaUrl}${sep}email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(name)}`
@@ -934,7 +959,11 @@ export const sponsorshipService = {
           sender_name: 'YAH Hope',
           sender_email: 'contato@yahhope.com',
           dispatchSource: forceSend ? 'manual' : 'automatico',
-          dispatchTitle: forceSend ? `[Manual] Boas-vindas Padrinho (${name})` : `[Automático] Boas-vindas Padrinho (${name})`
+          dispatchTitle: forceSend
+            ? `[Manual] Boas-vindas Padrinho (${name})`
+            : isPix
+              ? `[Automático PIX ${planMonths}m] Boas-vindas Padrinho (${name})`
+              : `[Automático] Boas-vindas Padrinho (${name})`
         })
       });
 
@@ -947,6 +976,66 @@ export const sponsorshipService = {
     } catch (e) {
       if (forceSend) throw e;
       console.warn('Fallback de e-mail de apadrinhamento:', e);
+    }
+  },
+
+  /**
+   * Envia e-mail de boas-vindas e acesso ao portal para Mantenedor Geral (ex: via PIX).
+   */
+  async sendMaintainerAccessEmail(
+    email: string,
+    name: string,
+    monthlyAmount: number,
+    paymentMethod: string = 'pix'
+  ): Promise<void> {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) return;
+
+    const isRegistered = await this.isUserRegistered(cleanEmail);
+    const appOrigin = typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://yahhope.org';
+
+    const ctaUrl = isRegistered
+      ? `${appOrigin}/portal/dashboard`
+      : `${appOrigin}/finalizar-cadastro?email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(name || 'Mantenedor')}`;
+    const ctaText = isRegistered ? 'Acessar Portal do Mantenedor' : 'Finalizar Cadastro e Criar Senha';
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) return;
+
+      await fetch(`${supabaseUrl}/functions/v1/send-campaign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`
+        },
+        body: JSON.stringify({
+          isTransactional: true,
+          to: cleanEmail,
+          recipientName: name || 'Mantenedor YAH Hope',
+          subject: 'Bem-vindo à família YAH Hope! 🧡 Seu acesso ao Portal do Mantenedor',
+          heading: 'Obrigado por se tornar um mantenedor!',
+          preheader: 'Seu apoio mensal sustenta a Casa Nutri e transforma vidas.',
+          body_html: `
+            <p>Olá <strong>${name || 'Amigo(a)'}</strong>,</p>
+            <p>Estamos muito felizes em receber você como mantenedor da YAH Hope (R$ ${monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} via ${paymentMethod.toUpperCase()})!</p>
+            <p>No Portal do Mantenedor você acompanha as atualizações gerais do projeto, relatórios de impacto e transparência.</p>
+            <p>Clique no botão abaixo para acessar ou finalizar seu cadastro criando sua senha:</p>
+          `,
+          has_cta: true,
+          cta_text: ctaText,
+          cta_url: ctaUrl,
+          sender_name: 'YAH Hope',
+          sender_email: 'contato@yahhope.com',
+          dispatchSource: 'automatico',
+          dispatchTitle: `[Automático PIX] Acesso Mantenedor (${name || cleanEmail})`
+        })
+      });
+    } catch (e) {
+      console.warn('Aviso ao enviar e-mail de acesso ao mantenedor:', e);
     }
   },
 

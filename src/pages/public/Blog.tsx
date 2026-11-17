@@ -18,10 +18,12 @@ import {
 } from 'lucide-react';
 import { SEO } from '../../components/common/SEO';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslatedBlogPosts } from '../../i18n/blogTranslations';
 
 export function Blog() {
-  const { tr } = useLanguage();
-  const { posts, incrementViews, incrementReads, toggleLike, incrementShares } = useBlog();
+  const { tr, isEn } = useLanguage();
+  const { posts: rawPosts, incrementViews, incrementReads, toggleLike, incrementShares } = useBlog();
+  const posts = useTranslatedBlogPosts(rawPosts, isEn);
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   const navigate = useNavigate();

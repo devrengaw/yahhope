@@ -419,7 +419,6 @@ export function HomeDonationCard({
                   <div className="space-y-1.5 animate-fade-in">
                     <div className="text-[10px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
                       <span>{tr('Pacote de meses no PIX:', 'PIX month package:')}</span>
-                      <span className="text-emerald-600">{tr('Acesso garantido no período', 'Guaranteed access for period')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([3, 6, 12] as const).map((m) => {
@@ -455,7 +454,7 @@ export function HomeDonationCard({
                 <Sparkles size={14} className="text-[#F49853] shrink-0" />
                 <span>
                   {sponsorshipPayMethod === 'pix'
-                    ? tr(`Acesso e apadrinhamento garantidos por ${sponsorshipPixMonths} meses completos.`, `Access and sponsorship guaranteed for ${sponsorshipPixMonths} full months.`)
+                    ? tr(`Pacote de ${sponsorshipPixMonths} meses via PIX. O perfil do afilhado é enviado por e-mail.`, `${sponsorshipPixMonths}-month PIX package. Your sponsored child’s profile is sent by email.`)
                     : tr('Distribuição justa: o perfil do afilhado é enviado após a confirmação.', 'Fair distribution: your sponsored child’s profile is sent after confirmation.')}
                 </span>
               </div>

@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { Send, User, Clock, CheckCircle2, Paperclip, Smile, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function PortalMessages() {
+  const { tr } = useLanguage();
   const [replyText, setReplyText] = useState('');
 
   const messages = [
-    { id: 1, sender: 'Equipe YAHope', text: 'Olá! Como podemos ajudar hoje?', time: '09:00', isMe: false },
-    { id: 2, sender: 'Você', text: 'Gostaria de saber como está o Kofi este mês.', time: '10:45', isMe: true },
-    { id: 3, sender: 'Equipe YAHope', text: 'Olá! O Kofi está ótimo. Ele participou da oficina de artes ontem e se divertiu muito.', time: '11:02', isMe: false },
+    { id: 1, sender: tr('Equipe YAHope', 'YAHope Team'), text: tr('Olá! Como podemos ajudar hoje?', 'Hello! How can we help today?'), time: '09:00', isMe: false },
+    { id: 2, sender: tr('Você', 'You'), text: tr('Gostaria de saber como está o Kofi este mês.', 'I would like to know how Kofi is doing this month.'), time: '10:45', isMe: true },
+    { id: 3, sender: tr('Equipe YAHope', 'YAHope Team'), text: tr('Olá! O Kofi está ótimo. Ele participou da oficina de artes ontem e se divertiu muito.', 'Hello! Kofi is doing great. He joined the arts workshop yesterday and had a lot of fun.'), time: '11:02', isMe: false },
   ];
 
   return (
@@ -21,10 +23,10 @@ export function PortalMessages() {
             YH
           </div>
           <div>
-            <h3 className="font-black text-slate-900 tracking-tight">Suporte YAHope</h3>
+            <h3 className="font-black text-slate-900 tracking-tight">{tr('Suporte YAHope', 'YAHope Support')}</h3>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Online agora</span>
+              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{tr('Online agora', 'Online now')}</span>
             </div>
           </div>
         </div>
@@ -36,7 +38,7 @@ export function PortalMessages() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="text-center">
-          <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest">Canal Direto com a Equipe</span>
+          <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest">{tr('Canal Direto com a Equipe', 'Direct Channel with the Team')}</span>
         </div>
         
         {messages.map(msg => (
@@ -63,7 +65,7 @@ export function PortalMessages() {
           <textarea 
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Escreva sua mensagem..."
+            placeholder={tr('Escreva sua mensagem...', 'Write your message...')}
             rows={1}
             className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-sm font-medium resize-none"
           />

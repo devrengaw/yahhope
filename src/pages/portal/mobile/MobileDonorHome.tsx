@@ -29,8 +29,12 @@ import {
   ZoomIn
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTranslatedBlogPosts } from '../../../i18n/blogTranslations';
+import { translateChildStatus, useTranslatedImpactItems, useTranslatedStrings } from '../../../i18n/portalTranslations';
 
 export function MobileDonorHome() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const { getPublishedItems } = useImpact();
   const { 
@@ -40,7 +44,8 @@ export function MobileDonorHome() {
     campaigns,
     calculateCampaignProgress
   } = useFundraising();
-  const { posts } = useBlog();
+  const { posts: rawPosts } = useBlog();
+  const posts = useTranslatedBlogPosts(rawPosts, isEn);
   const { patients } = usePatients();
   const navigate = useNavigate();
 
@@ -189,14 +194,14 @@ export function MobileDonorHome() {
     const now = new Date();
     const curYear = now.getFullYear();
     const curMonth = now.getMonth();
-    const rawMonthName = now.toLocaleDateString('pt-BR', { month: 'long' });
+    const rawMonthName = now.toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { month: 'long' });
     const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
     return {
       year: curYear,
       month: curMonth,
       name: monthName
     };
-  }, []);
+  }, [isEn]);
 
   // Doações do usuário estritamente no mês atual
   const userMonthlyDonations = useMemo(() => {
@@ -240,9 +245,9 @@ export function MobileDonorHome() {
 
   // Cálculo de idade da criança a partir de dob
   const calculateAge = (dobString?: string) => {
-    if (!dobString) return 'Idade não informada';
+    if (!dobString) return tr('Idade não informada', 'Age not provided');
     const dob = new Date(dobString);
-    if (isNaN(dob.getTime())) return 'Idade não informada';
+    if (isNaN(dob.getTime())) return tr('Idade não informada', 'Age not provided');
     const now = new Date();
     let years = now.getFullYear() - dob.getFullYear();
     let months = now.getMonth() - dob.getMonth();
@@ -250,8 +255,8 @@ export function MobileDonorHome() {
       years--;
       months += 12;
     }
-    if (years > 0) return `${years} ${years === 1 ? 'ano' : 'anos'}`;
-    return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    if (years > 0) return `${years} ${years === 1 ? tr('ano', 'year') : tr('anos', 'years')}`;
+    return `${months} ${months === 1 ? tr('mês', 'month') : tr('meses', 'months')}`;
   };
 
   const isDonorOrSponsor = user?.role === 'SPONSOR' || myChildren.length > 0 || (user?.role !== 'ADMIN' && user?.role !== 'USER');
@@ -286,7 +291,7 @@ export function MobileDonorHome() {
     return getPublishedItems().filter(item => canSupporterViewImpactItem(item, myChildren));
   }, [getPublishedItems, myChildren]);
 
-  const publishedImpact = useMemo(() => {
+  const rawPublishedImpact = useMemo(() => {
     const filtered = allVisibleImpact.filter(item => {
       if (impactFilter === 'general') return !isChildSpecificImpactItem(item);
       if (impactFilter === 'children') return isChildSpecificImpactItem(item);
@@ -294,6 +299,12 @@ export function MobileDonorHome() {
     });
     return filtered.slice(0, 6);
   }, [allVisibleImpact, impactFilter]);
+  const publishedImpact = useTranslatedImpactItems(rawPublishedImpact, isEn);
+
+  const trDynamic = useTranslatedStrings(
+    [currentCampaign?.title, currentCampaign?.description],
+    isEn
+  );
 
   const latestPost = posts.find(p => p.status === 'published') || posts[0];
 
@@ -308,15 +319,18 @@ export function MobileDonorHome() {
           <div className="lg:col-span-7 space-y-5">
             <div className="inline-flex items-center gap-2.5 bg-gradient-to-r from-[#F49853]/25 to-orange-500/10 border border-[#F49853]/40 px-3.5 py-1.5 rounded-full text-[#F49853] text-xs font-gotham-bold uppercase tracking-wider backdrop-blur-sm shadow-xs">
               <Heart size={14} fill="currentColor" className="animate-pulse text-[#F49853]" />
-              <span>Aliança de Esperança • Mantenedor Ativo</span>
+              <span>{tr('Aliança de Esperança • Mantenedor Ativo', 'Alliance of Hope • Active Supporter')}</span>
             </div>
 
             <div className="space-y-2">
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black tracking-tight leading-tight">
-                Ihale, <span className="bg-gradient-to-r from-white via-orange-50 to-[#F49853] bg-clip-text text-transparent">{user?.name?.split(' ')[0] || 'Mantenedor'}</span>!
+                {tr('Ihale,', 'Hello,')} <span className="bg-gradient-to-r from-white via-orange-50 to-[#F49853] bg-clip-text text-transparent">{user?.name?.split(' ')[0] || tr('Mantenedor', 'Supporter')}</span>!
               </h1>
               <p className="text-sm sm:text-base text-slate-300 font-gotham-light leading-relaxed max-w-xl">
-                Sua fidelidade e generosidade sustentam o tratamento de crianças desnutridas na Casa Nutri e geram transformação real para famílias em extrema vulnerabilidade.
+                {tr(
+                  'Sua fidelidade e generosidade sustentam o tratamento de crianças desnutridas na Casa Nutri e geram transformação real para famílias em extrema vulnerabilidade.',
+                  'Your faithfulness and generosity sustain the treatment of malnourished children at Casa Nutri and bring real transformation to families in extreme vulnerability.'
+                )}
               </p>
             </div>
 
@@ -326,14 +340,14 @@ export function MobileDonorHome() {
                 className="group relative overflow-hidden bg-gradient-to-r from-[#F49853] to-orange-500 hover:from-[#e0853d] hover:to-orange-600 text-white font-gotham-bold text-xs uppercase tracking-wider px-6 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-98"
               >
                 <Heart size={16} fill="currentColor" className="group-hover:scale-110 transition-transform" />
-                <span>Fazer Nova Contribuição</span>
+                <span>{tr('Fazer Nova Contribuição', 'Make a New Contribution')}</span>
               </Link>
               <Link
                 to="/portal/my-donations"
                 className="bg-white/10 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white font-gotham-medium text-xs px-5 py-3.5 rounded-xl transition-all flex items-center gap-2 backdrop-blur-sm shadow-xs active:scale-98"
               >
                 <Receipt size={16} className="text-orange-300" />
-                <span>Histórico de Contribuições</span>
+                <span>{tr('Histórico de Contribuições', 'Contribution History')}</span>
               </Link>
             </div>
           </div>
@@ -347,7 +361,7 @@ export function MobileDonorHome() {
                     <Sparkles size={16} />
                   </div>
                   <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-orange-200">
-                    Seu Impacto na Missão
+                    {tr('Seu Impacto na Missão', 'Your Mission Impact')}
                   </span>
                 </div>
                 <span className={`text-[10px] font-gotham-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border ${
@@ -356,23 +370,38 @@ export function MobileDonorHome() {
                     : 'text-amber-300 bg-amber-500/15 border-amber-500/30'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${donationsCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-amber-300'}`}></span>
-                  {donationsCount > 0 ? 'Mantenedor Ativo' : 'Cadastro Recente'}
+                  {donationsCount > 0 ? tr('Mantenedor Ativo', 'Active Supporter') : tr('Cadastro Recente', 'New Member')}
                 </span>
               </div>
 
               {/* Descrição real do impacto das contribuições */}
               <p className="text-xs text-slate-200 font-gotham-light leading-relaxed">
                 {myChildren.length > 0 ? (
-                  <>
-                    Você apadrinha diretamente <strong className="font-gotham-bold text-white">{myChildren.length === 1 ? myChildren[0].name : `${myChildren.length} crianças`}</strong> na Casa Nutri, garantindo acompanhamento clínico e nutricional.
-                  </>
+                  isEn ? (
+                    <>
+                      You directly sponsor <strong className="font-gotham-bold text-white">{myChildren.length === 1 ? myChildren[0].name : `${myChildren.length} children`}</strong> at Casa Nutri, ensuring clinical and nutritional care.
+                    </>
+                  ) : (
+                    <>
+                      Você apadrinha diretamente <strong className="font-gotham-bold text-white">{myChildren.length === 1 ? myChildren[0].name : `${myChildren.length} crianças`}</strong> na Casa Nutri, garantindo acompanhamento clínico e nutricional.
+                    </>
+                  )
                 ) : totalUserDonated > 0 ? (
-                  <>
-                    Seu total de <strong className="font-gotham-bold text-white">R$ {totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> foi direcionado para o tratamento de crianças desnutridas e manutenção da Casa Nutri.
-                  </>
+                  isEn ? (
+                    <>
+                      Your total of <strong className="font-gotham-bold text-white">R$ {totalUserDonated.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> has been directed to treating malnourished children and sustaining Casa Nutri.
+                    </>
+                  ) : (
+                    <>
+                      Seu total de <strong className="font-gotham-bold text-white">R$ {totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> foi direcionado para o tratamento de crianças desnutridas e manutenção da Casa Nutri.
+                    </>
+                  )
                 ) : (
                   <>
-                    Suas futuras contribuições e apadrinhamentos serão convertidos diretamente em tratamento e refeições nutritivas com acompanhamento aqui.
+                    {tr(
+                      'Suas futuras contribuições e apadrinhamentos serão convertidos diretamente em tratamento e refeições nutritivas com acompanhamento aqui.',
+                      'Your future contributions and sponsorships will go directly toward treatment and nutritious meals with follow-up right here.'
+                    )}
                   </>
                 )}
               </p>
@@ -381,29 +410,29 @@ export function MobileDonorHome() {
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <div className="bg-black/25 rounded-xl p-3 border border-white/5 space-y-0.5">
                   <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">
-                    Refeições Viabilizadas
+                    {tr('Refeições Viabilizadas', 'Meals Provided')}
                   </span>
                   <span className="text-sm font-heading font-black text-amber-300 block">
-                    {mealsProvided > 0 ? `~${mealsProvided} refeições` : '0 refeições'}
+                    {mealsProvided > 0 ? `~${mealsProvided} ${tr('refeições', 'meals')}` : `0 ${tr('refeições', 'meals')}`}
                   </span>
                   <span className="text-[9px] text-slate-400 font-gotham-light block">
-                    {totalUserDonated > 0 ? 'Nutrição terapêutica' : 'Aguardando 1ª doação'}
+                    {totalUserDonated > 0 ? tr('Nutrição terapêutica', 'Therapeutic nutrition') : tr('Aguardando 1ª doação', 'Awaiting 1st donation')}
                   </span>
                 </div>
 
                 <div className="bg-black/25 rounded-xl p-3 border border-white/5 space-y-0.5">
                   <span className="text-[10px] text-slate-400 uppercase font-gotham-medium block">
-                    Última Contribuição
+                    {tr('Última Contribuição', 'Latest Contribution')}
                   </span>
                   <span className="text-sm font-heading font-black text-white block">
                     {latestDonation 
-                      ? `R$ ${latestDonation.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                      ? `R$ ${latestDonation.amount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}` 
                       : 'R$ 0,00'}
                   </span>
                   <span className="text-[9px] text-slate-400 font-gotham-light block truncate">
                     {latestDonation?.date 
-                      ? `${new Date(latestDonation.paid_at || latestDonation.date).toLocaleDateString('pt-BR')} • ${latestDonation.payment_method?.toUpperCase() || 'PIX'}`
-                      : 'Nenhuma ainda'}
+                      ? `${new Date(latestDonation.paid_at || latestDonation.date).toLocaleDateString(isEn ? 'en-US' : 'pt-BR')} • ${latestDonation.payment_method?.toUpperCase() || 'PIX'}`
+                      : tr('Nenhuma ainda', 'None yet')}
                   </span>
                 </div>
               </div>
@@ -414,13 +443,13 @@ export function MobileDonorHome() {
                   <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
                   <span>
                     {donationsCount > 0 
-                      ? `${donationsCount} ${donationsCount === 1 ? 'doação confirmada' : 'doações confirmadas'} no sistema` 
-                      : 'Nenhuma doação registrada'}
+                      ? `${donationsCount} ${donationsCount === 1 ? tr('doação confirmada', 'confirmed donation') : tr('doações confirmadas', 'confirmed donations')} ${tr('no sistema', 'in the system')}` 
+                      : tr('Nenhuma doação registrada', 'No donations recorded')}
                   </span>
                 </span>
                 {myChildren.length > 0 && (
                   <span className="text-xs text-rose-300 flex items-center gap-1 font-gotham-bold">
-                    <Heart size={12} fill="currentColor" /> {myChildren.length} {myChildren.length === 1 ? 'afilhada' : 'afilhadas'}
+                    <Heart size={12} fill="currentColor" /> {myChildren.length} {myChildren.length === 1 ? tr('afilhada', 'sponsored child') : tr('afilhadas', 'sponsored children')}
                   </span>
                 )}
               </div>
@@ -444,17 +473,20 @@ export function MobileDonorHome() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  Apoio Mensal Ativo
+                  {tr('Apoio Mensal Ativo', 'Active Monthly Support')}
                 </span>
                 <span className="text-xs text-slate-500 font-gotham-medium">
-                  R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                  R$ {monthlyCommitments.generalMonthlySupport.monthlyAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}/{tr('mês', 'mo')}
                 </span>
               </div>
               <h4 className="text-sm sm:text-base font-heading font-black text-slate-900 mt-1">
-                Apoio Mensal Geral • Casa Nutri
+                {tr('Apoio Mensal Geral • Casa Nutri', 'General Monthly Support • Casa Nutri')}
               </h4>
               <p className="text-xs text-slate-500 font-gotham-light">
-                Ao alterar o valor, o novo valor substitui o anterior. Você pode cancelar ou alterar quando quiser.
+                {tr(
+                  'Ao alterar o valor, o novo valor substitui o anterior. Você pode cancelar ou alterar quando quiser.',
+                  'When you change the amount, the new amount replaces the previous one. You can cancel or update it anytime.'
+                )}
               </p>
             </div>
           </div>
@@ -465,14 +497,14 @@ export function MobileDonorHome() {
               onClick={() => setIsManageModalOpen(true)}
               className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-all cursor-pointer"
             >
-              Alterar / Aumentar Apoio
+              {tr('Alterar / Aumentar Apoio', 'Change / Increase Support')}
             </button>
             <button
               type="button"
               onClick={() => setIsManageModalOpen(true)}
               className="px-3.5 py-2.5 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 rounded-xl text-xs font-gotham-medium transition-all cursor-pointer"
             >
-              Cancelar
+              {tr('Cancelar', 'Cancel')}
             </button>
           </div>
         </div>
@@ -493,13 +525,13 @@ export function MobileDonorHome() {
           </div>
           <div>
             <span className="text-2xl sm:text-3xl font-heading font-black text-slate-900 block leading-tight tracking-tight">
-              {totalUserMonthlyDonated > 0 ? `R$ ${totalUserMonthlyDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+              {totalUserMonthlyDonated > 0 ? `R$ ${totalUserMonthlyDonated.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              Total Doado no Mês
+              {tr('Total Doado no Mês', 'Total Donated This Month')}
             </span>
             <span className="text-[10px] text-slate-400 font-gotham-book mt-1 block">
-              Geral acumulado: R$ {totalUserDonated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {tr('Geral acumulado:', 'All-time total:')} R$ {totalUserDonated.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
             </span>
           </div>
         </div>
@@ -511,7 +543,7 @@ export function MobileDonorHome() {
               <Receipt size={20} />
             </div>
             <span className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/60">
-              Confirmadas
+              {tr('Confirmadas', 'Confirmed')}
             </span>
           </div>
           <div>
@@ -519,7 +551,7 @@ export function MobileDonorHome() {
               {donationsCount}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              {donationsCount === 1 ? 'Doação Concluída' : 'Doações Concluídas'}
+              {donationsCount === 1 ? tr('Doação Concluída', 'Completed Donation') : tr('Doações Concluídas', 'Completed Donations')}
             </span>
           </div>
         </div>
@@ -535,7 +567,7 @@ export function MobileDonorHome() {
                 ? 'text-rose-700 bg-rose-50 border-rose-100' 
                 : 'text-amber-700 bg-amber-50 border-amber-100'
             }`}>
-              {myChildren.length > 0 ? 'Apadrinhamento' : 'Aguardando'}
+              {myChildren.length > 0 ? tr('Apadrinhamento', 'Sponsorship') : tr('Aguardando', 'Pending')}
             </span>
           </div>
           <div>
@@ -543,7 +575,7 @@ export function MobileDonorHome() {
               {isDonorOrSponsor ? myChildren.length : (patients.length > 0 ? patients.length : '18+')}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              {isDonorOrSponsor ? 'Crianças Apadrinhadas' : 'Crianças Atendidas'}
+              {isDonorOrSponsor ? tr('Crianças Apadrinhadas', 'Sponsored Children') : tr('Crianças Atendidas', 'Children Served')}
             </span>
           </div>
         </div>
@@ -555,7 +587,7 @@ export function MobileDonorHome() {
               <Target size={20} />
             </div>
             <span className="text-[10px] font-gotham-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60">
-              {currentActiveStage ? `Fase ${currentActiveStage.stageNumber}` : 'Casa Nutri'}
+              {currentActiveStage ? `${tr('Fase', 'Stage')} ${currentActiveStage.stageNumber}` : 'Casa Nutri'}
             </span>
           </div>
           <div>
@@ -565,7 +597,7 @@ export function MobileDonorHome() {
                 : '100%'}
             </span>
             <span className="text-[11px] font-gotham-bold text-slate-400 uppercase tracking-wider mt-1 block">
-              Meta do Estágio Atual
+              {tr('Meta do Estágio Atual', 'Current Stage Goal')}
             </span>
           </div>
         </div>
@@ -590,7 +622,7 @@ export function MobileDonorHome() {
                 onClick={() => setDeclinedSuccessMessage(null)}
                 className="text-emerald-700 hover:text-emerald-900 font-bold shrink-0 cursor-pointer"
               >
-                Fechar
+                {tr('Fechar', 'Close')}
               </button>
             </div>
           )}
@@ -609,16 +641,25 @@ export function MobileDonorHome() {
                     <div className="flex-1 min-w-0">
                       <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2.5 py-0.5 rounded-full inline-block mb-1">
                         {notice.isExpired
-                          ? `Pacote PIX de ${notice.planMonths} meses encerrado`
-                          : `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`}
+                          ? tr(`Pacote PIX de ${notice.planMonths} meses encerrado`, `${notice.planMonths}-month PIX package ended`)
+                          : tr(
+                              `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`,
+                              `${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'day' : 'days'} left in your package`
+                            )}
                       </span>
                       <h4 className="font-heading font-black text-slate-900 text-base">
-                        Deseja continuar apadrinhando {notice.childName}?
+                        {tr(`Deseja continuar apadrinhando ${notice.childName}?`, `Would you like to continue sponsoring ${notice.childName}?`)}
                       </h4>
                       <p className="text-xs text-slate-600 font-gotham-light mt-1 leading-relaxed">
                         {notice.isExpired
-                          ? `O período de ${notice.planMonths} meses do seu apadrinhamento de ${notice.childName} foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou continuar acessando o portal e todas as atualizações gerais do projeto sem acompanhar uma criança.`
-                          : `Seu pacote de ${notice.planMonths} meses para ${notice.childName} vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando a evolução dela ou opte por manter apenas acesso às atualizações gerais do projeto.`}
+                          ? tr(
+                              `O período de ${notice.planMonths} meses do seu apadrinhamento de ${notice.childName} foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou continuar acessando o portal e todas as atualizações gerais do projeto sem acompanhar uma criança.`,
+                              `The ${notice.planMonths}-month period of your sponsorship for ${notice.childName} ended on ${new Date(notice.expiresAt).toLocaleDateString('en-US')}. You can renew now or continue accessing the portal and all general project updates without following a child.`
+                            )
+                          : tr(
+                              `Seu pacote de ${notice.planMonths} meses para ${notice.childName} vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando a evolução dela ou opte por manter apenas acesso às atualizações gerais do projeto.`,
+                              `Your ${notice.planMonths}-month package for ${notice.childName} expires on ${new Date(notice.expiresAt).toLocaleDateString('en-US')}. Renew to keep following their progress or choose to keep access only to general project updates.`
+                            )}
                       </p>
                     </div>
                   </div>
@@ -634,14 +675,14 @@ export function MobileDonorHome() {
                       className="flex-1 py-3 px-4 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Heart size={14} fill="currentColor" />
-                      <span>Continuar Apadrinhando</span>
+                      <span>{tr('Continuar Apadrinhando', 'Continue Sponsoring')}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeclineRenewal(notice)}
                       className="py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
                     >
-                      Não continuar (Manter acesso ao projeto)
+                      {tr('Não continuar (Manter acesso ao projeto)', 'Do not continue (Keep project access)')}
                     </button>
                   </div>
                 </div>
@@ -655,19 +696,19 @@ export function MobileDonorHome() {
               <div>
                 <h3 className="text-xl font-heading font-black text-slate-900 flex items-center gap-2">
                   <Heart className="text-[#F49853]" size={22} fill="currentColor" /> 
-                  {isDonorOrSponsor ? 'Minhas Crianças Apadrinhadas' : 'Crianças em Acompanhamento'}
+                  {isDonorOrSponsor ? tr('Minhas Crianças Apadrinhadas', 'My Sponsored Children') : tr('Crianças em Acompanhamento', 'Children in Care')}
                 </h3>
                 <p className="text-xs text-slate-500 font-gotham-light">
                   {isDonorOrSponsor 
-                    ? 'Acompanhe a recuperação e o progresso da(s) criança(s) que você apadrinha.' 
-                    : 'Vidas que recebem acolhimento e tratamento nutricional contínuo.'}
+                    ? tr('Acompanhe a recuperação e o progresso da(s) criança(s) que você apadrinha.', 'Follow the recovery and progress of the child(ren) you sponsor.') 
+                    : tr('Vidas que recebem acolhimento e tratamento nutricional contínuo.', 'Lives receiving shelter and continuous nutritional care.')}
                 </p>
               </div>
               <Link
                 to="/portal/sponsorship"
                 className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
               >
-                <span>Ver todas</span>
+                <span>{tr('Ver todas', 'View all')}</span>
                 <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
@@ -675,7 +716,7 @@ export function MobileDonorHome() {
             {isLoadingChildren ? (
               <div className="bg-white rounded-[1.75rem] p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                <p className="font-bold text-slate-600">Carregando suas crianças apadrinhadas...</p>
+                <p className="font-bold text-slate-600">{tr('Carregando suas crianças apadrinhadas...', 'Loading your sponsored children...')}</p>
               </div>
             ) : displayedPatients.length === 0 ? (
               isDonorOrSponsor ? (
@@ -688,10 +729,13 @@ export function MobileDonorHome() {
                       </div>
                       <div className="space-y-1">
                         <h4 className="font-heading font-black text-slate-900 text-base">
-                          Seja a resposta para uma criança na Casa Nutri
+                          {tr('Seja a resposta para uma criança na Casa Nutri', 'Be the answer for a child at Casa Nutri')}
                         </h4>
                         <p className="text-xs text-slate-600 font-gotham-light leading-relaxed">
-                          Com o apadrinhamento mensal de R$ 90, você garante tratamento nutricional intensivo, fórmulas terapêuticas e acompanha fotos e relatórios exclusivos de recuperação.
+                          {tr(
+                            'Com o apadrinhamento mensal de R$ 90, você garante tratamento nutricional intensivo, fórmulas terapêuticas e acompanha fotos e relatórios exclusivos de recuperação.',
+                            'With a monthly sponsorship of R$ 90, you ensure intensive nutritional care, therapeutic formulas, and receive exclusive recovery photos and reports.'
+                          )}
                         </p>
                       </div>
                     </div>
@@ -702,7 +746,7 @@ export function MobileDonorHome() {
                         className="inline-flex items-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-5 py-2.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 transition-all active:scale-98 cursor-pointer"
                       >
                         <Heart size={14} fill="currentColor" />
-                        <span>Apadrinhar uma Criança Agora</span>
+                        <span>{tr('Apadrinhar uma Criança Agora', 'Sponsor a Child Now')}</span>
                       </Link>
                     </div>
                   </div>
@@ -710,8 +754,8 @@ export function MobileDonorHome() {
               ) : (
                 <div className="bg-white rounded-[1.75rem] p-8 border border-slate-200/80 text-center text-slate-400 text-xs">
                   <Users size={32} className="mx-auto mb-2 opacity-40 text-slate-400" />
-                  <p className="font-bold text-slate-600">Nenhuma criança registrada no momento.</p>
-                  <p className="mt-1">Novos atendimentos da Casa Nutri serão sincronizados em breve.</p>
+                  <p className="font-bold text-slate-600">{tr('Nenhuma criança registrada no momento.', 'No children registered at the moment.')}</p>
+                  <p className="mt-1">{tr('Novos atendimentos da Casa Nutri serão sincronizados em breve.', 'New Casa Nutri care records will sync soon.')}</p>
                 </div>
               )
             ) : (
@@ -743,7 +787,7 @@ export function MobileDonorHome() {
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}>
-                          {child.status}
+                          {translateChildStatus(child.status, isEn)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 font-gotham-light mt-0.5">
@@ -752,11 +796,11 @@ export function MobileDonorHome() {
                       {spDetail?.expiresAt && (
                         <p className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1.5">
                           <Calendar size={10} />
-                          Pacote {spDetail.planMonths}m • Até {new Date(spDetail.expiresAt).toLocaleDateString('pt-BR')}
+                          {tr('Pacote', 'Package')} {spDetail.planMonths}m • {tr('Até', 'Until')} {new Date(spDetail.expiresAt).toLocaleDateString(isEn ? 'en-US' : 'pt-BR')}
                         </p>
                       )}
                       <span className="text-[11px] text-[#F49853] font-gotham-bold mt-2 block inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                        Acompanhar evolução <ArrowRight size={12} />
+                        {tr('Acompanhar evolução', 'Track progress')} <ArrowRight size={12} />
                       </span>
                     </div>
                   </div>
@@ -772,12 +816,12 @@ export function MobileDonorHome() {
               <div>
                 <h3 className="text-xl font-heading font-black text-slate-900 flex items-center gap-2">
                   <TrendingUp className="text-emerald-500" size={22} />
-                  Atualizações de Impacto
+                  {tr('Atualizações de Impacto', 'Impact Updates')}
                 </h3>
                 <p className="text-xs text-slate-500 font-gotham-light">
                   {myChildren.length > 0
-                    ? 'Atualizações gerais dos apoiadores e notícias exclusivas das suas crianças apadrinhadas.'
-                    : 'Atualizações gerais de impacto compartilhadas com todos os apoiadores.'}
+                    ? tr('Atualizações gerais dos apoiadores e notícias exclusivas das suas crianças apadrinhadas.', 'General supporter updates and exclusive news about your sponsored children.')
+                    : tr('Atualizações gerais de impacto compartilhadas com todos os apoiadores.', 'General impact updates shared with all supporters.')}
                 </p>
               </div>
               {myChildren.length > 0 ? (
@@ -789,7 +833,7 @@ export function MobileDonorHome() {
                       impactFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Todas
+                    {tr('Todas', 'All')}
                   </button>
                   <button
                     type="button"
@@ -798,7 +842,7 @@ export function MobileDonorHome() {
                       impactFilter === 'general' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Geral
+                    {tr('Geral', 'General')}
                   </button>
                   <button
                     type="button"
@@ -807,7 +851,7 @@ export function MobileDonorHome() {
                       impactFilter === 'children' ? 'bg-[#F49853] text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Minhas Crianças
+                    {tr('Minhas Crianças', 'My Children')}
                   </button>
                 </div>
               ) : (
@@ -815,7 +859,7 @@ export function MobileDonorHome() {
                   to="/portal/projects"
                   className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 group"
                 >
-                  <span>Ver projetos</span>
+                  <span>{tr('Ver projetos', 'View projects')}</span>
                   <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               )}
@@ -825,8 +869,8 @@ export function MobileDonorHome() {
               {publishedImpact.length === 0 ? (
                 <div className="bg-white p-6 rounded-[1.75rem] border border-slate-200/80 text-center text-xs text-slate-400">
                   {impactFilter === 'children'
-                    ? 'Nenhuma atualização exclusiva publicada ainda para suas crianças apadrinhadas.'
-                    : 'Novas atualizações e relatórios serão publicados em breve pela coordenação.'}
+                    ? tr('Nenhuma atualização exclusiva publicada ainda para suas crianças apadrinhadas.', 'No exclusive updates published yet for your sponsored children.')
+                    : tr('Novas atualizações e relatórios serão publicados em breve pela coordenação.', 'New updates and reports will be published soon by coordination.')}
                 </div>
               ) : (
                 publishedImpact.map((item) => {
@@ -843,15 +887,15 @@ export function MobileDonorHome() {
                         {isChildUpdate ? (
                           <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
                             <Heart size={10} fill="currentColor" className="text-[#F49853]" />
-                            Exclusivo do Padrinho{item.child ? ` • ${item.child}` : ''}
+                            {tr('Exclusivo do Padrinho', 'Sponsor Exclusive')}{item.child ? ` • ${item.child}` : ''}
                           </span>
                         ) : (
                           <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                            {item.type === 'project' ? 'Projeto' : 'Atualização Geral • Todos Apoiadores'}
+                            {item.type === 'project' ? tr('Projeto', 'Project') : tr('Atualização Geral • Todos Apoiadores', 'General Update • All Supporters')}
                           </span>
                         )}
                         <span className="text-xs text-slate-400 font-medium">
-                          {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : (item.date || '')}
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString(isEn ? 'en-US' : 'pt-BR') : (item.date || '')}
                         </span>
                       </div>
                       <h4 className="font-heading font-black text-slate-900 text-sm leading-snug">{item.title}</h4>
@@ -865,7 +909,7 @@ export function MobileDonorHome() {
                           />
                           <div className="absolute bottom-2 right-2 bg-slate-950/70 backdrop-blur-xs text-white px-2.5 py-1 rounded-full text-[10px] font-gotham-bold flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
                             <ZoomIn size={12} />
-                            <span>Ampliar</span>
+                            <span>{tr('Ampliar', 'Zoom')}</span>
                           </div>
                         </div>
                       )}
@@ -887,27 +931,27 @@ export function MobileDonorHome() {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-gotham-bold uppercase tracking-widest text-[#F49853] bg-orange-500/15 px-3 py-1 rounded-full border border-orange-500/30 flex items-center gap-1.5">
                   <Target size={12} />
-                  Meta da Casa Nutri
+                  {tr('Meta da Casa Nutri', 'Casa Nutri Goal')}
                 </span>
                 <span className="text-xs font-gotham-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  {currentActiveStage ? `Fase ${currentActiveStage.stageNumber} Ativa` : 'Fase Ativa'}
+                  {currentActiveStage ? tr(`Fase ${currentActiveStage.stageNumber} Ativa`, `Stage ${currentActiveStage.stageNumber} Active`) : tr('Fase Ativa', 'Active Stage')}
                 </span>
               </div>
 
               <div className="space-y-1.5">
                 <h3 className="text-xl font-heading font-black text-white leading-snug">
-                  {currentCampaign.title}
+                  {trDynamic(currentCampaign.title)}
                 </h3>
                 <p className="text-xs text-slate-300 font-gotham-light leading-relaxed line-clamp-2">
-                  {currentCampaign.description}
+                  {trDynamic(currentCampaign.description)}
                 </p>
               </div>
 
               {/* Barra de Progresso Real da Fase com Glow */}
               <div className="space-y-2 pt-1 bg-white/[0.04] p-4 rounded-2xl border border-white/5">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-gotham-medium text-slate-400">Progresso da Fase Atual</span>
+                  <span className="font-gotham-medium text-slate-400">{tr('Progresso da Fase Atual', 'Current Stage Progress')}</span>
                   <span className="font-gotham-bold text-[#F49853] text-sm">
                     {currentStageProgress}%
                   </span>
@@ -919,28 +963,28 @@ export function MobileDonorHome() {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 font-gotham-medium pt-0.5">
-                  <span>R$ {currentStageRaised.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  <span className="text-slate-300 font-gotham-bold">Alvo da Fase: R$ {currentStageTarget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span>R$ {currentStageRaised.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-slate-300 font-gotham-bold">{tr('Alvo da Fase:', 'Stage Goal:')} R$ {currentStageTarget.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
               {/* Pilares do Impacto */}
               <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-gotham-medium text-slate-300">
                 <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
-                  🥣 Nutrição Diária
+                  🥣 {tr('Nutrição Diária', 'Daily Nutrition')}
                 </div>
                 <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
-                  🩺 Exames & Triagem
+                  🩺 {tr('Exames & Triagem', 'Exams & Screening')}
                 </div>
                 <div className="bg-white/5 py-2 px-1 rounded-xl border border-white/5">
-                  👩‍⚕️ Equipe Clínica
+                  👩‍⚕️ {tr('Equipe Clínica', 'Clinical Team')}
                 </div>
               </div>
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-                <span className="text-slate-400 text-[11px]">Transparência total dos recursos</span>
+                <span className="text-slate-400 text-[11px]">{tr('Transparência total dos recursos', 'Full resource transparency')}</span>
                 <Link to="/campanha" className="text-[#F49853] hover:text-amber-300 font-gotham-bold flex items-center gap-1 group transition-colors">
-                  <span>Ver detalhes da régua</span>
+                  <span>{tr('Ver detalhes da régua', 'View campaign details')}</span>
                   <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
@@ -953,13 +997,13 @@ export function MobileDonorHome() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-heading font-black text-slate-900 flex items-center gap-2">
                   <Newspaper className="text-blue-500" size={20} />
-                  Novidades da Comunidade
+                  {tr('Novidades da Comunidade', 'Community News')}
                 </h3>
                 <Link
                   to="/portal/blog"
                   className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-0.5 group"
                 >
-                  <span>Ver todas</span>
+                  <span>{tr('Ver todas', 'View all')}</span>
                   <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
@@ -986,9 +1030,9 @@ export function MobileDonorHome() {
                     {latestPost.excerpt}
                   </p>
                   <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-                    <span>{latestPost.author || 'Equipe YAH Hope'}</span>
+                    <span>{latestPost.author || tr('Equipe YAH Hope', 'YAH Hope Team')}</span>
                     <span className="text-[#F49853] font-gotham-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      Ler artigo <ArrowRight size={13} />
+                      {tr('Ler artigo', 'Read article')} <ArrowRight size={13} />
                     </span>
                   </div>
                 </div>
@@ -1030,7 +1074,7 @@ export function MobileDonorHome() {
                 type="button"
                 onClick={() => setZoomedImpactPhoto(null)}
                 className="p-2 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer shrink-0"
-                title="Fechar (Esc)"
+                title={tr('Fechar (Esc)', 'Close (Esc)')}
               >
                 <X size={20} />
               </button>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sponsorshipService } from '../../services/sponsorshipService';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ManageMonthlyPlanModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export function ManageMonthlyPlanModal({
   isActive,
   onSuccess
 }: ManageMonthlyPlanModalProps) {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'update' | 'cancel'>('update');
   const [selectedAmount, setSelectedAmount] = useState<number>(currentAmount > 0 ? currentAmount : 100);
@@ -40,10 +42,10 @@ export function ManageMonthlyPlanModal({
   if (!isOpen) return null;
 
   const predefinedAmounts = [
-    { value: 50, label: 'R$ 50/mês', desc: 'Plano Essencial • Vitaminas e insumos' },
-    { value: 100, label: 'R$ 100/mês', desc: 'Nutrição Plena • Refeições diárias' },
-    { value: 150, label: 'R$ 150/mês', desc: 'Transformador • Tratamento clínico intensivo' },
-    { value: 250, label: 'R$ 250/mês', desc: 'Guardião da Esperança • Resgate completo' },
+    { value: 50, label: tr('R$ 50/mês', 'R$ 50/mo'), desc: tr('Plano Essencial • Vitaminas e insumos', 'Essential Plan • Vitamins & supplies') },
+    { value: 100, label: tr('R$ 100/mês', 'R$ 100/mo'), desc: tr('Nutrição Plena • Refeições diárias', 'Full Nutrition • Daily meals') },
+    { value: 150, label: tr('R$ 150/mês', 'R$ 150/mo'), desc: tr('Transformador • Tratamento clínico intensivo', 'Transformer • Intensive clinical care') },
+    { value: 250, label: tr('R$ 250/mês', 'R$ 250/mo'), desc: tr('Guardião da Esperança • Resgate completo', 'Guardian of Hope • Complete rescue') },
   ];
 
   const targetAmount = customAmount 
@@ -52,7 +54,7 @@ export function ManageMonthlyPlanModal({
 
   const handleUpdate = async () => {
     if (targetAmount < 10) {
-      alert('Por favor, selecione ou informe um valor mensal mínimo de R$ 10,00.');
+      alert(tr('Por favor, selecione ou informe um valor mensal mínimo de R$ 10,00.', 'Please select or enter a minimum monthly amount of R$ 10.00.'));
       return;
     }
 
@@ -65,7 +67,7 @@ export function ManageMonthlyPlanModal({
         user?.email || 'mantenedor@yahhope.org',
         targetAmount,
         paymentMethod,
-        user?.name || 'Mantenedor YAH Hope'
+        user?.name || tr('Mantenedor YAH Hope', 'YAH Hope Supporter')
       );
 
       if (result.success) {
@@ -78,7 +80,7 @@ export function ManageMonthlyPlanModal({
         setFeedbackMessage({ type: 'error', text: result.message });
       }
     } catch (e: any) {
-      setFeedbackMessage({ type: 'error', text: e.message || 'Erro ao atualizar apoio mensal.' });
+      setFeedbackMessage({ type: 'error', text: e.message || tr('Erro ao atualizar apoio mensal.', 'Error updating monthly support.') });
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +106,7 @@ export function ManageMonthlyPlanModal({
         setFeedbackMessage({ type: 'error', text: result.message });
       }
     } catch (e: any) {
-      setFeedbackMessage({ type: 'error', text: e.message || 'Erro ao cancelar apoio mensal.' });
+      setFeedbackMessage({ type: 'error', text: e.message || tr('Erro ao cancelar apoio mensal.', 'Error canceling monthly support.') });
     } finally {
       setIsSubmitting(false);
     }
@@ -122,10 +124,10 @@ export function ManageMonthlyPlanModal({
             </div>
             <div>
               <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-[#F49853] block">
-                Portal do Mantenedor
+                {tr('Portal do Mantenedor', 'Supporter Portal')}
               </span>
               <h3 className="text-xl font-heading font-black text-white">
-                Gerenciar Apoio Mensal
+                {tr('Gerenciar Apoio Mensal', 'Manage Monthly Support')}
               </h3>
             </div>
           </div>
@@ -152,7 +154,7 @@ export function ManageMonthlyPlanModal({
               }`}
             >
               <TrendingUp size={14} className="text-[#F49853]" />
-              <span>Aumentar / Alterar Valor</span>
+              <span>{tr('Aumentar / Alterar Valor', 'Increase / Change Amount')}</span>
             </button>
             <button
               onClick={() => {
@@ -166,7 +168,7 @@ export function ManageMonthlyPlanModal({
               }`}
             >
               <AlertTriangle size={14} />
-              <span>Cancelar Apoio</span>
+              <span>{tr('Cancelar Apoio', 'Cancel Support')}</span>
             </button>
           </div>
         )}
@@ -193,13 +195,13 @@ export function ManageMonthlyPlanModal({
                   </div>
                   <div className="text-xs text-slate-700 leading-relaxed font-gotham-light">
                     <strong className="text-slate-900 font-gotham-bold block mb-0.5">
-                      Regra de Atualização:
+                      {tr('Regra de Atualização:', 'Update Rule:')}
                     </strong>
-                    O novo valor selecionado <strong>substituirá</strong> o seu apoio atual de{' '}
+                    {tr('O novo valor selecionado', 'The newly selected amount')} <strong>{tr('substituirá', 'will replace')}</strong> {tr('o seu apoio atual de', 'your current support of')}{' '}
                     <span className="font-bold text-slate-900">
-                      R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}/{tr('mês', 'mo')}
                     </span>
-                    . Não haverá acúmulo nem soma duplicada no seu compromisso geral.
+                    . {tr('Não haverá acúmulo nem soma duplicada no seu compromisso geral.', 'There will be no duplicate charges or accumulation on your commitment.')}
                   </div>
                 </div>
               </div>
@@ -207,7 +209,7 @@ export function ManageMonthlyPlanModal({
               {/* Seleção do Novo Valor */}
               <div>
                 <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block mb-2.5">
-                  Escolha o Novo Valor Mensal
+                  {tr('Escolha o Novo Valor Mensal', 'Choose the New Monthly Amount')}
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">
                   {predefinedAmounts.map((amt) => {
@@ -244,7 +246,7 @@ export function ManageMonthlyPlanModal({
                   </span>
                   <input
                     type="text"
-                    placeholder="Outro valor mensal personalizado (ex: 200,00)"
+                    placeholder={tr('Outro valor mensal personalizado (ex: 200,00)', 'Other custom monthly amount (e.g., 200.00)')}
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F49853]/20 focus:border-[#F49853] transition-all"
@@ -255,7 +257,7 @@ export function ManageMonthlyPlanModal({
               {/* Forma de Pagamento */}
               <div>
                 <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block mb-2">
-                  Forma de Cobrança
+                  {tr('Forma de Cobrança', 'Billing Method')}
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
@@ -268,7 +270,7 @@ export function ManageMonthlyPlanModal({
                     }`}
                   >
                     <QrCode size={16} />
-                    <span>PIX Mensal</span>
+                    <span>{tr('PIX Mensal', 'Monthly PIX')}</span>
                   </button>
                   <button
                     type="button"
@@ -280,13 +282,19 @@ export function ManageMonthlyPlanModal({
                     }`}
                   >
                     <CreditCard size={16} />
-                    <span>Cartão de Crédito</span>
+                    <span>{tr('Cartão de Crédito', 'Credit Card')}</span>
                   </button>
                 </div>
                 {paymentMethod === 'card' && (
                   <div className="mt-2 p-2.5 bg-blue-50/70 border border-blue-200/70 rounded-xl text-[11px] text-blue-900 font-gotham-light flex items-center gap-2">
                     <ShieldCheck size={14} className="text-blue-600 shrink-0" />
-                    <span><strong>Não compromete seu limite:</strong> cobrança mensal avulsa, sem parcelamento e sem bloquear o limite total do cartão.</span>
+                    <span>
+                      <strong>{tr('Não compromete seu limite:', 'Does not tie up your credit limit:')}</strong>{' '}
+                      {tr(
+                        'cobrança mensal avulsa, sem parcelamento e sem bloquear o limite total do cartão.',
+                        'single monthly charge, without installments or holding your full card limit.'
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
@@ -301,7 +309,7 @@ export function ManageMonthlyPlanModal({
                 >
                   <RefreshCw size={16} className={isSubmitting ? 'animate-spin' : ''} />
                   <span>
-                    Substituir para R$ {targetAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    {tr('Substituir para', 'Update to')} R$ {targetAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}/{tr('mês', 'mo')}
                   </span>
                   <ArrowRight size={14} />
                 </button>
@@ -313,17 +321,23 @@ export function ManageMonthlyPlanModal({
               <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-rose-700 font-gotham-bold text-sm">
                   <AlertTriangle size={18} />
-                  <span>Deseja cancelar seu apoio mensal?</span>
+                  <span>{tr('Deseja cancelar seu apoio mensal?', 'Do you want to cancel your monthly support?')}</span>
                 </div>
                 <p className="text-xs text-rose-800/90 font-gotham-light leading-relaxed">
-                  Seu apoio mensal atual de{' '}
+                  {tr('Seu apoio mensal atual de', 'Your current monthly support of')}{' '}
                   <strong className="font-gotham-bold">
-                    R$ {currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}/{tr('mês', 'mo')}
                   </strong>{' '}
-                  sustenta a alimentação terapêutica e exames médicos de crianças na Casa Nutri em Moçambique.
+                  {tr(
+                    'sustenta a alimentação terapêutica e exames médicos de crianças na Casa Nutri em Moçambique.',
+                    'sustains therapeutic nutrition and medical exams for children at Casa Nutri in Mozambique.'
+                  )}
                 </p>
                 <p className="text-xs text-slate-600 font-gotham-light">
-                  Se estiver passando por um momento difícil, você pode reduzir o valor para R$ 50/mês na aba de alteração em vez de cancelar.
+                  {tr(
+                    'Se estiver passando por um momento difícil, você pode reduzir o valor para R$ 50/mês na aba de alteração em vez de cancelar.',
+                    'If you are going through a difficult time, you can lower the amount to R$ 50/mo in the update tab instead of canceling.'
+                  )}
                 </p>
               </div>
 
@@ -335,14 +349,14 @@ export function ManageMonthlyPlanModal({
                   className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   <AlertTriangle size={14} />
-                  <span>Confirmar Cancelamento</span>
+                  <span>{tr('Confirmar Cancelamento', 'Confirm Cancellation')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
                   className="py-3.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
                 >
-                  Manter Apoio
+                  {tr('Manter Apoio', 'Keep Support')}
                 </button>
               </div>
             </div>
@@ -351,7 +365,7 @@ export function ManageMonthlyPlanModal({
 
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 font-gotham-light">
           <ShieldCheck size={14} className="text-emerald-500" />
-          <span>Gestão segura sem fidelidade forçada • YAH Hope</span>
+          <span>{tr('Gestão segura sem fidelidade forçada • YAH Hope', 'Secure management with no forced lock-in • YAH Hope')}</span>
         </div>
 
       </div>

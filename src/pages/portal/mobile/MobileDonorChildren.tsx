@@ -25,6 +25,8 @@ import { usePatients } from '../../../contexts/PatientContext';
 import { useImpact, isChildSpecificImpactItem, isImpactItemForSponsoredChild } from '../../../contexts/ImpactContext';
 import { sponsorshipService, ChildSponsorshipDetail, PendingSponsorshipRenewal } from '../../../services/sponsorshipService';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { translateChildStatus, useTranslatedImpactItems, useTranslatedStrings } from '../../../i18n/portalTranslations';
 
 interface WeightPoint {
   date: string;
@@ -34,6 +36,7 @@ interface WeightPoint {
 }
 
 function WeightEvolutionChart({ history }: { history: WeightPoint[] }) {
+  const { tr } = useLanguage();
   if (!history || history.length === 0) return null;
 
   const weights = history.map(h => h.weight);
@@ -79,10 +82,10 @@ function WeightEvolutionChart({ history }: { history: WeightPoint[] }) {
           </div>
           <div>
             <h4 className="text-xs font-gotham-bold text-slate-800 uppercase tracking-wider">
-              Evolução do Peso
+              {tr('Evolução do Peso', 'Weight Evolution')}
             </h4>
             <span className="text-[10px] text-slate-500 font-gotham-light">
-              Histórico de pesagens na Casa Nutri
+              {tr('Histórico de pesagens na Casa Nutri', 'Weigh-in history at Casa Nutri')}
             </span>
           </div>
         </div>
@@ -236,14 +239,15 @@ function WeightEvolutionChart({ history }: { history: WeightPoint[] }) {
       </div>
 
       <div className="mt-1 pt-2 border-t border-orange-100/80 flex items-center justify-between text-[11px] text-slate-500 font-gotham-light">
-        <span>Peso na Entrada: <strong>{points[0].weight.toFixed(1)} kg</strong></span>
-        <span>Última Aferição: <strong className="text-slate-900">{points[points.length - 1].weight.toFixed(1)} kg</strong></span>
+        <span>{tr('Peso na Entrada:', 'Entry Weight:')} <strong>{points[0].weight.toFixed(1)} kg</strong></span>
+        <span>{tr('Última Aferição:', 'Latest Measurement:')} <strong className="text-slate-900">{points[points.length - 1].weight.toFixed(1)} kg</strong></span>
       </div>
     </div>
   );
 }
 
 export function MobileDonorChildren() {
+  const { tr, isEn } = useLanguage();
   const { user } = useAuth();
   const { patients, events } = usePatients();
   const { getPublishedItems } = useImpact();
@@ -396,7 +400,7 @@ export function MobileDonorChildren() {
         alert(res.message);
       }
     } catch (e: any) {
-      alert(e.message || 'Erro ao cancelar apadrinhamento.');
+      alert(e.message || tr('Erro ao cancelar apadrinhamento.', 'Error canceling sponsorship.'));
     } finally {
       setIsCancelingChild(false);
     }
@@ -417,10 +421,15 @@ export function MobileDonorChildren() {
         setCelebrationChildren(reconciled);
         setShowCelebration(true);
       } else {
-        alert('Identificamos seus dados de mantenedor e atualizamos a sincronização. Por favor, recarregue a página.');
+        alert(
+          tr(
+            'Identificamos seus dados de mantenedor e atualizamos a sincronização. Por favor, recarregue a página.',
+            'We identified your supporter record and updated the sync. Please reload the page.'
+          )
+        );
       }
     } catch (err: any) {
-      alert(err?.message || 'Erro ao sincronizar apadrinhamento.');
+      alert(err?.message || tr('Erro ao sincronizar apadrinhamento.', 'Error syncing sponsorship.'));
     } finally {
       setIsSyncingPayer(false);
       refreshChildren();
@@ -429,9 +438,9 @@ export function MobileDonorChildren() {
 
   // Calcula idade a partir do dob
   const calculateAge = (dobString?: string) => {
-    if (!dobString) return 'Idade não informada';
+    if (!dobString) return tr('Idade não informada', 'Age not provided');
     const dob = new Date(dobString);
-    if (isNaN(dob.getTime())) return 'Idade não informada';
+    if (isNaN(dob.getTime())) return tr('Idade não informada', 'Age not provided');
     const now = new Date();
     let years = now.getFullYear() - dob.getFullYear();
     let months = now.getMonth() - dob.getMonth();
@@ -439,13 +448,13 @@ export function MobileDonorChildren() {
       years--;
       months += 12;
     }
-    if (years > 0) return `${years} ${years === 1 ? 'ano' : 'anos'}`;
-    return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    if (years > 0) return `${years} ${years === 1 ? tr('ano', 'year') : tr('anos', 'years')}`;
+    return `${months} ${months === 1 ? tr('mês', 'month') : tr('meses', 'months')}`;
   };
 
   // Formata data completa de nascimento de forma segura (sem deslocamento de timezone)
   const formatBirthDate = (dobString?: string) => {
-    if (!dobString) return 'Data não informada';
+    if (!dobString) return tr('Data não informada', 'Date not provided');
     try {
       const raw = dobString.split('T')[0];
       const parts = raw.split('-');
@@ -453,6 +462,13 @@ export function MobileDonorChildren() {
         const year = parts[0];
         const month = parseInt(parts[1], 10) - 1;
         const day = parseInt(parts[2], 10);
+        if (isEn) {
+          const monthsEn = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+          return `${monthsEn[month] || parts[1]} ${day}, ${year}`;
+        }
         const months = [
           'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
           'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
@@ -461,7 +477,7 @@ export function MobileDonorChildren() {
       }
       const d = new Date(dobString);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+        return d.toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
       }
     } catch (e) {}
     return dobString;
@@ -474,9 +490,11 @@ export function MobileDonorChildren() {
       const parts = raw.split('-');
       if (parts.length === 3) {
         const day = parts[2];
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const months = isEn
+          ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const mIdx = parseInt(parts[1], 10) - 1;
-        return `${day}/${months[mIdx] || parts[1]}`;
+        return isEn ? `${months[mIdx] || parts[1]} ${day}` : `${day}/${months[mIdx] || parts[1]}`;
       }
     } catch (e) {}
     return dateString;
@@ -497,7 +515,7 @@ export function MobileDonorChildren() {
         date: e.date,
         formattedDate: formatShortDate(e.date),
         weight: Number(e.weight),
-        label: idx === 0 ? 'Entrada' : idx === childEvents.length - 1 ? 'Atual' : `Pesagem ${idx + 1}`
+        label: idx === 0 ? tr('Entrada', 'Entry') : idx === childEvents.length - 1 ? tr('Atual', 'Current') : `${tr('Pesagem', 'Weigh-in')} ${idx + 1}`
       }));
     }
 
@@ -506,9 +524,9 @@ export function MobileDonorChildren() {
       const initialWeight = Math.max(3.5, Number((singleWeight - 1.2).toFixed(1)));
       const midWeight = Number(((initialWeight + singleWeight) / 2).toFixed(1));
       return [
-        { date: '2025-11-15', formattedDate: '15/Nov', weight: initialWeight, label: 'Entrada' },
-        { date: '2025-12-20', formattedDate: '20/Dez', weight: midWeight, label: 'Fase 1' },
-        { date: childEvents[0].date, formattedDate: formatShortDate(childEvents[0].date), weight: singleWeight, label: 'Atual' }
+        { date: '2025-11-15', formattedDate: isEn ? 'Nov 15' : '15/Nov', weight: initialWeight, label: tr('Entrada', 'Entry') },
+        { date: '2025-12-20', formattedDate: isEn ? 'Dec 20' : '20/Dez', weight: midWeight, label: tr('Fase 1', 'Stage 1') },
+        { date: childEvents[0].date, formattedDate: formatShortDate(childEvents[0].date), weight: singleWeight, label: tr('Atual', 'Current') }
       ];
     }
 
@@ -545,10 +563,10 @@ export function MobileDonorChildren() {
     const step2 = Number((initial + (current - initial) * 0.70).toFixed(1));
 
     return [
-      { date: '2025-11-10', formattedDate: '10/Nov', weight: initial, label: 'Entrada' },
-      { date: '2025-12-15', formattedDate: '15/Dez', weight: step1, label: 'Mês 1' },
-      { date: '2026-01-18', formattedDate: '18/Jan', weight: step2, label: 'Mês 2' },
-      { date: '2026-02-12', formattedDate: '12/Fev', weight: current, label: 'Atual' }
+      { date: '2025-11-10', formattedDate: isEn ? 'Nov 10' : '10/Nov', weight: initial, label: tr('Entrada', 'Entry') },
+      { date: '2025-12-15', formattedDate: isEn ? 'Dec 15' : '15/Dez', weight: step1, label: tr('Mês 1', 'Month 1') },
+      { date: '2026-01-18', formattedDate: isEn ? 'Jan 18' : '18/Jan', weight: step2, label: tr('Mês 2', 'Month 2') },
+      { date: '2026-02-12', formattedDate: isEn ? 'Feb 12' : '12/Fev', weight: current, label: tr('Atual', 'Current') }
     ];
   };
 
@@ -568,12 +586,22 @@ export function MobileDonorChildren() {
     };
   };
 
+  const trDynamic = useTranslatedStrings(
+    [selectedChild?.story],
+    isEn
+  );
+  const allPublishedImpact = getPublishedItems();
+  const translatedImpactItems = useTranslatedImpactItems(allPublishedImpact, isEn);
+
   const getChildStory = (child: any) => {
-    if (child?.story && child.story.trim().length > 15) {
-      return child.story;
+    if (child?.story && child.story.trim().length > 15 && child.story.trim() !== 'Acompanhada com amor na Casa Nutri.') {
+      return trDynamic(child.story);
     }
-    const childName = child?.name || 'A criança';
-    return `${childName} foi acolhida com amor na Casa Nutri após triagem realizada pela equipe de saúde comunitária em Nampula. Com o apadrinhamento regular, recebe suplementação vitamínica, papas terapêuticas e acompanhamento pediátrico contínuo. Graças ao suporte dos padrinhos, sua recuperação nutricional tem sido notável, garantindo um desenvolvimento saudável e cheio de esperança.`;
+    const childName = child?.name || tr('A criança', 'The child');
+    return tr(
+      `${childName} foi acolhida com amor na Casa Nutri após triagem realizada pela equipe de saúde comunitária em Nampula. Com o apadrinhamento regular, recebe suplementação vitamínica, papas terapêuticas e acompanhamento pediátrico contínuo. Graças ao suporte dos padrinhos, sua recuperação nutricional tem sido notável, garantindo um desenvolvimento saudável e cheio de esperança.`,
+      `${childName} was lovingly welcomed at Casa Nutri after screening by the community health team in Nampula. With regular sponsorship, they receive vitamin supplementation, therapeutic porridge, and continuous pediatric care. Thanks to sponsors' support, their nutritional recovery has been remarkable, ensuring healthy development filled with hope.`
+    );
   };
 
   const isDonorOrSponsor = user?.role === 'SPONSOR' || myChildren.length > 0 || (user?.role !== 'ADMIN' && user?.role !== 'USER');
@@ -636,12 +664,12 @@ export function MobileDonorChildren() {
           </span>
           <h2 className="text-3xl sm:text-4xl font-heading font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <Heart className="text-[#F49853]" size={32} fill="currentColor" /> 
-            {isDonorOrSponsor ? 'Minhas Crianças Apadrinhadas' : 'Crianças em Acompanhamento'}
+            {isDonorOrSponsor ? tr('Minhas Crianças Apadrinhadas', 'My Sponsored Children') : tr('Crianças em Acompanhamento', 'Children in Care')}
           </h2>
           <p className="text-sm text-slate-500 font-gotham-light mt-1">
             {isDonorOrSponsor 
-              ? 'Acompanhe a recuperação nutricional, fotos e relatórios da(s) criança(s) sob seu apadrinhamento.' 
-              : 'Conheça as vidas atendidas e acompanhe a evolução nutricional em tempo real.'}
+              ? tr('Acompanhe a recuperação nutricional, fotos e relatórios da(s) criança(s) sob seu apadrinhamento.', 'Follow the nutritional recovery, photos, and reports of the child(ren) you sponsor.') 
+              : tr('Conheça as vidas atendidas e acompanhe a evolução nutricional em tempo real.', 'Meet the lives served and follow nutritional progress in real time.')}
           </p>
         </div>
 
@@ -654,13 +682,13 @@ export function MobileDonorChildren() {
               className="px-4 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-500 hover:text-slate-800"
             >
               <Heart size={14} className="text-[#F49853]" />
-              <span>Apadrinhar Criança</span>
+              <span>{tr('Apadrinhar Criança', 'Sponsor a Child')}</span>
             </Link>
             <button
               className="px-4 py-2 rounded-xl text-xs font-gotham-bold transition-all flex items-center gap-1.5 cursor-pointer bg-white text-slate-900 shadow-xs"
             >
               <Users size={14} className="text-slate-600" />
-              <span>Minhas Crianças</span>
+              <span>{tr('Minhas Crianças', 'My Children')}</span>
             </button>
           </div>
 
@@ -669,8 +697,8 @@ export function MobileDonorChildren() {
             <Users size={16} className="text-[#F49853]" />
             <span className="text-xs font-gotham-bold text-slate-800">
               {basePatients.length} {isDonorOrSponsor 
-                ? (basePatients.length === 1 ? 'Apadrinhada' : 'Apadrinhadas') 
-                : (basePatients.length === 1 ? 'Cadastrada' : 'Cadastradas')}
+                ? (basePatients.length === 1 ? tr('Apadrinhada', 'Sponsored') : tr('Apadrinhadas', 'Sponsored')) 
+                : (basePatients.length === 1 ? tr('Cadastrada', 'Registered') : tr('Cadastradas', 'Registered'))}
             </span>
           </div>
         </div>
@@ -688,7 +716,7 @@ export function MobileDonorChildren() {
             onClick={() => setDeclinedNoticeMsg(null)}
             className="text-emerald-700 hover:text-emerald-900 font-bold shrink-0 cursor-pointer"
           >
-            Fechar
+            {tr('Fechar', 'Close')}
           </button>
         </div>
       )}
@@ -707,16 +735,25 @@ export function MobileDonorChildren() {
                 <div>
                   <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2.5 py-0.5 rounded-full inline-block mb-1">
                     {notice.isExpired
-                      ? `Pacote PIX de ${notice.planMonths} meses encerrado`
-                      : `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`}
+                      ? tr(`Pacote PIX de ${notice.planMonths} meses encerrado`, `${notice.planMonths}-month PIX package ended`)
+                      : tr(
+                          `Faltam ${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'dia' : 'dias'} para encerrar seu pacote`,
+                          `${notice.daysRemaining} ${notice.daysRemaining === 1 ? 'day' : 'days'} left in your package`
+                        )}
                   </span>
                   <h4 className="font-heading font-black text-slate-900 text-base">
-                    Deseja continuar apadrinhando {notice.childName}?
+                    {tr(`Deseja continuar apadrinhando ${notice.childName}?`, `Would you like to continue sponsoring ${notice.childName}?`)}
                   </h4>
                   <p className="text-xs text-slate-600 font-gotham-light mt-1 leading-relaxed">
                     {notice.isExpired
-                      ? `O seu pacote de ${notice.planMonths} meses foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando ${notice.childName} ou mantenha apenas seu acesso às atualizações gerais do projeto.`
-                      : `Seu pacote de ${notice.planMonths} meses vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou optar por manter apenas acesso às novidades do projeto.`}
+                      ? tr(
+                          `O seu pacote de ${notice.planMonths} meses foi concluído em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Renove para continuar acompanhando ${notice.childName} ou mantenha apenas seu acesso às atualizações gerais do projeto.`,
+                          `Your ${notice.planMonths}-month package ended on ${new Date(notice.expiresAt).toLocaleDateString('en-US')}. Renew to keep following ${notice.childName} or keep access only to general project updates.`
+                        )
+                      : tr(
+                          `Seu pacote de ${notice.planMonths} meses vence em ${new Date(notice.expiresAt).toLocaleDateString('pt-BR')}. Você pode renovar agora ou optar por manter apenas acesso às novidades do projeto.`,
+                          `Your ${notice.planMonths}-month package expires on ${new Date(notice.expiresAt).toLocaleDateString('en-US')}. You can renew now or choose to keep access only to project news.`
+                        )}
                   </p>
                 </div>
               </div>
@@ -732,14 +769,14 @@ export function MobileDonorChildren() {
                   className="py-3 px-4 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Heart size={14} fill="currentColor" />
-                  <span>Continuar Apadrinhando</span>
+                  <span>{tr('Continuar Apadrinhando', 'Continue Sponsoring')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeclineRenewal(notice)}
                   className="py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-gotham-bold text-xs rounded-xl transition-all cursor-pointer"
                 >
-                  Não continuar (Só projeto)
+                  {tr('Não continuar (Só projeto)', 'Do not continue (Project only)')}
                 </button>
               </div>
             </div>
@@ -755,7 +792,7 @@ export function MobileDonorChildren() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nome, registro ou comunidade..."
+            placeholder={tr('Buscar por nome, registro ou comunidade...', 'Search by name, record ID, or community...')}
             className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F49853]/20 focus:border-[#F49853] transition-all shadow-2xs font-gotham-medium"
           />
         </div>
@@ -769,7 +806,7 @@ export function MobileDonorChildren() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {isDonorOrSponsor ? `Todas (${basePatients.length})` : `Todos (${basePatients.length})`}
+            {isDonorOrSponsor ? `${tr('Todas', 'All')} (${basePatients.length})` : `${tr('Todos', 'All')} (${basePatients.length})`}
           </button>
           {!isDonorOrSponsor && myChildren.length > 0 && (
             <button
@@ -781,7 +818,7 @@ export function MobileDonorChildren() {
               }`}
             >
               <Star size={13} className="fill-current" />
-              Minhas Crianças ({myChildren.length})
+              {tr('Minhas Crianças', 'My Children')} ({myChildren.length})
             </button>
           )}
           <button
@@ -792,7 +829,7 @@ export function MobileDonorChildren() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            Em Tratamento (DAM)
+            {tr('Em Tratamento (DAM)', 'In Treatment (MAM)')}
           </button>
           <button
             onClick={() => setStatusFilter('Adequado')}
@@ -802,7 +839,7 @@ export function MobileDonorChildren() {
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            Recuperadas
+            {tr('Recuperadas', 'Recovered')}
           </button>
         </div>
       </div>
@@ -810,7 +847,7 @@ export function MobileDonorChildren() {
       {/* Grid de Crianças Responsivo (1 col mobile, 2 sm, 3 lg) */}
       {isLoadingChildren ? (
         <div className="bg-white rounded-3xl p-12 border border-slate-200/80 text-center text-slate-400">
-          <p className="font-bold text-slate-600">Carregando dados das crianças...</p>
+          <p className="font-bold text-slate-600">{tr('Carregando dados das crianças...', 'Loading children data...')}</p>
         </div>
       ) : filteredPatients.length === 0 ? (
         isDonorOrSponsor && basePatients.length === 0 ? (
@@ -819,10 +856,13 @@ export function MobileDonorChildren() {
               <Heart size={32} />
             </div>
             <h4 className="font-heading font-black text-slate-900 text-xl">
-              Você ainda não possui crianças apadrinhadas
+              {tr('Você ainda não possui crianças apadrinhadas', 'You do not have any sponsored children yet')}
             </h4>
             <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-              Com o apadrinhamento solidário, você garante acompanhamento clínico, alimentação especial e recebe fotos e relatórios de evolução exclusivos da sua criança.
+              {tr(
+                'Com o apadrinhamento solidário, você garante acompanhamento clínico, alimentação especial e recebe fotos e relatórios de evolução exclusivos da sua criança.',
+                'Through compassionate sponsorship, you provide clinical follow-up, specialized nutrition, and receive exclusive photos and progress reports of your child.'
+              )}
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
@@ -832,23 +872,23 @@ export function MobileDonorChildren() {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-60"
               >
                 <RefreshCw size={15} className={isSyncingPayer ? 'animate-spin' : ''} />
-                <span>{isSyncingPayer ? 'Localizando pagamento...' : 'Já paguei, vincular minha criança'}</span>
+                <span>{isSyncingPayer ? tr('Localizando pagamento...', 'Finding payment...') : tr('Já paguei, vincular minha criança', 'I already paid, link my child')}</span>
               </button>
               <Link
                 to="/portal/apadrinhar"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#F49853] hover:bg-[#e0853d] text-white px-6 py-3.5 rounded-xl font-gotham-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
               >
                 <Heart size={15} fill="currentColor" />
-                <span>Novo Apadrinhamento</span>
+                <span>{tr('Novo Apadrinhamento', 'New Sponsorship')}</span>
               </Link>
             </div>
           </div>
         ) : (
           <div className="bg-white rounded-3xl p-12 border border-slate-200/80 text-center text-slate-400">
             <Users size={40} className="mx-auto mb-3 opacity-30 text-slate-400" />
-            <h4 className="font-heading font-black text-slate-700 text-base">Nenhum registro encontrado</h4>
+            <h4 className="font-heading font-black text-slate-700 text-base">{tr('Nenhum registro encontrado', 'No records found')}</h4>
             <p className="text-xs text-slate-500 mt-1 font-gotham-light">
-              Tente buscar com outros termos ou limpe os filtros para visualizar os dados.
+              {tr('Tente buscar com outros termos ou limpe os filtros para visualizar os dados.', 'Try searching with different terms or clear filters to view the data.')}
             </p>
           </div>
         )
@@ -879,7 +919,7 @@ export function MobileDonorChildren() {
                         {myChildIds.has(child.id) && (
                           <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs">
                             <Star size={10} className="fill-current" />
-                            Apadrinhado
+                            {tr('Apadrinhado', 'Sponsored')}
                           </span>
                         )}
                         <span className={`text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
@@ -887,7 +927,7 @@ export function MobileDonorChildren() {
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}>
-                          {child.status}
+                          {translateChildStatus(child.status, isEn)}
                         </span>
                       </div>
                     </div>
@@ -898,7 +938,7 @@ export function MobileDonorChildren() {
                       </h3>
                       <p className="text-xs text-slate-300 font-gotham-light flex items-center gap-1.5 mt-1">
                         <MapPin size={12} className="text-[#F49853]" />
-                        <span>{child.community || 'Casa Nutri • Nampula'} • {calculateAge(child.dob)}</span>
+                        <span>{child.community || tr('Casa Nutri • Nampula', 'Casa Nutri • Nampula')} • {calculateAge(child.dob)}</span>
                       </p>
                     </div>
                   </div>
@@ -907,30 +947,30 @@ export function MobileDonorChildren() {
                   <div className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-2 text-center">
                       <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        <span className="text-[10px] font-gotham-bold uppercase text-slate-400 block">Peso Inicial</span>
+                        <span className="text-[10px] font-gotham-bold uppercase text-slate-400 block">{tr('Peso Inicial', 'Initial Weight')}</span>
                         <span className="text-xs font-black text-slate-800">{weights.initial}</span>
                       </div>
                       <div className="bg-orange-50/50 p-2.5 rounded-xl border border-orange-100">
-                        <span className="text-[10px] font-gotham-bold uppercase text-[#F49853] block">Peso Atual</span>
+                        <span className="text-[10px] font-gotham-bold uppercase text-[#F49853] block">{tr('Peso Atual', 'Current Weight')}</span>
                         <span className="text-xs font-black text-slate-900">{weights.current}</span>
                       </div>
                     </div>
 
                     <div className="text-xs text-slate-500 font-gotham-light space-y-1">
                       <p>
-                        <strong>Nascimento:</strong> {formatBirthDate(child.dob)}
+                        <strong>{tr('Nascimento:', 'Birth Date:')}</strong> {formatBirthDate(child.dob)}
                       </p>
                       <p>
-                        <strong>Responsável:</strong> {child.guardian_name || 'Familiar'}
+                        <strong>{tr('Responsável:', 'Guardian:')}</strong> {child.guardian_name || tr('Familiar', 'Family Member')}
                       </p>
                       <p>
-                        <strong>Registro Casa Nutri:</strong> {child.registration_number || 'YAH-2026'}
+                        <strong>{tr('Registro Casa Nutri:', 'Casa Nutri Record:')}</strong> {child.registration_number || 'YAH-2026'}
                       </p>
                       {(child as any).expiresAt && (
                         <p className="pt-1">
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-gotham-bold">
                             <Calendar size={10} />
-                            Pacote {(child as any).planMonths || 3} meses • Vigente até {new Date((child as any).expiresAt).toLocaleDateString('pt-BR')}
+                            {tr('Pacote', 'Package')} {(child as any).planMonths || 3} {tr('meses • Vigente até', 'months • Valid until')} {new Date((child as any).expiresAt).toLocaleDateString(isEn ? 'en-US' : 'pt-BR')}
                           </span>
                         </p>
                       )}
@@ -941,7 +981,7 @@ export function MobileDonorChildren() {
                 {/* Footer do Card */}
                 <div className="px-6 pb-6 pt-2 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-xs font-gotham-bold text-[#F49853] group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                    Ver ficha nutricional & evolução <ArrowRight size={13} />
+                    {tr('Ver ficha nutricional & evolução', 'View nutrition record & progress')} <ArrowRight size={13} />
                   </span>
                   <span className="text-[10px] bg-slate-100 text-slate-600 font-gotham-bold px-2.5 py-1 rounded-lg">
                     Casa Nutri
@@ -960,7 +1000,7 @@ export function MobileDonorChildren() {
         const childStory = getChildStory(child);
         const isRecovered = child.status === 'Adequado' || child.status === 'Alta';
         const childUpdates = myChildIds.has(child.id)
-          ? getPublishedItems().filter(
+          ? translatedImpactItems.filter(
               item => isChildSpecificImpactItem(item) && isImpactItemForSponsoredChild(item, [{ id: child.id, name: child.name }])
             )
           : [];
@@ -975,7 +1015,7 @@ export function MobileDonorChildren() {
                   <div 
                     onClick={() => child.photo_url && setZoomedPhoto({ url: child.photo_url, name: child.name })}
                     className={`w-16 h-16 rounded-2xl overflow-hidden bg-orange-100 text-[#F49853] font-heading font-black text-2xl flex items-center justify-center shrink-0 border border-white/20 relative group ${child.photo_url ? 'cursor-pointer hover:border-orange-400/80 transition-all' : ''}`}
-                    title={child.photo_url ? "Clique para ampliar a foto" : undefined}
+                    title={child.photo_url ? tr('Clique para ampliar a foto', 'Click to enlarge photo') : undefined}
                   >
                     {child.photo_url ? (
                       <>
@@ -1011,7 +1051,7 @@ export function MobileDonorChildren() {
                   <div 
                     onClick={() => setZoomedPhoto({ url: child.photo_url, name: child.name })}
                     className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs relative group cursor-pointer"
-                    title="Clique para ver a foto ampliada"
+                    title={tr('Clique para ver a foto ampliada', 'Click to view larger photo')}
                   >
                     <img 
                       src={child.photo_url} 
@@ -1020,7 +1060,7 @@ export function MobileDonorChildren() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
                       <span className="text-white text-xs font-gotham-bold flex items-center gap-1.5 drop-shadow">
-                        <ZoomIn size={16} className="text-[#F49853]" /> Clique para ampliar
+                        <ZoomIn size={16} className="text-[#F49853]" /> {tr('Clique para ampliar', 'Click to zoom')}
                       </span>
                     </div>
                     <div className="absolute top-3 right-3 bg-slate-900/60 hover:bg-slate-900/90 text-white p-2 rounded-xl backdrop-blur-xs transition-colors shadow-sm">
@@ -1032,23 +1072,23 @@ export function MobileDonorChildren() {
                 {/* Status Nutricional */}
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
                   <span className="text-xs font-gotham-bold text-slate-500 uppercase tracking-wider">
-                    Status Nutricional Atual:
+                    {tr('Status Nutricional Atual:', 'Current Nutritional Status:')}
                   </span>
                   <span className={`text-xs font-gotham-bold uppercase px-3 py-1 rounded-full ${
                     isRecovered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {child.status}
+                    {translateChildStatus(child.status, isEn)}
                   </span>
                 </div>
 
                 {/* Pesagens Resumidas */}
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                    <span className="text-[10px] font-gotham-bold uppercase text-slate-400 block mb-1">Peso de Entrada</span>
+                    <span className="text-[10px] font-gotham-bold uppercase text-slate-400 block mb-1">{tr('Peso de Entrada', 'Entry Weight')}</span>
                     <span className="text-base font-black text-slate-800">{weights.initial}</span>
                   </div>
                   <div className="bg-orange-50/60 p-3.5 rounded-2xl border border-orange-100">
-                    <span className="text-[10px] font-gotham-bold uppercase text-[#F49853] block mb-1">Última Aferição</span>
+                    <span className="text-[10px] font-gotham-bold uppercase text-[#F49853] block mb-1">{tr('Última Aferição', 'Latest Measurement')}</span>
                     <span className="text-base font-black text-slate-900">{weights.current}</span>
                   </div>
                 </div>
@@ -1060,7 +1100,7 @@ export function MobileDonorChildren() {
                 <div className="bg-gradient-to-br from-amber-50/70 to-orange-50/40 rounded-2xl p-4 border border-amber-200/80 space-y-2">
                   <div className="flex items-center gap-2 text-amber-900 font-gotham-bold text-xs uppercase tracking-wider">
                     <BookOpen size={16} className="text-[#F49853]" />
-                    <span>História da Criança</span>
+                    <span>{tr('História da Criança', 'Child’s Story')}</span>
                   </div>
                   <p className="text-xs text-slate-700 font-gotham-light leading-relaxed">
                     {childStory}
@@ -1073,10 +1113,10 @@ export function MobileDonorChildren() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-slate-900 font-gotham-bold text-xs uppercase tracking-wider">
                         <Sparkles size={15} className="text-[#F49853]" />
-                        <span>Atualizações de Impacto • {child.name}</span>
+                        <span>{tr('Atualizações de Impacto', 'Impact Updates')} • {child.name}</span>
                       </div>
                       <span className="text-[9px] font-gotham-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                        Exclusivo do Padrinho
+                        {tr('Exclusivo do Padrinho', 'Sponsor Exclusive')}
                       </span>
                     </div>
                     <div className="space-y-2.5">
@@ -1090,7 +1130,7 @@ export function MobileDonorChildren() {
                         >
                           <div className="flex items-center justify-between text-[10px] text-slate-500 font-gotham-medium">
                             <span className="font-gotham-bold text-slate-800">{upd.title}</span>
-                            <span>{upd.created_at ? new Date(upd.created_at).toLocaleDateString('pt-BR') : upd.date}</span>
+                            <span>{upd.created_at ? new Date(upd.created_at).toLocaleDateString(isEn ? 'en-US' : 'pt-BR') : upd.date}</span>
                           </div>
                           <p className="text-xs text-slate-700 font-gotham-light leading-relaxed">{upd.content}</p>
                           {upd.img_url && (
@@ -1102,7 +1142,7 @@ export function MobileDonorChildren() {
                               />
                               <div className="absolute bottom-2 right-2 bg-slate-950/70 backdrop-blur-xs text-white px-2 py-0.5 rounded-full text-[10px] font-gotham-bold flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
                                 <ZoomIn size={11} />
-                                <span>Ampliar</span>
+                                <span>{tr('Ampliar', 'Zoom')}</span>
                               </div>
                             </div>
                           )}
@@ -1115,21 +1155,21 @@ export function MobileDonorChildren() {
                 {/* Ficha Cadastral e Localidade com Data de Nascimento */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2.5 text-xs text-slate-600 font-gotham-light">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-gotham-bold text-slate-500 shrink-0">Data de Nascimento:</span>
+                    <span className="font-gotham-bold text-slate-500 shrink-0">{tr('Data de Nascimento:', 'Date of Birth:')}</span>
                     <span className="font-gotham-bold text-slate-800 text-right">
                       {formatBirthDate(child.dob)} ({calculateAge(child.dob)})
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-gotham-bold text-slate-500 shrink-0">Cuidador / Responsável:</span>
-                    <span className="font-gotham-bold text-slate-800 text-right">{child.guardian_name || 'Familiar Cadastrado'}</span>
+                    <span className="font-gotham-bold text-slate-500 shrink-0">{tr('Cuidador / Responsável:', 'Caregiver / Guardian:')}</span>
+                    <span className="font-gotham-bold text-slate-800 text-right">{child.guardian_name || tr('Familiar Cadastrado', 'Registered Family Member')}</span>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-gotham-bold text-slate-500 shrink-0">Localidade:</span>
-                    <span className="font-gotham-bold text-slate-800 text-right">{child.community || 'Nampula, Moçambique'}</span>
+                    <span className="font-gotham-bold text-slate-500 shrink-0">{tr('Localidade:', 'Location:')}</span>
+                    <span className="font-gotham-bold text-slate-800 text-right">{child.community || tr('Nampula, Moçambique', 'Nampula, Mozambique')}</span>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-gotham-bold text-slate-500 shrink-0">Número de Registro Clínico:</span>
+                    <span className="font-gotham-bold text-slate-500 shrink-0">{tr('Número de Registro Clínico:', 'Clinical Record Number:')}</span>
                     <span className="font-gotham-bold text-slate-800 text-right">{child.registration_number || '202606'}</span>
                   </div>
                 </div>
@@ -1140,10 +1180,10 @@ export function MobileDonorChildren() {
                     <div className="p-4 bg-orange-50/70 border border-orange-200/80 rounded-2xl flex items-center justify-between">
                       <div>
                         <span className="text-[10px] font-gotham-bold uppercase tracking-wider text-[#F49853] block">
-                          Apadrinhamento Ativo
+                          {tr('Apadrinhamento Ativo', 'Active Sponsorship')}
                         </span>
                         <p className="text-xs text-slate-800 font-gotham-bold mt-0.5">
-                          Cota Mensal: R$ 90,00/mês
+                          {tr('Cota Mensal: R$ 90,00/mês', 'Monthly Quota: R$ 90.00/mo')}
                         </p>
                       </div>
                       <button
@@ -1155,7 +1195,7 @@ export function MobileDonorChildren() {
                         })}
                         className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-gotham-bold transition-all cursor-pointer shadow-2xs"
                       >
-                        Cancelar Apadrinhamento
+                        {tr('Cancelar Apadrinhamento', 'Cancel Sponsorship')}
                       </button>
                     </div>
 
@@ -1166,13 +1206,13 @@ export function MobileDonorChildren() {
                         className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Heart size={16} fill="currentColor" />
-                        <span>Apadrinhar Mais Crianças (+R$ 90/mês)</span>
+                        <span>{tr('Apadrinhar Mais Crianças (+R$ 90/mês)', 'Sponsor More Children (+R$ 90/mo)')}</span>
                       </Link>
                       <button
                         onClick={() => setSelectedChild(null)}
                         className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
                       >
-                        Fechar
+                        {tr('Fechar', 'Close')}
                       </button>
                     </div>
                   </div>
@@ -1185,13 +1225,13 @@ export function MobileDonorChildren() {
                       className="flex-1 py-3.5 bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2"
                     >
                       <Heart size={16} fill="currentColor" />
-                      <span>Fazer Apadrinhamento Solidário</span>
+                      <span>{tr('Fazer Apadrinhamento Solidário', 'Start Sponsorship')}</span>
                     </Link>
                     <button
                       onClick={() => setSelectedChild(null)}
                       className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
                     >
-                      Fechar
+                      {tr('Fechar', 'Close')}
                     </button>
                   </div>
                 )}
@@ -1212,7 +1252,7 @@ export function MobileDonorChildren() {
                   <X size={20} />
                 </div>
                 <h3 className="text-lg font-heading font-black text-white">
-                  Cancelar Apadrinhamento
+                  {tr('Cancelar Apadrinhamento', 'Cancel Sponsorship')}
                 </h3>
               </div>
               <button
@@ -1226,10 +1266,13 @@ export function MobileDonorChildren() {
             <div className="p-6 space-y-4">
               <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 space-y-2">
                 <p className="font-gotham-bold text-sm">
-                  Deseja realmente cancelar o apadrinhamento de {childToCancel.name}?
+                  {tr(`Deseja realmente cancelar o apadrinhamento de ${childToCancel.name}?`, `Are you sure you want to cancel your sponsorship for ${childToCancel.name}?`)}
                 </p>
                 <p className="font-gotham-light leading-relaxed">
-                  Ao confirmar, a cota mensal de R$ 90,00 deixará de ser cobrada no seu plano e a vaga da criança será liberada na Casa Nutri para acolhimento por outro padrinho.
+                  {tr(
+                    'Ao confirmar, a cota mensal de R$ 90,00 deixará de ser cobrada no seu plano e a vaga da criança será liberada na Casa Nutri para acolhimento por outro padrinho.',
+                    'By confirming, the R$ 90.00 monthly quota will no longer be charged to your plan and the child’s spot will be opened at Casa Nutri for another sponsor.'
+                  )}
                 </p>
               </div>
 
@@ -1240,14 +1283,14 @@ export function MobileDonorChildren() {
                   disabled={isCancelingChild}
                   className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-gotham-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  <span>{isCancelingChild ? 'Cancelando...' : 'Confirmar Cancelamento'}</span>
+                  <span>{isCancelingChild ? tr('Cancelando...', 'Canceling...') : tr('Confirmar Cancelamento', 'Confirm Cancellation')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setChildToCancel(null)}
                   className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-gotham-medium text-xs rounded-xl transition-all cursor-pointer"
                 >
-                  Voltar
+                  {tr('Voltar', 'Back')}
                 </button>
               </div>
             </div>
@@ -1266,15 +1309,18 @@ export function MobileDonorChildren() {
                 <Heart size={28} fill="currentColor" />
               </div>
               <span className="text-[11px] font-gotham-bold uppercase tracking-widest text-[#F49853] block">
-                Apadrinhamento Confirmado! 🧡
+                {tr('Apadrinhamento Confirmado! 🧡', 'Sponsorship Confirmed! 🧡')}
               </span>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 font-heading">
                 {celebrationChildren.length === 1 
-                  ? 'Conheça o seu afilhado(a)!' 
-                  : 'Conheça suas crianças apadrinhadas!'}
+                  ? tr('Conheça o seu afilhado(a)!', 'Meet your sponsored child!') 
+                  : tr('Conheça suas crianças apadrinhadas!', 'Meet your sponsored children!')}
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 font-gotham-medium leading-relaxed">
-                Pelo nosso modelo solidário de distribuição justa, vinculamos o seu carinho para a(s) criança(s) em maior prioridade na Casa Nutri. Enviamos os detalhes completos também para seu e-mail!
+                {tr(
+                  'Pelo nosso modelo solidário de distribuição justa, vinculamos o seu carinho para a(s) criança(s) em maior prioridade na Casa Nutri. Enviamos os detalhes completos também para seu e-mail!',
+                  'Through our fair distribution model, we matched your support to the child(ren) with the highest priority at Casa Nutri. We have also sent full details to your email!'
+                )}
               </p>
             </div>
 
@@ -1289,7 +1335,7 @@ export function MobileDonorChildren() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
-                        {c.gender === 'F' ? 'Menina' : 'Menino'} • {c.ageText}
+                        {c.gender === 'F' ? tr('Menina', 'Girl') : tr('Menino', 'Boy')} • {c.ageText}
                       </span>
                     </div>
                     <h4 className="font-heading font-black text-slate-900 text-base truncate">
@@ -1309,7 +1355,7 @@ export function MobileDonorChildren() {
                 onClick={() => setShowCelebration(false)}
                 className="w-full bg-[#F49853] hover:bg-[#e0853d] text-white font-gotham-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md cursor-pointer"
               >
-                Acessar Minhas Crianças
+                {tr('Acessar Minhas Crianças', 'Access My Children')}
               </button>
             </div>
           </div>
@@ -1338,7 +1384,7 @@ export function MobileDonorChildren() {
                 type="button"
                 onClick={() => setZoomedPhoto(null)}
                 className="p-2 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer"
-                title="Fechar (Esc)"
+                title={tr('Fechar (Esc)', 'Close (Esc)')}
               >
                 <X size={20} />
               </button>

@@ -21,11 +21,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { isNative, initializeNativeApp } from '../../lib/capacitor';
 import { DonationModal } from '../common/DonationModal';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 
 export function MobileDonorLayout({ children }: { children?: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { tr, isEn } = useLanguage();
   const { notifications, markAsRead, markAllAsRead, requestPermission, permission } = useNotification();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -39,13 +42,13 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const navItems = [
-    { label: 'Visão Geral', path: '/portal/dashboard', icon: Home },
-    { label: 'Crianças', path: '/portal/sponsorship', icon: Heart },
-    { label: 'Futuro Univ.', path: '/portal/futuro-universitario', icon: GraduationCap },
-    { label: 'Projetos', path: '/portal/projects', icon: Briefcase },
-    { label: 'Fazer Doação', path: '/portal/donations', icon: DollarSign },
-    { label: 'Minhas Doações', path: '/portal/my-donations', icon: Receipt },
-    { label: 'Blog', path: '/portal/blog', icon: Newspaper },
+    { key: 'dashboard', label: tr('Visão Geral', 'Overview'), path: '/portal/dashboard', icon: Home },
+    { key: 'children', label: tr('Crianças', 'Children'), path: '/portal/sponsorship', icon: Heart },
+    { key: 'university', label: tr('Futuro Univ.', 'Univ. Future'), path: '/portal/futuro-universitario', icon: GraduationCap },
+    { key: 'projects', label: tr('Projetos', 'Projects'), path: '/portal/projects', icon: Briefcase },
+    { key: 'donations', label: tr('Fazer Doação', 'Donate'), path: '/portal/donations', icon: DollarSign },
+    { key: 'my-donations', label: tr('Minhas Doações', 'My Donations'), path: '/portal/my-donations', icon: Receipt },
+    { key: 'blog', label: 'Blog', path: '/portal/blog', icon: Newspaper },
   ];
 
   const isActive = (path: string) => {
@@ -81,7 +84,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               <div className="border-l border-slate-200/80 pl-3">
                 <span className="text-[10px] font-gotham-bold text-[#F49853] uppercase tracking-widest leading-none flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#F49853] animate-pulse"></span>
-                  Portal do Mantenedor
+                  {tr('Portal do Mantenedor', 'Supporter Portal')}
                 </span>
               </div>
             </Link>
@@ -118,7 +121,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                 className="hidden sm:flex items-center gap-1.5 text-xs font-gotham-bold text-slate-700 hover:text-white bg-slate-100 hover:bg-slate-900 px-3.5 py-2 rounded-xl transition-all shadow-xs"
               >
                 <ShieldCheck size={14} className="text-[#F49853]" />
-                <span>Área Administrativa</span>
+                <span>{tr('Área Administrativa', 'Admin Area')}</span>
               </Link>
             )}
 
@@ -127,15 +130,17 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               to="/"
               className="hidden lg:flex items-center gap-1.5 text-xs font-gotham-bold text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 px-3.5 py-2 rounded-xl transition-all"
             >
-              <span>Site Principal</span>
+              <span>{tr('Site Principal', 'Main Website')}</span>
               <ExternalLink size={13} />
             </Link>
+
+            <LanguageSwitcher />
 
             {/* Sino de Notificações */}
             <button
               onClick={() => setIsNotifOpen(true)}
               className="relative p-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
-              aria-label="Notificações"
+              aria-label={tr('Notificações', 'Notifications')}
             >
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -155,10 +160,10 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               </div>
               <div className="hidden sm:flex flex-col text-left">
                 <span className="text-xs font-gotham-bold text-slate-800 max-w-[120px] truncate leading-tight">
-                  {user?.name?.split(' ')[0] || 'Mantenedor'}
+                  {user?.name?.split(' ')[0] || tr('Mantenedor', 'Supporter')}
                 </span>
                 <span className="text-[9px] font-gotham-medium text-amber-600 uppercase tracking-tight leading-none">
-                  Mantenedor
+                  {tr('Mantenedor', 'Supporter')}
                 </span>
               </div>
             </button>
@@ -193,7 +198,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                   }`}
                 >
                   <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-                  {item.label === 'Crianças' && (
+                  {item.key === 'children' && (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full"></span>
                   )}
                 </div>
@@ -213,10 +218,10 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="text-amber-500" size={20} />
-                <h3 className="font-black text-slate-900 text-lg">Notificações</h3>
+                <h3 className="font-black text-slate-900 text-lg">{tr('Notificações', 'Notifications')}</h3>
                 {unreadCount > 0 && (
                   <span className="text-xs bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-full">
-                    {unreadCount} novas
+                    {unreadCount} {tr('novas', 'new')}
                   </span>
                 )}
               </div>
@@ -232,13 +237,16 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
             {permission !== 'granted' && (
               <div className="m-4 p-4 rounded-2xl bg-amber-50 border border-amber-200">
                 <p className="text-xs font-bold text-amber-900 mb-2">
-                  Ative as notificações para receber novidades sobre suas crianças e a Casa Nutri!
+                  {tr(
+                    'Ative as notificações para receber novidades sobre suas crianças e a Casa Nutri!',
+                    'Enable notifications to receive updates about your children and Casa Nutri!'
+                  )}
                 </p>
                 <button
                   onClick={() => requestPermission(user?.id)}
                   className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl transition-all shadow-xs"
                 >
-                  Permitir Notificações Push
+                  {tr('Permitir Notificações Push', 'Allow Push Notifications')}
                 </button>
               </div>
             )}
@@ -248,7 +256,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               {notifications.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 text-xs">
                   <Bell size={32} className="mx-auto mb-2 opacity-30" />
-                  Nenhuma notificação no momento.
+                  {tr('Nenhuma notificação no momento.', 'No notifications at the moment.')}
                 </div>
               ) : (
                 notifications.map((notif) => (
@@ -267,7 +275,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                     </div>
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed">{notif.message}</p>
                     <span className="text-[10px] text-slate-400 mt-2 block font-medium">
-                      {new Date(notif.date).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(notif.date).toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 ))
@@ -280,7 +288,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                   onClick={markAllAsRead}
                   className="w-full py-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                 >
-                  Marcar todas como lidas
+                  {tr('Marcar todas como lidas', 'Mark all as read')}
                 </button>
               </div>
             )}
@@ -293,7 +301,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex justify-end">
           <div className="w-full max-w-sm bg-white h-full shadow-2xl flex flex-col pt-safe pb-safe animate-slideLeft">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg">Meu Perfil</h3>
+              <h3 className="font-black text-slate-900 text-lg">{tr('Meu Perfil', 'My Profile')}</h3>
               <button
                 onClick={() => setIsProfileOpen(false)}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
@@ -307,10 +315,10 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               <div className="w-16 h-16 rounded-full bg-amber-500 text-white font-black text-xl flex items-center justify-center mx-auto shadow-md shadow-amber-500/20 mb-3">
                 {user?.name ? user.name[0].toUpperCase() : 'A'}
               </div>
-              <h4 className="font-black text-slate-900 text-base">{user?.name || 'Apoiador YAH Hope'}</h4>
+              <h4 className="font-black text-slate-900 text-base">{user?.name || tr('Apoiador YAH Hope', 'YAH Hope Supporter')}</h4>
               <p className="text-xs text-slate-500 mt-0.5">{user?.email}</p>
               <div className="inline-flex items-center gap-1.5 mt-2 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">
-                <Heart size={12} fill="currentColor" /> Apoiador Ativo
+                <Heart size={12} fill="currentColor" /> {tr('Apoiador Ativo', 'Active Supporter')}
               </div>
             </div>
 
@@ -324,7 +332,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                 >
                   <div className="flex items-center gap-3">
                     <ShieldCheck size={18} className="text-[#F49853]" />
-                    <span>Painel Administrativo</span>
+                    <span>{tr('Painel Administrativo', 'Admin Dashboard')}</span>
                   </div>
                   <ChevronRight size={16} className="text-orange-400" />
                 </Link>
@@ -337,7 +345,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <Receipt size={18} className="text-amber-500" />
-                  <span>Minhas Doações & Recibos</span>
+                  <span>{tr('Minhas Doações & Recibos', 'My Donations & Receipts')}</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
@@ -349,7 +357,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <Heart size={18} className="text-rose-500" />
-                  <span>Minhas Crianças Apadrinhadas</span>
+                  <span>{tr('Minhas Crianças Apadrinhadas', 'My Sponsored Children')}</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
@@ -361,7 +369,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <GraduationCap size={18} className="text-indigo-600" />
-                  <span>Programa Futuro Universitário</span>
+                  <span>{tr('Programa Futuro Universitário', 'University Future Program')}</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
@@ -373,7 +381,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <Heart size={18} className="text-[#F49853]" />
-                  <span>Central de Apadrinhamento</span>
+                  <span>{tr('Central de Apadrinhamento', 'Sponsorship Center')}</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
@@ -385,7 +393,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
               >
                 <div className="flex items-center gap-3">
                   <User size={18} className="text-slate-400" />
-                  <span>Política de Privacidade</span>
+                  <span>{tr('Política de Privacidade', 'Privacy Policy')}</span>
                 </div>
                 <ChevronRight size={16} className="text-slate-400" />
               </Link>
@@ -398,7 +406,7 @@ export function MobileDonorLayout({ children }: { children?: React.ReactNode }) 
                 className="w-full py-3 px-4 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
               >
                 <LogOut size={16} />
-                <span>Sair da Conta</span>
+                <span>{tr('Sair da Conta', 'Sign Out')}</span>
               </button>
             </div>
           </div>

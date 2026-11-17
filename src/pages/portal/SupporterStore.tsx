@@ -1,15 +1,17 @@
 import React from 'react';
 import { ShoppingBag, Tag, Star, ArrowRight, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export function SupporterStore() {
+  const { tr } = useLanguage();
   const products = [
-    { id: '1', name: 'Camiseta YAHope Original', price: 'R$ 89,90', impact: '2 semanas de refeições', img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1780&auto=format&fit=crop' },
-    { id: '2', name: 'Cesta de Artesanato Moçambique', price: 'R$ 145,00', impact: 'Ajuda a cooperativa local', img: 'https://images.unsplash.com/photo-1606126610021-4522900504e6?q=80&w=1974&auto=format&fit=crop' },
-    { id: '3', name: 'Pulseira da Esperança (Kit 3)', price: 'R$ 45,00', impact: 'Suplemento Vitamínico', img: 'https://images.unsplash.com/photo-1611591439902-16bc1f39dd3b?q=80&w=2070&auto=format&fit=crop' },
-    { id: '4', name: 'Caneca Logo YAHope', price: 'R$ 39,90', impact: 'Kit de higiene básico', img: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?q=80&w=2070&auto=format&fit=crop' },
-    { id: '5', name: 'Ecobag Sustentável', price: 'R$ 55,00', impact: 'Mudas para a horta comunitária', img: 'https://images.unsplash.com/photo-1544816153-12ad5d7133a2?q=80&w=1887&auto=format&fit=crop' },
-    { id: '6', name: 'Caderno de Notas YAHope', price: 'R$ 29,90', impact: 'Material escolar para 1 criança', img: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=1887&auto=format&fit=crop' },
+    { id: '1', name: tr('Camiseta YAHope Original', 'Original YAHope T-Shirt'), price: 'R$ 89,90', impact: tr('2 semanas de refeições', '2 weeks of meals'), img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1780&auto=format&fit=crop' },
+    { id: '2', name: tr('Cesta de Artesanato Moçambique', 'Mozambique Artisan Basket'), price: 'R$ 145,00', impact: tr('Ajuda a cooperativa local', 'Supports local cooperative'), img: 'https://images.unsplash.com/photo-1606126610021-4522900504e6?q=80&w=1974&auto=format&fit=crop' },
+    { id: '3', name: tr('Pulseira da Esperança (Kit 3)', 'Hope Bracelet (3-Pack)'), price: 'R$ 45,00', impact: tr('Suplemento Vitamínico', 'Vitamin Supplement'), img: 'https://images.unsplash.com/photo-1611591439902-16bc1f39dd3b?q=80&w=2070&auto=format&fit=crop' },
+    { id: '4', name: tr('Caneca Logo YAHope', 'YAHope Logo Mug'), price: 'R$ 39,90', impact: tr('Kit de higiene básico', 'Basic hygiene kit'), img: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?q=80&w=2070&auto=format&fit=crop' },
+    { id: '5', name: tr('Ecobag Sustentável', 'Sustainable Tote Bag'), price: 'R$ 55,00', impact: tr('Mudas para a horta comunitária', 'Seedlings for the community garden'), img: 'https://images.unsplash.com/photo-1544816153-12ad5d7133a2?q=80&w=1887&auto=format&fit=crop' },
+    { id: '6', name: tr('Caderno de Notas YAHope', 'YAHope Notebook'), price: 'R$ 29,90', impact: tr('Material escolar para 1 criança', 'School supplies for 1 child'), img: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=1887&auto=format&fit=crop' },
   ];
 
   return (
@@ -19,16 +21,16 @@ export function SupporterStore() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500 rounded-full blur-[120px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10 max-w-xl">
           <div className="inline-flex items-center gap-2 bg-amber-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-6">
-            Loja Solidária
+            {tr('Loja Solidária', 'Solidarity Store')}
           </div>
-          <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight">Onde cada compra é <br/><span className="text-amber-400">um ato de amor.</span></h1>
-          <p className="text-slate-400 text-lg font-medium">100% dos lucros da nossa loja são revertidos diretamente para os projetos de nutrição em Moçambique.</p>
+          <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight">{tr('Onde cada compra é', 'Where every purchase is')} <br/><span className="text-amber-400">{tr('um ato de amor.', 'an act of love.')}</span></h1>
+          <p className="text-slate-400 text-lg font-medium">{tr('100% dos lucros da nossa loja são revertidos diretamente para os projetos de nutrição em Moçambique.', '100% of our store profits go directly to nutrition projects in Mozambique.')}</p>
         </div>
         <div className="relative z-10 shrink-0">
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-[2.5rem] text-center">
             <Star className="text-amber-400 mx-auto mb-4" size={32} fill="currentColor" />
-            <p className="text-sm font-bold text-slate-300 uppercase tracking-widest">Meta do Mês</p>
-            <h2 className="text-3xl font-black mt-2">78% Alcançada</h2>
+            <p className="text-sm font-bold text-slate-300 uppercase tracking-widest">{tr('Meta do Mês', 'Monthly Goal')}</p>
+            <h2 className="text-3xl font-black mt-2">{tr('78% Alcançada', '78% Reached')}</h2>
             <div className="w-48 h-2 bg-white/10 rounded-full mt-4 overflow-hidden">
               <div className="w-3/4 h-full bg-amber-500"></div>
             </div>
@@ -56,11 +58,11 @@ export function SupporterStore() {
               
               <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl w-max">
                 <Heart size={14} fill="currentColor" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Impacto: {product.impact}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{tr('Impacto:', 'Impact:')} {product.impact}</span>
               </div>
 
               <p className="text-slate-500 text-sm font-medium line-clamp-2 pt-2">
-                Produto feito com materiais sustentáveis e mão de obra ética para apoiar nossa causa.
+                {tr('Produto feito com materiais sustentáveis e mão de obra ética para apoiar nossa causa.', 'Product made with sustainable materials and ethical labor to support our cause.')}
               </p>
             </div>
           </div>
@@ -69,13 +71,13 @@ export function SupporterStore() {
 
       {/* Bottom CTA */}
       <div className="text-center py-12">
-        <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mb-6">Quer ajudar de outra forma?</p>
+        <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mb-6">{tr('Quer ajudar de outra forma?', 'Want to help in another way?')}</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black transition-all hover:bg-slate-800">
-            Fazer uma Doação Direta
+            {tr('Fazer uma Doação Direta', 'Make a Direct Donation')}
           </button>
           <button className="bg-white border-2 border-slate-200 text-slate-600 px-10 py-4 rounded-2xl font-black transition-all hover:bg-slate-50">
-            Quero ser Voluntário
+            {tr('Quero ser Voluntário', 'I Want to Volunteer')}
           </button>
         </div>
       </div>

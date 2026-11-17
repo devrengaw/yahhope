@@ -368,26 +368,49 @@ export function MonthlyDonor() {
         }
       }
 
-      // Se for Mantenedor Geral com valor >= R$ 90 sem Stripe, vincula crianças a cada R$ 90 (excedente fica pro projeto geral)
-      if (donationType !== 'sponsorship' && currentAmount >= 90 && !isStripeCheckout) {
-        try {
-          const numChildren = Math.floor(currentAmount / 90);
-          const assignRes = await sponsorshipService.assignChildrenToSponsor({
-            donorName: finalName,
-            donorEmail: finalEmail,
-            donorPhone: finalPhone,
-            quotasCount: numChildren,
-            amountPerQuota: 90,
-            amount: currentAmount,
-            paymentMethod,
-            sponsorUserId: user?.id
-          });
-          if (assignRes.success && assignRes.assignedChildren.length > 0) {
-            setAssignedChildren(assignRes.assignedChildren);
+      // Se for Mantenedor Geral via PIX ou sem Stripe
+      if (donationType !== 'sponsorship' && !isStripeCheckout) {
+        if (currentAmount >= 90) {
+          try {
+            const numChildren = Math.floor(currentAmount / 90);
+            const assignRes = await sponsorshipService.assignChildrenToSponsor({
+              donorName: finalName,
+              donorEmail: finalEmail,
+              donorPhone: finalPhone,
+              quotasCount: numChildren,
+              amountPerQuota: 90,
+              amount: currentAmount,
+              paymentMethod,
+              sponsorUserId: user?.id
+            });
+            if (assignRes.success && assignRes.assignedChildren.length > 0) {
+              setAssignedChildren(assignRes.assignedChildren);
+            }
+          } catch (e) {
+            console.warn('Aviso ao atribuir crianças da doação de mantenedor:', e);
           }
-        } catch (e) {
-          console.warn('Aviso ao atribuir crianças da doação de mantenedor:', e);
+        } else {
+          // Apoio Geral (< R$ 90) via PIX: envia o e-mail de acesso ao Portal do Mantenedor
+          await sponsorshipService.sendMaintainerAccessEmail(
+            finalEmail,
+            finalName,
+            currentAmount,
+            paymentMethod
+          );
         }
+
+        if (createDonation && currentCampaign) {
+          createDonation({
+            campaign_id: currentCampaign.id,
+            donor_name: finalName,
+            donor_email: finalEmail,
+            amount: currentAmount,
+            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
+          });
+        }
+        setIsLoading(false);
+        setIsSuccess(true);
+        return;
       }
 
       // 2. Caso seja Mantenedor Geral do Projeto
@@ -678,7 +701,7 @@ export function MonthlyDonor() {
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
                 {donationType === 'sponsorship' && paymentMethod === 'pix' ? (
                   <>
-                    {tr('O seu pacote de apadrinhamento de ', 'Your sponsorship package of ')}<strong>{pixPackageMonths} {tr('meses', 'months')} (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>{tr(' já está registrado! Você tem acesso garantido ao acompanhamento da criança durante todos os ', ' is now registered! You have guaranteed access to your child’s updates for all ')}{pixPackageMonths}{tr(' meses.', ' months.')}
+                    {tr('O seu pacote de apadrinhamento de ', 'Your sponsorship package of ')}<strong>{pixPackageMonths} {tr('meses', 'months')} (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>{tr(' já está registrado! Você acompanhará a criança durante todos os ', ' is now registered! You will follow your child’s progress for all ')}{pixPackageMonths}{tr(' meses.', ' months.')}
                   </>
                 ) : (
                   <>
@@ -1165,7 +1188,7 @@ export function MonthlyDonor() {
                       {donationType === 'sponsorship' && paymentMethod === 'pix' && (
                         <span className="text-[10px] text-emerald-700 font-gotham-bold flex items-center gap-1 mt-0.5">
                           <Calendar size={10} className="text-emerald-600" />
-                          {tr(`Equivale a R$ ${sponsorshipMonthlyTotal}/mês • Acesso garantido por ${pixPackageMonths} meses!`, `Equals R$ ${sponsorshipMonthlyTotal}/mo • Access guaranteed for ${pixPackageMonths} months!`)}
+                          {tr(`Equivale a R$ ${sponsorshipMonthlyTotal}/mês • Pacote de ${pixPackageMonths} meses`, `Equals R$ ${sponsorshipMonthlyTotal}/mo • ${pixPackageMonths}-month package`)}
                         </span>
                       )}
                       {donationType !== 'sponsorship' && currentAmount >= 90 && currentAmount % 90 !== 0 && (
@@ -1297,9 +1320,6 @@ export function MonthlyDonor() {
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-700">
                             {tr('Escolha o Pacote de Meses (PIX):', 'Choose Months Package (PIX):')}
-                          </span>
-                          <span className="text-[10px] font-gotham-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            {tr('Acesso contínuo garantido', 'Guaranteed continuous access')}
                           </span>
                         </div>
 
