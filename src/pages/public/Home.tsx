@@ -43,6 +43,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { HomeDonationCard } from '../../components/public/HomeDonationCard';
 import { Layers } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslatedProjects } from '../../i18n/projectTranslations';
 
 // Exact Quotas used for Stripe receipts in YAH Hope
 const STRIPE_QUOTAS = [
@@ -74,7 +75,8 @@ export function Home() {
   const { activeMetrics: impactMetrics } = useImpactMetrics();
 
   // Dynamic Projects managed via /admin/local-projects and /projetos
-  const { projects: websiteProjects } = useWebsiteProjects();
+  const { projects: rawWebsiteProjects } = useWebsiteProjects();
+  const websiteProjects = useTranslatedProjects(rawWebsiteProjects, isEn);
 
   // Régua Geral de Arrecadação Cumulativa
   const { 
@@ -687,7 +689,7 @@ export function Home() {
                     className="inline-block text-white px-3 py-0.5 rounded-full font-gotham-bold text-[11px] uppercase tracking-wider mb-2 shadow-xs"
                     style={{ backgroundColor: project.tag_color || '#F49853' }}
                   >
-                    {project.category || 'Projeto Local'}
+                    {project.category || tr('Projeto Local', 'Local Project')}
                   </span>
                   <h3 className="text-xl font-heading font-bold mb-2 group-hover:text-orange-200 transition-colors">
                     {project.title}

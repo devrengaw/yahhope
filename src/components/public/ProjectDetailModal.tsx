@@ -8,6 +8,7 @@ import { YAHHopeProject } from '../../lib/mockData';
 import { useDonationModal } from '../../contexts/DonationModalContext';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslatedProject } from '../../i18n/projectTranslations';
 
 interface ProjectDetailModalProps {
   project: YAHHopeProject | null;
@@ -15,8 +16,9 @@ interface ProjectDetailModalProps {
   onClose: () => void;
 }
 
-export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailModalProps) {
-  const { tr } = useLanguage();
+export function ProjectDetailModal({ project: rawProject, isOpen, onClose }: ProjectDetailModalProps) {
+  const { tr, isEn } = useLanguage();
+  const project = useTranslatedProject(rawProject, isEn);
   const { openDonationModal } = useDonationModal();
   const [copiedLink, setCopiedLink] = useState(false);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);

@@ -6,10 +6,12 @@ import { YAHHopeProject } from '../../lib/mockData';
 import { SEO } from '../../components/common/SEO';
 import { ProjectDetailModal } from '../../components/public/ProjectDetailModal';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslatedProjects } from '../../i18n/projectTranslations';
 
 export function LocalProjects() {
-  const { tr } = useLanguage();
-  const { projects } = useWebsiteProjects();
+  const { tr, isEn } = useLanguage();
+  const { projects: rawProjects } = useWebsiteProjects();
+  const projects = useTranslatedProjects(rawProjects, isEn);
   const [selectedProject, setSelectedProject] = useState<YAHHopeProject | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 

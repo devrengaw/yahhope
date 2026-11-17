@@ -15,14 +15,16 @@ import { useDonationModal } from '../contexts/DonationModalContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSwitcher } from './common/LanguageSwitcher';
+import { useTranslatedProjects } from '../i18n/projectTranslations';
 
 export function PublicHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { tr } = useLanguage();
+  const { tr, isEn } = useLanguage();
   const { banner: topBanner } = useTopBanner();
-  const { projects: websiteProjects } = useWebsiteProjects();
+  const { projects: rawWebsiteProjects } = useWebsiteProjects();
+  const websiteProjects = useTranslatedProjects(rawWebsiteProjects, isEn);
   const { openDonationModal } = useDonationModal();
 
   const activeLocalProjects = websiteProjects.filter(p => p.status === 'active' || !p.status);
