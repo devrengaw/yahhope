@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { useState, useMemo, type RefObject } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
@@ -109,8 +109,6 @@ export const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeigh
 
 type ChartId = 'heightForAge' | 'weightForHeight' | 'hcForAge';
 
-const ZOOM_LEVELS = [1, 1.5, 2, 3, 4] as const;
-
 function getAdaptiveSteps(chartId: ChartId, axis: 'x' | 'y', span: number, isExport = false): [number, number] {
   if (chartId === 'heightForAge' || chartId === 'hcForAge') {
     if (axis === 'x') {
@@ -168,22 +166,6 @@ function formatTickValue(value: number) {
   return Number(value.toFixed(2)).toString();
 }
 
-function clampDomain(center: number, halfSpan: number, bounds: [number, number]): [number, number] {
-  const [bMin, bMax] = bounds;
-  const fullSpan = bMax - bMin;
-  if (halfSpan * 2 >= fullSpan) return [bMin, bMax];
-  let min = center - halfSpan;
-  let max = center + halfSpan;
-  if (min < bMin) {
-    min = bMin;
-    max = bMin + halfSpan * 2;
-  } else if (max > bMax) {
-    max = bMax;
-    min = bMax - halfSpan * 2;
-  }
-  return [min, max];
-}
-
 function renderCustomXTick(majorSet: Set<string>) {
   return ({ x, y, payload }: any) => {
     const val = Number(payload?.value);
@@ -230,15 +212,6 @@ function renderCustomYTick(majorSet: Set<string>) {
 
 export function GrowthCharts({ patient, events }: GrowthChartsProps) {
   const [currentChart, setCurrentChart] = useState(0);
-  const [viewDomain, setViewDomain] = useState<{ x: [number, number]; y: [number, number] } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{
-    startX: number;
-    startY: number;
-    startDomain: { x: [number, number]; y: [number, number] };
-  } | null>(null);
-
   const isBoy = patient.gender === 'M';
   
   const themeClasses = isBoy 
@@ -275,99 +248,10 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
     }
   ];
 
-  const handlePrev = () => {
-    setViewDomain(null);
-    setCurrentChart(prev => (prev > 0 ? prev - 1 : charts.length - 1));
-  };
-  const handleNext = () => {
-    setViewDomain(null);
-    setCurrentChart(prev => (prev < charts.length - 1 ? prev + 1 : 0));
-  };
+  const handlePrev = () => setCurrentChart(prev => (prev > 0 ? prev - 1 : charts.length - 1));
+  const handleNext = () => setCurrentChart(prev => (prev < charts.length - 1 ? prev + 1 : 0));
 
   const activeChartData = charts[currentChart];
-  const activeXDomain = viewDomain?.x ?? activeChartData.xDomain;
-  const activeYDomain = viewDomain?.y ?? activeChartData.domain;
-  const baseXSpan = activeChartData.xDomain[1] - activeChartData.xDomain[0];
-  const baseYSpan = activeChartData.domain[1] - activeChartData.domain[0];
-  const currentZoom = viewDomain ? Math.round((baseXSpan / (activeXDomain[1] - activeXDomain[0])) * 100) / 100 : 1;
-
-  const applyZoom = (nextZoom: number) => {
-    if (nextZoom <= 1) {
-      setViewDomain(null);
-      return;
-    }
-    const clampedZoom = Math.min(ZOOM_LEVELS[ZOOM_LEVELS.length - 1], nextZoom);
-    const patientPoints = activeChartData.data.filter((d) => d.patientValue !== undefined);
-    const cx = viewDomain
-      ? (activeXDomain[0] + activeXDomain[1]) / 2
-      : patientPoints.length > 0
-        ? patientPoints.reduce((acc, p) => acc + p.x, 0) / patientPoints.length
-        : (activeChartData.xDomain[0] + activeChartData.xDomain[1]) / 2;
-    const cy = viewDomain
-      ? (activeYDomain[0] + activeYDomain[1]) / 2
-      : patientPoints.length > 0
-        ? patientPoints.reduce((acc, p) => acc + p.patientValue, 0) / patientPoints.length
-        : (activeChartData.domain[0] + activeChartData.domain[1]) / 2;
-
-    const newHalfX = baseXSpan / (2 * clampedZoom);
-    const newHalfY = baseYSpan / (2 * clampedZoom);
-
-    setViewDomain({
-      x: clampDomain(cx, newHalfX, activeChartData.xDomain),
-      y: clampDomain(cy, newHalfY, activeChartData.domain),
-    });
-  };
-
-  const handleZoomIn = () => {
-    const next = ZOOM_LEVELS.find((z) => z > currentZoom + 0.05) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
-    applyZoom(next);
-  };
-
-  const handleZoomOut = () => {
-    const prev = [...ZOOM_LEVELS].reverse().find((z) => z < currentZoom - 0.05) ?? 1;
-    applyZoom(prev);
-  };
-
-  const handleResetZoom = () => setViewDomain(null);
-
-  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (currentZoom <= 1) return;
-    setIsDragging(true);
-    dragStateRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      startDomain: { x: [...activeXDomain] as [number, number], y: [...activeYDomain] as [number, number] },
-    };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !dragStateRef.current || !chartWrapperRef.current) return;
-    const rect = chartWrapperRef.current.getBoundingClientRect();
-    const plotW = Math.max(rect.width - 80, 100);
-    const plotH = Math.max(rect.height - 65, 100);
-    const dxPx = e.clientX - dragStateRef.current.startX;
-    const dyPx = e.clientY - dragStateRef.current.startY;
-    const { x: startXDom, y: startYDom } = dragStateRef.current.startDomain;
-    const xSpan = startXDom[1] - startXDom[0];
-    const ySpan = startYDom[1] - startYDom[0];
-    const dxData = -(dxPx / plotW) * xSpan;
-    const dyData = (dyPx / plotH) * ySpan;
-
-    setViewDomain({
-      x: clampDomain((startXDom[0] + startXDom[1]) / 2 + dxData, xSpan / 2, activeChartData.xDomain),
-      y: clampDomain((startYDom[0] + startYDom[1]) / 2 + dyData, ySpan / 2, activeChartData.domain),
-    });
-  };
-
-  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    dragStateRef.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -495,64 +379,14 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
       {/* Chart Container with Gender Theme */}
       <div className={cn("border-4 rounded-2xl overflow-hidden bg-white", themeClasses.border)}>
-        <div className={cn("px-4 py-2 flex flex-wrap justify-between items-center gap-2 text-white font-bold", themeClasses.bg)}>
+        <div className={cn("px-4 py-2 flex justify-between items-center text-white font-bold", themeClasses.bg)}>
           <span>{activeChartData.title.toUpperCase()}</span>
-          <div className="flex items-center gap-3">
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1 bg-black/15 rounded-lg px-1.5 py-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={handleZoomOut}
-                disabled={currentZoom <= 1}
-                title="Diminuir zoom"
-                className="p-1 rounded hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                <ZoomOut size={15} />
-              </button>
-              <span className="min-w-[40px] text-center tabular-nums">{Math.round(currentZoom * 100)}%</span>
-              <button
-                type="button"
-                onClick={handleZoomIn}
-                disabled={currentZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
-                title="Aumentar zoom"
-                className="p-1 rounded hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                <ZoomIn size={15} />
-              </button>
-              {currentZoom > 1 && (
-                <button
-                  type="button"
-                  onClick={handleResetZoom}
-                  title="Resetar zoom"
-                  className="p-1 rounded hover:bg-white/20 transition-colors cursor-pointer ml-0.5"
-                >
-                  <RotateCcw size={14} />
-                </button>
-              )}
-            </div>
-            <span className="text-sm">NOME: {patient.name.toUpperCase()}</span>
-          </div>
+          <span>NOME: {patient.name.toUpperCase()}</span>
         </div>
         
-        <div
-          ref={chartWrapperRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className={cn(
-            "p-4 h-[440px] w-full relative select-none",
-            themeClasses.lightBg,
-            currentZoom > 1 && (isDragging ? "cursor-grabbing" : "cursor-grab")
-          )}
-        >
-          {currentZoom > 1 && (
-            <div className="absolute top-2 right-6 z-10 text-[11px] font-medium text-slate-500 bg-white/85 backdrop-blur-xs px-2 py-0.5 rounded-md border border-slate-200 pointer-events-none">
-              Arraste para mover • {Math.round(currentZoom * 100)}%
-            </div>
-          )}
+        <div className={cn("p-4 h-[440px] w-full", themeClasses.lightBg)}>
           <ResponsiveContainer width="100%" height="100%">
-            {renderComposedChart(activeChartData, activeXDomain, activeYDomain)}
+            {renderComposedChart(activeChartData, activeChartData.xDomain, activeChartData.domain)}
           </ResponsiveContainer>
         </div>
       </div>
