@@ -1,6 +1,6 @@
-import { useState, useMemo, type RefObject } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useMemo, useRef, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import { Patient, ClinicalEvent } from '../lib/mockData';
 import { cn, parseLocalDate } from '../lib/utils';
@@ -107,46 +107,267 @@ export const generateCombinedChartData = (type: 'heightForAge' | 'weightForHeigh
   return data;
 };
 
+type ChartId = 'heightForAge' | 'weightForHeight' | 'hcForAge';
+
+const ZOOM_LEVELS = [1, 1.5, 2, 3, 4] as const;
+
+function getAdaptiveSteps(chartId: ChartId, axis: 'x' | 'y', span: number, isExport = false): [number, number] {
+  if (chartId === 'heightForAge' || chartId === 'hcForAge') {
+    if (axis === 'x') {
+      if (span > 45) return [4, 2];
+      if (span > 22) return [2, 1];
+      return [1, 0.5];
+    }
+    if (chartId === 'heightForAge') {
+      if (span > 55) return [10, 5];
+      if (span > 28) return [10, 2];
+      return [5, 1];
+    }
+    // hcForAge Y
+    if (span > 14) return [2, 1];
+    if (span > 7) return [2, 0.5];
+    return [1, 0.25];
+  }
+
+  // weightForHeight
+  if (axis === 'x') {
+    if (span > 50) return [10, 5];
+    if (span > 25) return [10, 2];
+    return [5, 1];
+  }
+  if (isExport) {
+    return span > 18 ? [4, 2] : [2, 1];
+  }
+  if (span > 18) return [5, 1];
+  if (span > 9) return [2, 0.5];
+  return [1, 0.5];
+}
+
+function buildAxisScale(domain: [number, number], majorStep: number, minorStep: number) {
+  const [min, max] = domain;
+  const eps = 1e-6;
+  const start = Math.ceil((min - eps) / minorStep) * minorStep;
+  const allTicks: number[] = [];
+  const majorSet = new Set<string>();
+
+  for (let v = start; v <= max + eps; v += minorStep) {
+    const rounded = Math.round(v * 1000) / 1000;
+    if (rounded < min - eps || rounded > max + eps) continue;
+    allTicks.push(rounded);
+    const mod = Math.abs(rounded / majorStep - Math.round(rounded / majorStep));
+    if (mod < 1e-4) {
+      majorSet.add(rounded.toFixed(3));
+    }
+  }
+
+  return { allTicks, majorSet };
+}
+
+function formatTickValue(value: number) {
+  if (Number.isInteger(value)) return value.toString();
+  return Number(value.toFixed(2)).toString();
+}
+
+function clampDomain(center: number, halfSpan: number, bounds: [number, number]): [number, number] {
+  const [bMin, bMax] = bounds;
+  const fullSpan = bMax - bMin;
+  if (halfSpan * 2 >= fullSpan) return [bMin, bMax];
+  let min = center - halfSpan;
+  let max = center + halfSpan;
+  if (min < bMin) {
+    min = bMin;
+    max = bMin + halfSpan * 2;
+  } else if (max > bMax) {
+    max = bMax;
+    min = bMax - halfSpan * 2;
+  }
+  return [min, max];
+}
+
+function renderCustomXTick(majorSet: Set<string>) {
+  return ({ x, y, payload }: any) => {
+    const val = Number(payload?.value);
+    const isMajor = Number.isFinite(val) && majorSet.has(val.toFixed(3));
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={isMajor ? 10 : 8}
+          textAnchor="middle"
+          fill={isMajor ? '#475569' : '#94a3b8'}
+          fontSize={isMajor ? 10 : 8}
+          fontWeight={isMajor ? 600 : 400}
+        >
+          {Number.isFinite(val) ? formatTickValue(val) : payload?.value}
+        </text>
+      </g>
+    );
+  };
+}
+
+function renderCustomYTick(majorSet: Set<string>) {
+  return ({ x, y, payload }: any) => {
+    const val = Number(payload?.value);
+    const isMajor = Number.isFinite(val) && majorSet.has(val.toFixed(3));
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={-3}
+          y={0}
+          dy={3}
+          textAnchor="end"
+          fill={isMajor ? '#475569' : '#94a3b8'}
+          fontSize={isMajor ? 10 : 8}
+          fontWeight={isMajor ? 600 : 400}
+        >
+          {Number.isFinite(val) ? formatTickValue(val) : payload?.value}
+        </text>
+      </g>
+    );
+  };
+}
+
 export function GrowthCharts({ patient, events }: GrowthChartsProps) {
   const [currentChart, setCurrentChart] = useState(0);
+  const [viewDomain, setViewDomain] = useState<{ x: [number, number]; y: [number, number] } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    startDomain: { x: [number, number]; y: [number, number] };
+  } | null>(null);
+
   const isBoy = patient.gender === 'M';
   
-  const themeColor = isBoy ? 'blue' : 'pink';
   const themeClasses = isBoy 
     ? { border: 'border-blue-500', bg: 'bg-blue-500', text: 'text-blue-700', lightBg: 'bg-blue-50' }
     : { border: 'border-pink-500', bg: 'bg-pink-500', text: 'text-pink-700', lightBg: 'bg-pink-50' };
 
   const charts = [
     {
-      id: 'heightForAge',
+      id: 'heightForAge' as ChartId,
       title: `Estatura por Idade - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Estatura (cm)',
       data: useMemo(() => generateCombinedChartData('heightForAge', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
-      domain: [45, 125],
+      xDomain: [0, 60] as [number, number],
+      domain: [45, 125] as [number, number],
     },
     {
-      id: 'weightForHeight',
+      id: 'weightForHeight' as ChartId,
       title: `Peso por Estatura - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Estatura (cm)',
       yAxisLabel: 'Peso (kg)',
       data: useMemo(() => generateCombinedChartData('weightForHeight', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
-      domain: [2, 30],
+      xDomain: [45, 120] as [number, number],
+      domain: [2, 30] as [number, number],
     },
     {
-      id: 'hcForAge',
+      id: 'hcForAge' as ChartId,
       title: `Perímetro Craniano - ${isBoy ? 'Rapazes' : 'Raparigas'}`,
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Perímetro Craniano (cm)',
       data: useMemo(() => generateCombinedChartData('hcForAge', patient.gender, events, patient.dob), [patient.gender, events, patient.dob]),
-      domain: [32, 54],
+      xDomain: [0, 60] as [number, number],
+      domain: [32, 54] as [number, number],
     }
   ];
 
-  const handlePrev = () => setCurrentChart(prev => (prev > 0 ? prev - 1 : charts.length - 1));
-  const handleNext = () => setCurrentChart(prev => (prev < charts.length - 1 ? prev + 1 : 0));
+  const handlePrev = () => {
+    setViewDomain(null);
+    setCurrentChart(prev => (prev > 0 ? prev - 1 : charts.length - 1));
+  };
+  const handleNext = () => {
+    setViewDomain(null);
+    setCurrentChart(prev => (prev < charts.length - 1 ? prev + 1 : 0));
+  };
 
   const activeChartData = charts[currentChart];
+  const activeXDomain = viewDomain?.x ?? activeChartData.xDomain;
+  const activeYDomain = viewDomain?.y ?? activeChartData.domain;
+  const baseXSpan = activeChartData.xDomain[1] - activeChartData.xDomain[0];
+  const baseYSpan = activeChartData.domain[1] - activeChartData.domain[0];
+  const currentZoom = viewDomain ? Math.round((baseXSpan / (activeXDomain[1] - activeXDomain[0])) * 100) / 100 : 1;
+
+  const applyZoom = (nextZoom: number) => {
+    if (nextZoom <= 1) {
+      setViewDomain(null);
+      return;
+    }
+    const clampedZoom = Math.min(ZOOM_LEVELS[ZOOM_LEVELS.length - 1], nextZoom);
+    const patientPoints = activeChartData.data.filter((d) => d.patientValue !== undefined);
+    const cx = viewDomain
+      ? (activeXDomain[0] + activeXDomain[1]) / 2
+      : patientPoints.length > 0
+        ? patientPoints.reduce((acc, p) => acc + p.x, 0) / patientPoints.length
+        : (activeChartData.xDomain[0] + activeChartData.xDomain[1]) / 2;
+    const cy = viewDomain
+      ? (activeYDomain[0] + activeYDomain[1]) / 2
+      : patientPoints.length > 0
+        ? patientPoints.reduce((acc, p) => acc + p.patientValue, 0) / patientPoints.length
+        : (activeChartData.domain[0] + activeChartData.domain[1]) / 2;
+
+    const newHalfX = baseXSpan / (2 * clampedZoom);
+    const newHalfY = baseYSpan / (2 * clampedZoom);
+
+    setViewDomain({
+      x: clampDomain(cx, newHalfX, activeChartData.xDomain),
+      y: clampDomain(cy, newHalfY, activeChartData.domain),
+    });
+  };
+
+  const handleZoomIn = () => {
+    const next = ZOOM_LEVELS.find((z) => z > currentZoom + 0.05) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+    applyZoom(next);
+  };
+
+  const handleZoomOut = () => {
+    const prev = [...ZOOM_LEVELS].reverse().find((z) => z < currentZoom - 0.05) ?? 1;
+    applyZoom(prev);
+  };
+
+  const handleResetZoom = () => setViewDomain(null);
+
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (currentZoom <= 1) return;
+    setIsDragging(true);
+    dragStateRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startDomain: { x: [...activeXDomain] as [number, number], y: [...activeYDomain] as [number, number] },
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDragging || !dragStateRef.current || !chartWrapperRef.current) return;
+    const rect = chartWrapperRef.current.getBoundingClientRect();
+    const plotW = Math.max(rect.width - 80, 100);
+    const plotH = Math.max(rect.height - 65, 100);
+    const dxPx = e.clientX - dragStateRef.current.startX;
+    const dyPx = e.clientY - dragStateRef.current.startY;
+    const { x: startXDom, y: startYDom } = dragStateRef.current.startDomain;
+    const xSpan = startXDom[1] - startXDom[0];
+    const ySpan = startYDom[1] - startYDom[0];
+    const dxData = -(dxPx / plotW) * xSpan;
+    const dyData = (dyPx / plotH) * ySpan;
+
+    setViewDomain({
+      x: clampDomain((startXDom[0] + startXDom[1]) / 2 + dxData, xSpan / 2, activeChartData.xDomain),
+      y: clampDomain((startYDom[0] + startYDom[1]) / 2 + dyData, ySpan / 2, activeChartData.domain),
+    });
+  };
+
+  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    dragStateRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -174,56 +395,87 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
     return null;
   };
 
-  const renderComposedChart = (chart: typeof charts[number], fixedWidth?: number, fixedHeight?: number) => (
-    <ComposedChart
-      data={chart.data}
-      width={fixedWidth}
-      height={fixedHeight}
-      margin={{ top: 20, right: 30, left: 10, bottom: 25 }}
-    >
-      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-      <XAxis
-        dataKey="x"
-        type="number"
-        domain={['dataMin', 'dataMax']}
-        tickCount={20}
-        stroke="#94a3b8"
-        tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-        tickLine={{ stroke: '#cbd5e1' }}
-        label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: -15, fill: '#334155', fontWeight: 'bold', fontSize: 12 }}
-      />
-      <YAxis
-        domain={chart.domain}
-        tickCount={20}
-        stroke="#94a3b8"
-        tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-        tickLine={{ stroke: '#cbd5e1' }}
-        tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
-        label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: -5, fill: '#334155', fontWeight: 'bold', fontSize: 12 }}
-      />
-      {!fixedWidth && <Tooltip content={<CustomTooltip />} />}
+  const renderComposedChart = (
+    chart: typeof charts[number],
+    xDom: [number, number],
+    yDom: [number, number],
+    fixedWidth?: number,
+    fixedHeight?: number,
+  ) => {
+    const isExport = Boolean(fixedWidth);
+    const [xMaj, xMin] = getAdaptiveSteps(chart.id, 'x', xDom[1] - xDom[0], isExport);
+    const [yMaj, yMin] = getAdaptiveSteps(chart.id, 'y', yDom[1] - yDom[0], isExport);
+    const xScale = buildAxisScale(xDom, xMaj, xMin);
+    const yScale = buildAxisScale(yDom, yMaj, yMin);
 
-      {/* WHO Curves */}
-      <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
-      <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-      <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-      <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-      <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+    return (
+      <ComposedChart
+        data={chart.data}
+        width={fixedWidth}
+        height={fixedHeight}
+        margin={isExport ? { top: 18, right: 28, left: 10, bottom: 24 } : { top: 20, right: 30, left: 10, bottom: 25 }}
+      >
+        <CartesianGrid stroke="#e2e8f0" strokeWidth={0.5} strokeDasharray="2 2" />
+        <XAxis
+          dataKey="x"
+          type="number"
+          domain={xDom}
+          allowDataOverflow={true}
+          ticks={xScale.allTicks}
+          interval={0}
+          stroke="#94a3b8"
+          tick={renderCustomXTick(xScale.majorSet)}
+          tickLine={{ stroke: '#cbd5e1', strokeWidth: 0.75 }}
+          tickSize={3}
+          label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: isExport ? -14 : -15, fill: '#334155', fontWeight: 'bold', fontSize: isExport ? 11 : 12 }}
+        />
+        <YAxis
+          domain={yDom}
+          allowDataOverflow={true}
+          ticks={yScale.allTicks}
+          interval={0}
+          stroke="#94a3b8"
+          tick={renderCustomYTick(yScale.majorSet)}
+          tickLine={{ stroke: '#cbd5e1', strokeWidth: 0.75 }}
+          tickSize={3}
+          label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: isExport ? -2 : -5, fill: '#334155', fontWeight: 'bold', fontSize: isExport ? 11 : 12 }}
+        />
+        {!isExport && <Tooltip content={<CustomTooltip />} />}
 
-      {/* Patient Data Points */}
-      <Line
-        type="monotone"
-        dataKey="patientValue"
-        name="Paciente"
-        stroke={isBoy ? '#3b82f6' : '#ec4899'}
-        strokeWidth={2}
-        connectNulls={true}
-        dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
-        activeDot={{ r: 5 }}
-        isAnimationActive={false}
-      />
-    </ComposedChart>
-  );
+        {/* Major Scale Grid Lines */}
+        {xScale.allTicks
+          .filter((t) => xScale.majorSet.has(t.toFixed(3)))
+          .map((t) => (
+            <ReferenceLine key={`xm-${t}`} x={t} stroke="#cbd5e1" strokeWidth={0.9} ifOverflow="hidden" />
+          ))}
+        {yScale.allTicks
+          .filter((t) => yScale.majorSet.has(t.toFixed(3)))
+          .map((t) => (
+            <ReferenceLine key={`ym-${t}`} y={t} stroke="#cbd5e1" strokeWidth={0.9} ifOverflow="hidden" />
+          ))}
+
+        {/* WHO Curves */}
+        <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+
+        {/* Patient Data Points */}
+        <Line
+          type="monotone"
+          dataKey="patientValue"
+          name="Paciente"
+          stroke={isBoy ? '#3b82f6' : '#ec4899'}
+          strokeWidth={2}
+          connectNulls={true}
+          dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
+          activeDot={{ r: 5 }}
+          isAnimationActive={false}
+        />
+      </ComposedChart>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -243,14 +495,64 @@ export function GrowthCharts({ patient, events }: GrowthChartsProps) {
 
       {/* Chart Container with Gender Theme */}
       <div className={cn("border-4 rounded-2xl overflow-hidden bg-white", themeClasses.border)}>
-        <div className={cn("px-4 py-2 flex justify-between items-center text-white font-bold", themeClasses.bg)}>
+        <div className={cn("px-4 py-2 flex flex-wrap justify-between items-center gap-2 text-white font-bold", themeClasses.bg)}>
           <span>{activeChartData.title.toUpperCase()}</span>
-          <span>NOME: {patient.name.toUpperCase()}</span>
+          <div className="flex items-center gap-3">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 bg-black/15 rounded-lg px-1.5 py-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={currentZoom <= 1}
+                title="Diminuir zoom"
+                className="p-1 rounded hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+              >
+                <ZoomOut size={15} />
+              </button>
+              <span className="min-w-[40px] text-center tabular-nums">{Math.round(currentZoom * 100)}%</span>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={currentZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                title="Aumentar zoom"
+                className="p-1 rounded hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+              >
+                <ZoomIn size={15} />
+              </button>
+              {currentZoom > 1 && (
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  title="Resetar zoom"
+                  className="p-1 rounded hover:bg-white/20 transition-colors cursor-pointer ml-0.5"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+            </div>
+            <span className="text-sm">NOME: {patient.name.toUpperCase()}</span>
+          </div>
         </div>
         
-        <div className={cn("p-4 h-[400px] w-full", themeClasses.lightBg)}>
+        <div
+          ref={chartWrapperRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={cn(
+            "p-4 h-[440px] w-full relative select-none",
+            themeClasses.lightBg,
+            currentZoom > 1 && (isDragging ? "cursor-grabbing" : "cursor-grab")
+          )}
+        >
+          {currentZoom > 1 && (
+            <div className="absolute top-2 right-6 z-10 text-[11px] font-medium text-slate-500 bg-white/85 backdrop-blur-xs px-2 py-0.5 rounded-md border border-slate-200 pointer-events-none">
+              Arraste para mover • {Math.round(currentZoom * 100)}%
+            </div>
+          )}
           <ResponsiveContainer width="100%" height="100%">
-            {renderComposedChart(activeChartData)}
+            {renderComposedChart(activeChartData, activeXDomain, activeYDomain)}
           </ResponsiveContainer>
         </div>
       </div>
@@ -288,7 +590,8 @@ export function GrowthChartsExportView({
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Estatura (cm)',
       data: generateCombinedChartData('heightForAge', patient.gender, events, patient.dob),
-      domain: [45, 125],
+      xDomain: [0, 60] as [number, number],
+      domain: [45, 125] as [number, number],
     },
     {
       id: 'weightForHeight' as const,
@@ -296,7 +599,8 @@ export function GrowthChartsExportView({
       xAxisLabel: 'Estatura (cm)',
       yAxisLabel: 'Peso (kg)',
       data: generateCombinedChartData('weightForHeight', patient.gender, events, patient.dob),
-      domain: [2, 30],
+      xDomain: [45, 120] as [number, number],
+      domain: [2, 30] as [number, number],
     },
     {
       id: 'hcForAge' as const,
@@ -304,7 +608,8 @@ export function GrowthChartsExportView({
       xAxisLabel: 'Idade (meses)',
       yAxisLabel: 'Perímetro Craniano (cm)',
       data: generateCombinedChartData('hcForAge', patient.gender, events, patient.dob),
-      domain: [32, 54],
+      xDomain: [0, 60] as [number, number],
+      domain: [32, 54] as [number, number],
     },
   ], [isBoy, patient.gender, events, patient.dob]);
 
@@ -322,52 +627,74 @@ export function GrowthChartsExportView({
         zIndex: -1,
       }}
     >
-      {charts.map((chart) => (
-        <div key={chart.id} data-export-chart={chart.id} style={{ background: '#ffffff', padding: '8px' }}>
-          <ComposedChart
-            data={chart.data}
-            width={720}
-            height={290}
-            margin={{ top: 18, right: 28, left: 10, bottom: 24 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis
-              dataKey="x"
-              type="number"
-              domain={['dataMin', 'dataMax']}
-              tickCount={20}
-              stroke="#94a3b8"
-              tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-              tickLine={{ stroke: '#cbd5e1' }}
-              label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: -14, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
-            />
-            <YAxis
-              domain={chart.domain}
-              tickCount={16}
-              stroke="#94a3b8"
-              tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
-              tickLine={{ stroke: '#cbd5e1' }}
-              tickFormatter={(value) => Number.isInteger(value) ? value.toString() : value.toFixed(1)}
-              label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: -2, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
-            />
-            <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
-            <Line
-              type="monotone"
-              dataKey="patientValue"
-              name="Paciente"
-              stroke={isBoy ? '#3b82f6' : '#ec4899'}
-              strokeWidth={2}
-              connectNulls={true}
-              dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </div>
-      ))}
+      {charts.map((chart) => {
+        const [xMaj, xMin] = getAdaptiveSteps(chart.id, 'x', chart.xDomain[1] - chart.xDomain[0], true);
+        const [yMaj, yMin] = getAdaptiveSteps(chart.id, 'y', chart.domain[1] - chart.domain[0], true);
+        const xScale = buildAxisScale(chart.xDomain, xMaj, xMin);
+        const yScale = buildAxisScale(chart.domain, yMaj, yMin);
+
+        return (
+          <div key={chart.id} data-export-chart={chart.id} style={{ background: '#ffffff', padding: '8px' }}>
+            <ComposedChart
+              data={chart.data}
+              width={720}
+              height={290}
+              margin={{ top: 18, right: 28, left: 10, bottom: 24 }}
+            >
+              <CartesianGrid stroke="#e2e8f0" strokeWidth={0.5} strokeDasharray="2 2" />
+              <XAxis
+                dataKey="x"
+                type="number"
+                domain={chart.xDomain}
+                allowDataOverflow={true}
+                ticks={xScale.allTicks}
+                interval={0}
+                stroke="#94a3b8"
+                tick={renderCustomXTick(xScale.majorSet)}
+                tickLine={{ stroke: '#cbd5e1', strokeWidth: 0.75 }}
+                tickSize={3}
+                label={{ value: chart.xAxisLabel, position: 'insideBottom', offset: -14, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
+              />
+              <YAxis
+                domain={chart.domain}
+                allowDataOverflow={true}
+                ticks={yScale.allTicks}
+                interval={0}
+                stroke="#94a3b8"
+                tick={renderCustomYTick(yScale.majorSet)}
+                tickLine={{ stroke: '#cbd5e1', strokeWidth: 0.75 }}
+                tickSize={3}
+                label={{ value: chart.yAxisLabel, angle: -90, position: 'insideLeft', offset: -2, fill: '#334155', fontWeight: 'bold', fontSize: 11 }}
+              />
+              {xScale.allTicks
+                .filter((t) => xScale.majorSet.has(t.toFixed(3)))
+                .map((t) => (
+                  <ReferenceLine key={`xm-${t}`} x={t} stroke="#cbd5e1" strokeWidth={0.9} ifOverflow="hidden" />
+                ))}
+              {yScale.allTicks
+                .filter((t) => yScale.majorSet.has(t.toFixed(3)))
+                .map((t) => (
+                  <ReferenceLine key={`ym-${t}`} y={t} stroke="#cbd5e1" strokeWidth={0.9} ifOverflow="hidden" />
+                ))}
+              <Line type="monotone" dataKey="z3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="z2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="z0" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="z_2" stroke="#ef4444" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="z_3" stroke="#000000" strokeWidth={1} dot={false} isAnimationActive={false} />
+              <Line
+                type="monotone"
+                dataKey="patientValue"
+                name="Paciente"
+                stroke={isBoy ? '#3b82f6' : '#ec4899'}
+                strokeWidth={2}
+                connectNulls={true}
+                dot={{ r: 3, fill: isBoy ? '#1e3a8a' : '#831843', stroke: '#fff', strokeWidth: 1.5 }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </div>
+        );
+      })}
     </div>
   );
 }
