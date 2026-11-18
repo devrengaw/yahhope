@@ -52,6 +52,7 @@ export function SupportersList() {
   const [unsubscribedEmails, setUnsubscribedEmails] = useState<Set<string>>(new Set());
   const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [isSavingChild, setIsSavingChild] = useState(false);
+  const [isDistributingChildren, setIsDistributingChildren] = useState(false);
 
   const fetchSupporters = async () => {
     setIsLoading(true);
@@ -702,6 +703,52 @@ export function SupportersList() {
     }
   };
 
+  const handleAutoDistributeChildren = async () => {
+    setIsDistributingChildren(true);
+    setSyncFeedback(null);
+    try {
+      const waitingSupporters = supporters
+        .filter(s => s.role === 'Padrinho' && !s.sponsoredChildId && (!s.sponsoredChildren || s.sponsoredChildren.length === 0))
+        .map(s => {
+          const activeUnassigned = (s.sponsorships || []).find((sp: any) => {
+            const st = String(sp.status || 'active').toLowerCase().trim();
+            return !sp.child_id && (st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed');
+          });
+          return {
+            id: s.id,
+            email: s.email,
+            name: s.name,
+            phone: s.phone,
+            sponsorshipId: activeUnassigned?.id || s.sponsorshipId
+          };
+        });
+
+      const { linkedCount } = await sponsorshipService.autoLinkPendingSponsors(waitingSupporters);
+      await fetchSupporters();
+
+      if (linkedCount > 0) {
+        setSyncFeedback({
+          type: 'success',
+          message: `${linkedCount} ${linkedCount === 1 ? 'padrinho aguardando vínculo foi conectado' : 'padrinhos aguardando vínculo foram conectados'} automaticamente de forma igualitária (sem alterar quem já tinha criança)!`
+        });
+      } else {
+        setSyncFeedback({
+          type: 'error',
+          message: 'Nenhum novo vínculo realizado. Verifique se há padrinhos "Aguardando vínculo" e se existem crianças com vagas disponíveis dentro do limite configurado.'
+        });
+      }
+    } catch (err: any) {
+      console.error('Erro ao distribuir crianças:', err);
+      setSyncFeedback({
+        type: 'error',
+        message: err.message || 'Erro ao distribuir crianças automaticamente.'
+      });
+    } finally {
+      setIsDistributingChildren(false);
+      setTimeout(() => setSyncFeedback(null), 8000);
+    }
+  };
+
   const openChangeChildModal = (supporter: SupporterData) => {
     setChildModalSupporter(supporter);
     // Só pré-seleciona uma criança se o padrinho realmente já tiver vínculo ativo exibido na tabela
@@ -1109,6 +1156,17 @@ export function SupportersList() {
                 </span>
               </button>
             </div>
+
+            {/* Distribuir Crianças Automaticamente para Padrinhos Aguardando Vínculo */}
+            <button
+              onClick={handleAutoDistributeChildren}
+              disabled={isDistributingChildren}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-500/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Distribuir crianças disponíveis igualmente entre os padrinhos que estão Aguardando vínculo (sem alterar quem já tem criança)"
+            >
+              <Heart size={14} className={cn("text-white fill-white", isDistributingChildren && "animate-pulse")} />
+              {isDistributingChildren ? 'Distribuindo...' : 'Distribuir Crianças Automaticamente'}
+            </button>
 
             {/* Exportar CSV */}
             <button

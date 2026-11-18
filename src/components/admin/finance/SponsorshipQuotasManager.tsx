@@ -367,7 +367,17 @@ export function SponsorshipQuotasManager() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAutoDistribute}
+              disabled={isDistributing}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black shadow-sm transition-all cursor-pointer"
+              title="Distribuir crianças com vagas igualmente entre padrinhos que estão Aguardando vínculo"
+            >
+              <Sparkles size={14} className={isDistributing ? 'animate-spin' : ''} />
+              <span>{isDistributing ? 'Distribuindo...' : 'Distribuir Crianças Automaticamente'}</span>
+            </button>
             <button
               onClick={() => setFilterStatus('all')}
               className={cn(

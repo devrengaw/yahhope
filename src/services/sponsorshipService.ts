@@ -859,15 +859,27 @@ export const sponsorshipService = {
   },
 
   /**
-   * Vincula automaticamente padrinhos que estão na fila "Aguardando vínculo" (child_id IS NULL)
+   * Vincula automaticamente padrinhos que estão na fila "Aguardando vínculo"
    * sempre que houver crianças com vagas abertas dentro de maxSponsorsPerChild.
+   * Nunca altera os padrinhos que já possuem criança vinculada.
    */
-  async autoLinkPendingSponsors(): Promise<{ linkedCount: number }> {
+  async autoLinkPendingSponsors(
+    extraWaitingSupporters?: Array<{ id?: string; email: string; name?: string; phone?: string; sponsorshipId?: string }>
+  ): Promise<{ linkedCount: number }> {
     try {
       const metrics = await this.getMetrics();
-      if (!metrics.pendingSponsors || metrics.pendingSponsors.length === 0 || metrics.availableSlots <= 0) {
+      if (metrics.availableSlots <= 0) {
         return { linkedCount: 0 };
       }
+
+      // E-mails que já possuem criança vinculada ativa (NÃO devem ser alterados)
+      const alreadyLinkedEmails = new Set<string>();
+      metrics.children.forEach(c => {
+        c.sponsors.forEach(s => {
+          const em = (s.email || '').toLowerCase().trim();
+          if (em) alreadyLinkedEmails.add(em);
+        });
+      });
 
       // Cópia mutável das crianças com vagas abertas (Least-Sponsored primeiro)
       const openChildren = metrics.children
@@ -879,8 +891,65 @@ export const sponsorshipService = {
         return { linkedCount: 0 };
       }
 
+      // Monta fila consolidada: 1) linhas de sponsorships sem child_id; 2) padrinhos aguardando vínculo da Base de Apoiadores / users
+      const queue: Array<{ sponsorshipId?: string; userId?: string; name: string; email: string; phone?: string; monthly_amount: number; created_at?: string }> = [];
+      const queuedEmails = new Set<string>();
+
+      (metrics.pendingSponsors || []).forEach(ps => {
+        const em = (ps.email || '').toLowerCase().trim();
+        queue.push({
+          sponsorshipId: ps.id,
+          name: ps.name,
+          email: em,
+          monthly_amount: ps.monthly_amount || metrics.quotaCost,
+          created_at: ps.created_at
+        });
+        if (em) queuedEmails.add(em);
+      });
+
+      if (extraWaitingSupporters && extraWaitingSupporters.length > 0) {
+        extraWaitingSupporters.forEach(ws => {
+          const em = (ws.email || '').toLowerCase().trim();
+          if (!em || alreadyLinkedEmails.has(em) || queuedEmails.has(em)) return;
+          queuedEmails.add(em);
+          queue.push({
+            sponsorshipId: ws.sponsorshipId,
+            userId: ws.id && !ws.id.startsWith('donor_') ? ws.id : undefined,
+            name: ws.name || em.split('@')[0],
+            email: em,
+            phone: ws.phone,
+            monthly_amount: metrics.quotaCost
+          });
+        });
+      } else {
+        // Caso chamado da aba Quotização sem extraWaitingSupporters, busca também users com role SPONSOR/PADRINHO sem criança vinculada
+        const { data: sponsorUsers } = await supabase
+          .from('users')
+          .select('id, name, email, phone, status, created_at')
+          .in('role', ['SPONSOR', 'PADRINHO']);
+
+        (sponsorUsers || []).forEach((u: any) => {
+          if (u.status === 'inactive') return;
+          const em = (u.email || '').toLowerCase().trim();
+          if (!em || alreadyLinkedEmails.has(em) || queuedEmails.has(em)) return;
+          queuedEmails.add(em);
+          queue.push({
+            userId: u.id,
+            name: u.name || em.split('@')[0],
+            email: em,
+            phone: u.phone || undefined,
+            monthly_amount: metrics.quotaCost,
+            created_at: u.created_at
+          });
+        });
+      }
+
+      if (queue.length === 0) {
+        return { linkedCount: 0 };
+      }
+
       // Ordena pendentes do mais antigo para o mais novo (FIFO)
-      const queue = [...metrics.pendingSponsors].sort((a, b) =>
+      queue.sort((a, b) =>
         new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
       );
 
@@ -894,16 +963,45 @@ export const sponsorshipService = {
         );
         if (!target) continue;
 
-        const { error } = await supabase
-          .from('sponsorships')
-          .update({
-            child_id: target.id,
-            last_sponsored_at: new Date().toISOString()
-          })
-          .eq('id', pending.id)
-          .is('child_id', null);
+        let saved = false;
+        if (pending.sponsorshipId) {
+          const { data: updated, error } = await supabase
+            .from('sponsorships')
+            .update({
+              child_id: target.id,
+              status: 'active',
+              last_sponsored_at: new Date().toISOString()
+            })
+            .eq('id', pending.sponsorshipId)
+            .select();
 
-        if (!error) {
+          if (!error && updated && updated.length > 0) {
+            saved = true;
+          }
+        }
+
+        if (!saved) {
+          const { error: insErr } = await supabase
+            .from('sponsorships')
+            .insert([{
+              child_id: target.id,
+              sponsor_id: pending.userId || null,
+              donor_name: pending.name,
+              donor_email: cleanEmail || null,
+              donor_phone: pending.phone || null,
+              monthly_amount: pending.monthly_amount || metrics.quotaCost,
+              quotas_count: 1,
+              status: 'active',
+              payment_method: 'credit_card',
+              last_sponsored_at: new Date().toISOString()
+            }]);
+
+          if (!insErr) {
+            saved = true;
+          }
+        }
+
+        if (saved) {
           target.sponsorsCount += 1;
           if (cleanEmail) target.sponsorEmails.add(cleanEmail);
           linkedCount += 1;
