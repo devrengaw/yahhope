@@ -158,21 +158,24 @@ export function Settings() {
     try {
       const res = await saveOrgSettings(orgInfo);
       setIsSavingOrg(false);
+      if (res.error) {
+        showAlert(
+          'Erro ao salvar no banco de dados',
+          `As alterações foram mantidas localmente, mas falharam ao sincronizar com o Supabase: ${res.error}`
+        );
+        return;
+      }
+      if (res.warning) {
+        showAlert('Atenção: Migração SQL Pendente', res.warning);
+        return;
+      }
       if (res.success) {
         setOrgSaveSuccess(true);
-        if (res.warning) {
-          sendNotification(
-            'Salvo localmente (Atenção)',
-            res.warning,
-            'warning'
-          );
-        } else {
-          sendNotification(
-            'Configurações Salvas',
-            'As configurações da organização foram salvas e sincronizadas com sucesso!',
-            'success'
-          );
-        }
+        sendNotification(
+          'Configurações Salvas',
+          'As configurações da organização foram salvas e sincronizadas com sucesso!',
+          'success'
+        );
         setTimeout(() => setOrgSaveSuccess(false), 3000);
       }
     } catch (err: any) {
@@ -384,8 +387,25 @@ export function Settings() {
               </button>
             )}
             {activeTab === 'general' && (
-              <button className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-[1.25rem] font-bold flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 w-full sm:w-auto justify-center">
-                <Save size={20} /> Salvar Alterações
+              <button
+                type="button"
+                onClick={handleSaveOrganization}
+                disabled={isSavingOrg}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-[1.25rem] font-bold flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 w-full sm:w-auto justify-center disabled:opacity-50"
+              >
+                {isSavingOrg ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} /> Salvando...
+                  </>
+                ) : orgSaveSuccess ? (
+                  <>
+                    <Check className="text-emerald-400" size={20} /> Salvo com Sucesso!
+                  </>
+                ) : (
+                  <>
+                    <Save size={20} /> Salvar Alterações
+                  </>
+                )}
               </button>
             )}
           </div>
