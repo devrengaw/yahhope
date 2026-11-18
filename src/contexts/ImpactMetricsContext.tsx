@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { getPublicChildrenCount, formatChildrenCountLabel } from '../services/childrenCountService';
 
 export interface ImpactMetricItem {
   id: string | number;
@@ -61,6 +62,17 @@ const ImpactMetricsContext = createContext<ImpactMetricsContextType | undefined>
 
 const STORAGE_KEY = 'yah_hope_impact_metrics_v2';
 
+function applyLiveChildrenCount(items: ImpactMetricItem[], count: number | null): ImpactMetricItem[] {
+  if (count === null || count <= 0) return items;
+  const formatted = formatChildrenCountLabel(count);
+  return items.map(item => {
+    const isChildrenMetric =
+      String(item.id) === 'metric-1' ||
+      (item.icon === 'users' && /^\d+\s*(crian[çc]as?|children)$/i.test(item.metric.trim()));
+    return isChildrenMetric ? { ...item, metric: formatted } : item;
+  });
+}
+
 export function ImpactMetricsProvider({ children }: { children: ReactNode }) {
   const [metrics, setMetrics] = useState<ImpactMetricItem[]>(() => {
     try {
@@ -94,13 +106,16 @@ export function ImpactMetricsProvider({ children }: { children: ReactNode }) {
     async function loadFromSupabase() {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('impact_metrics')
-          .select('*');
+        const [{ data, error }, liveCount] = await Promise.all([
+          supabase.from('impact_metrics').select('*'),
+          getPublicChildrenCount()
+        ]);
 
-        if (!error && data && data.length > 0 && isMounted) {
+        if (!isMounted) return;
+
+        if (!error && data && data.length > 0) {
           const sorted = [...data].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-          setMetrics(sorted.map(item => ({
+          const mapped = sorted.map(item => ({
             id: item.id,
             metric: item.metric,
             subtitle: item.subtitle,
@@ -109,7 +124,10 @@ export function ImpactMetricsProvider({ children }: { children: ReactNode }) {
             color: item.color || '#F49853',
             active: item.active !== false,
             order: item.order || 0
-          })));
+          }));
+          setMetrics(applyLiveChildrenCount(mapped, liveCount));
+        } else if (liveCount !== null && liveCount > 0) {
+          setMetrics(prev => applyLiveChildrenCount(prev, liveCount));
         }
       } catch {
         // Fallback to local storage state

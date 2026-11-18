@@ -26,7 +26,11 @@ import {
   Users,
   Filter,
   Info,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  User
 } from 'lucide-react';
 import { useInventory } from '../../contexts/InventoryContext';
 import { usePatients } from '../../contexts/PatientContext';
@@ -266,6 +270,181 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
       };
     });
   }, [kits, items, kitTargets, mznRate]);
+
+  // ============================================================================
+  // CUSTO INDIVIDUAL POR CRIANÇA (Baseado nos Kits Atribuídos + Idade/Clínica)
+  // ============================================================================
+  const STORAGE_CHILD_KIT_OVERRIDES_KEY = 'yah_hope_child_kit_overrides_v1';
+  const [childSearchTerm, setChildSearchTerm] = useState('');
+  const [isChildrenCostExpanded, setIsChildrenCostExpanded] = useState(true);
+  const [customChildKits, setCustomChildKits] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CHILD_KIT_OVERRIDES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {}
+    return {};
+  });
+
+  const activePatientsForCost = useMemo(() => {
+    const active = patients.filter(p =>
+      p.status !== 'Alta' && p.status !== 'Encerrado' && p.status !== 'Encerrada'
+    );
+    return active.length > 0 ? active : patients;
+  }, [patients]);
+
+  const getDefaultKitIdsForChild = (p: any): string[] => {
+    let ageMonths: number | null = null;
+    if (p.dob) {
+      const birth = new Date(p.dob);
+      if (!isNaN(birth.getTime())) {
+        const now = new Date();
+        ageMonths = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+      }
+    }
+
+    const isHiv =
+      p.hiv_status === 'Reagente' ||
+      p.hiv_status === 'Positivo' ||
+      p.hiv_exposed === true ||
+      (typeof p.exams_hiv === 'string' && (
+        p.exams_hiv.toLowerCase().includes('reag') ||
+        p.exams_hiv.toLowerCase().includes('pos') ||
+        p.exams_hiv.toLowerCase().includes('sim')
+      ));
+
+    const matchedIds: string[] = [];
+    kitsWithCosts.forEach(kData => {
+      const name = kData.kit.name.toLowerCase();
+      const isUniversal = name.includes('cesta') || name.includes('básica') || name.includes('basica') || name.includes('familiar');
+      const is0to6 = name.includes('0 a 6') || name.includes('0-6') || name.includes('lactente') || name.includes('fórmula') || name.includes('formula');
+      const is6to24 = name.includes('6 a 24') || name.includes('6-24') || name.includes('transição') || name.includes('transicao');
+      const isOver24 = name.includes('2 a 5') || name.includes('2-5') || name.includes('> 24') || name.includes('maior');
+      const isHivKit = name.includes('hiv') || name.includes('imun') || name.includes('terapêut') || name.includes('terapeut');
+
+      if (isUniversal) {
+        matchedIds.push(kData.kit.id);
+      } else if (is0to6) {
+        if (ageMonths !== null && ageMonths < 6) matchedIds.push(kData.kit.id);
+      } else if (is6to24) {
+        if (ageMonths !== null && ageMonths >= 6 && ageMonths <= 24) matchedIds.push(kData.kit.id);
+      } else if (isOver24) {
+        if (ageMonths !== null && ageMonths > 24) matchedIds.push(kData.kit.id);
+      } else if (isHivKit) {
+        if (isHiv) matchedIds.push(kData.kit.id);
+      } else if (kData.targetCount > 0) {
+        // Kits gerais ativos (ex: Kit Nutrição) entram quando há meta definida no mês
+        matchedIds.push(kData.kit.id);
+      }
+    });
+
+    return matchedIds;
+  };
+
+  const handleToggleChildKit = (childId: string, kitId: string, currentKitIds: string[]) => {
+    const exists = currentKitIds.includes(kitId);
+    const nextIds = exists
+      ? currentKitIds.filter(id => id !== kitId)
+      : [...currentKitIds, kitId];
+
+    setCustomChildKits(prev => {
+      const updated = { ...prev, [childId]: nextIds };
+      try {
+        localStorage.setItem(STORAGE_CHILD_KIT_OVERRIDES_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const handleResetChildOverrides = () => {
+    setCustomChildKits({});
+    try {
+      localStorage.removeItem(STORAGE_CHILD_KIT_OVERRIDES_KEY);
+    } catch {}
+  };
+
+  const childrenCostBreakdown = useMemo(() => {
+    return activePatientsForCost
+      .map(p => {
+        let ageText = 'Idade não inf.';
+        if (p.dob) {
+          const birth = new Date(p.dob);
+          if (!isNaN(birth.getTime())) {
+            const now = new Date();
+            const months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+            if (months >= 24) {
+              const yrs = Math.floor(months / 12);
+              ageText = `${yrs} ${yrs === 1 ? 'ano' : 'anos'}`;
+            } else {
+              ageText = `${Math.max(0, months)} ${months === 1 ? 'mês' : 'meses'}`;
+            }
+          }
+        }
+
+        const anyP = p as any;
+        const isHiv =
+          anyP.hiv_status === 'Reagente' ||
+          anyP.hiv_status === 'Positivo' ||
+          anyP.hiv_exposed === true ||
+          (typeof anyP.exams_hiv === 'string' && (
+            anyP.exams_hiv.toLowerCase().includes('reag') ||
+            anyP.exams_hiv.toLowerCase().includes('pos') ||
+            anyP.exams_hiv.toLowerCase().includes('sim')
+          ));
+
+        const hasCustom = Boolean(customChildKits[p.id]);
+        const appliedKitIds = hasCustom ? customChildKits[p.id] : getDefaultKitIdsForChild(p);
+        const appliedKits = kitsWithCosts.filter(k => appliedKitIds.includes(k.kit.id));
+
+        const totalMzn = appliedKits.reduce((sum, k) => sum + k.unitCostMzn, 0);
+        const totalBrl = convertMznToBrl(totalMzn, mznRate);
+
+        return {
+          patient: p,
+          ageText,
+          isHiv,
+          hasCustom,
+          appliedKitIds,
+          appliedKits,
+          totalMzn,
+          totalBrl
+        };
+      })
+      .sort((a, b) => b.totalMzn - a.totalMzn || a.patient.name.localeCompare(b.patient.name));
+  }, [activePatientsForCost, customChildKits, kitsWithCosts, mznRate]);
+
+  const filteredChildrenCost = useMemo(() => {
+    const q = childSearchTerm.trim().toLowerCase();
+    if (!q) return childrenCostBreakdown;
+    return childrenCostBreakdown.filter(c =>
+      c.patient.name.toLowerCase().includes(q) ||
+      (c.patient.community || '').toLowerCase().includes(q) ||
+      (c.patient.status || '').toLowerCase().includes(q)
+    );
+  }, [childrenCostBreakdown, childSearchTerm]);
+
+  const childrenCostSummary = useMemo(() => {
+    const count = childrenCostBreakdown.length;
+    if (count === 0) {
+      return { count: 0, totalMzn: 0, totalBrl: 0, avgMzn: 0, avgBrl: 0, minBrl: 0, maxBrl: 0 };
+    }
+    const totalMzn = childrenCostBreakdown.reduce((s, c) => s + c.totalMzn, 0);
+    const totalBrl = convertMznToBrl(totalMzn, mznRate);
+    const avgMzn = totalMzn / count;
+    const avgBrl = totalBrl / count;
+    const brlValues = childrenCostBreakdown.map(c => c.totalBrl);
+    return {
+      count,
+      totalMzn,
+      totalBrl,
+      avgMzn,
+      avgBrl,
+      minBrl: Math.min(...brlValues),
+      maxBrl: Math.max(...brlValues)
+    };
+  }, [childrenCostBreakdown, mznRate]);
 
   // Edição inline de Preço Unitário de Insumos
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -877,6 +1056,201 @@ export function NutritionPurchasingPlanner({ onRefreshFinance }: NutritionPurcha
             {purchasingAnalysis.length} insumos mapeados
           </span>
         </div>
+      </div>
+
+      {/* Painel: Custo Individual por Criança */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <Users className="text-emerald-600" size={20} />
+              <h3 className="text-lg font-bold text-slate-900">
+                Custo Mensal por Criança
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {childrenCostSummary.count} {childrenCostSummary.count === 1 ? 'criança ativa' : 'crianças ativas'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Veja quanto cada criança custa no mês conforme os kits recebidos (Cesta Básica + kits por faixa etária/clínica). Clique nos kits da criança para personalizar caso necessário.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Resumo Rápido Médio */}
+            <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/80 rounded-2xl px-4 py-2.5">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Custo Médio / Criança</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-black text-emerald-700">
+                    {childrenCostSummary.avgMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    (≈ R$ {childrenCostSummary.avgBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                  </span>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="hidden sm:block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total das Crianças</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-black text-slate-900">
+                    {childrenCostSummary.totalMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    (≈ R$ {childrenCostSummary.totalBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {Object.keys(customChildKits).length > 0 && (
+              <button
+                type="button"
+                onClick={handleResetChildOverrides}
+                className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+                title="Volta todas as crianças para o cálculo automático pela idade e condição clínica"
+              >
+                Restaurar Automático
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsChildrenCostExpanded(v => !v)}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {isChildrenCostExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              <span>{isChildrenCostExpanded ? 'Recolher Lista' : 'Ver Crianças'}</span>
+            </button>
+          </div>
+        </div>
+
+        {isChildrenCostExpanded && (
+          <div className="space-y-4">
+            {/* Busca por criança */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={childSearchTerm}
+                  onChange={e => setChildSearchTerm(e.target.value)}
+                  placeholder="Buscar criança por nome, comunidade ou status..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                />
+              </div>
+              <span className="text-[11px] text-slate-400 font-medium">
+                Faixa de custo: <strong className="text-slate-700">R$ {childrenCostSummary.minBrl.toFixed(2)}</strong> a <strong className="text-slate-700">R$ {childrenCostSummary.maxBrl.toFixed(2)}</strong> / mês
+              </span>
+            </div>
+
+            {filteredChildrenCost.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-slate-100">
+                Nenhuma criança ativa encontrada.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 text-slate-400 text-[10px] uppercase font-black tracking-[0.15em] border-b border-slate-100">
+                      <th className="px-5 py-3.5">Criança / Idade</th>
+                      <th className="px-5 py-3.5">Kits Mensais Aplicados (clique para ajustar)</th>
+                      <th className="px-5 py-3.5 text-right">Custo em MT</th>
+                      <th className="px-5 py-3.5 text-right">Custo em R$</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredChildrenCost.map(({ patient, ageText, isHiv, hasCustom, appliedKitIds, totalMzn, totalBrl }) => (
+                      <tr key={patient.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl overflow-hidden bg-emerald-50 border border-emerald-200/60 flex items-center justify-center shrink-0 font-black text-emerald-700 text-xs">
+                              {patient.photo_url ? (
+                                <img src={patient.photo_url} alt={patient.name} className="w-full h-full object-cover" />
+                              ) : (
+                                patient.name.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-900 text-sm truncate max-w-[180px]">
+                                  {patient.name}
+                                </span>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded text-[9px] font-black uppercase",
+                                  patient.status === 'DAG' ? "bg-rose-100 text-rose-700" :
+                                  patient.status === 'DAM' ? "bg-amber-100 text-amber-800" :
+                                  patient.status === 'Risco' ? "bg-yellow-100 text-yellow-800" :
+                                  "bg-emerald-100 text-emerald-700"
+                                )}>
+                                  {patient.status}
+                                </span>
+                                {isHiv && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-purple-100 text-purple-700">
+                                    HIV+
+                                  </span>
+                                )}
+                                {hasCustom && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                    Ajustado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                {ageText} • {patient.community || 'Casa Nutri'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {kitsWithCosts.map(kData => {
+                              const isApplied = appliedKitIds.includes(kData.kit.id);
+                              return (
+                                <button
+                                  key={kData.kit.id}
+                                  type="button"
+                                  onClick={() => handleToggleChildKit(patient.id, kData.kit.id, appliedKitIds)}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 cursor-pointer",
+                                    isApplied
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                                      : "bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600"
+                                  )}
+                                  title={isApplied ? 'Clique para remover este kit desta criança' : 'Clique para incluir este kit nesta criança'}
+                                >
+                                  {isApplied ? <Check size={11} className="text-emerald-600" /> : <Plus size={11} />}
+                                  <span>{kData.kit.name}</span>
+                                  <span className="opacity-75 font-semibold">
+                                    ({kData.unitCostMzn.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} MT)
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <span className="text-sm font-black text-slate-900">
+                            {totalMzn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/70">
+                            R$ {totalBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 4 Cards de Resumo Executivo */}

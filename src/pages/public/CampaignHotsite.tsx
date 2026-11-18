@@ -26,6 +26,7 @@ import { PublicFooter } from '../../components/PublicFooter';
 import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupporterCounterCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/common/LanguageSwitcher';
+import { getPublicChildrenCount, formatChildrenCountLabel } from '../../services/childrenCountService';
 
 /**
  * Estrutura escalável de projetos para a campanha institucional da YAH Hope.
@@ -142,19 +143,35 @@ export function CampaignHotsite() {
   const { tr, isEn } = useLanguage();
   const [selectedModality, setSelectedModality] = useState<'sponsorship' | 'general'>('sponsorship');
   const [selectedQuotas, setSelectedQuotas] = useState<number>(1);
+  const [liveChildrenCount, setLiveChildrenCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getPublicChildrenCount().then((count) => {
+      if (mounted && count !== null && count > 0) {
+        setLiveChildrenCount(count);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const displayedChildrenCount = liveChildrenCount ?? 10;
+  const childrenCountText = formatChildrenCountLabel(displayedChildrenCount, isEn);
 
   const publishedProjects = PUBLISHED_CAMPAIGN_PROJECTS.map((p) => ({
     ...p,
     name: isEn ? 'Child Nutrition Care — Mozambique' : p.name,
     summary: isEn
-      ? 'We currently care for 10 children facing malnutrition, offering ongoing support and guidance to their families. Our commitment is to walk alongside every story with responsibility, care, and closeness.'
-      : p.summary,
+      ? `We currently care for ${childrenCountText} facing malnutrition, offering ongoing support and guidance to their families. Our commitment is to walk alongside every story with responsibility, care, and closeness.`
+      : `Atualmente, acompanhamos ${childrenCountText} em situação de desnutrição infantil, oferecendo cuidado contínuo e apoio às suas famílias. Nosso compromisso é acompanhar cada história com responsabilidade, atenção e proximidade.`,
     location: isEn ? 'Mozambique' : p.location,
     category: isEn ? 'Health & Nutrition' : p.category,
     statusLabel: isEn ? 'Active' : p.statusLabel,
     verifiedHighlights: isEn
-      ? ['10 children currently supported', 'Family support & guidance', 'Continuous follow-up care']
-      : p.verifiedHighlights,
+      ? [`${childrenCountText} currently supported`, 'Family support & guidance', 'Continuous follow-up care']
+      : [`${childrenCountText} atualmente acompanhadas`, 'Apoio e orientação às famílias', 'Continuidade do acompanhamento'],
   }));
 
   const institutionalPillars = INSTITUTIONAL_PILLARS.map((pillar) => ({
