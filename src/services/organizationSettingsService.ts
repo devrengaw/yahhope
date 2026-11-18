@@ -116,7 +116,7 @@ export async function fetchAndSyncOrgSettings(): Promise<OrganizationSettings> {
   return local;
 }
 
-export async function saveOrgSettings(settings: OrganizationSettings): Promise<{ success: boolean; error?: string }> {
+export async function saveOrgSettings(settings: OrganizationSettings): Promise<{ success: boolean; error?: string; warning?: string }> {
   // 1. Salva localmente com garantia imediata
   saveLocalOrgSettings(settings);
 
@@ -144,8 +144,11 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
       .from('organization_settings')
       .upsert(payload, { onConflict: 'id' });
 
+    let warning: string | undefined;
+
     // Fallback caso a tabela ainda não tenha as colunas no Supabase remoto
     if (error && error.message?.includes('column')) {
+      warning = 'As colunas de redes sociais ainda não existem no banco de dados (Supabase). Execute o script add_social_links_to_organization_settings.sql no SQL Editor do Supabase para sincronizar entre dispositivos.';
       const fallbackPayload = { ...payload };
       delete fallbackPayload.sponsorship_quota_cost;
       delete fallbackPayload.max_sponsors_per_child;
@@ -159,9 +162,9 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
 
     if (error) {
       console.warn('Aviso: erro ao salvar no Supabase, mantido em cache local:', error.message);
-      return { success: true, error: error.message };
+      return { success: true, error: error.message, warning };
     }
-    return { success: true };
+    return { success: true, warning };
   } catch (err: any) {
     console.warn('Exceção ao salvar organization_settings:', err);
     return { success: true, error: err?.message };

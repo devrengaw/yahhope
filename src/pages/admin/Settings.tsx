@@ -53,7 +53,7 @@ type SettingsTab = 'general' | 'projects' | 'local-projects' | 'users' | 'user-c
 const CURRENT_USER_ID = '1';
 
 export function Settings() {
-  const { addNotification } = useNotification();
+  const { sendNotification } = useNotification();
   const { confirm, alert: showAlert } = useConfirm();
   const location = useLocation();
   
@@ -160,11 +160,19 @@ export function Settings() {
       setIsSavingOrg(false);
       if (res.success) {
         setOrgSaveSuccess(true);
-        addNotification({
-          title: 'Configurações Salvas',
-          message: 'As configurações da organização foram salvas e sincronizadas com sucesso!',
-          type: 'success'
-        });
+        if (res.warning) {
+          sendNotification(
+            'Salvo localmente (Atenção)',
+            res.warning,
+            'warning'
+          );
+        } else {
+          sendNotification(
+            'Configurações Salvas',
+            'As configurações da organização foram salvas e sincronizadas com sucesso!',
+            'success'
+          );
+        }
         setTimeout(() => setOrgSaveSuccess(false), 3000);
       }
     } catch (err: any) {
@@ -209,11 +217,11 @@ export function Settings() {
         setMembers(updated);
         setSelectedMember(null);
         setIsUserModalOpen(false);
-        addNotification({
-          title: 'Acessos Salvos',
-          message: `As permissões e informações de ${newMember.name} foram gravadas com sucesso.`,
-          type: 'success'
-        });
+        sendNotification(
+          'Acessos Salvos',
+          `As permissões e informações de ${newMember.name} foram gravadas com sucesso.`,
+          'success'
+        );
       } catch (err: any) {
         console.error('Error updating user:', err);
         alert('Erro ao atualizar usuário: ' + err.message);
@@ -307,11 +315,11 @@ export function Settings() {
 
       setMembers(prev => prev.map(m => (m.id === member.id ? { ...m, role: newRole } : m)));
       const label = newRole === 'SPONSOR' ? 'Padrinho' : newRole === 'MANTENEDOR' ? 'Mantenedor' : 'Conta do Site';
-      addNotification({
-        title: 'Classificação Atualizada',
-        message: `${member.name} agora está classificado(a) como ${label}.`,
-        type: 'success'
-      });
+      sendNotification(
+        'Classificação Atualizada',
+        `${member.name} agora está classificado(a) como ${label}.`,
+        'success'
+      );
     } catch (err: any) {
       console.error('Error updating role:', err);
       showAlert('Erro', 'Não foi possível alterar o tipo de apoiador: ' + (err?.message || 'Erro desconhecido'));
