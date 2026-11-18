@@ -47,14 +47,24 @@ async function syncMaintainerProfile(data: {
   const isMonthly = Boolean(data.isMonthly);
   const monthlyAmount = Number(data.amount || 0);
 
+  // Busca parâmetros dinâmicos da área de Finanças (valor da cota e teto de padrinhos por criança)
+  const { data: orgSettings } = await supabase
+    .from('organization_settings')
+    .select('sponsorship_quota_cost, max_sponsors_per_child')
+    .eq('id', 'default')
+    .maybeSingle();
+
+  const quotaCost = Math.max(90, Number(orgSettings?.sponsorship_quota_cost) || 90);
+  const maxSponsorsPerChild = Math.max(1, Number(orgSettings?.max_sponsors_per_child) || 2);
+
   // REGRA DE OURO:
-  // - Apenas doadores MENSAIS com valor >= R$ 90,00 podem apadrinhar crianças.
-  // - Crianças atribuídas a cada múltiplo inteiro de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
+  // - Apenas doadores MENSAIS com valor >= quotaCost (padrão R$ 90,00) podem apadrinhar crianças.
+  // - Crianças atribuídas a cada múltiplo inteiro de quotaCost.
   // - Excedentes (ex: 95) apadrinham 1 criança e o excedente apoia o projeto como um todo.
-  // - Quem doa R$ 50,00 (ou qualquer valor < R$ 90) é Mantenedor Mensal de Apoio Geral (child_id = NULL).
+  // - Quem doa R$ 50,00 (ou qualquer valor < quotaCost) é Mantenedor Mensal de Apoio Geral (child_id = NULL).
   // - Doações avulsas/pontuais não entram na tabela 'sponsorships'.
-  const canSponsorChild = isMonthly && monthlyAmount >= 90 && data.isSponsor !== false;
-  const quotasCount = canSponsorChild ? Math.floor(monthlyAmount / 90) : 0;
+  const canSponsorChild = isMonthly && monthlyAmount >= quotaCost && data.isSponsor !== false;
+  const quotasCount = canSponsorChild ? Math.floor(monthlyAmount / quotaCost) : 0;
 
   // 1. Atualiza ou insere o perfil na tabela 'users'
   const { data: existingUser } = await supabase
@@ -110,10 +120,10 @@ async function syncMaintainerProfile(data: {
 
     if (existingSp && existingSp.length > 0) {
       const targetQuotas = canSponsorChild ? Math.max(quotasCount, existingSp.length) : existingSp.length;
-      // REGRA DE OURO: Cada cota de apadrinhamento tem valor mínimo de R$ 90,00 (nunca R$ 30,00)
-      const perQuotaAmount = Math.max(90, targetQuotas > 1 && monthlyAmount >= targetQuotas * 90
+      // REGRA DE OURO: Cada cota de apadrinhamento tem valor mínimo de quotaCost (padrão R$ 90,00)
+      const perQuotaAmount = Math.max(quotaCost, targetQuotas > 1 && monthlyAmount >= targetQuotas * quotaCost
         ? Number((monthlyAmount / targetQuotas).toFixed(2))
-        : (monthlyAmount >= 90 ? monthlyAmount : 90));
+        : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost));
 
       const existingChildIds = new Set(existingSp.map((sp: any) => sp.child_id).filter(Boolean));
       const missingCount = canSponsorChild ? Math.max(0, quotasCount - existingSp.length) : 0;
@@ -132,16 +142,12 @@ async function syncMaintainerProfile(data: {
         });
 
         const available = (allChildren || []).filter(
-          (c: any) => !existingChildIds.has(c.id) && (spCountByChild.get(c.id) || 0) < 2
+          (c: any) => !existingChildIds.has(c.id) && (spCountByChild.get(c.id) || 0) < maxSponsorsPerChild
         );
         available.sort((a: any, b: any) => ((spCountByChild.get(a.id) || 0) - (spCountByChild.get(b.id) || 0)));
 
         const totalNeeded = missingCount + unassignedExisting.length;
         extraChildIds = available.slice(0, totalNeeded).map((c: any) => c.id);
-        if (extraChildIds.length < totalNeeded && allChildren && allChildren.length > 0) {
-          const fallbackPool = allChildren.filter((c: any) => !existingChildIds.has(c.id) && !extraChildIds.includes(c.id));
-          extraChildIds = [...extraChildIds, ...fallbackPool.slice(0, totalNeeded - extraChildIds.length).map((c: any) => c.id)];
-        }
       }
 
       for (const sp of existingSp) {
@@ -167,10 +173,9 @@ async function syncMaintainerProfile(data: {
           .eq('id', sp.id);
       }
 
-      // Se o valor mensal dá direito a mais cotas do que os registros existentes (ex: R$ 300 = 3 crianças, tinha só 1), cria as faltantes
-      for (let i = 0; i < missingCount && extraChildIds.length > 0; i++) {
-        const chId = extraChildIds.shift();
-        if (!chId) break;
+      // Se o valor mensal dá direito a mais cotas do que os registros existentes, cria as faltantes (ou como Aguardando vínculo se não houver crianças livres)
+      for (let i = 0; i < missingCount; i++) {
+        const chId = extraChildIds.shift() || null;
         await supabase.from('sponsorships').insert({
           child_id: chId,
           sponsor_id: userId || null,
@@ -203,14 +208,14 @@ async function syncMaintainerProfile(data: {
           }
         });
 
-        const available = (allChildren || []).filter((c: any) => (spCountByChild.get(c.id) || 0) < 2);
+        const available = (allChildren || []).filter((c: any) => (spCountByChild.get(c.id) || 0) < maxSponsorsPerChild);
         available.sort((a: any, b: any) => ((spCountByChild.get(a.id) || 0) - (spCountByChild.get(b.id) || 0)));
 
         const needed = Math.max(quotasCount, 1);
         assignedChildIds = available.slice(0, needed).map((c: any) => c.id);
-        if (assignedChildIds.length === 0) {
-          // Não há mais crianças disponíveis para apadrinhamento; segue como Mantenedor sem criança vinculada
-          assignedChildIds = [null];
+        while (assignedChildIds.length < needed) {
+          // Não há mais crianças disponíveis dentro do teto maxSponsorsPerChild; excedente segue como Mantenedor sem criança vinculada
+          assignedChildIds.push(null);
         }
       }
 
@@ -221,7 +226,7 @@ async function syncMaintainerProfile(data: {
           donor_name: donorName,
           donor_email: cleanEmail,
           donor_phone: donorPhone,
-          monthly_amount: Math.max(90, quotasCount > 1 && monthlyAmount >= quotasCount * 90 ? monthlyAmount / quotasCount : (monthlyAmount >= 90 ? monthlyAmount : 90)),
+          monthly_amount: Math.max(quotaCost, quotasCount > 1 && monthlyAmount >= quotasCount * quotaCost ? monthlyAmount / quotasCount : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost)),
           quotas_count: 1,
           status: 'active',
           payment_method: paymentMethod,

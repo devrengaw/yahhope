@@ -33,6 +33,7 @@ import {
   isSameDonorNameAndHandle
 } from '../../../utils/userCleanup';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
+import { evaluateSponsorshipValidity, sponsorshipService } from '../../../services/sponsorshipService';
 import { sponsorshipService } from '../../../services/sponsorshipService';
 
 export function SupportersList() {
@@ -57,6 +58,7 @@ export function SupportersList() {
     setIsLoading(true);
     try {
       purgeSpamUsersFromDatabase();
+      await sponsorshipService.autoLinkPendingSponsors();
 
       const [usersRes, sponsorshipsRes, donationsRes, childrenRes] = await Promise.all([
         supabase.from('users').select('*').order('created_at', { ascending: false }),
@@ -338,9 +340,13 @@ export function SupportersList() {
         const isKnownMantenedor = CONFIRMED_STRIPE_MANTENEDORES.has(cleanEmail);
 
         // Identificação estrita de quem é Padrinho de criança vs Doador Mensal vs Doador Geral
+        // Alinhado com sponsorshipService.getMetrics(): verifica status ativo E vigência (evaluateSponsorshipValidity)
         const monthlySponsorships = uniqueSponsorships.filter(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
-          return st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+          const isStatusActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+          if (!isStatusActive) return false;
+          const validity = evaluateSponsorshipValidity(sp, email);
+          return !validity.isExpired;
         });
 
         // Calcula o valor mensal comprometido (apadrinhamento ou recorrência)
@@ -381,8 +387,8 @@ export function SupportersList() {
         const assignedChildrenList: Array<{ id: string; name: string; village?: string; photo_url?: string }> = [];
         const seenChildIds = new Set<string>();
 
-        // 1. Crianças já vinculadas no banco em sponsorships
-        uniqueSponsorships.forEach(sp => {
+        // 1. Crianças já vinculadas no banco em sponsorships (apenas apadrinhamentos ativos e vigentes)
+        monthlySponsorships.forEach(sp => {
           if (sp.child_id && !seenChildIds.has(sp.child_id)) {
             const ch = sp.children || childrenMap.get(sp.child_id);
             if (ch) {

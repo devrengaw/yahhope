@@ -75,6 +75,15 @@ export interface SupporterCommitmentSummary {
   totalMonthlyCommitment: number;
 }
 
+export interface PendingSponsorInfo {
+  id: string;
+  name: string;
+  email: string;
+  monthly_amount: number;
+  payment_method: string;
+  created_at?: string;
+}
+
 export interface SponsorshipMetrics {
   totalChildren: number;
   quotaCost: number;
@@ -86,6 +95,7 @@ export interface SponsorshipMetrics {
   occupancyRate: number;
   monthlySponsorshipRevenue: number;
   children: ChildSponsorshipDetail[];
+  pendingSponsors?: PendingSponsorInfo[];
 }
 
 export interface AssignSponsorPayload {
@@ -104,6 +114,7 @@ export interface AssignSponsorPayload {
 export interface AssignSponsorResult {
   success: boolean;
   assignedChildren: ChildSponsorshipDetail[];
+  pendingAssignmentCount?: number;
   totalAmount: number;
   planMonths?: number;
   expiresAt?: string | null;
@@ -331,10 +342,11 @@ export const sponsorshipService = {
       const allSponsorships = sponsorshipsData || [];
 
       // Mapeia padrinhos por child_id (resiliente a variações de status, case de ID e vigência de pacote PIX)
+      // e também coleta padrinhos ativos com valor >= quotaCost que estão "Aguardando vínculo" (child_id IS NULL)
       const sponsorsByChild = new Map<string, any[]>();
+      const pendingSponsors: PendingSponsorInfo[] = [];
+
       allSponsorships.forEach(sp => {
-        if (!sp.child_id) return;
-        
         // Ignora status explicitamente cancelados, substituídos ou expirados
         const st = String(sp.status || 'active').toLowerCase().trim();
         if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired') {
@@ -347,15 +359,31 @@ export const sponsorshipService = {
           return;
         }
 
+        const sponsorName = sp.donor_name || sp.users?.name || sp.donor_email?.split('@')[0] || 'Padrinho';
+        const sponsorEmail = sp.donor_email || sp.users?.email || '';
+        const rawAmt = Number(sp.monthly_amount);
+
+        if (!sp.child_id) {
+          // Só entra na fila de "Aguardando vínculo" se tiver valor de cota de apadrinhamento (>= quotaCost)
+          if (!isNaN(rawAmt) && rawAmt >= quotaCost) {
+            pendingSponsors.push({
+              id: sp.id,
+              name: sponsorName,
+              email: sponsorEmail,
+              monthly_amount: rawAmt,
+              payment_method: sp.payment_method || 'credit_card',
+              created_at: sp.created_at
+            });
+          }
+          return;
+        }
+
         const cleanChildId = String(sp.child_id).trim().toLowerCase();
         if (!sponsorsByChild.has(cleanChildId)) {
           sponsorsByChild.set(cleanChildId, []);
         }
-        const sponsorName = sp.donor_name || sp.users?.name || sp.donor_email?.split('@')[0] || 'Padrinho';
-        const sponsorEmail = sp.donor_email || sp.users?.email || '';
         
         // REGRA DE OURO: O valor mínimo de apadrinhamento por cota é R$ 90,00 (nunca R$ 30)
-        const rawAmt = Number(sp.monthly_amount);
         const effectiveAmt = (!isNaN(rawAmt) && rawAmt >= quotaCost) ? rawAmt : quotaCost;
 
         sponsorsByChild.get(cleanChildId)!.push({
@@ -418,7 +446,8 @@ export const sponsorshipService = {
         isFullySponsored,
         occupancyRate,
         monthlySponsorshipRevenue,
-        children: childrenDetails
+        children: childrenDetails,
+        pendingSponsors
       };
     } catch (err) {
       console.error('Erro ao calcular métricas de apadrinhamento:', err);
@@ -481,21 +510,8 @@ export const sponsorshipService = {
       effectiveQuotas = Math.max(1, Math.floor(monthlyEquivalent / 90));
     }
 
-    // 1. Filtra crianças elegíveis (ou prioriza a criança específica em caso de renovação)
-    let availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors || c.id === renewChildId);
-
-    if (availableChildren.length === 0 && metrics.children.length > 0) {
-      availableChildren = [...metrics.children];
-    }
-
-    if (availableChildren.length === 0) {
-      return {
-        success: false,
-        assignedChildren: [],
-        totalAmount: 0,
-        message: 'Todas as crianças já estão 100% apadrinhadas! Convidamos você a ser um Mantenedor Mensal Global.'
-      };
-    }
+    // 1. Filtra crianças elegíveis (respeitando rigorosamente o teto maxSponsors, exceto renovação da própria criança)
+    const availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors || c.id === renewChildId);
 
     // 2. Ordena priorizando a criança em renovação (se houver) e depois menor número de padrinhos ativos (Least-Sponsored)
     availableChildren.sort((a, b) => {
@@ -509,10 +525,11 @@ export const sponsorshipService = {
       return a.name.localeCompare(b.name);
     });
 
-    // 3. Seleciona as N crianças prioritárias (até o limite de cotas solicitadas)
+    // 3. Seleciona as N crianças disponíveis (se não houver crianças livres, as cotas restantes ficam como "Aguardando vínculo")
     const countToAssign = Math.min(effectiveQuotas, availableChildren.length);
+    const pendingAssignmentCount = Math.max(0, effectiveQuotas - countToAssign);
     const selectedChildren = availableChildren.slice(0, countToAssign);
-    const totalAmount = totalSupplied > 0 ? totalSupplied : countToAssign * quotaCost * planMonths;
+    const totalAmount = totalSupplied > 0 ? totalSupplied : effectiveQuotas * quotaCost * planMonths;
     const perChildPackageAmount = quotaCost * planMonths;
 
     const cleanEmail = donorEmail.toLowerCase().trim();
@@ -646,6 +663,42 @@ export const sponsorshipService = {
         }
       }
 
+      // 4b. Se houver cotas excedentes sem criança disponível no teto atual, registra como "Aguardando vínculo" (child_id: null)
+      for (let p = 0; p < pendingAssignmentCount; p++) {
+        const pendingRecord: any = {
+          child_id: null,
+          sponsor_id: sponsorUserId || null,
+          donor_name: donorName,
+          donor_email: cleanEmail,
+          donor_phone: donorPhone || null,
+          monthly_amount: quotaCost,
+          quotas_count: 1,
+          status: 'active',
+          payment_method: paymentMethod,
+          last_sponsored_at: nowIso,
+          plan_months: planMonths,
+          package_amount: perChildPackageAmount,
+          started_at: nowIso,
+          expires_at: finalExpiresAt,
+          renewal_declined: false
+        };
+        const { error: pErr } = await supabase.from('sponsorships').insert([pendingRecord]);
+        if (pErr) {
+          await supabase.from('sponsorships').insert([{
+            child_id: null,
+            sponsor_id: sponsorUserId || null,
+            donor_name: donorName,
+            donor_email: cleanEmail,
+            donor_phone: donorPhone || null,
+            monthly_amount: quotaCost,
+            quotas_count: 1,
+            status: 'active',
+            payment_method: paymentMethod,
+            last_sponsored_at: nowIso
+          }]);
+        }
+      }
+
       // Enriquecer selectedChildren com metadados do pacote
       const enrichedChildren: ChildSponsorshipDetail[] = selectedChildren.map(c => ({
         ...c,
@@ -661,9 +714,10 @@ export const sponsorshipService = {
 
       // 5. Registra no Módulo Financeiro Global (apenas para apoiadores legítimos)
       if (!isGibberishBotName(donorName)) {
+        const suffixPending = countToAssign === 0 ? ' - Aguardando vínculo' : '';
         const txDescription = planMonths > 1 || isPix
-          ? `Apadrinhamento PIX - Pacote ${planMonths} Meses (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`
-          : `Apadrinhamento Mensal (${countToAssign} ${countToAssign === 1 ? 'cota' : 'cotas'}) - ${donorName}`;
+          ? `Apadrinhamento PIX - Pacote ${planMonths} Meses (${effectiveQuotas} ${effectiveQuotas === 1 ? 'cota' : 'cotas'}${suffixPending}) - ${donorName}`
+          : `Apadrinhamento Mensal (${effectiveQuotas} ${effectiveQuotas === 1 ? 'cota' : 'cotas'}${suffixPending}) - ${donorName}`;
 
         await supabase.from('finance_transactions').insert({
           description: txDescription,
@@ -695,15 +749,23 @@ export const sponsorshipService = {
         expiresAt: finalExpiresAt
       });
 
+      let finalMessage: string;
+      if (enrichedChildren.length === 0) {
+        finalMessage = 'Parabéns! Sua contribuição de apadrinhamento foi confirmada com sucesso. Obrigado por transformar vidas!';
+      } else if (planMonths > 1) {
+        finalMessage = `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'} pelo pacote de ${planMonths} meses!`;
+      } else {
+        finalMessage = `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'}. Enviamos o perfil completo por e-mail!`;
+      }
+
       return {
         success: true,
         assignedChildren: enrichedChildren,
+        pendingAssignmentCount,
         totalAmount,
         planMonths,
         expiresAt: finalExpiresAt,
-        message: planMonths > 1
-          ? `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'} pelo pacote de ${planMonths} meses!`
-          : `Parabéns! Você apadrinhou ${enrichedChildren.length} ${enrichedChildren.length === 1 ? 'criança' : 'crianças'}. Enviamos o perfil completo por e-mail!`
+        message: finalMessage
       };
     } catch (err: any) {
       console.error('Erro ao efetivar apadrinhamento:', err);
@@ -715,6 +777,65 @@ export const sponsorshipService = {
         expiresAt: finalExpiresAt,
         error: err.message || 'Erro ao processar apadrinhamento'
       };
+    }
+  },
+
+  /**
+   * Vincula automaticamente padrinhos que estão na fila "Aguardando vínculo" (child_id IS NULL)
+   * sempre que houver crianças com vagas abertas dentro de maxSponsorsPerChild.
+   */
+  async autoLinkPendingSponsors(): Promise<{ linkedCount: number }> {
+    try {
+      const metrics = await this.getMetrics();
+      if (!metrics.pendingSponsors || metrics.pendingSponsors.length === 0 || metrics.availableSlots <= 0) {
+        return { linkedCount: 0 };
+      }
+
+      // Cópia mutável das crianças com vagas abertas (Least-Sponsored primeiro)
+      const openChildren = metrics.children
+        .filter(c => c.sponsorsCount < metrics.maxSponsorsPerChild)
+        .map(c => ({ ...c, sponsorEmails: new Set(c.sponsors.map(s => (s.email || '').toLowerCase().trim()).filter(Boolean)) }))
+        .sort((a, b) => a.sponsorsCount - b.sponsorsCount || a.name.localeCompare(b.name));
+
+      if (openChildren.length === 0) {
+        return { linkedCount: 0 };
+      }
+
+      // Ordena pendentes do mais antigo para o mais novo (FIFO)
+      const queue = [...metrics.pendingSponsors].sort((a, b) =>
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      );
+
+      let linkedCount = 0;
+      for (const pending of queue) {
+        const cleanEmail = (pending.email || '').toLowerCase().trim();
+        // Escolhe a criança com menor número de padrinhos que ainda não atingiu o teto e ainda não é apadrinhada por este e-mail
+        openChildren.sort((a, b) => a.sponsorsCount - b.sponsorsCount || a.name.localeCompare(b.name));
+        const target = openChildren.find(
+          c => c.sponsorsCount < metrics.maxSponsorsPerChild && (!cleanEmail || !c.sponsorEmails.has(cleanEmail))
+        );
+        if (!target) continue;
+
+        const { error } = await supabase
+          .from('sponsorships')
+          .update({
+            child_id: target.id,
+            last_sponsored_at: new Date().toISOString()
+          })
+          .eq('id', pending.id)
+          .is('child_id', null);
+
+        if (!error) {
+          target.sponsorsCount += 1;
+          if (cleanEmail) target.sponsorEmails.add(cleanEmail);
+          linkedCount += 1;
+        }
+      }
+
+      return { linkedCount };
+    } catch (err) {
+      console.warn('Erro ao vincular padrinhos pendentes automaticamente:', err);
+      return { linkedCount: 0 };
     }
   },
 
@@ -1204,7 +1325,7 @@ export const sponsorshipService = {
       const newlyAssignedChildren: ChildSponsorshipDetail[] = [];
 
       for (let i = 0; i < neededCount; i++) {
-        const targetChild = availableChildren[i] || metrics.children.find(c => !assignedChildIds.has(c.id)) || metrics.children[0];
+        const targetChild = availableChildren[i];
         if (!targetChild) break;
         assignedChildIds.add(targetChild.id);
 

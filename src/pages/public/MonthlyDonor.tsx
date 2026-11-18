@@ -1110,19 +1110,6 @@ export function MonthlyDonor() {
                 {/* QUANTIDADE DE CRIANÇAS DENTRO DA CAIXA DE DOAÇÃO (COMO NOS OUTROS LUGARES) */}
                 {donationType === 'sponsorship' && (
                   <div className="space-y-2.5 mb-4 animate-fade-in">
-                    {sponsorshipMetrics?.isFullySponsored ? (
-                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs text-emerald-800">
-                        {tr('🎉 Todas as crianças estão 100% apadrinhadas!', '🎉 All children are 100% sponsored!')}
-                        <button
-                          type="button"
-                          onClick={() => setDonationType('general')}
-                          className="mt-1 block mx-auto text-[11px] font-gotham-bold underline text-emerald-950 cursor-pointer"
-                        >
-                          {tr('Seja um Mantenedor Geral do Projeto →', 'Become a General Project Supporter →')}
-                        </button>
-                      </div>
-                    ) : (
-                      <>
                         <div className="text-[11px] font-gotham-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
                           <span>{tr('Quantas crianças apadrinhar:', 'How many children to sponsor:')}</span>
                           <span className="text-[#F49853]">{tr(`R$ ${quotaCost}/mês por cota`, `R$ ${quotaCost}/mo per share`)}</span>
@@ -1159,8 +1146,6 @@ export function MonthlyDonor() {
                           <Sparkles size={14} className="text-[#F49853] shrink-0" />
                           <span>{tr('Distribuição justa: o perfil do afilhado é enviado após a confirmação.', 'Fair distribution: your sponsored child’s profile is sent after confirmation.')}</span>
                         </div>
-                      </>
-                    )}
                   </div>
                 )}
 

@@ -166,6 +166,8 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
 
       if (socialCols.includes(missingCol)) {
         warning = `A coluna "${missingCol}" ainda não está visível no Supabase (schema cache). Execute add_social_links_to_organization_settings.sql ou "NOTIFY pgrst, 'reload schema';" no SQL Editor do Supabase.`;
+      } else if (missingCol === 'max_sponsors_per_child' || missingCol === 'sponsorship_quota_cost') {
+        warning = `A coluna "${missingCol}" não existe no Supabase. Execute sponsorship_distribution_migration.sql no SQL Editor do Supabase para persistir o limite de padrinhos.`;
       }
       delete fallbackPayload[missingCol];
       const retry = await supabase.from('organization_settings').upsert(fallbackPayload, { onConflict: 'id' });

@@ -38,6 +38,7 @@ export function SponsorshipQuotasManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
+      await sponsorshipService.autoLinkPendingSponsors();
       const data = await sponsorshipService.getMetrics();
       setMetrics(data);
       setQuotaCost(data.quotaCost);
@@ -60,15 +61,19 @@ export function SponsorshipQuotasManager() {
 
     try {
       const currentOrg = await fetchAndSyncOrgSettings();
-      await saveOrgSettings({
+      const saveRes = await saveOrgSettings({
         ...currentOrg,
         sponsorship_quota_cost: Number(quotaCost),
         max_sponsors_per_child: Number(maxSponsors)
       });
 
       await loadData();
-      setSuccessMessage('Parâmetros de apadrinhamento atualizados com sucesso!');
-      setTimeout(() => setSuccessMessage(null), 4000);
+      if (saveRes.warning || saveRes.error) {
+        alert(saveRes.warning || `Aviso ao salvar no banco: ${saveRes.error}`);
+      } else {
+        setSuccessMessage('Parâmetros de apadrinhamento atualizados com sucesso!');
+        setTimeout(() => setSuccessMessage(null), 4000);
+      }
     } catch (err: any) {
       console.error('Erro ao salvar parâmetros:', err);
       alert('Erro ao salvar parâmetros');
@@ -267,11 +272,49 @@ export function SponsorshipQuotasManager() {
           </div>
           <div className="pt-3 mt-3 border-t border-white/10 text-[11px] text-white/80 font-medium">
             {metrics?.isFullySponsored 
-              ? 'Visitantes são convidados para o fundo de Mantenedor Global.' 
+              ? 'Novos padrinhos doam normalmente e ficam em "Aguardando vínculo" até surgir vaga.' 
               : 'O algoritmo aloca novos padrinhos para as crianças menos assistidas.'}
           </div>
         </div>
       </div>
+
+      {/* Fila Integrada: Padrinhos Aguardando Vínculo */}
+      {metrics?.pendingSponsors && metrics.pendingSponsors.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-[2rem] p-6 sm:p-8 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-100 rounded-2xl text-amber-700">
+                <Users size={20} />
+              </div>
+              <div>
+                <h4 className="text-base font-black text-amber-950">
+                  Aguardando na fila ({metrics.pendingSponsors.length})
+                </h4>
+                <p className="text-xs text-amber-800 font-medium">
+                  Estes padrinhos já contribuíram e serão vinculados automaticamente assim que houver vagas abertas (ou ao aumentar o limite de padrinhos por criança).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {metrics.pendingSponsors.map((ps) => (
+              <div
+                key={ps.id}
+                className="bg-white border border-amber-200/80 rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{ps.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{ps.email || 'Sem e-mail'}</p>
+                </div>
+                <span className="shrink-0 text-xs font-black text-amber-700 bg-amber-100 px-2.5 py-1 rounded-lg">
+                  R$ {Number(ps.monthly_amount || metrics.quotaCost).toFixed(0)}/mês
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabela de Crianças e Distribuição de Padrinhos */}
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
