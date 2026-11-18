@@ -50,6 +50,7 @@ export interface SupporterData {
   sponsorshipId?: string;
   sponsorships?: any[];
   totalDonated: number;
+  monthlyAmount?: number;
   donationsCount: number;
   lastDonationDate?: string;
   donations: SupporterDonation[];

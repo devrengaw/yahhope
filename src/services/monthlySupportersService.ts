@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { isSpamOrMockUser } from '../utils/userCleanup';
+import { evaluateSponsorshipValidity, MAX_INACTIVE_DAYS_BEFORE_CHURN } from './sponsorshipService';
 
 export interface MonthlySupportersData {
   count: number;
@@ -7,95 +8,120 @@ export interface MonthlySupportersData {
   loading: boolean;
 }
 
-const STORAGE_KEY_SUPPORTERS_COUNT = 'yah_hope_unique_monthly_supporters_count_v1';
+const STORAGE_KEY_SUPPORTERS_COUNT = 'yah_hope_unique_monthly_supporters_count_v2';
 
 /**
- * Obtém a contagem de apoiadores mensais únicos (deduplicados por email ou ID).
- * Regras:
- * - Não faz distinção entre mantenedor do projeto e padrinho/madrinha.
- * - Cada pessoa conta estritamente UMA ÚNICA VEZ.
- * - Conta apenas contribuições mensais / recorrentes (exclui doações avulsas/esporádicas).
+ * Obtém a contagem real de apoiadores mensais ativos (Padrinhos + Mantenedores Mensais),
+ * estritamente alinhada com a Base de Apoiadores da área de Finanças:
+ * - Cada pessoa (e-mail) conta uma única vez.
+ * - Exclui quem está há mais de 2 meses (> 60 dias) sem contribuir (exceto pacotes PIX vigentes no prazo).
+ * - Exclui doadores de contribuição única/avulsa e usuários inativos ou de teste/spam.
+ * - Nunca retorna números fictícios.
  */
 export async function getUniqueMonthlySupportersCount(): Promise<number> {
-  const uniqueEmails = new Set<string>();
-
   try {
-    // 1. Apadrinhamentos ativos (tabela sponsorships)
-    const { data: sponsorships } = await supabase
-      .from('sponsorships')
-      .select('donor_email, sponsor_id, status');
+    const [usersRes, sponsorshipsRes, donationsRes] = await Promise.all([
+      supabase.from('users').select('id, name, email, role, status'),
+      supabase.from('sponsorships').select('*'),
+      supabase.from('donations').select('*')
+    ]);
 
-    if (sponsorships && sponsorships.length > 0) {
-      sponsorships.forEach(sp => {
-        const st = (sp.status || 'active').toLowerCase().trim();
-        // Apenas status ativos ou válidos
-        if (st !== 'cancelled' && st !== 'cancelado' && st !== 'paused') {
-          const email = (sp.donor_email || sp.sponsor_id || '').toLowerCase().trim();
-          if (email) uniqueEmails.add(email);
+    const dbUsers = (usersRes.data || []).filter(u => !isSpamOrMockUser(u));
+    const dbSponsorships = sponsorshipsRes.data || [];
+    const dbDonations = donationsRes.data || [];
+
+    const usersByEmail = new Map<string, any>();
+    const usersById = new Map<string, any>();
+    dbUsers.forEach(u => {
+      if (u.email) usersByEmail.set(u.email.toLowerCase().trim(), u);
+      if (u.id) usersById.set(u.id, u);
+    });
+
+    // Agrupa doações pagas e identifica a última data de contribuição por e-mail
+    const paidDonationsByEmail = new Map<string, any[]>();
+    const latestPaidDonationByEmail = new Map<string, string>();
+
+    dbDonations.forEach(d => {
+      const rawStatus = String(d.status || 'paid').toLowerCase().trim();
+      const isPaid = rawStatus === 'paid' || rawStatus === 'completed' || rawStatus === 'confirmed' || rawStatus === 'pago';
+      if (!isPaid) return;
+
+      const email = (d.donor_email || d.email || '').toLowerCase().trim();
+      if (!email) return;
+
+      if (!paidDonationsByEmail.has(email)) paidDonationsByEmail.set(email, []);
+      paidDonationsByEmail.get(email)!.push(d);
+
+      const dt = d.paid_at || d.created_at;
+      if (dt) {
+        const prev = latestPaidDonationByEmail.get(email);
+        if (!prev || new Date(dt).getTime() > new Date(prev).getTime()) {
+          latestPaidDonationByEmail.set(email, dt);
         }
-      });
-    }
+      }
+    });
 
-    // 2. Doações recorrentes/mensais (tabela donations)
-    // Filtra apenas as que são assinaturas ou recorrentes mensais, NUNCA avulsas
-    const { data: donations } = await supabase
-      .from('donations')
-      .select('*');
+    const activeMonthlyEmails = new Set<string>();
 
-    if (donations && donations.length > 0) {
-      donations.forEach(d => {
-        const rawStatus = (d.status || 'paid').toLowerCase().trim();
-        const isPaid = rawStatus === 'paid' || rawStatus === 'completed' || rawStatus === 'confirmed' || rawStatus === 'pago';
+    // 1. Verifica apadrinhamentos e assinaturas na tabela sponsorships que estão ativos e vigentes (<= 60 dias ou pacote vigente)
+    dbSponsorships.forEach(sp => {
+      const st = String(sp.status || 'active').toLowerCase().trim();
+      const isStatusActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+      if (!isStatusActive) return;
 
-        // Critério estrito de recorrência mensal (ignora esporádicas)
-        const isMonthlyRecurrent = Boolean(
+      const linkedUser = sp.sponsor_id ? usersById.get(sp.sponsor_id) : undefined;
+      const email = (sp.donor_email || linkedUser?.email || '').toLowerCase().trim();
+      if (!email) return;
+
+      const userRecord = usersByEmail.get(email) || linkedUser;
+      if (userRecord && (isSpamOrMockUser(userRecord) || userRecord.status === 'inactive')) return;
+
+      const latestDonIso = latestPaidDonationByEmail.get(email);
+      const validity = evaluateSponsorshipValidity(sp, email, latestDonIso);
+      if (!validity.isExpired) {
+        activeMonthlyEmails.add(email);
+      }
+    });
+
+    // 2. Verifica doações recorrentes/mensais pagas nos últimos 60 dias (caso ainda não tenham linha em sponsorships)
+    paidDonationsByEmail.forEach((donationsList, email) => {
+      if (activeMonthlyEmails.has(email)) return;
+
+      const userRecord = usersByEmail.get(email);
+      if (userRecord && (isSpamOrMockUser(userRecord) || userRecord.status === 'inactive')) return;
+
+      const hasRecentRecurringDonation = donationsList.some(d => {
+        const isRecurring = Boolean(
           d.stripe_subscription_id ||
           d.is_sponsorship ||
           d.recurrence === 'monthly' ||
           d.type === 'monthly' ||
-          d.type === 'sponsorship'
+          d.type === 'sponsorship' ||
+          (d.campaign_title && String(d.campaign_title).toLowerCase().includes('apadrinh'))
         );
+        if (!isRecurring) return false;
 
-        if (isPaid && isMonthlyRecurrent) {
-          const email = (d.donor_email || d.email || d.user_id || '').toLowerCase().trim();
-          if (email) uniqueEmails.add(email);
-        }
+        const dt = d.paid_at || d.created_at;
+        if (!dt) return false;
+        const daysAgo = Math.floor((Date.now() - new Date(dt).getTime()) / (1000 * 60 * 60 * 24));
+        return daysAgo <= MAX_INACTIVE_DAYS_BEFORE_CHURN;
       });
-    }
 
-    // 3. Usuários com perfil específico de apoiador contínuo (SPONSOR, PADRINHO, MANTENEDOR)
-    const { data: users } = await supabase
-      .from('users')
-      .select('email, id, name, role');
+      if (hasRecentRecurringDonation) {
+        activeMonthlyEmails.add(email);
+      }
+    });
 
-    if (users && users.length > 0) {
-      users.forEach(u => {
-        if (isSpamOrMockUser(u)) return;
-        const role = (u.role || '').toUpperCase();
-        if (role === 'SPONSOR' || role === 'PADRINHO' || role === 'MANTENEDOR') {
-          const email = (u.email || u.id || '').toLowerCase().trim();
-          if (email) uniqueEmails.add(email);
-        }
-      });
-    }
-
-    // 4. Salva no cache local para resiliência offline e ultra-performance
-    const finalCount = uniqueEmails.size;
-    if (finalCount > 0) {
-      localStorage.setItem(STORAGE_KEY_SUPPORTERS_COUNT, finalCount.toString());
-      return finalCount;
-    }
+    const finalCount = activeMonthlyEmails.size;
+    localStorage.setItem(STORAGE_KEY_SUPPORTERS_COUNT, finalCount.toString());
+    return finalCount;
   } catch (err) {
     console.warn('Erro ao consultar apoiadores mensais únicos no Supabase:', err);
+    const cached = localStorage.getItem(STORAGE_KEY_SUPPORTERS_COUNT);
+    if (cached) {
+      const parsed = parseInt(cached, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+    return 0;
   }
-
-  // Fallback cache local ou valor base consistente
-  const cached = localStorage.getItem(STORAGE_KEY_SUPPORTERS_COUNT);
-  if (cached) {
-    const parsed = parseInt(cached, 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  // Base mínima de apoiadores já ativos na YAH Hope
-  return 38;
 }

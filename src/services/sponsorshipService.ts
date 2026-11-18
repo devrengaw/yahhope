@@ -969,8 +969,7 @@ export const sponsorshipService = {
             .from('sponsorships')
             .update({
               child_id: target.id,
-              status: 'active',
-              last_sponsored_at: new Date().toISOString()
+              status: 'active'
             })
             .eq('id', pending.sponsorshipId)
             .select();
@@ -2259,12 +2258,12 @@ export const sponsorshipService = {
         if (userRow?.id) realSponsorId = userRow.id;
       }
 
-      // 3. Se já existe o apadrinhamento, atualiza child_id, ativa o vínculo e garante sponsor_id
+      // 3. Se já existe o apadrinhamento, atualiza child_id, ativa o vínculo e garante sponsor_id (preservando a data real da última contribuição)
       if (existingSponsorship?.id) {
         const updatePayload: any = {
           child_id: params.newChildId,
           status: 'active',
-          last_sponsored_at: new Date().toISOString()
+          last_sponsored_at: existingSponsorship.last_sponsored_at || existingSponsorship.created_at || new Date().toISOString()
         };
         if (realSponsorId) updatePayload.sponsor_id = realSponsorId;
 

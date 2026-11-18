@@ -7,6 +7,7 @@ import {
   isSameDonorNameAndHandle,
   splitFinanceDescription
 } from '../utils/userCleanup';
+import { evaluateSponsorshipValidity } from '../services/sponsorshipService';
 
 export interface CampaignMilestone {
   id: string;
@@ -216,8 +217,8 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
     // Para campanhas mensais (monthly): calcula estritamente as doações do mês vigente (ex: R$ 50 avulso + R$ 90 apadrinhamento = R$ 140).
     // Para campanhas pontuais (specific): considera o histórico total arrecadado.
     const currentAmount = isMonthly
-      ? (currentMonthTotal > 0 ? currentMonthTotal : Number(camp.current_amount || 0))
-      : (totalHistorical > 0 ? totalHistorical : Number(camp.current_amount || 0));
+      ? currentMonthTotal
+      : totalHistorical;
 
     const targetAmount = Math.max(camp.target_amount || 1, 1);
     const percentage = Math.min(Math.round((currentAmount / targetAmount) * 100), 100);
@@ -375,8 +376,11 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
           const isActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed' || st === 'active_recurring';
           if (!isActive) return;
 
-          const spAmount = Number(sp.monthly_amount || sp.amount || 90);
           const effectiveEmail = (sp.donor_email || '').toLowerCase().trim();
+          const validity = evaluateSponsorshipValidity(sp, effectiveEmail);
+          if (validity.isExpired) return;
+
+          const spAmount = Number(sp.monthly_amount || sp.amount || 90);
           const effectiveName = sp.donor_name || 'Padrinho YAH Hope';
           const childName = sp.child_id ? childrenMap.get(sp.child_id) : undefined;
           const targetTitle = childName ? `Apadrinhamento Mensal - ${childName}` : 'Apadrinhamento Mensal (Casa Nutri)';

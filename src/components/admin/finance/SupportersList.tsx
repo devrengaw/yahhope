@@ -483,6 +483,14 @@ export function SupportersList() {
 
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
+
+        // Calcula o valor da contribuição mensal ativa do padrinho / mantenedor
+        const latestPaidAmt = Number(paidDonations[0]?.amount || 0);
+        const computedMonthlyAmount = isRealPadrinho
+          ? Math.max(90, effectiveMonthlyAmount || (assignedChildrenList.length * 90) || (latestPaidAmt >= 90 ? latestPaidAmt : 90))
+          : isDoadorMensal
+            ? (effectiveMonthlyAmount > 0 ? effectiveMonthlyAmount : (latestPaidAmt > 0 ? latestPaidAmt : 50))
+            : 0;
         const candidateNames = [
           user?.name,
           ...uniqueSponsorships.map((s: any) => s.donor_name),
@@ -521,6 +529,7 @@ export function SupportersList() {
           sponsorshipId: uniqueSponsorships[0]?.id,
           sponsorships: uniqueSponsorships,
           totalDonated,
+          monthlyAmount: computedMonthlyAmount,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
           isChurned,
@@ -1227,6 +1236,7 @@ export function SupportersList() {
               <th className="px-6 py-4">Modalidade / Papel</th>
               <th className="px-6 py-4">Criança Apadrinhada</th>
               <th className="px-6 py-4">Data Cadastro</th>
+              <th className="px-6 py-4 text-right">Contribuição Mensal</th>
               <th className="px-6 py-4 text-right">Total Efetivamente Doado</th>
               <th className="px-6 py-4 text-center">Status</th>
               <th className="px-6 py-4 text-center">Ações</th>
@@ -1374,6 +1384,28 @@ export function SupportersList() {
                 {/* Data de Cadastro */}
                 <td className="px-6 py-5 text-xs text-slate-500 font-bold">
                   {new Date(s.joinedAt).toLocaleDateString('pt-BR')}
+                </td>
+
+                {/* Contribuição Mensal */}
+                <td className="px-6 py-5 text-right">
+                  {(s.monthlyAmount || 0) > 0 ? (
+                    <>
+                      <p className="text-sm font-black text-slate-900">
+                        R$ {(s.monthlyAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <span className="text-[11px] font-bold text-slate-400">/mês</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold">
+                        {s.role === 'Padrinho'
+                          ? `${Math.max(1, Math.floor((s.monthlyAmount || 90) / 90))} ${Math.max(1, Math.floor((s.monthlyAmount || 90) / 90)) === 1 ? 'cota ativa' : 'cotas ativas'}`
+                          : 'Recorrente mensal'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-slate-400">—</p>
+                      <p className="text-[10px] text-slate-400">Avulso / Inativo</p>
+                    </>
+                  )}
                 </td>
 
                 {/* Total Efetivamente Doado */}
