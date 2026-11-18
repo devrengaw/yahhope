@@ -172,7 +172,9 @@ function saveLocalPixPackageMeta(email: string, childId: string, meta: { planMon
  * Pacotes PIX de 3, 6 e 12 meses permanecem ativos durante todo o período contratado
  * (não perdem acesso na virada de cada mês) e só expiram ao final do prazo contratado.
  */
-export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
+export const MAX_INACTIVE_DAYS_BEFORE_CHURN = 60; // 2 meses sem contribuir
+
+export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string, latestDonationIso?: string): {
   planMonths: number;
   packageAmount: number;
   startedAt: string;
@@ -181,6 +183,7 @@ export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
   isExpiringSoon: boolean;
   isExpired: boolean;
   renewalDeclined: boolean;
+  daysSinceLastContribution: number;
 } {
   const email = (sp?.donor_email || fallbackEmail || '').toLowerCase().trim();
   const localMeta = getLocalPixPackageMeta(email, sp?.child_id);
@@ -192,6 +195,22 @@ export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
   const monthlyAmt = Math.max(90, Number(sp?.monthly_amount || 90));
   const packageAmount = Number(sp?.package_amount || localMeta?.packageAmount || (monthlyAmt * planMonths));
   const startedAt = sp?.started_at || localMeta?.startedAt || sp?.last_sponsored_at || sp?.created_at || new Date().toISOString();
+
+  // Calcula quantos dias se passaram desde a última contribuição conhecida deste padrinho
+  const candidateDates = [
+    sp?.last_sponsored_at,
+    sp?.started_at,
+    sp?.created_at,
+    localMeta?.startedAt,
+    latestDonationIso
+  ]
+    .filter(Boolean)
+    .map(d => new Date(d).getTime())
+    .filter(t => !isNaN(t));
+
+  const latestContributionMs = candidateDates.length > 0 ? Math.max(...candidateDates) : Date.now();
+  const daysSinceLastContribution = Math.max(0, Math.floor((Date.now() - latestContributionMs) / (1000 * 60 * 60 * 24)));
+  const isOverdueTwoMonths = daysSinceLastContribution > MAX_INACTIVE_DAYS_BEFORE_CHURN;
 
   let expiresAt: string | null = sp?.expires_at || localMeta?.expiresAt || null;
   if (!expiresAt && (planMonths > 1 || isPix) && (sp?.started_at || sp?.last_sponsored_at || sp?.created_at)) {
@@ -213,8 +232,9 @@ export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
       expiresAt: null,
       daysRemaining: null,
       isExpiringSoon: false,
-      isExpired: renewalDeclined,
-      renewalDeclined
+      isExpired: renewalDeclined || isOverdueTwoMonths,
+      renewalDeclined,
+      daysSinceLastContribution
     };
   }
 
@@ -227,16 +247,19 @@ export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
       expiresAt: null,
       daysRemaining: null,
       isExpiringSoon: false,
-      isExpired: renewalDeclined,
-      renewalDeclined
+      isExpired: renewalDeclined || isOverdueTwoMonths,
+      renewalDeclined,
+      daysSinceLastContribution
     };
   }
 
   const now = new Date();
   const diffMs = expDate.getTime() - now.getTime();
   const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const isExpired = diffMs <= 0 || renewalDeclined;
-  const isExpiringSoon = !isExpired && daysRemaining <= 15;
+  // Se o pacote futuro ainda está vigente (diffMs > 0), permanece ativo;
+  // Se o pacote original venceu, mas a pessoa fez uma nova contribuição há <= 2 meses (!isOverdueTwoMonths), continua ativa!
+  const isExpired = (diffMs <= 0 && isOverdueTwoMonths) || renewalDeclined;
+  const isExpiringSoon = !isExpired && diffMs > 0 && daysRemaining <= 15;
 
   return {
     planMonths,
@@ -246,7 +269,8 @@ export function evaluateSponsorshipValidity(sp: any, fallbackEmail?: string): {
     daysRemaining,
     isExpiringSoon,
     isExpired,
-    renewalDeclined
+    renewalDeclined,
+    daysSinceLastContribution
   };
 }
 
@@ -331,16 +355,31 @@ export const sponsorshipService = {
         console.warn('Aviso ao consultar children no Supabase, usando catálogo local:', childError.message);
       }
 
-      // 2. Busca apadrinhamentos e altas clínicas para excluir crianças que já receberam alta do programa
-      const [spRes, dischargeRes] = await Promise.all([
+      // 2. Busca apadrinhamentos, doações (para checar inatividade > 2 meses) e altas clínicas
+      const [spRes, dischargeRes, donationsRes] = await Promise.all([
         supabase.from('sponsorships').select('*'),
-        supabase.from('clinical_events').select('child_id, is_discharge, nutritional_status, notes').or('is_discharge.eq.true,nutritional_status.eq.Alta,nutritional_status.eq.Encerrado')
+        supabase.from('clinical_events').select('child_id, is_discharge, nutritional_status, notes').or('is_discharge.eq.true,nutritional_status.eq.Alta,nutritional_status.eq.Encerrado'),
+        supabase.from('donations').select('donor_email, paid_at, created_at, status')
       ]);
 
       const sponsorshipsData = spRes.data;
       if (spRes.error) {
         console.warn('Aviso ao consultar sponsorships:', spRes.error.message);
       }
+
+      // Mapeia a data da última doação paga por e-mail
+      const latestDonationByEmail = new Map<string, string>();
+      (donationsRes.data || []).forEach((d: any) => {
+        const dSt = String(d.status || 'paid').toLowerCase().trim();
+        if (dSt === 'failed' || dSt === 'canceled' || dSt === 'cancelled') return;
+        const em = (d.donor_email || '').toLowerCase().trim();
+        const dt = d.paid_at || d.created_at;
+        if (!em || !dt) return;
+        const prev = latestDonationByEmail.get(em);
+        if (!prev || new Date(dt).getTime() > new Date(prev).getTime()) {
+          latestDonationByEmail.set(em, dt);
+        }
+      });
 
       const dischargedChildIds = new Set<string>();
       (dischargeRes.data || []).forEach((ev: any) => {
@@ -364,16 +403,38 @@ export const sponsorshipService = {
       const pendingSponsors: PendingSponsorInfo[] = [];
 
       allSponsorships.forEach(sp => {
-        // Ignora status explicitamente cancelados, substituídos, expirados ou com alta (graduated/discharged)
+        // Ignora status explicitamente cancelados, substituídos ou com alta (graduated/discharged)
+        // Se um apadrinhamento estava marcado como 'inactive' ou 'expired', mas o padrinho fez uma doação recente (<= 60 dias),
+        // evaluateSponsorshipValidity logo abaixo identificará que !validity.isExpired e reativará a vaga!
         const st = String(sp.status || 'active').toLowerCase().trim();
-        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired' || st === 'graduated' || st === 'discharged') {
+        if (st === 'canceled' || st === 'cancelled' || st === 'replaced' || st === 'graduated' || st === 'discharged') {
           return;
         }
 
-        // Verifica se o pacote PIX já venceu ou se a renovação foi recusada
-        const validity = evaluateSponsorshipValidity(sp);
+        // Verifica se o pacote PIX já venceu, se a renovação foi recusada ou se está há mais de 2 meses sem contribuir
+        const cleanSpEmail = (sp.donor_email || sp.users?.email || '').toLowerCase().trim();
+        const latestDonIso = latestDonationByEmail.get(cleanSpEmail);
+        const hasRecentPaidDonation = Boolean(
+          latestDonIso &&
+          Math.floor((Date.now() - new Date(latestDonIso).getTime()) / (1000 * 60 * 60 * 24)) <= MAX_INACTIVE_DAYS_BEFORE_CHURN
+        );
+
+        if ((st === 'inactive' || st === 'expired') && !hasRecentPaidDonation) {
+          return;
+        }
+
+        const validity = evaluateSponsorshipValidity(sp, cleanSpEmail, latestDonIso);
         if (validity.isExpired) {
           return;
+        }
+
+        // Auto-cura silenciosa no banco caso o registro estivesse 'inactive'/'expired' mas houve pagamento recente
+        if ((st === 'inactive' || st === 'expired') && hasRecentPaidDonation && sp.id) {
+          supabase
+            .from('sponsorships')
+            .update({ status: 'active', last_sponsored_at: latestDonIso })
+            .eq('id', sp.id)
+            .then(() => {});
         }
 
         const sponsorName = sp.donor_name || sp.users?.name || sp.donor_email?.split('@')[0] || 'Padrinho';
@@ -1393,6 +1454,24 @@ export const sponsorshipService = {
           .in('status', ['active', 'paid', 'completed', 'ACTIVE']);
       }
 
+      let latestReconcileDonationIso: string | undefined;
+      if (cleanEmail) {
+        const { data: userDonRows } = await supabase
+          .from('donations')
+          .select('paid_at, created_at, status')
+          .ilike('donor_email', cleanEmail)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        (userDonRows || []).forEach((d: any) => {
+          const dSt = String(d.status || 'paid').toLowerCase().trim();
+          if (dSt === 'failed' || dSt === 'canceled' || dSt === 'cancelled') return;
+          const dt = d.paid_at || d.created_at;
+          if (dt && (!latestReconcileDonationIso || new Date(dt).getTime() > new Date(latestReconcileDonationIso).getTime())) {
+            latestReconcileDonationIso = dt;
+          }
+        });
+      }
+
       const combinedSp: any[] = [];
       const seenIds = new Set<string>();
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
@@ -1401,7 +1480,7 @@ export const sponsorshipService = {
           if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired') {
             return;
           }
-          const validity = evaluateSponsorshipValidity(item, cleanEmail);
+          const validity = evaluateSponsorshipValidity(item, cleanEmail, latestReconcileDonationIso);
           if (validity.isExpired) {
             return;
           }
@@ -1544,6 +1623,25 @@ export const sponsorshipService = {
           .ilike('donor_email', cleanEmail);
       }
 
+      // Busca também a data da última doação paga para evitar inativar padrinho que renovou ou doou recentemente
+      let latestUserDonationIso: string | undefined;
+      if (cleanEmail) {
+        const { data: userDonRows } = await supabase
+          .from('donations')
+          .select('paid_at, created_at, status')
+          .ilike('donor_email', cleanEmail)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        (userDonRows || []).forEach((d: any) => {
+          const dSt = String(d.status || 'paid').toLowerCase().trim();
+          if (dSt === 'failed' || dSt === 'canceled' || dSt === 'cancelled') return;
+          const dt = d.paid_at || d.created_at;
+          if (dt && (!latestUserDonationIso || new Date(dt).getTime() > new Date(latestUserDonationIso).getTime())) {
+            latestUserDonationIso = dt;
+          }
+        });
+      }
+
       const seenSpIds = new Set<string>();
 
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
@@ -1551,7 +1649,7 @@ export const sponsorshipService = {
           const st = String(item.status || 'active').toLowerCase().trim();
           const isGraduatedRow = st === 'graduated' || st === 'discharged';
           if (st !== 'canceled' && st !== 'cancelled' && st !== 'inactive' && st !== 'replaced' && st !== 'expired') {
-            const validity = evaluateSponsorshipValidity(item, cleanEmail);
+            const validity = evaluateSponsorshipValidity(item, cleanEmail, latestUserDonationIso);
             // Se o pacote PIX venceu ou o usuário optou por não renovar, ele não acompanha mais a criança ativa
             // (Exceto registros históricos de alta do programa de nutrição, que permanecem no histórico)
             if (!validity.isExpired || isGraduatedRow) {

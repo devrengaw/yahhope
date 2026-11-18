@@ -53,6 +53,9 @@ export interface SupporterData {
   donationsCount: number;
   lastDonationDate?: string;
   donations: SupporterDonation[];
+  isChurned?: boolean;
+  formerRole?: 'Ex-Padrinho' | 'Ex-Mantenedor';
+  daysSinceLastContribution?: number;
 }
 
 interface SupporterFinancialModalProps {

@@ -33,15 +33,14 @@ import {
   isSameDonorNameAndHandle
 } from '../../../utils/userCleanup';
 import { SupporterFinancialModal, SupporterData } from './SupporterFinancialModal';
-import { evaluateSponsorshipValidity, sponsorshipService } from '../../../services/sponsorshipService';
-import { sponsorshipService } from '../../../services/sponsorshipService';
+import { evaluateSponsorshipValidity, sponsorshipService, MAX_INACTIVE_DAYS_BEFORE_CHURN } from '../../../services/sponsorshipService';
 
 export function SupportersList() {
   const [supporters, setSupporters] = useState<SupporterData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'sponsor' | 'maintainer' | 'donor'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'sponsor' | 'maintainer' | 'donor' | 'churned'>('all');
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterData | null>(null);
   const [isSyncingStripe, setIsSyncingStripe] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -338,17 +337,65 @@ export function SupportersList() {
         const isKnownPadrinho = CONFIRMED_STRIPE_PADRINHOS.has(cleanEmail);
         const isKnownMantenedor = CONFIRMED_STRIPE_MANTENEDORES.has(cleanEmail);
 
+        const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
+        const latestPaidDonationIso = paidDonations.reduce<string | undefined>((latest, d) => {
+          const dt = d.paid_at || d.created_at;
+          if (!dt) return latest;
+          if (!latest || new Date(dt).getTime() > new Date(latest).getTime()) return dt;
+          return latest;
+        }, undefined);
+
+        // Verifica se há doação paga recente (<= 60 dias)
+        const hasRecentPaidDonation = Boolean(
+          latestPaidDonationIso &&
+          Math.floor((Date.now() - new Date(latestPaidDonationIso).getTime()) / (1000 * 60 * 60 * 24)) <= MAX_INACTIVE_DAYS_BEFORE_CHURN
+        );
+
         // Identificação estrita de quem é Padrinho de criança vs Doador Mensal vs Doador Geral
-        // Alinhado com sponsorshipService.getMetrics(): verifica status ativo E vigência (evaluateSponsorshipValidity)
+        // Alinhado com sponsorshipService.getMetrics(): verifica status ativo (ou reativado por doação recente) E vigência (evaluateSponsorshipValidity)
         const monthlySponsorships = uniqueSponsorships.filter(sp => {
           const st = (sp.status || 'active').toLowerCase().trim();
-          const isStatusActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed';
+          const isExplicitlyCanceled = st === 'canceled' || st === 'cancelled' || st === 'replaced' || st === 'graduated' || st === 'discharged';
+          if (isExplicitlyCanceled) return false;
+          const isStatusActive = st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed' || ((st === 'inactive' || st === 'expired') && hasRecentPaidDonation);
           if (!isStatusActive) return false;
-          const validity = evaluateSponsorshipValidity(sp, email);
+          const validity = evaluateSponsorshipValidity(sp, email, latestPaidDonationIso);
+          if (!validity.isExpired && (st === 'inactive' || st === 'expired') && hasRecentPaidDonation && sp.id) {
+            // Auto-cura no banco se o registro de apadrinhamento estava inactive mas houve doação paga recente
+            supabase.from('sponsorships').update({ status: 'active', last_sponsored_at: latestPaidDonationIso }).eq('id', sp.id).then(() => {});
+          }
           return !validity.isExpired;
         });
 
-        // Calcula o valor mensal comprometido (apadrinhamento ou recorrência)
+        // Se o usuário estava com status 'inactive' na tabela users mas realizou uma doação paga recente (<= 60 dias), reativa automaticamente
+        if (user?.status === 'inactive' && hasRecentPaidDonation && user?.id) {
+          supabase.from('users').update({ status: 'active' }).eq('id', user.id).then(() => {});
+        }
+
+        // Verifica quantos dias se passaram desde a última contribuição (doação paga ou apadrinhamento)
+        const allContribTimestamps = [
+          latestPaidDonationIso,
+          ...uniqueSponsorships.map((sp: any) => sp.last_sponsored_at || sp.started_at || sp.created_at)
+        ]
+          .filter(Boolean)
+          .map(d => new Date(d as string).getTime())
+          .filter(t => !isNaN(t));
+
+        const latestContributionMs = allContribTimestamps.length > 0 ? Math.max(...allContribTimestamps) : 0;
+        const daysSinceLastContribution = latestContributionMs > 0
+          ? Math.max(0, Math.floor((Date.now() - latestContributionMs) / (1000 * 60 * 60 * 24)))
+          : 999;
+
+        // Se possui pacote trimestral/semestral/anual ainda vigente no futuro, não está inadimplente
+        const hasActiveFuturePackage = monthlySponsorships.some(sp => {
+          const val = evaluateSponsorshipValidity(sp, email, latestPaidDonationIso);
+          return !val.isExpired && val.expiresAt && new Date(val.expiresAt).getTime() > Date.now();
+        });
+
+        const isOverTwoMonthsWithoutContributing =
+          !hasActiveFuturePackage && daysSinceLastContribution > MAX_INACTIVE_DAYS_BEFORE_CHURN;
+
+        // Calcula o valor mensal comprometido (apadrinhamento ou recorrência ativa)
         // REGRA DE OURO: Cada cota de apadrinhamento de criança é no mínimo R$ 90,00
         const spAmounts = monthlySponsorships.map(sp => {
           const raw = Number(sp.monthly_amount || sp.amount || 0);
@@ -365,9 +412,8 @@ export function SupportersList() {
         const isExplicitMaintainer =
           isKnownMantenedor || (user?.role === 'MANTENEDOR' && !hasExplicitSponsorship && !isKnownPadrinho);
 
-        // REGRA DE OURO: Se a pessoa apadrinha com >= 90 reais (e não é Mantenedor Geral explícito),
-        // recebe 1 criança por múltiplo de R$ 90.
-        const isCandidateForPadrinho = !isExplicitMaintainer && (
+        // Histórico: já foi ou era candidato a Padrinho ou Mantenedor
+        const wasEverPadrinho = !isExplicitMaintainer && (
           isKnownPadrinho ||
           user?.role === 'SPONSOR' ||
           user?.role === 'PADRINHO' ||
@@ -376,55 +422,64 @@ export function SupportersList() {
           hasExplicitSponsorship
         );
 
-        // REGRA DE OURO: Acompanha crianças a cada múltiplo de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
-        // Se doar 95: 90 apadrinha a criança e 5 é para o projeto geral.
-        const targetChildrenCount = isCandidateForPadrinho
-          ? Math.max(1, Math.floor(effectiveMonthlyAmount / 90))
-          : 0;
-
-        // Coleta todas as crianças vinculadas ou a vincular para este padrinho
-        const assignedChildrenList: Array<{ id: string; name: string; village?: string; photo_url?: string }> = [];
-        const seenChildIds = new Set<string>();
-
-        // 1. Crianças já vinculadas no banco em sponsorships (apenas apadrinhamentos ativos e vigentes)
-        monthlySponsorships.forEach(sp => {
-          if (sp.child_id && !seenChildIds.has(sp.child_id)) {
-            const ch = sp.children || childrenMap.get(sp.child_id);
-            if (ch) {
-              seenChildIds.add(sp.child_id);
-              assignedChildrenList.push({
-                id: sp.child_id,
-                name: ch.name,
-                village: ch.address || ch.province || 'Casa Nutri',
-                photo_url: ch.photo_url
-              });
-            }
-          }
-        });
-
-        // Fonte da verdade: apenas as crianças realmente vinculadas na tabela 'sponsorships' do banco.
-        // Não injeta crianças fictícias ou hardcoded em memória.
-
-        const isRealPadrinho = assignedChildrenList.length > 0 || isCandidateForPadrinho;
-
-        // 2. Doador Mensal / Mantenedor:
-        // - Os Mantenedores oficiais confirmados da Stripe (R$ 50 - Apoio Geral)
-        // - Ou novas assinaturas mensais de apoio geral (sem apadrinhamento de criança)
-        const isDoadorMensal = !isRealPadrinho && (
-          isKnownMantenedor || 
+        const wasEverMaintainer = !wasEverPadrinho && (
+          isKnownMantenedor ||
           user?.role === 'MANTENEDOR' ||
-          monthlySponsorships.some(sp => sp.stripe_subscription_id) ||
+          uniqueSponsorships.some(sp => sp.stripe_subscription_id || Number(sp.monthly_amount || 0) > 0) ||
           userDonations.some(d => d.stripe_subscription_id || d.recurrence === 'monthly')
         );
 
-        // 3. Doador Geral: Doações pontuais/avulsas (ex: campanhas específicas)
+        const hasInactiveSponsorshipOnly =
+          uniqueSponsorships.length > 0 &&
+          monthlySponsorships.length === 0;
+
+        const isUserInactiveWithoutRecentDonation =
+          user?.status === 'inactive' && !hasRecentPaidDonation && !hasActiveFuturePackage;
+
+        // REGRA SOLICITADA: Padrinhos/Mantenedores que estão há mais de 2 meses sem contribuir
+        // saem da lista ativa de Padrinhos/Mantenedores, ficam na lista de quem já contribuiu (Doador Geral)
+        // e entram na lista de "Deixaram de Contribuir" para contato.
+        const isChurned =
+          (wasEverPadrinho || wasEverMaintainer) &&
+          (isOverTwoMonthsWithoutContributing || hasInactiveSponsorshipOnly || isUserInactiveWithoutRecentDonation);
+
+        const formerRole: 'Ex-Padrinho' | 'Ex-Mantenedor' | undefined = isChurned
+          ? (wasEverPadrinho ? 'Ex-Padrinho' : 'Ex-Mantenedor')
+          : undefined;
+
+        const isCandidateForPadrinho = !isChurned && wasEverPadrinho;
+
+        // Coleta todas as crianças vinculadas para este padrinho (apenas se ativo e em dia <= 2 meses)
+        const assignedChildrenList: Array<{ id: string; name: string; village?: string; photo_url?: string }> = [];
+        const seenChildIds = new Set<string>();
+
+        if (!isChurned) {
+          monthlySponsorships.forEach(sp => {
+            if (sp.child_id && !seenChildIds.has(sp.child_id)) {
+              const ch = sp.children || childrenMap.get(sp.child_id);
+              if (ch) {
+                seenChildIds.add(sp.child_id);
+                assignedChildrenList.push({
+                  id: sp.child_id,
+                  name: ch.name,
+                  village: ch.address || ch.province || 'Casa Nutri',
+                  photo_url: ch.photo_url
+                });
+              }
+            }
+          });
+        }
+
+        const isRealPadrinho = !isChurned && (assignedChildrenList.length > 0 || isCandidateForPadrinho);
+        const isDoadorMensal = !isChurned && !isRealPadrinho && wasEverMaintainer;
+
+        // Quem deixou de contribuir há > 2 meses sai de Padrinho/Doador Mensal e fica como Doador Geral (Já Contribuíram)
         const roleDisplay = isRealPadrinho 
           ? 'Padrinho' 
           : isDoadorMensal 
             ? 'Doador Mensal' 
             : 'Doador Geral';
 
-        const paidDonations = userDonations.filter((d: any) => d.status === 'paid');
         const totalDonated = paidDonations.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
         const lastDonation = userDonations[0];
         const candidateNames = [
@@ -440,16 +495,14 @@ export function SupportersList() {
         const childVillage = primaryChild?.village;
         const sponsoredChildId = primaryChild?.id;
 
-        const hasInactiveSponsorshipOnly =
-          uniqueSponsorships.length > 0 &&
-          monthlySponsorships.length === 0;
-
         const computedStatus =
-          user?.status === 'inactive' || hasInactiveSponsorshipOnly
+          isChurned || isUserInactiveWithoutRecentDonation || hasInactiveSponsorshipOnly
             ? 'inactive'
-            : userDonations.some((d: any) => d.status === 'pending')
-              ? 'pending'
-              : 'active';
+            : paidDonations.length > 0 || monthlySponsorships.length > 0
+              ? 'active'
+              : userDonations.some((d: any) => d.status === 'pending')
+                ? 'pending'
+                : 'active';
 
         mappedSupporters.push({
           id: user?.id || `donor_${email}`,
@@ -469,6 +522,9 @@ export function SupportersList() {
           totalDonated,
           donationsCount: paidDonations.length,
           lastDonationDate: lastDonation ? (lastDonation.paid_at || lastDonation.created_at)?.split('T')[0] : undefined,
+          isChurned,
+          formerRole,
+          daysSinceLastContribution: latestContributionMs > 0 ? daysSinceLastContribution : undefined,
           donations: userDonations.map((d: any) => ({
             id: d.id,
             amount: Number(d.amount) || 0,
@@ -516,6 +572,7 @@ export function SupportersList() {
     // Doadores Mensais (Mantenedores do Fundo Geral / Nutrição - ex: R$ 50/mês):
     const monthlyDonors = supporters.filter(s => s.role === 'Doador Mensal').length;
     const generalDonors = supporters.filter(s => s.role === 'Doador Geral').length;
+    const churnedDonors = supporters.filter(s => Boolean(s.isChurned)).length;
     const totalRaised = supporters.reduce((acc, s) => acc + s.totalDonated, 0);
     const avgTicket = total > 0 ? totalRaised / total : 0;
 
@@ -526,6 +583,7 @@ export function SupportersList() {
       totalSponsoredChildren,
       monthlyDonors,
       generalDonors,
+      churnedDonors,
       totalRaised,
       avgTicket
     };
@@ -545,7 +603,8 @@ export function SupportersList() {
         roleFilter === 'all' || 
         (roleFilter === 'sponsor' && s.role === 'Padrinho') ||
         (roleFilter === 'maintainer' && s.role === 'Doador Mensal') ||
-        (roleFilter === 'donor' && s.role === 'Doador Geral');
+        (roleFilter === 'donor' && s.role === 'Doador Geral') ||
+        (roleFilter === 'churned' && Boolean(s.isChurned));
 
       return matchSearch && matchStatus && matchRole;
     });
@@ -1018,15 +1077,35 @@ export function SupportersList() {
                     ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30" 
                     : "text-amber-800 hover:bg-amber-50"
                 )}
-                title="Filtrar apenas doadores pontuais/gerais"
+                title="Filtrar todos aqueles que já contribuíram (doadores gerais e ex-padrinhos)"
               >
                 <DollarSign size={12} />
-                <span>Doadores Gerais</span>
+                <span>Já Contribuíram</span>
                 <span className={cn(
                   "text-[10px] px-1.5 py-0.2 rounded-md font-black",
                   roleFilter === 'donor' ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
                 )}>
                   {stats.generalDonors}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setRoleFilter('churned')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  roleFilter === 'churned' 
+                    ? "bg-orange-700 text-white shadow-sm shadow-orange-700/30" 
+                    : "text-orange-800 hover:bg-orange-50"
+                )}
+                title="Lista de padrinhos/mantenedores há mais de 2 meses sem contribuir para entrarmos em contato"
+              >
+                <AlertCircle size={12} />
+                <span>Deixaram de Contribuir (Contato)</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-md font-black",
+                  roleFilter === 'churned' ? "bg-white/20 text-white" : "bg-orange-100 text-orange-800"
+                )}>
+                  {stats.churnedDonors}
                 </span>
               </button>
             </div>
@@ -1131,31 +1210,53 @@ export function SupportersList() {
 
                 {/* Tipo / Modalidade */}
                 <td className="px-6 py-5">
-                  <span className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm",
-                    s.role === 'Padrinho'
-                      ? "bg-rose-50 text-rose-700 border-rose-100"
-                      : s.role === 'Doador Mensal'
-                        ? "bg-blue-50 text-blue-700 border-blue-100"
-                        : "bg-slate-100 text-slate-700 border-slate-200"
-                  )}>
-                    {s.role === 'Padrinho' ? (
-                      <>
-                        <Heart size={11} className="fill-rose-500 text-rose-500" />
-                        Padrinho
-                      </>
-                    ) : s.role === 'Doador Mensal' ? (
-                      <>
-                        <RefreshCw size={11} className="text-blue-600" />
-                        Doador Mensal
-                      </>
-                    ) : (
-                      <>
-                        <Users size={11} className="text-slate-500" />
-                        Doador Geral
-                      </>
+                  <div className="flex flex-col items-start gap-1">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm",
+                      s.role === 'Padrinho'
+                        ? "bg-rose-50 text-rose-700 border-rose-100"
+                        : s.role === 'Doador Mensal'
+                          ? "bg-blue-50 text-blue-700 border-blue-100"
+                          : "bg-slate-100 text-slate-700 border-slate-200"
+                    )}>
+                      {s.role === 'Padrinho' ? (
+                        <>
+                          <Heart size={11} className="fill-rose-500 text-rose-500" />
+                          Padrinho
+                        </>
+                      ) : s.role === 'Doador Mensal' ? (
+                        <>
+                          <RefreshCw size={11} className="text-blue-600" />
+                          Doador Mensal
+                        </>
+                      ) : (
+                        <>
+                          <Users size={11} className="text-slate-500" />
+                          Já Contribuiu
+                        </>
+                      )}
+                    </span>
+
+                    {s.isChurned && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-50 text-orange-800 border border-orange-200 text-[10px] font-black">
+                          <AlertCircle size={10} />
+                          {s.formerRole || 'Ex-Padrinho'} • {s.daysSinceLastContribution ? `${s.daysSinceLastContribution}d sem contribuir` : '> 2 meses sem doar'}
+                        </span>
+                        {s.phone && (
+                          <a
+                            href={`https://wa.me/${s.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold transition-colors"
+                            title="Entrar em contato via WhatsApp"
+                          >
+                            <Phone size={10} /> WhatsApp
+                          </a>
+                        )}
+                      </div>
                     )}
-                  </span>
+                  </div>
                 </td>
 
                 {/* Criança Apadrinhada */}

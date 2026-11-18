@@ -78,7 +78,8 @@ async function syncMaintainerProfile(data: {
   if (existingUser) {
     const updates: any = {
       name: donorName || existingUser.name,
-      phone: donorPhone || existingUser.phone
+      phone: donorPhone || existingUser.phone,
+      status: 'active'
     };
     if (canSponsorChild) {
       updates.role = 'SPONSOR';
@@ -93,6 +94,7 @@ async function syncMaintainerProfile(data: {
         name: donorName,
         email: cleanEmail,
         phone: donorPhone,
+        status: 'active',
         role: canSponsorChild ? 'SPONSOR' : isMonthly ? 'MANTENEDOR' : 'USER'
       })
       .select('id')
@@ -108,7 +110,7 @@ async function syncMaintainerProfile(data: {
     let spQuery = supabase
       .from('sponsorships')
       .select('id, child_id')
-      .eq('status', 'active');
+      .in('status', ['active', 'inactive', 'expired', 'paused']);
 
     if (userId) {
       spQuery = spQuery.or(`donor_email.ilike.${cleanEmail},sponsor_id.eq.${userId}`);
@@ -432,10 +434,25 @@ async function handleStripeSync(filterEmail?: string) {
       const hasActiveSub = Boolean(sub && (sub.status === 'active' || sub.status === 'trialing'));
       const hasCanceledOrUnpaidSub = Boolean(sub && !hasActiveSub);
 
-      // Se existe assinatura na Stripe e ela foi cancelada / cortada por falta de pagamento, desativa no banco!
+      // Se existe assinatura na Stripe e ela foi cancelada / cortada por falta de pagamento,
+      // só desativa no banco se o apoiador NÃO realizou uma doação paga recente (ex: PIX ou nova doação nos últimos 60 dias)!
       if (hasCanceledOrUnpaidSub) {
-        await supabase.from('sponsorships').update({ status: 'inactive' }).ilike('donor_email', email);
-        await supabase.from('users').update({ status: 'inactive' }).ilike('email', email);
+        const { data: recentPaidDon } = await supabase
+          .from('donations')
+          .select('id, paid_at, created_at')
+          .ilike('donor_email', email)
+          .eq('status', 'paid')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const lastDonMs = recentPaidDon ? new Date(recentPaidDon.paid_at || recentPaidDon.created_at).getTime() : 0;
+        const hasRecentDon = lastDonMs > 0 && (Date.now() - lastDonMs) <= 60 * 24 * 60 * 60 * 1000;
+
+        if (!hasRecentDon) {
+          await supabase.from('sponsorships').update({ status: 'inactive' }).ilike('donor_email', email);
+          await supabase.from('users').update({ status: 'inactive' }).ilike('email', email);
+        }
         results.synced_customers++;
         continue;
       }
