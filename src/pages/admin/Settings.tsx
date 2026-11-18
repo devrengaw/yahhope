@@ -15,7 +15,11 @@ import {
   Link as LinkIcon,
   ExternalLink,
   MapPin,
-  Search
+  Search,
+  Instagram,
+  Youtube,
+  Facebook,
+  Linkedin
 } from 'lucide-react';
 import { UserCategorySettings } from '../../components/admin/UserCategorySettings';
 import { LocalProjectsSettings } from '../../components/admin/LocalProjectsSettings';
@@ -625,6 +629,69 @@ export function Settings() {
                         <option value="Africa/Maputo">Moçambique (GMT+2)</option>
                         <option value="UTC">UTC (Universal)</option>
                       </select>
+                    </div>
+
+                    <div className="md:col-span-2 pt-4 mt-2 border-t border-slate-100">
+                      <h4 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Redes Sociais (Rodapé do Site)</h4>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">
+                        Configure os links exibidos no rodapé público. Deixe em branco para ocultar o ícone.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Instagram</label>
+                      <div className="relative group">
+                        <Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input
+                          type="url"
+                          placeholder="https://instagram.com/yahhope"
+                          value={orgInfo.instagram_url ?? ''}
+                          onChange={(e) => handleOrgChange('instagram_url', e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">YouTube</label>
+                      <div className="relative group">
+                        <Youtube className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input
+                          type="url"
+                          placeholder="https://youtube.com/@yahhope"
+                          value={orgInfo.youtube_url ?? ''}
+                          onChange={(e) => handleOrgChange('youtube_url', e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Facebook</label>
+                      <div className="relative group">
+                        <Facebook className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input
+                          type="url"
+                          placeholder="https://facebook.com/yahhope"
+                          value={orgInfo.facebook_url ?? ''}
+                          onChange={(e) => handleOrgChange('facebook_url', e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">LinkedIn</label>
+                      <div className="relative group">
+                        <Linkedin className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-900" size={18} />
+                        <input
+                          type="url"
+                          placeholder="https://linkedin.com/company/yahhope"
+                          value={orgInfo.linkedin_url ?? ''}
+                          onChange={(e) => handleOrgChange('linkedin_url', e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl pl-12 pr-5 py-3.5 font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-slate-200 transition-all text-sm outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

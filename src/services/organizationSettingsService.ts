@@ -10,6 +10,10 @@ export interface OrganizationSettings {
   locale: string;
   sponsorship_quota_cost?: number;
   max_sponsors_per_child?: number;
+  instagram_url?: string;
+  youtube_url?: string;
+  facebook_url?: string;
+  linkedin_url?: string;
 }
 
 const STORAGE_KEY = 'yah_hope_org_settings_v2';
@@ -23,8 +27,19 @@ export const DEFAULT_ORG_SETTINGS: OrganizationSettings = {
   timezone: 'America/Sao_Paulo',
   locale: 'pt-BR',
   sponsorship_quota_cost: 90.00,
-  max_sponsors_per_child: 2
+  max_sponsors_per_child: 2,
+  instagram_url: 'https://instagram.com',
+  youtube_url: 'https://youtube.com',
+  facebook_url: 'https://facebook.com',
+  linkedin_url: 'https://linkedin.com'
 };
+
+export function normalizeExternalUrl(url?: string): string {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 export function getLocalOrgSettings(): OrganizationSettings {
   try {
@@ -42,6 +57,9 @@ export function getLocalOrgSettings(): OrganizationSettings {
 export function saveLocalOrgSettings(settings: OrganizationSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('org-settings-updated', { detail: settings }));
+    }
   } catch (err) {
     console.warn('Erro ao gravar configurações no localStorage:', err);
   }
@@ -76,7 +94,11 @@ export async function fetchAndSyncOrgSettings(): Promise<OrganizationSettings> {
           : local.sponsorship_quota_cost,
         max_sponsors_per_child: data.max_sponsors_per_child !== undefined && data.max_sponsors_per_child !== null 
           ? Number(data.max_sponsors_per_child) 
-          : local.max_sponsors_per_child
+          : local.max_sponsors_per_child,
+        instagram_url: data.instagram_url !== undefined && data.instagram_url !== null ? data.instagram_url : local.instagram_url,
+        youtube_url: data.youtube_url !== undefined && data.youtube_url !== null ? data.youtube_url : local.youtube_url,
+        facebook_url: data.facebook_url !== undefined && data.facebook_url !== null ? data.facebook_url : local.facebook_url,
+        linkedin_url: data.linkedin_url !== undefined && data.linkedin_url !== null ? data.linkedin_url : local.linkedin_url
       };
       saveLocalOrgSettings(remoteSettings);
       return remoteSettings;
@@ -111,6 +133,10 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
       locale: settings.locale,
       sponsorship_quota_cost: settings.sponsorship_quota_cost ?? 90,
       max_sponsors_per_child: settings.max_sponsors_per_child ?? 2,
+      instagram_url: settings.instagram_url ?? '',
+      youtube_url: settings.youtube_url ?? '',
+      facebook_url: settings.facebook_url ?? '',
+      linkedin_url: settings.linkedin_url ?? '',
       updated_at: new Date().toISOString()
     };
 
@@ -123,6 +149,10 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
       const fallbackPayload = { ...payload };
       delete fallbackPayload.sponsorship_quota_cost;
       delete fallbackPayload.max_sponsors_per_child;
+      delete fallbackPayload.instagram_url;
+      delete fallbackPayload.youtube_url;
+      delete fallbackPayload.facebook_url;
+      delete fallbackPayload.linkedin_url;
       const retry = await supabase.from('organization_settings').upsert(fallbackPayload, { onConflict: 'id' });
       error = retry.error;
     }

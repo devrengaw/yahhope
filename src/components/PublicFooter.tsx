@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Instagram, 
@@ -12,9 +12,45 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSwitcher } from './common/LanguageSwitcher';
+import {
+  OrganizationSettings,
+  getLocalOrgSettings,
+  fetchAndSyncOrgSettings,
+  normalizeExternalUrl
+} from '../services/organizationSettingsService';
 
 export function PublicFooter() {
   const { tr } = useLanguage();
+  const [orgSettings, setOrgSettings] = useState<OrganizationSettings>(getLocalOrgSettings);
+
+  useEffect(() => {
+    let active = true;
+    fetchAndSyncOrgSettings().then(settings => {
+      if (active) setOrgSettings(settings);
+    });
+
+    const handleSettingsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<OrganizationSettings>;
+      if (customEvent.detail) {
+        setOrgSettings(customEvent.detail);
+      } else {
+        setOrgSettings(getLocalOrgSettings());
+      }
+    };
+
+    window.addEventListener('org-settings-updated', handleSettingsUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener('org-settings-updated', handleSettingsUpdated);
+    };
+  }, []);
+
+  const socialLinks = [
+    { label: 'Instagram', url: normalizeExternalUrl(orgSettings.instagram_url), icon: <Instagram size={17} /> },
+    { label: 'YouTube', url: normalizeExternalUrl(orgSettings.youtube_url), icon: <Youtube size={17} /> },
+    { label: 'Facebook', url: normalizeExternalUrl(orgSettings.facebook_url), icon: <Facebook size={17} /> },
+    { label: 'LinkedIn', url: normalizeExternalUrl(orgSettings.linkedin_url), icon: <Linkedin size={17} /> },
+  ].filter(item => Boolean(item.url));
   return (
     <footer className="bg-slate-900 text-white font-gotham-regular pt-16 pb-12 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -46,25 +82,27 @@ export function PublicFooter() {
             </div>
 
             {/* Social Media Links */}
-            <div className="pt-3">
-              <span className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 block mb-3">
-                {tr('Siga a YAH Hope', 'Follow YAH Hope')}
-              </span>
-              <div className="flex items-center gap-3">
-                <a href="https://instagram.com" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-slate-800 hover:bg-[#F49853] text-white flex items-center justify-center transition-colors" aria-label="Instagram">
-                  <Instagram size={17} />
-                </a>
-                <a href="https://youtube.com" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-slate-800 hover:bg-[#F49853] text-white flex items-center justify-center transition-colors" aria-label="YouTube">
-                  <Youtube size={17} />
-                </a>
-                <a href="https://facebook.com" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-slate-800 hover:bg-[#F49853] text-white flex items-center justify-center transition-colors" aria-label="Facebook">
-                  <Facebook size={17} />
-                </a>
-                <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full bg-slate-800 hover:bg-[#F49853] text-white flex items-center justify-center transition-colors" aria-label="LinkedIn">
-                  <Linkedin size={17} />
-                </a>
+            {socialLinks.length > 0 && (
+              <div className="pt-3">
+                <span className="text-xs font-gotham-bold uppercase tracking-wider text-slate-400 block mb-3">
+                  {tr('Siga a YAH Hope', 'Follow YAH Hope')}
+                </span>
+                <div className="flex items-center gap-3">
+                  {socialLinks.map(social => (
+                    <a
+                      key={social.label}
+                      href={social.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-9 h-9 rounded-full bg-slate-800 hover:bg-[#F49853] text-white flex items-center justify-center transition-colors"
+                      aria-label={social.label}
+                    >
+                      {social.icon}
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Column 2: Navigation Links */}
