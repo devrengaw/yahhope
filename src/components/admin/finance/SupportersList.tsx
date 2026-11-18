@@ -646,12 +646,8 @@ export function SupportersList() {
 
   const openChangeChildModal = (supporter: SupporterData) => {
     setChildModalSupporter(supporter);
-    // Identifica o ID da criança atualmente vinculada
+    // Só pré-seleciona uma criança se o padrinho realmente já tiver vínculo ativo exibido na tabela
     let currentId = supporter.sponsoredChildId || '';
-    if (!currentId && supporter.sponsorships && supporter.sponsorships.length > 0) {
-      const sp = supporter.sponsorships.find((s: any) => s.child_id);
-      if (sp) currentId = sp.child_id;
-    }
     if (!currentId && supporter.sponsoredChildName) {
       const matched = childrenList.find(c => c.name.toLowerCase().trim() === supporter.sponsoredChildName?.toLowerCase().trim());
       if (matched) currentId = matched.id;
@@ -665,12 +661,19 @@ export function SupportersList() {
 
     setIsSavingChild(true);
     try {
+      // Prioriza a linha ativa sem criança vinculada (Aguardando vínculo) se houver
+      const activeUnassigned = (childModalSupporter.sponsorships || []).find((s: any) => {
+        const st = String(s.status || 'active').toLowerCase().trim();
+        return !s.child_id && (st === 'active' || st === 'paid' || st === 'ativo' || st === 'confirmed');
+      });
+      const targetSponsorshipId = activeUnassigned?.id || childModalSupporter.sponsorshipId || childModalSupporter.sponsorships?.[0]?.id;
+
       const result = await sponsorshipService.updateSponsorChild({
         supporterId: childModalSupporter.id,
         supporterEmail: childModalSupporter.email,
         supporterName: childModalSupporter.name,
         supporterPhone: childModalSupporter.phone,
-        sponsorshipId: childModalSupporter.sponsorshipId || childModalSupporter.sponsorships?.[0]?.id,
+        sponsorshipId: targetSponsorshipId,
         newChildId: selectedChildId
       });
 

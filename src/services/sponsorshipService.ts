@@ -1938,9 +1938,13 @@ export const sponsorshipService = {
         if (userRow?.id) realSponsorId = userRow.id;
       }
 
-      // 3. Se já existe o apadrinhamento, atualiza child_id e garante sponsor_id (preservando status atual)
+      // 3. Se já existe o apadrinhamento, atualiza child_id, ativa o vínculo e garante sponsor_id
       if (existingSponsorship?.id) {
-        const updatePayload: any = { child_id: params.newChildId };
+        const updatePayload: any = {
+          child_id: params.newChildId,
+          status: 'active',
+          last_sponsored_at: new Date().toISOString()
+        };
         if (realSponsorId) updatePayload.sponsor_id = realSponsorId;
 
         const { data: updated, error: updateErr } = await supabase
@@ -1953,7 +1957,10 @@ export const sponsorshipService = {
           console.error('Erro ao atualizar sponsorship:', updateErr);
           throw new Error(updateErr.message || 'Erro ao atualizar vínculo no banco');
         }
-        savedRecord = updated?.[0] || existingSponsorship;
+        if (!updated || updated.length === 0) {
+          throw new Error('O banco de dados bloqueou a atualização do vínculo (RLS). Execute o script fix_sponsorship_manual_assignment_rls.sql no SQL Editor do Supabase.');
+        }
+        savedRecord = updated[0];
       } else {
         // 4. Se não existe registro em sponsorships, insere um novo
         const { data: inserted, error: insertErr } = await supabase
