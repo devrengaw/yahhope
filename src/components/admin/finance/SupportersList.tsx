@@ -58,7 +58,6 @@ export function SupportersList() {
     setIsLoading(true);
     try {
       purgeSpamUsersFromDatabase();
-      await sponsorshipService.autoLinkPendingSponsors();
 
       const [usersRes, sponsorshipsRes, donationsRes, childrenRes] = await Promise.all([
         supabase.from('users').select('*').order('created_at', { ascending: false }),

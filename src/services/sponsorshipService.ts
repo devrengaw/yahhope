@@ -27,6 +27,8 @@ export interface ChildSponsorshipDetail {
   daysRemaining?: number | null;
   isExpiringSoon?: boolean;
   isExpired?: boolean;
+  isGraduated?: boolean;
+  graduatedAt?: string | null;
   sponsors: Array<{
     id: string;
     name: string;
@@ -329,16 +331,31 @@ export const sponsorshipService = {
         console.warn('Aviso ao consultar children no Supabase, usando catálogo local:', childError.message);
       }
 
-      // 2. Busca apadrinhamentos (consulta resiliente que não descarta registros por variação de status)
-      const { data: sponsorshipsData, error: spError } = await supabase
-        .from('sponsorships')
-        .select('*');
+      // 2. Busca apadrinhamentos e altas clínicas para excluir crianças que já receberam alta do programa
+      const [spRes, dischargeRes] = await Promise.all([
+        supabase.from('sponsorships').select('*'),
+        supabase.from('clinical_events').select('child_id, is_discharge, nutritional_status, notes').or('is_discharge.eq.true,nutritional_status.eq.Alta,nutritional_status.eq.Encerrado')
+      ]);
 
-      if (spError) {
-        console.warn('Aviso ao consultar sponsorships:', spError.message);
+      const sponsorshipsData = spRes.data;
+      if (spRes.error) {
+        console.warn('Aviso ao consultar sponsorships:', spRes.error.message);
       }
 
-      const allChildren = childrenData || [];
+      const dischargedChildIds = new Set<string>();
+      (dischargeRes.data || []).forEach((ev: any) => {
+        const isHospDischarge = ev.notes && String(ev.notes).includes('[ALTA HOSPITALAR]');
+        if (!isHospDischarge && (ev.is_discharge || ev.nutritional_status === 'Alta' || ev.nutritional_status === 'Encerrado')) {
+          if (ev.child_id) dischargedChildIds.add(String(ev.child_id).trim().toLowerCase());
+        }
+      });
+
+      const allChildren = (childrenData || []).filter((c: any) => {
+        const spSt = String(c.sponsorship_status || 'active').toLowerCase().trim();
+        if (spSt === 'graduated' || spSt === 'paused' || spSt === 'discharged') return false;
+        if (dischargedChildIds.has(String(c.id).trim().toLowerCase())) return false;
+        return true;
+      });
       const allSponsorships = sponsorshipsData || [];
 
       // Mapeia padrinhos por child_id (resiliente a variações de status, case de ID e vigência de pacote PIX)
@@ -347,9 +364,9 @@ export const sponsorshipService = {
       const pendingSponsors: PendingSponsorInfo[] = [];
 
       allSponsorships.forEach(sp => {
-        // Ignora status explicitamente cancelados, substituídos ou expirados
+        // Ignora status explicitamente cancelados, substituídos, expirados ou com alta (graduated/discharged)
         const st = String(sp.status || 'active').toLowerCase().trim();
-        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired') {
+        if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced' || st === 'expired' || st === 'graduated' || st === 'discharged') {
           return;
         }
 
@@ -836,6 +853,109 @@ export const sponsorshipService = {
     } catch (err) {
       console.warn('Erro ao vincular padrinhos pendentes automaticamente:', err);
       return { linkedCount: 0 };
+    }
+  },
+
+  /**
+   * Processa a Alta do programa de nutrição de uma criança:
+   * - A criança sai do programa ativo (sponsorship_status = 'graduated')
+   * - O vínculo anterior do(s) padrinho(s) passa para 'graduated' (mantendo o histórico da criança para o padrinho)
+   * - Entra automaticamente outra criança disponível (respeitando maxSponsorsPerChild) no apadrinhamento de cada padrinho,
+   *   ou fica em "Aguardando na fila" (child_id: null) se não houver vaga no momento.
+   */
+  async handleChildDischarge(childId: string): Promise<{ transitionedCount: number }> {
+    if (!childId) return { transitionedCount: 0 };
+    try {
+      // 1. Marca a criança como graduada (se a coluna existir no banco)
+      try {
+        await supabase
+          .from('children')
+          .update({ sponsorship_status: 'graduated' })
+          .eq('id', childId);
+      } catch {}
+
+      // 2. Busca apadrinhamentos ativos dessa criança
+      const { data: activeRows, error: fetchErr } = await supabase
+        .from('sponsorships')
+        .select('*')
+        .eq('child_id', childId)
+        .eq('status', 'active');
+
+      if (fetchErr || !activeRows || activeRows.length === 0) {
+        return { transitionedCount: 0 };
+      }
+
+      // 3. Obtém métricas atualizadas (a criança recém-graduada já não entra como elegível)
+      const metrics = await this.getMetrics();
+      const openChildren = metrics.children
+        .filter(c => c.id !== childId && c.sponsorsCount < metrics.maxSponsorsPerChild)
+        .map(c => ({
+          ...c,
+          sponsorEmails: new Set(c.sponsors.map(s => (s.email || '').toLowerCase().trim()).filter(Boolean))
+        }));
+
+      let transitionedCount = 0;
+
+      for (const oldSp of activeRows) {
+        // Marca o vínculo anterior como 'graduated' (mantém o histórico da criança para o padrinho)
+        await supabase
+          .from('sponsorships')
+          .update({ status: 'graduated' })
+          .eq('id', oldSp.id);
+
+        const cleanEmail = (oldSp.donor_email || '').toLowerCase().trim();
+        openChildren.sort((a, b) => a.sponsorsCount - b.sponsorsCount || a.name.localeCompare(b.name));
+        const nextChild = openChildren.find(
+          c => c.sponsorsCount < metrics.maxSponsorsPerChild && (!cleanEmail || !c.sponsorEmails.has(cleanEmail))
+        );
+
+        const newRecord: any = {
+          child_id: nextChild ? nextChild.id : null,
+          sponsor_id: oldSp.sponsor_id || null,
+          donor_name: oldSp.donor_name || null,
+          donor_email: oldSp.donor_email || null,
+          donor_phone: oldSp.donor_phone || null,
+          monthly_amount: oldSp.monthly_amount || metrics.quotaCost,
+          quotas_count: 1,
+          status: 'active',
+          payment_method: oldSp.payment_method || 'credit_card',
+          last_sponsored_at: new Date().toISOString(),
+          stripe_subscription_id: oldSp.stripe_subscription_id || null,
+          stripe_customer_id: oldSp.stripe_customer_id || null,
+          plan_months: oldSp.plan_months || null,
+          package_amount: oldSp.package_amount || null,
+          started_at: oldSp.started_at || null,
+          expires_at: oldSp.expires_at || null,
+          renewal_declined: false
+        };
+
+        const { error: insErr } = await supabase.from('sponsorships').insert([newRecord]);
+        if (insErr) {
+          await supabase.from('sponsorships').insert([{
+            child_id: nextChild ? nextChild.id : null,
+            sponsor_id: oldSp.sponsor_id || null,
+            donor_name: oldSp.donor_name || null,
+            donor_email: oldSp.donor_email || null,
+            donor_phone: oldSp.donor_phone || null,
+            monthly_amount: oldSp.monthly_amount || metrics.quotaCost,
+            quotas_count: 1,
+            status: 'active',
+            payment_method: oldSp.payment_method || 'credit_card',
+            last_sponsored_at: new Date().toISOString()
+          }]);
+        }
+
+        if (nextChild) {
+          nextChild.sponsorsCount += 1;
+          if (cleanEmail) nextChild.sponsorEmails.add(cleanEmail);
+        }
+        transitionedCount += 1;
+      }
+
+      return { transitionedCount };
+    } catch (err) {
+      console.warn('Erro ao processar alta da criança nos apadrinhamentos:', err);
+      return { transitionedCount: 0 };
     }
   },
 
@@ -1429,12 +1549,14 @@ export const sponsorshipService = {
       [...(queryBySponsorId?.data || []), ...(queryByEmail?.data || [])].forEach((item: any) => {
         if (!seenSpIds.has(item.id)) {
           const st = String(item.status || 'active').toLowerCase().trim();
+          const isGraduatedRow = st === 'graduated' || st === 'discharged';
           if (st !== 'canceled' && st !== 'cancelled' && st !== 'inactive' && st !== 'replaced' && st !== 'expired') {
             const validity = evaluateSponsorshipValidity(item, cleanEmail);
             // Se o pacote PIX venceu ou o usuário optou por não renovar, ele não acompanha mais a criança ativa
-            if (!validity.isExpired) {
+            // (Exceto registros históricos de alta do programa de nutrição, que permanecem no histórico)
+            if (!validity.isExpired || isGraduatedRow) {
               seenSpIds.add(item.id);
-              combinedData.push({ ...item, _validity: validity });
+              combinedData.push({ ...item, _validity: validity, _isGraduated: isGraduatedRow });
             }
           }
         }
@@ -1462,6 +1584,7 @@ export const sponsorshipService = {
           const childName = c.name || 'Jesica Afito';
           const childId = c.id || item.child_id;
           const val = item._validity || evaluateSponsorshipValidity(item, cleanEmail);
+          const isGraduated = Boolean(item._isGraduated || String(c.sponsorship_status || '').toLowerCase() === 'graduated');
 
           return {
             id: childId,
@@ -1473,7 +1596,7 @@ export const sponsorshipService = {
             community: c.address || c.province || c.community || 'Casa Nutri',
             photo_url: c.photo_url || '',
             story: c.story || 'Acompanhada com amor e acompanhamento nutricional intensivo na Casa Nutri.',
-            nutritional_status: c.status || 'Adequado',
+            nutritional_status: isGraduated ? 'Alta do programa de nutrição' : (c.status || 'Adequado'),
             sponsorsCount: 1,
             maxSponsors: 2,
             isFull: false,
@@ -1485,9 +1608,11 @@ export const sponsorshipService = {
             daysRemaining: val.daysRemaining,
             isExpiringSoon: val.isExpiringSoon,
             isExpired: val.isExpired,
+            isGraduated,
+            graduatedAt: isGraduated ? (item.last_sponsored_at || item.updated_at || null) : null,
             sponsors: []
           };
-        });
+        }).sort((a, b) => Number(Boolean(a.isGraduated)) - Number(Boolean(b.isGraduated)));
 
         // Auto-vincula sponsor_id se existir userId mas o registro estava sem sponsor_id (blinda RLS)
         if (userId) {

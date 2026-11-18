@@ -25,6 +25,7 @@ export function SponsorshipQuotasManager() {
   const [metrics, setMetrics] = useState<SponsorshipMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDistributing, setIsDistributing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Form de Parâmetros
@@ -38,7 +39,6 @@ export function SponsorshipQuotasManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      await sponsorshipService.autoLinkPendingSponsors();
       const data = await sponsorshipService.getMetrics();
       setMetrics(data);
       setQuotaCost(data.quotaCost);
@@ -47,6 +47,26 @@ export function SponsorshipQuotasManager() {
       console.error('Erro ao carregar métricas:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAutoDistribute = async () => {
+    setIsDistributing(true);
+    setSuccessMessage(null);
+    try {
+      const { linkedCount } = await sponsorshipService.autoLinkPendingSponsors();
+      await loadData();
+      if (linkedCount > 0) {
+        setSuccessMessage(`${linkedCount} ${linkedCount === 1 ? 'padrinho da fila foi vinculado' : 'padrinhos da fila foram vinculados'} automaticamente de forma igualitária!`);
+      } else {
+        setSuccessMessage('Nenhum novo vínculo realizado (verifique se há padrinhos na fila e vagas livres nas crianças).');
+      }
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err) {
+      console.error('Erro na distribuição automática:', err);
+      alert('Erro ao distribuir crianças automaticamente.');
+    } finally {
+      setIsDistributing(false);
     }
   };
 
@@ -291,10 +311,26 @@ export function SponsorshipQuotasManager() {
                   Aguardando na fila ({metrics.pendingSponsors.length})
                 </h4>
                 <p className="text-xs text-amber-800 font-medium">
-                  Estes padrinhos já contribuíram e serão vinculados automaticamente assim que houver vagas abertas (ou ao aumentar o limite de padrinhos por criança).
+                  Estes padrinhos já contribuíram e podem ser vinculados às vagas abertas sem alterar os padrinhos que já possuem criança.
                 </p>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleAutoDistribute}
+              disabled={isDistributing || (metrics.availableSlots || 0) <= 0}
+              className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black shadow-sm transition-all cursor-pointer"
+            >
+              <Sparkles size={15} className={isDistributing ? 'animate-spin' : ''} />
+              <span>
+                {isDistributing
+                  ? 'Distribuindo...'
+                  : (metrics.availableSlots || 0) > 0
+                    ? 'Distribuir Crianças Automaticamente'
+                    : 'Sem vagas livres no momento'}
+              </span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

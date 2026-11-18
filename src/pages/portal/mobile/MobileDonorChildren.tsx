@@ -379,6 +379,10 @@ export function MobileDonorChildren() {
     return map;
   }, [myChildren]);
 
+  const graduatedChildIds = useMemo(() => {
+    return new Set(myChildren.filter(c => c.isGraduated).map(c => c.id));
+  }, [myChildren]);
+
   const handleConfirmCancelChild = async () => {
     if (!childToCancel) return;
     setIsCancelingChild(true);
@@ -916,19 +920,28 @@ export function MobileDonorChildren() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {myChildIds.has(child.id) && (
-                          <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs">
-                            <Star size={10} className="fill-current" />
-                            {tr('Apadrinhado', 'Sponsored')}
+                        {graduatedChildIds.has(child.id) || child.status === 'Alta' || child.status === 'Alta do programa de nutrição' ? (
+                          <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500 text-white flex items-center gap-1 shadow-xs">
+                            <CheckCircle2 size={10} />
+                            {tr('Alta do programa de nutrição', 'Discharged from Nutrition Program')}
                           </span>
+                        ) : (
+                          <>
+                            {myChildIds.has(child.id) && (
+                              <span className="text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs">
+                                <Star size={10} className="fill-current" />
+                                {tr('Apadrinhado', 'Sponsored')}
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                              isRecovered
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {translateChildStatus(child.status, isEn)}
+                            </span>
+                          </>
                         )}
-                        <span className={`text-[10px] font-gotham-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                          isRecovered
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {translateChildStatus(child.status, isEn)}
-                        </span>
                       </div>
                     </div>
 

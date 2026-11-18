@@ -20,6 +20,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { useImpact } from '../contexts/ImpactContext';
 import { matchDefaultKitByIdOrName, matchInventoryItem } from '../lib/defaultNutritionKits';
 import { evaluateNutritionalStatus, calculateWeightForHeightZScore } from '../lib/whoStandards';
+import { sponsorshipService } from '../services/sponsorshipService';
 
 // Helper to calculate Z-score and nutritional status strictly based on WHO Child Growth Standards
 const calculateZScoreAndStatus = (
@@ -694,6 +695,9 @@ export function PatientDetails() {
     // Update patient status if it's a discharge
     if (isDischarge) {
       updatePatient(patient.id, { status: 'Alta' });
+      sponsorshipService.handleChildDischarge(patient.id).catch(err =>
+        console.warn('Aviso ao processar transição de apadrinhamento na alta:', err)
+      );
     } else if (calcStatus !== 'N/A' && !isRetroactive) {
       // Also update status based on latest measurement if not discharge and not a historical record
       updatePatient(patient.id, { status: calcStatus as any });
