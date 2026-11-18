@@ -13,3 +13,5 @@ SET
   facebook_url = COALESCE(facebook_url, 'https://facebook.com'),
   linkedin_url = COALESCE(linkedin_url, 'https://linkedin.com')
 WHERE id = 'default';
+
+NOTIFY pgrst, 'reload schema';

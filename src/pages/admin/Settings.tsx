@@ -386,28 +386,6 @@ export function Settings() {
                 <Plus size={20} /> Novo Usuário
               </button>
             )}
-            {activeTab === 'general' && (
-              <button
-                type="button"
-                onClick={handleSaveOrganization}
-                disabled={isSavingOrg}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-[1.25rem] font-bold flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 w-full sm:w-auto justify-center disabled:opacity-50"
-              >
-                {isSavingOrg ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} /> Salvando...
-                  </>
-                ) : orgSaveSuccess ? (
-                  <>
-                    <Check className="text-emerald-400" size={20} /> Salvo com Sucesso!
-                  </>
-                ) : (
-                  <>
-                    <Save size={20} /> Salvar Alterações
-                  </>
-                )}
-              </button>
-            )}
           </div>
         </div>
 

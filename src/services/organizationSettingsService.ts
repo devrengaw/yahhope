@@ -145,17 +145,29 @@ export async function saveOrgSettings(settings: OrganizationSettings): Promise<{
       .upsert(payload, { onConflict: 'id' });
 
     let warning: string | undefined;
+    const optionalCols = [
+      'sponsorship_quota_cost',
+      'max_sponsors_per_child',
+      'instagram_url',
+      'youtube_url',
+      'facebook_url',
+      'linkedin_url',
+      'updated_at'
+    ];
+    const socialCols = ['instagram_url', 'youtube_url', 'facebook_url', 'linkedin_url'];
+    const fallbackPayload = { ...payload };
+    let attempts = 0;
 
-    // Fallback caso a tabela ainda não tenha as colunas no Supabase remoto
-    if (error && error.message?.includes('column')) {
-      warning = 'As colunas de redes sociais ainda não existem no banco de dados (Supabase). Execute o script add_social_links_to_organization_settings.sql no SQL Editor do Supabase para sincronizar entre dispositivos.';
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.sponsorship_quota_cost;
-      delete fallbackPayload.max_sponsors_per_child;
-      delete fallbackPayload.instagram_url;
-      delete fallbackPayload.youtube_url;
-      delete fallbackPayload.facebook_url;
-      delete fallbackPayload.linkedin_url;
+    // Remove apenas a(s) coluna(s) ausente(s) reportada(s) pelo Supabase
+    while (error && error.message?.includes('column') && attempts < optionalCols.length) {
+      attempts++;
+      const missingCol = optionalCols.find(col => col in fallbackPayload && error!.message.includes(col));
+      if (!missingCol) break;
+
+      if (socialCols.includes(missingCol)) {
+        warning = `A coluna "${missingCol}" ainda não está visível no Supabase (schema cache). Execute add_social_links_to_organization_settings.sql ou "NOTIFY pgrst, 'reload schema';" no SQL Editor do Supabase.`;
+      }
+      delete fallbackPayload[missingCol];
       const retry = await supabase.from('organization_settings').upsert(fallbackPayload, { onConflict: 'id' });
       error = retry.error;
     }
