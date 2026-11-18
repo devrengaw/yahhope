@@ -83,6 +83,7 @@ import { HomeHighlightsManager } from './pages/admin/HomeHighlightsManager';
 import { ImpactMetricsManager } from './pages/admin/ImpactMetricsManager';
 import { TopBannerManager } from './pages/admin/TopBannerManager';
 import { AdminAnalyticsDashboard } from './pages/admin/AdminAnalyticsDashboard';
+import { VolunteerPartnershipsAdmin } from './pages/admin/VolunteerPartnershipsAdmin';
 import { AnalyticsTracker } from './components/analytics/AnalyticsTracker';
 import { HomeHighlightsProvider } from './contexts/HomeHighlightsContext';
 import { ImpactMetricsProvider } from './contexts/ImpactMetricsContext';
@@ -360,6 +361,7 @@ export default function App() {
                                                 <Routes>
                                                   <Route path="/" element={<Navigate to="/admin/analytics" replace />} />
                                                   <Route path="/analytics" element={<AdminAnalyticsDashboard />} />
+                                                  <Route path="/volunteers-partnerships" element={<VolunteerPartnershipsAdmin />} />
                                                   <Route path="/hotsite" element={<CampaignHotsiteAdmin />} />
                                                   <Route path="/home-highlights" element={<Navigate to="/communication/home-highlights" replace />} />
                                                   <Route path="/impact-metrics" element={<Navigate to="/communication/impact-metrics" replace />} />

@@ -241,18 +241,66 @@ async function syncMaintainerProfile(data: {
   return { userId, cleanEmail, donorName };
 }
 
+const currencyRateCache = new Map<string, number>();
+
 /**
- * Obtém o Valor Líquido Real (net) e a Taxa (fee) diretamente do balance_transaction da Stripe.
- * Caso o objeto já venha expandido, lê direto; caso contrário, consulta na API ou aplica a taxa padrão da Stripe Brasil.
+ * Obtém a cotação de conversão para BRL (ex: USD -> BRL) com cache em memória.
+ */
+async function getCurrencyToBrlRate(currency?: string): Promise<number> {
+  const code = (currency || 'brl').toUpperCase().trim();
+  if (code === 'BRL' || !code) return 1;
+  if (currencyRateCache.has(code)) return currencyRateCache.get(code)!;
+
+  const fallbackRates: Record<string, number> = {
+    USD: 5.75,
+    EUR: 6.15,
+    GBP: 7.25,
+    MZN: 0.09
+  };
+
+  try {
+    const res = await fetch(`https://economia.awesomeapi.com.br/last/${code}-BRL`);
+    if (res.ok) {
+      const json = await res.json();
+      const pair = json[`${code}BRL`];
+      const bid = pair?.bid ? parseFloat(pair.bid) : 0;
+      if (bid > 0) {
+        currencyRateCache.set(code, bid);
+        return bid;
+      }
+    }
+  } catch (err) {
+    console.warn(`Aviso ao consultar cotação ${code}->BRL:`, err);
+  }
+
+  const fb = fallbackRates[code] || 1;
+  currencyRateCache.set(code, fb);
+  return fb;
+}
+
+/**
+ * Obtém o Valor Líquido Real (net) e a Taxa (fee) em BRL diretamente do balance_transaction da Stripe.
+ * Se o pagamento foi feito em outra moeda (ex: USD), converte automaticamente para BRL usando o
+ * câmbio real liquidado pela Stripe (ou cotação do dia caso ainda pendente).
  */
 async function resolveStripeNetAndFee(params: {
   grossAmount: number;
+  currency?: string;
   paymentMethod?: 'pix' | 'credit_card' | string;
   balanceTx?: any;
   chargeId?: string | null;
   paymentIntentId?: string | null;
-}): Promise<{ grossAmount: number; feeAmount: number; netAmount: number; noteTag: string }> {
-  const gross = Number(params.grossAmount.toFixed(2));
+}): Promise<{
+  grossAmount: number;
+  feeAmount: number;
+  netAmount: number;
+  originalCurrency: string;
+  originalAmount: number;
+  exchangeRate: number;
+  noteTag: string;
+}> {
+  const originalCurrency = (params.currency || 'brl').toUpperCase().trim();
+  const originalAmount = Number(params.grossAmount.toFixed(2));
   let btObj: any = typeof params.balanceTx === 'object' && params.balanceTx !== null ? params.balanceTx : null;
 
   try {
@@ -271,21 +319,32 @@ async function resolveStripeNetAndFee(params: {
   }
 
   if (btObj && typeof btObj === 'object' && typeof btObj.net === 'number' && typeof btObj.fee === 'number') {
-    const netAmount = Number((btObj.net / 100).toFixed(2));
-    const feeAmount = Number((btObj.fee / 100).toFixed(2));
-    const noteTag = `[STRIPE_NET:gross=${gross.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
-    return { grossAmount: gross, feeAmount, netAmount, noteTag };
+    const btCurrency = String(btObj.currency || 'brl').toUpperCase().trim();
+    const rate = btCurrency === 'BRL'
+      ? (originalCurrency !== 'BRL' && originalAmount > 0 ? Number(((btObj.amount / 100) / originalAmount).toFixed(4)) : 1)
+      : await getCurrencyToBrlRate(btCurrency);
+
+    const grossBrl = btCurrency === 'BRL'
+      ? Number(((btObj.amount ? btObj.amount / 100 : originalAmount)).toFixed(2))
+      : Number((originalAmount * rate).toFixed(2));
+    const netAmount = Number(((btObj.net / 100) * (btCurrency === 'BRL' ? 1 : rate)).toFixed(2));
+    const feeAmount = Number(((btObj.fee / 100) * (btCurrency === 'BRL' ? 1 : rate)).toFixed(2));
+    const origPrefix = originalCurrency !== 'BRL' ? `orig=${originalCurrency} ${originalAmount.toFixed(2)},rate=${rate.toFixed(4)},` : '';
+    const noteTag = `[STRIPE_NET:${origPrefix}gross=${grossBrl.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
+    return { grossAmount: grossBrl, feeAmount, netAmount, originalCurrency, originalAmount, exchangeRate: rate, noteTag };
   }
 
-  // Fallback caso o balance_transaction ainda esteja pendente de liquidação no segundo exato do webhook:
-  // Taxas padrão Stripe Brasil: PIX = 1.19%, Cartão = 3.99% + R$ 0.39
+  // Fallback caso o balance_transaction ainda esteja pendente de liquidação no segundo exato do webhook
+  const rate = await getCurrencyToBrlRate(originalCurrency);
+  const grossBrl = Number((originalAmount * rate).toFixed(2));
   const isPix = params.paymentMethod === 'pix';
   const feeAmount = isPix
-    ? Number((gross * 0.0119).toFixed(2))
-    : Number((gross * 0.0399 + (gross > 0 ? 0.39 : 0)).toFixed(2));
-  const netAmount = Number(Math.max(0, gross - feeAmount).toFixed(2));
-  const noteTag = `[STRIPE_NET:gross=${gross.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
-  return { grossAmount: gross, feeAmount, netAmount, noteTag };
+    ? Number((grossBrl * 0.0119).toFixed(2))
+    : Number((grossBrl * 0.0399 + (grossBrl > 0 ? 0.39 : 0)).toFixed(2));
+  const netAmount = Number(Math.max(0, grossBrl - feeAmount).toFixed(2));
+  const origPrefix = originalCurrency !== 'BRL' ? `orig=${originalCurrency} ${originalAmount.toFixed(2)},rate=${rate.toFixed(4)},` : '';
+  const noteTag = `[STRIPE_NET:${origPrefix}gross=${grossBrl.toFixed(2)},fee=${feeAmount.toFixed(2)},net=${netAmount.toFixed(2)}]`;
+  return { grossAmount: grossBrl, feeAmount, netAmount, originalCurrency, originalAmount, exchangeRate: rate, noteTag };
 }
 
 /**
@@ -378,9 +437,12 @@ async function handleStripeSync(filterEmail?: string) {
       
       const isMonthly = isKnownPadrinho || isKnownMantenedor || hasActiveSub;
       
-      const stripeUnitAmount = sub?.items?.data?.[0]?.price?.unit_amount
+      const subCurrency = (sub?.currency || sub?.items?.data?.[0]?.price?.currency || 'brl').toLowerCase();
+      const rawUnitAmount = sub?.items?.data?.[0]?.price?.unit_amount
         ? sub.items.data[0].price.unit_amount / 100
         : 0;
+      const subRate = subCurrency !== 'brl' ? await getCurrencyToBrlRate(subCurrency) : 1;
+      const stripeUnitAmount = Number((rawUnitAmount * subRate).toFixed(2));
 
       let subAmount = 0;
       if (hasActiveSub && stripeUnitAmount > 0) {
@@ -433,22 +495,25 @@ async function handleStripeSync(filterEmail?: string) {
       if (!email) continue;
       if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
 
-      const amount = inv.amount_paid ? inv.amount_paid / 100 : 0;
-      if (amount <= 0) continue;
+      const rawInvAmount = inv.amount_paid ? inv.amount_paid / 100 : 0;
+      if (rawInvAmount <= 0) continue;
 
+      const invCurrency = (inv.currency || 'brl').toLowerCase();
       const paymentId = (inv.payment_intent as string) || inv.id;
       const invDateIso = new Date(inv.created * 1000).toISOString();
       const donorName = inv.customer_name || email.split('@')[0];
-      const isPadrinhoInv = !CONFIRMED_STRIPE_MANTENEDORES.has(email) && (CONFIRMED_STRIPE_PADRINHOS.has(email) || amount >= 90);
 
       const invChargeObj: any = typeof inv.charge === 'object' ? inv.charge : null;
-      const { netAmount: invNet, grossAmount: invGross, noteTag: invNoteTag } = await resolveStripeNetAndFee({
-        grossAmount: amount,
+      const { netAmount: invNet, grossAmount: invGross, originalCurrency: invOrigCur, originalAmount: invOrigAmt, noteTag: invNoteTag } = await resolveStripeNetAndFee({
+        grossAmount: rawInvAmount,
+        currency: invCurrency,
         paymentMethod: 'credit_card',
         balanceTx: invChargeObj?.balance_transaction,
         chargeId: typeof inv.charge === 'string' ? inv.charge : invChargeObj?.id,
         paymentIntentId: typeof inv.payment_intent === 'string' ? inv.payment_intent : null
       });
+      const isPadrinhoInv = !CONFIRMED_STRIPE_MANTENEDORES.has(email) && (CONFIRMED_STRIPE_PADRINHOS.has(email) || invGross >= 90);
+      const invOrigSuffix = invOrigCur !== 'BRL' ? ` (${invOrigCur} ${invOrigAmt.toFixed(2)})` : '';
 
       const { data: existingDonation } = await supabase
         .from('donations')
@@ -489,7 +554,7 @@ async function handleStripeSync(filterEmail?: string) {
 
       if (!existingFinTx) {
         await supabase.from('finance_transactions').insert({
-          description: `${isPadrinhoInv ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${donorName}`,
+          description: `${isPadrinhoInv ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'}${invOrigSuffix} - ${donorName}`,
           amount: invNet,
           original_amount: invGross,
           type: 'income',
@@ -522,6 +587,7 @@ async function handleStripeSync(filterEmail?: string) {
       if (filterEmail && email !== filterEmail.toLowerCase().trim()) continue;
 
       const amount = charge.amount / 100;
+      const chargeCurrency = (charge.currency || 'brl').toLowerCase();
       const paymentDate = new Date(charge.created * 1000).toISOString();
       const dayPrefix = paymentDate.slice(0, 10);
       const paymentMethod = charge.payment_method_details?.type === 'pix' ? 'pix' : 'credit_card';
@@ -530,13 +596,15 @@ async function handleStripeSync(filterEmail?: string) {
       const paymentId = paymentIntentId || chargeId;
       const emailPrefix = email.split('@')[0];
 
-      const { netAmount: chNet, grossAmount: chGross, noteTag: chNoteTag } = await resolveStripeNetAndFee({
+      const { netAmount: chNet, grossAmount: chGross, originalCurrency: chOrigCur, originalAmount: chOrigAmt, noteTag: chNoteTag } = await resolveStripeNetAndFee({
         grossAmount: amount,
+        currency: chargeCurrency,
         paymentMethod,
         balanceTx: charge.balance_transaction,
         chargeId,
         paymentIntentId
       });
+      const chOrigSuffix = chOrigCur !== 'BRL' ? ` (${chOrigCur} ${chOrigAmt.toFixed(2)})` : '';
 
       // Verifica se já existe a doação por payment_intent (pi_), charge.id (ch_) ou pelo mesmo e-mail + valor no mesmo dia
       const { data: sameDayDonations } = await supabase
@@ -595,7 +663,7 @@ async function handleStripeSync(filterEmail?: string) {
 
       if (!existingFinTx) {
         await supabase.from('finance_transactions').insert({
-          description: `Doação via Stripe (${paymentMethod === 'pix' ? 'PIX' : 'Cartão'}) - ${donorName}`,
+          description: `Doação via Stripe (${paymentMethod === 'pix' ? 'PIX' : 'Cartão'}${chOrigSuffix}) - ${donorName}`,
           amount: chNet,
           original_amount: chGross,
           type: 'income',
@@ -714,12 +782,31 @@ serve(async (req) => {
       const rawDonorEmail = customer?.email || session.customer_details?.email || session.metadata?.donorEmail || ''
       const donorEmail = rawDonorEmail.toLowerCase().trim()
       const donorPhone = customer?.phone || session.customer_details?.phone || session.metadata?.donorPhone || null
-      const amount = session.amount_total ? session.amount_total / 100 : 0
+      const rawAmount = session.amount_total ? session.amount_total / 100 : 0
+      const sessionCurrency = (session.currency || 'brl').toLowerCase()
       const isSponsorship = session.metadata?.type === 'sponsorship' || session.mode === 'subscription'
       const isMonthly = session.metadata?.isMonthly === 'true' || session.mode === 'subscription'
       const quotasCount = Number(session.metadata?.quotasCount) || 1
       const isPix = session.metadata?.paymentMethod === 'pix' || session.payment_method_types?.includes('pix')
       const paymentMethod = isPix ? 'pix' : 'credit_card'
+
+      const {
+        netAmount: sessNet,
+        grossAmount: sessGross,
+        originalCurrency: sessOrigCur,
+        originalAmount: sessOrigAmt,
+        noteTag: sessNoteTag
+      } = rawAmount > 0
+        ? await resolveStripeNetAndFee({
+            grossAmount: rawAmount,
+            currency: sessionCurrency,
+            paymentMethod,
+            paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null
+          })
+        : { netAmount: 0, grossAmount: 0, originalCurrency: sessionCurrency.toUpperCase(), originalAmount: 0, noteTag: '' }
+
+      const amount = sessGross
+      const sessOrigSuffix = sessOrigCur !== 'BRL' ? ` (${sessOrigCur} ${sessOrigAmt.toFixed(2)})` : ''
 
       // Verifica antes de inserir se já é doador/padrinho/mantenedor recorrente para não repetir e-mail de boas-vindas todo mês
       let isRepeatSupporter = false
@@ -783,12 +870,6 @@ serve(async (req) => {
         })
 
         if (!isSponsorship && !isMonthly && campaignId) {
-          const { netAmount: sessNet, grossAmount: sessGross, noteTag: sessNoteTag } = await resolveStripeNetAndFee({
-            grossAmount: amount,
-            paymentMethod,
-            paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null
-          })
-
           const newTotal = Number(campaigns[0].current_amount || 0) + sessNet
           await supabase.from('campaigns').update({
             current_amount: newTotal,
@@ -796,7 +877,7 @@ serve(async (req) => {
           }).eq('id', campaignId)
 
           await supabase.from('finance_transactions').insert({
-            description: `Doação via Stripe (${isPix ? 'PIX' : 'Cartão'}) - ${donorName}`,
+            description: `Doação via Stripe (${isPix ? 'PIX' : 'Cartão'})${sessOrigSuffix} - ${donorName}`,
             amount: sessNet,
             original_amount: sessGross,
             type: 'income',
@@ -852,7 +933,8 @@ serve(async (req) => {
     // 2. EVENTO: INVOICE PAYMENT SUCCEEDED (Recorrência Mensal Confirmada)
     else if (event.type === 'invoice.payment_succeeded') {
       const invoice = event.data.object as any
-      const amount = invoice.amount_paid ? invoice.amount_paid / 100 : 0
+      const rawAmount = invoice.amount_paid ? invoice.amount_paid / 100 : 0
+      const invoiceCurrency = (invoice.currency || 'brl').toLowerCase()
 
       let customer: any = null
       if (invoice.customer) {
@@ -866,7 +948,23 @@ serve(async (req) => {
       const name = customer?.name || invoice.customer_name || 'Mantenedor YAH Hope'
       const phone = customer?.phone || null
 
-      if (email && amount > 0) {
+      if (email && rawAmount > 0) {
+        const {
+          netAmount: invNet,
+          grossAmount: invGross,
+          originalCurrency: invOrigCur,
+          originalAmount: invOrigAmt,
+          noteTag: invNoteTag
+        } = await resolveStripeNetAndFee({
+          grossAmount: rawAmount,
+          currency: invoiceCurrency,
+          paymentMethod: 'credit_card',
+          chargeId: typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id,
+          paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : null
+        })
+
+        const amount = invGross
+        const invOrigSuffix = invOrigCur !== 'BRL' ? ` (${invOrigCur} ${invOrigAmt.toFixed(2)})` : ''
         const isPadrinho = amount >= 90
         const syncResult = await syncMaintainerProfile({
           email,
@@ -900,13 +998,6 @@ serve(async (req) => {
           .maybeSingle()
 
         if (!existingDonation) {
-          const { netAmount: invNet, grossAmount: invGross, noteTag: invNoteTag } = await resolveStripeNetAndFee({
-            grossAmount: amount,
-            paymentMethod: 'credit_card',
-            chargeId: typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id,
-            paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : null
-          })
-
           await supabase.from('donations').insert({
             donor_name: name,
             donor_email: email,
@@ -922,7 +1013,7 @@ serve(async (req) => {
           })
 
           await supabase.from('finance_transactions').insert({
-            description: `${isPadrinho ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'} - ${name}`,
+            description: `${isPadrinho ? 'Apadrinhamento Mensal Stripe' : 'Mantenedor Mensal Stripe'}${invOrigSuffix} - ${name}`,
             amount: invNet,
             original_amount: invGross,
             type: 'income',

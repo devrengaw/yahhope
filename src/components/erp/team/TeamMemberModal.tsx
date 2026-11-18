@@ -67,6 +67,7 @@ export function TeamMemberModal({ isOpen, onClose, onSave, editingMember }: Team
       name: 'Gestão YAH Hope (Admin)',
       modules: [
         { id: 'analytics', label: 'Dashboard de Acessos' },
+        { id: 'volunteers-partnerships', label: 'Voluntários & Parcerias' },
         { id: 'hotsite', label: 'Hotsite da Campanha' },
         { id: 'impact-feed', label: 'Feed de Impacto' },
         { id: 'messages', label: 'Mensagens' },

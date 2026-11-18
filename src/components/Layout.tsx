@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox, Flame, GraduationCap, Award, UserCheck, BookOpen, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, Package, Menu, X, Stethoscope, Briefcase, DollarSign, Calendar, LogOut, ArrowLeft, Home, Heart, ShoppingBag, BarChart3, Globe, MessageSquare, Newspaper, TrendingUp, Gift, Target, Mail, Activity, Plus, Sparkles, Megaphone, Send, PanelLeftClose, PanelLeftOpen, Inbox, Flame, GraduationCap, Award, UserCheck, BookOpen, FileBarChart, Handshake } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserAuthorizedModules, hasUniversityPermission, UniversityPermissionKey } from '../lib/universityPermissions';
@@ -31,6 +31,7 @@ const workspaceNavItems = [
 
 const adminNavItems = [
   { name: 'Dashboard de Acessos', path: '/admin/analytics', icon: BarChart3 },
+  { name: 'Voluntários & Parcerias', path: '/admin/volunteers-partnerships', icon: Handshake },
   { name: 'Hotsite da Campanha', path: '/admin/hotsite', icon: Flame },
   { name: 'Feed de Impacto', path: '/admin/impact-feed', icon: TrendingUp },
   { name: 'Mensagens', path: '/admin/messages', icon: MessageSquare },
@@ -329,6 +330,7 @@ export function Layout({ children, module }: { children: React.ReactNode, module
       '/futuro-universitario/scholarships': 'Bolsas',
       '/futuro-universitario/mentors': 'Mentoria',
       '/admin/analytics': 'Acessos',
+      '/admin/volunteers-partnerships': 'Voluntários',
       '/admin/impact-feed': 'Impacto',
       '/admin/local-projects': 'Locais',
       '/admin/store': 'Loja',

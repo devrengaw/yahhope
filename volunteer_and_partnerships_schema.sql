@@ -64,3 +64,30 @@ CREATE POLICY "Permitir leitura de parcerias empresariais para autenticados"
 ON corporate_partnerships FOR SELECT 
 TO authenticated 
 USING (true);
+
+-- 5. Políticas de atualização e exclusão para usuários autenticados (Gestão)
+DROP POLICY IF EXISTS "Permitir atualizacao de voluntariado para autenticados" ON volunteer_applications;
+CREATE POLICY "Permitir atualizacao de voluntariado para autenticados"
+ON volunteer_applications FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir exclusao de voluntariado para autenticados" ON volunteer_applications;
+CREATE POLICY "Permitir exclusao de voluntariado para autenticados"
+ON volunteer_applications FOR DELETE
+TO authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Permitir atualizacao de parcerias para autenticados" ON corporate_partnerships;
+CREATE POLICY "Permitir atualizacao de parcerias para autenticados"
+ON corporate_partnerships FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir exclusao de parcerias para autenticados" ON corporate_partnerships;
+CREATE POLICY "Permitir exclusao de parcerias para autenticados"
+ON corporate_partnerships FOR DELETE
+TO authenticated
+USING (true);
