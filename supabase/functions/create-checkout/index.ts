@@ -44,8 +44,12 @@ serve(async (req) => {
     const mode = isSubscription ? 'subscription' : 'payment';
     const isSponsorship = type === 'sponsorship';
 
+    const effectiveMonths = Number(planMonths) > 0 ? Number(planMonths) : 1;
+    const effectiveQuotas = Number(quotasCount) > 0 ? Number(quotasCount) : 1;
     const productName = isSponsorship
-      ? `Apadrinhamento de Criança (${quotasCount || 1} ${(quotasCount || 1) === 1 ? 'cota' : 'cotas'}) - YAH Hope`
+      ? (isPix && effectiveMonths > 1
+          ? `Apadrinhamento PIX (${effectiveQuotas} ${effectiveQuotas === 1 ? 'criança' : 'crianças'} • ${effectiveMonths} meses) - YAH Hope`
+          : `Apadrinhamento de Criança (${effectiveQuotas} ${effectiveQuotas === 1 ? 'cota' : 'cotas'}) - YAH Hope`)
       : isMonthly 
         ? (isPix ? 'Mantenedor Mensal (via Pix) - YAH Hope' : 'Doação Mensal - YAH Hope')
         : (isPix ? 'Doação via Pix - YAH Hope' : 'Doação - YAH Hope');

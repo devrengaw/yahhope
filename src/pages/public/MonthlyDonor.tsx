@@ -33,6 +33,7 @@ import { MonthlySupporterCounterCard } from '../../components/public/MonthlySupp
 import { getUniqueMonthlySupportersCount } from '../../services/monthlySupportersService';
 import { submitCampaignLead } from '../../services/campaignTrackingService';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { generatePixPayload, OFFICIAL_PIX_KEY } from '../../utils/pixGenerator';
 
 interface PlanOption {
   id: string;
@@ -264,13 +265,20 @@ export function MonthlyDonor() {
 
   const currentAmount = donationType === 'sponsorship' ? sponsorshipTotal : generalTotal;
 
-  const pixKey = 'contato@yahhope.org';
-  const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${currentAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
+  const pixKey = OFFICIAL_PIX_KEY;
+  const pixCopyPaste = generatePixPayload({ pixKey, amount: currentAmount });
+  const [pixCodeCopied, setPixCodeCopied] = useState(false);
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey);
     setPixCopied(true);
     setTimeout(() => setPixCopied(false), 3000);
+  };
+
+  const handleCopyPixCode = () => {
+    navigator.clipboard.writeText(pixCopyPaste);
+    setPixCodeCopied(true);
+    setTimeout(() => setPixCodeCopied(false), 3000);
   };
 
   const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +337,8 @@ export function MonthlyDonor() {
         ? quotasCount
         : (paymentMethod === 'pix' ? 0 : Math.floor(currentAmount / 90));
 
-      const isStripeCheckout = paymentMethod !== 'pix' && Boolean(import.meta.env.VITE_SUPABASE_URL);
+      // Tanto Cartão quanto PIX passam pelo Checkout oficial da Stripe (QR Code PIX oficial com confirmação automática via webhook)
+      const isStripeCheckout = Boolean(import.meta.env.VITE_SUPABASE_URL);
 
       // 1. Caso seja Apadrinhamento de Criança via PIX (Pacotes 3, 6 ou 12 meses) ou ambiente sem Stripe
       if (donationType === 'sponsorship' && !isStripeCheckout) {
@@ -444,11 +453,15 @@ export function MonthlyDonor() {
         body: JSON.stringify({
           campaignId: currentCampaign?.id || '1',
           amount: currentAmount,
-          isMonthly: true,
+          isMonthly: donationType === 'sponsorship' ? paymentMethod !== 'pix' : true,
           paymentMethod,
+          planMonths: effectivePlanMonths,
+          type: donationType === 'sponsorship' ? 'sponsorship' : 'donation',
+          quotasCount: calculatedQuotas,
           donorName: finalName,
           donorEmail: finalEmail,
-          successUrl: `${window.location.origin}/mantenedor?status=success&amount=${currentAmount}&name=${encodeURIComponent(finalName)}&email=${encodeURIComponent(finalEmail)}`,
+          donorPhone: finalPhone,
+          successUrl: `${window.location.origin}/mantenedor?status=success&mode=${donationType}&method=${paymentMethod}&months=${effectivePlanMonths}&quotas=${calculatedQuotas}&amount=${currentAmount}&name=${encodeURIComponent(finalName)}&email=${encodeURIComponent(finalEmail)}`,
           cancelUrl: `${window.location.origin}/mantenedor?status=cancel`
         })
       });
@@ -773,8 +786,16 @@ export function MonthlyDonor() {
                     />
                     <div className="flex-1 w-full space-y-2.5">
                       <p className="text-xs text-slate-500">
-                        {tr('Escaneie o QR Code no aplicativo do seu banco ou copie a chave PIX abaixo para transferir ', 'Scan the QR Code in your banking app or copy the PIX key below to transfer ')}<strong>R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
+                        {tr('Escaneie o QR Code no aplicativo do seu banco ou copie o código PIX Copia e Cola para transferir ', 'Scan the QR Code in your banking app or copy the PIX Copy & Paste code to transfer ')}<strong>R$ {currentAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
                       </p>
+                      <button
+                        type="button"
+                        onClick={handleCopyPixCode}
+                        className="w-full py-2.5 px-3 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        {pixCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{pixCodeCopied ? tr('Código PIX Copiado!', 'PIX Code Copied!') : tr('Copiar PIX Copia e Cola', 'Copy PIX Code')}</span>
+                      </button>
                       <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                         <span className="text-xs sm:text-sm font-mono text-slate-700 font-bold truncate mr-2">{pixKey}</span>
                         <button

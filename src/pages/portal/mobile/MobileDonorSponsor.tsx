@@ -21,6 +21,7 @@ import { useFundraising } from '../../../contexts/FundraisingContext';
 import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail, calculateChildAge, calculatePackageExpirationDate } from '../../../services/sponsorshipService';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { generatePixPayload, OFFICIAL_PIX_KEY } from '../../../utils/pixGenerator';
 
 export function MobileDonorSponsor() {
   const { tr, isEn } = useLanguage();
@@ -63,13 +64,20 @@ export function MobileDonorSponsor() {
   const totalAmount = paymentMethod === 'pix' ? monthlyTotal * pixPackageMonths : monthlyTotal;
   const previewExpirationDate = new Date(calculatePackageExpirationDate(pixPackageMonths)).toLocaleDateString(isEn ? 'en-US' : 'pt-BR');
 
-  const pixKey = 'contato@yahhope.org';
-  const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${totalAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
+  const pixKey = OFFICIAL_PIX_KEY;
+  const pixCopyPaste = generatePixPayload({ pixKey, amount: assignedResult?.totalAmount || totalAmount });
+  const [pixCodeCopied, setPixCodeCopied] = useState(false);
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey);
     setPixCopied(true);
     setTimeout(() => setPixCopied(false), 3000);
+  };
+
+  const handleCopyPixCode = () => {
+    navigator.clipboard.writeText(pixCopyPaste);
+    setPixCodeCopied(true);
+    setTimeout(() => setPixCodeCopied(false), 3000);
   };
 
   // Carrega métricas
@@ -117,33 +125,31 @@ export function MobileDonorSponsor() {
     const donorPhone = user?.phone || '';
     const effectivePlanMonths = paymentMethod === 'pix' ? pixPackageMonths : 1;
 
-    // Salva intenção de apadrinhamento apenas quando redireciona para Checkout externo (Cartão)
-    if (paymentMethod === 'card') {
-      try {
-        localStorage.setItem('yah_pending_sponsorship', JSON.stringify({
-          donorName,
-          donorEmail,
-          donorPhone,
-          quotasCount,
-          amountPerQuota: quotaCost,
-          totalAmount,
-          paymentMethod,
-          planMonths: effectivePlanMonths,
-          renewChildId,
-          sponsorUserId: user?.id,
-          timestamp: Date.now()
-        }));
-      } catch (e) {
-        console.warn('Erro ao gravar yah_pending_sponsorship:', e);
-      }
+    // Salva intenção de apadrinhamento para reconciliação pós-retorno do Checkout Stripe
+    try {
+      localStorage.setItem('yah_pending_sponsorship', JSON.stringify({
+        donorName,
+        donorEmail,
+        donorPhone,
+        quotasCount,
+        amountPerQuota: quotaCost,
+        totalAmount,
+        paymentMethod,
+        planMonths: effectivePlanMonths,
+        renewChildId,
+        sponsorUserId: user?.id,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Erro ao gravar yah_pending_sponsorship:', e);
     }
 
     const successReturnUrl = `${window.location.origin}/portal/sponsorship?status=success&quotas=${quotasCount}&months=${effectivePlanMonths}&amount=${totalAmount}&email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`;
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      // Checkout Stripe apenas para Cartão de Crédito recorrente
-      if (supabaseUrl && paymentMethod === 'card') {
+      // Checkout oficial Stripe tanto para Cartão de Crédito quanto para PIX (QR Code oficial Stripe com confirmação automática)
+      if (supabaseUrl) {
         const baseUrl = supabaseUrl.replace(/\/$/, '');
         const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
           method: 'POST',
@@ -154,9 +160,9 @@ export function MobileDonorSponsor() {
           body: JSON.stringify({
             campaignId: currentCampaign?.id || '1',
             amount: totalAmount,
-            isMonthly: true,
-            paymentMethod: 'card',
-            planMonths: 1,
+            isMonthly: paymentMethod !== 'pix',
+            paymentMethod,
+            planMonths: effectivePlanMonths,
             donorName,
             donorEmail,
             donorPhone,
@@ -615,8 +621,16 @@ export function MobileDonorSponsor() {
                     />
                     <div className="flex-1 w-full space-y-2">
                       <p className="text-xs text-slate-600 leading-snug">
-                        {tr('Escaneie o QR Code ou copie a chave PIX abaixo no valor de', 'Scan the QR Code or copy the PIX key below for')} <strong>R$ {assignedResult.totalAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
+                        {tr('Escaneie o QR Code ou copie o código PIX Copia e Cola no valor de', 'Scan the QR Code or copy the PIX Copy & Paste code for')} <strong>R$ {assignedResult.totalAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}</strong>:
                       </p>
+                      <button
+                        type="button"
+                        onClick={handleCopyPixCode}
+                        className="w-full py-2 px-3 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        {pixCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{pixCodeCopied ? tr('Código PIX Copiado!', 'PIX Code Copied!') : tr('Copiar PIX Copia e Cola', 'Copy PIX Code')}</span>
+                      </button>
                       <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                         <span className="text-xs font-mono font-bold text-slate-800 truncate mr-2">{pixKey}</span>
                         <button
@@ -625,7 +639,7 @@ export function MobileDonorSponsor() {
                           className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 shrink-0 cursor-pointer"
                         >
                           {pixCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                          <span>{pixCopied ? tr('Copiado!', 'Copied!') : tr('Copiar', 'Copy')}</span>
+                          <span>{pixCopied ? tr('Copiado!', 'Copied!') : tr('Copiar Chave', 'Copy Key')}</span>
                         </button>
                       </div>
                     </div>

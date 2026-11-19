@@ -24,6 +24,7 @@ import { sponsorshipService, SponsorshipMetrics, ChildSponsorshipDetail } from '
 import { submitCampaignLead, recordCampaignClick, getClientLocation, isHotsiteRoute } from '../../services/campaignTrackingService';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { generatePixPayload, OFFICIAL_PIX_KEY } from '../../utils/pixGenerator';
 
 interface HomeDonationCardProps {
   onClose?: () => void;
@@ -165,14 +166,21 @@ export function HomeDonationCard({
     ? sponsorshipTotal
     : (isCustom && customAmount ? parseFloat(customAmount) : selectedAmount);
 
-  const pixKey = 'contato@yahhope.org';
+  const pixKey = OFFICIAL_PIX_KEY;
   const displayAmountForPix = confirmedAmount || currentTotalAmount;
-  const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${displayAmountForPix.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
+  const pixCopyPaste = generatePixPayload({ pixKey, amount: displayAmountForPix });
+  const [pixCodeCopied, setPixCodeCopied] = useState(false);
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey);
     setPixCopied(true);
     setTimeout(() => setPixCopied(false), 3000);
+  };
+
+  const handleCopyPixCode = () => {
+    navigator.clipboard.writeText(pixCopyPaste);
+    setPixCodeCopied(true);
+    setTimeout(() => setPixCodeCopied(false), 3000);
   };
 
   // Processa confirmação inline na própria tela (PIX ou ambiente local sem redirecionar para /mantenedor)
@@ -327,19 +335,6 @@ export function HomeDonationCard({
           }),
           new Promise(resolve => setTimeout(resolve, 1500))
         ]);
-      }
-
-      // Se for pagamento via PIX (Apadrinhamento 3, 6, 12m ou Mantenedor/Doação PIX), confirma tudo direto nesta tela sem abrir outra página
-      if (isPixPayment) {
-        await completeInlineConfirmation(
-          finalVal,
-          finalDonorName,
-          finalDonorEmail,
-          finalDonorWhatsapp,
-          'pix',
-          effectivePlanMonths
-        );
-        return;
       }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -504,8 +499,16 @@ export function HomeDonationCard({
                 />
                 <div className="w-full space-y-2 text-center">
                   <p className="text-[11px] text-slate-500 leading-snug">
-                    {tr('Escaneie o QR Code no app do seu banco ou copie a chave PIX abaixo:', 'Scan the QR Code in your banking app or copy the PIX key below:')}
+                    {tr('Escaneie o QR Code no app do seu banco ou copie o código PIX Copia e Cola:', 'Scan the QR Code in your banking app or copy the PIX Copy & Paste code:')}
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleCopyPixCode}
+                    className="w-full py-2 px-3 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    {pixCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{pixCodeCopied ? tr('Código PIX Copiado!', 'PIX Code Copied!') : tr('Copiar PIX Copia e Cola', 'Copy PIX Code')}</span>
+                  </button>
                   <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
                     <span className="text-xs font-mono text-slate-700 font-bold truncate mr-2">{pixKey}</span>
                     <button

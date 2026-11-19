@@ -236,9 +236,15 @@ async function syncMaintainerProfile(data: {
       const perChildInsertAmount = isPix
         ? quotaCost
         : Math.max(quotaCost, quotasCount > 1 && monthlyAmount >= quotasCount * quotaCost ? monthlyAmount / quotasCount : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost));
+      const perChildPackageAmount = isPix ? Number((quotaCost * planMonths).toFixed(2)) : null;
+      const expiresDateObj = isPix ? new Date(timestamp) : null;
+      if (expiresDateObj) {
+        expiresDateObj.setMonth(expiresDateObj.getMonth() + planMonths);
+      }
+      const expiresAtIso = expiresDateObj ? expiresDateObj.toISOString() : null;
 
       for (const chId of assignedChildIds) {
-        await supabase.from('sponsorships').insert({
+        const fullInsert: any = {
           child_id: chId, // NULL para doadores de R$ 50 (Apoio Geral)
           sponsor_id: userId || null,
           donor_name: donorName,
@@ -251,8 +257,33 @@ async function syncMaintainerProfile(data: {
           created_at: timestamp,
           last_sponsored_at: timestamp,
           stripe_subscription_id: data.subscriptionId || null,
-          stripe_customer_id: data.customerId || null
-        });
+          stripe_customer_id: data.customerId || null,
+          ...(isPix ? {
+            plan_months: planMonths,
+            package_amount: perChildPackageAmount,
+            started_at: timestamp,
+            expires_at: expiresAtIso,
+            renewal_declined: false
+          } : {})
+        };
+        const { error: insErr } = await supabase.from('sponsorships').insert(fullInsert);
+        if (insErr && isPix) {
+          await supabase.from('sponsorships').insert({
+            child_id: chId,
+            sponsor_id: userId || null,
+            donor_name: donorName,
+            donor_email: cleanEmail,
+            donor_phone: donorPhone,
+            monthly_amount: perChildInsertAmount,
+            quotas_count: 1,
+            status: 'active',
+            payment_method: paymentMethod,
+            created_at: timestamp,
+            last_sponsored_at: timestamp,
+            stripe_subscription_id: data.subscriptionId || null,
+            stripe_customer_id: data.customerId || null
+          });
+        }
       }
     }
   } else {
@@ -803,9 +834,17 @@ serve(async (req) => {
 
     console.log(`Stripe Event recebido: ${event.type}`)
 
-    // 1. EVENTO: CHECKOUT SESSION COMPLETED
-    if (event.type === 'checkout.session.completed') {
+    // 1. EVENTO: CHECKOUT SESSION COMPLETED / ASYNC PAYMENT SUCCEEDED (inclui PIX pago)
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object as any
+      // Para PIX pendente (pagamento assíncrono ainda não liquidado), aguarda async_payment_succeeded
+      if (event.type === 'checkout.session.completed' && session.payment_status && session.payment_status !== 'paid') {
+        console.log(`Checkout session ${session.id} ainda com status '${session.payment_status}' (aguardando confirmação do PIX).`)
+        return new Response(JSON.stringify({ received: true, pending_payment: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      }
       
       let customer: any = null
       if (session.customer) {
@@ -922,6 +961,23 @@ serve(async (req) => {
             original_amount: sessGross,
             type: 'income',
             category_id: 'cat_donation',
+            status: 'completed',
+            account: 'Stripe',
+            date: new Date().toISOString(),
+            notes: sessNoteTag
+          })
+        } else if (isPix && (isSponsorship || isMonthly)) {
+          // Pagamentos PIX no Stripe são em modo 'payment' (não geram invoice.payment_succeeded),
+          // por isso registramos a entrada líquida diretamente em finance_transactions aqui.
+          const pixFinDesc = isSponsorship
+            ? `Apadrinhamento PIX Stripe (${planMonths}m • ${quotasCount} ${quotasCount === 1 ? 'criança' : 'crianças'})${sessOrigSuffix} - ${donorName}`
+            : `Mantenedor PIX Stripe${sessOrigSuffix} - ${donorName}`
+          await supabase.from('finance_transactions').insert({
+            description: pixFinDesc,
+            amount: sessNet,
+            original_amount: sessGross,
+            type: 'income',
+            category_id: isSponsorship ? 'cat_sponsorship' : 'cat_donations',
             status: 'completed',
             account: 'Stripe',
             date: new Date().toISOString(),

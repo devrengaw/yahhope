@@ -24,6 +24,7 @@ import { ManageMonthlyPlanModal } from '../../../components/portal/ManageMonthly
 import { PortalMyDonations } from '../PortalMyDonations';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useTranslatedStrings } from '../../../i18n/portalTranslations';
+import { generatePixPayload, OFFICIAL_PIX_KEY } from '../../../utils/pixGenerator';
 
 export function MobileDonorDonate() {
   const { tr, isEn } = useLanguage();
@@ -138,14 +139,21 @@ export function MobileDonorDonate() {
 
   const currentAmount = customAmount ? parseFloat(customAmount.replace(/\./g, '').replace(',', '.')) || 0 : selectedAmount;
 
-  // Pix oficial da YAH Hope
-  const pixKey = 'contato@yahhope.com';
-  const pixCopyPaste = `00020126580014br.gov.bcb.pix0114${pixKey}520400005303986540${currentAmount.toFixed(2)}5802BR5908YAH HOPE6009SAO PAULO62070503***6304`;
+  // Pix oficial da YAH Hope (padrão EMVCo / BACEN com CRC16 válido)
+  const pixKey = OFFICIAL_PIX_KEY;
+  const pixCopyPaste = generatePixPayload({ pixKey, amount: currentAmount });
+  const [isCodeCopied, setIsCodeCopied] = useState(false);
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2500);
+  };
+
+  const handleCopyPixCode = () => {
+    navigator.clipboard.writeText(pixCopyPaste);
+    setIsCodeCopied(true);
+    setTimeout(() => setIsCodeCopied(false), 2500);
   };
 
   const handleProceedPayment = async () => {
@@ -157,33 +165,31 @@ export function MobileDonorDonate() {
     setIsSubmitting(true);
 
     try {
-      if (paymentMethod === 'card') {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-        if (supabaseUrl) {
-          const baseUrl = supabaseUrl.replace(/\/$/, '');
-          const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              campaignId: selectedCampaignId || null,
-              amount: currentAmount,
-              isMonthly: frequency === 'monthly',
-              paymentMethod: 'card',
-              donorName: user?.name || 'Mantenedor YAH Hope',
-              donorEmail: user?.email || 'mantenedor@yahhope.com',
-              successUrl: `${window.location.origin}/portal/donations?status=success&amount=${currentAmount}`,
-              cancelUrl: `${window.location.origin}/portal/donations?status=cancel`
-            })
-          });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      if (supabaseUrl) {
+        const baseUrl = supabaseUrl.replace(/\/$/, '');
+        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            campaignId: selectedCampaignId || null,
+            amount: currentAmount,
+            isMonthly: frequency === 'monthly' && paymentMethod !== 'pix',
+            paymentMethod,
+            donorName: user?.name || 'Mantenedor YAH Hope',
+            donorEmail: user?.email || 'mantenedor@yahhope.com',
+            successUrl: `${window.location.origin}/portal/donations?status=success&amount=${currentAmount}`,
+            cancelUrl: `${window.location.origin}/portal/donations?status=cancel`
+          })
+        });
 
-          const data = await response.json();
-          if (data.url) {
-            window.location.href = data.url;
-            return;
-          }
+        const data = await response.json();
+        if (data.url) {
+          window.location.href = data.url;
+          return;
         }
       }
 
@@ -526,10 +532,25 @@ export function MobileDonorDonate() {
                   />
                 </div>
 
-                {/* Chave Pix Copia e Cola */}
-                <div className="space-y-2 text-left max-w-md mx-auto">
-                  <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block">
-                    {tr('Chave PIX Oficial (E-mail):', 'Official PIX Key (Email):')}
+                {/* Código PIX Copia e Cola + Chave PIX */}
+                <div className="space-y-2.5 text-left max-w-md mx-auto">
+                  <button
+                    type="button"
+                    onClick={handleCopyPixCode}
+                    className="w-full py-3 px-4 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    {isCodeCopied ? (
+                      <>
+                        <Check size={15} /> {tr('Código PIX Copiado!', 'PIX Code Copied!')}
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={15} /> {tr('Copiar Código PIX (Copia e Cola)', 'Copy PIX Code')}
+                      </>
+                    )}
+                  </button>
+                  <label className="text-xs font-gotham-bold uppercase tracking-wider text-slate-500 block pt-1">
+                    {tr('Ou copie a Chave PIX Oficial (E-mail):', 'Or copy the Official PIX Key (Email):')}
                   </label>
                   <div className="flex items-center gap-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
                     <span className="text-xs font-mono font-bold text-slate-800 flex-1 truncate">
