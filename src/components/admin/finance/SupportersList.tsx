@@ -284,10 +284,18 @@ export function SupportersList() {
             }
 
             // E) Mesmo mês/ano com mesmo valor do apadrinhamento (evita duplicar doações sincronizadas por webhook)
+            // ou pacote PIX (crianças * meses * 90) no mesmo mês
             const dMonth = (d.paid_at || d.created_at || '').slice(0, 7);
             const spMonth = (sp.last_sponsored_at || sp.created_at || '').slice(0, 7);
-            if (dMonth && spMonth && dMonth === spMonth && Math.abs(Number(d.amount) - spAmount) < 0.01) {
-              return true;
+            if (dMonth && spMonth && dMonth === spMonth) {
+              if (Math.abs(Number(d.amount) - spAmount) < 0.01) {
+                return true;
+              }
+              const isPixSp = String(sp.payment_method || '').toLowerCase().includes('pix') || Number(sp.plan_months || 0) > 1;
+              const isPixDon = String(d.payment_method || '').toLowerCase().includes('pix');
+              if (isPixSp && isPixDon && Number(d.amount) >= spAmount) {
+                return true;
+              }
             }
 
             return false;
@@ -397,14 +405,24 @@ export function SupportersList() {
           !hasActiveFuturePackage && daysSinceLastContribution > MAX_INACTIVE_DAYS_BEFORE_CHURN;
 
         // Calcula o valor mensal comprometido (apadrinhamento ou recorrência ativa)
-        // REGRA DE OURO: Cada cota de apadrinhamento de criança é no mínimo R$ 90,00
+        // REGRA DE OURO:
+        // - Cada cota de apadrinhamento de criança é no mínimo R$ 90,00/mês.
+        // - Em pacotes PIX (crianças * meses * 90), cada registro em sponsorships representa 1 criança escolhida (R$ 90/mês equivalente),
+        //   NÃO entrando na regra dos R$ 90,00 sobre o valor total do pacote!
+        const hasPixSponsorship = monthlySponsorships.some(
+          sp => String(sp.payment_method || '').toLowerCase().includes('pix') || Number(sp.plan_months || 0) > 1
+        );
         const spAmounts = monthlySponsorships.map(sp => {
+          const isPixSp = String(sp.payment_method || '').toLowerCase().includes('pix') || Number(sp.plan_months || 0) > 1;
           const raw = Number(sp.monthly_amount || sp.amount || 0);
+          if (isPixSp) {
+            return 90;
+          }
           return sp.child_id ? Math.max(90, raw) : raw;
         });
         const maxSpAmt = spAmounts.length > 0 ? Math.max(...spAmounts) : 0;
         const totalSpAmt = spAmounts.reduce((a, b) => a + b, 0);
-        const effectiveMonthlyAmount = Math.max(maxSpAmt, totalSpAmt);
+        const effectiveMonthlyAmount = hasPixSponsorship ? totalSpAmt : Math.max(maxSpAmt, totalSpAmt);
 
         const hasExplicitSponsorship =
           uniqueSponsorships.some(sp => Boolean(sp.child_id)) ||
@@ -485,9 +503,13 @@ export function SupportersList() {
         const lastDonation = userDonations[0];
 
         // Calcula o valor da contribuição mensal ativa do padrinho / mantenedor
+        // Em apadrinhamento via PIX (pacote de meses), NÃO usa o valor total do pagamento PIX como valor mensal!
         const latestPaidAmt = Number(paidDonations[0]?.amount || 0);
+        const latestPaidIsPix = String(paidDonations[0]?.payment_method || '').toLowerCase().includes('pix');
         const computedMonthlyAmount = isRealPadrinho
-          ? Math.max(90, effectiveMonthlyAmount || (assignedChildrenList.length * 90) || (latestPaidAmt >= 90 ? latestPaidAmt : 90))
+          ? (hasPixSponsorship || latestPaidIsPix)
+            ? Math.max(90, effectiveMonthlyAmount || (assignedChildrenList.length * 90) || 90)
+            : Math.max(90, effectiveMonthlyAmount || (assignedChildrenList.length * 90) || (latestPaidAmt >= 90 ? latestPaidAmt : 90))
           : isDoadorMensal
             ? (effectiveMonthlyAmount > 0 ? effectiveMonthlyAmount : (latestPaidAmt > 0 ? latestPaidAmt : 50))
             : 0;
@@ -1395,9 +1417,19 @@ export function SupportersList() {
                         <span className="text-[11px] font-bold text-slate-400">/mês</span>
                       </p>
                       <p className="text-[10px] text-slate-400 font-bold">
-                        {s.role === 'Padrinho'
-                          ? `${Math.max(1, Math.floor((s.monthlyAmount || 90) / 90))} ${Math.max(1, Math.floor((s.monthlyAmount || 90) / 90)) === 1 ? 'cota ativa' : 'cotas ativas'}`
-                          : 'Recorrente mensal'}
+                        {(() => {
+                          if (s.role !== 'Padrinho') return 'Recorrente mensal';
+                          const pixSp = (s.sponsorships || []).find(
+                            (sp: any) => String(sp.payment_method || '').toLowerCase().includes('pix') || Number(sp.plan_months || 0) > 1
+                          );
+                          if (pixSp) {
+                            const chosenChildrenCount = Math.max(1, s.sponsoredChildren?.length || (s.sponsorships || []).filter((sp: any) => String(sp.status || 'active').toLowerCase() === 'active').length || 1);
+                            const months = Number(pixSp.plan_months || 0);
+                            return `${chosenChildrenCount} ${chosenChildrenCount === 1 ? 'criança' : 'crianças'}${months > 1 ? ` • PIX ${months}m` : ' • PIX'}`;
+                          }
+                          const quotas = Math.max(1, Math.floor((s.monthlyAmount || 90) / 90));
+                          return `${quotas} ${quotas === 1 ? 'cota ativa' : 'cotas ativas'}`;
+                        })()}
                       </p>
                     </>
                   ) : (

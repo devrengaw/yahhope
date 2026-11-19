@@ -325,6 +325,8 @@ export function MobileDonorChildren() {
 
         const pendingRaw = localStorage.getItem('yah_pending_sponsorship');
         let quotas = Number(searchParams.get('quotas')) || 1;
+        let planMonths = Number(searchParams.get('months')) || 1;
+        let payMethod = planMonths > 1 ? 'pix' : 'cartao_mensal';
         let donorEmail = searchParams.get('email') || user?.email || '';
         let donorName = searchParams.get('name') || user?.name || 'Padrinho YAH Hope';
         let sponsorUserId = user?.id;
@@ -333,6 +335,8 @@ export function MobileDonorChildren() {
           try {
             const pending = JSON.parse(pendingRaw);
             if (pending.quotasCount) quotas = Number(pending.quotasCount);
+            if (pending.planMonths) planMonths = Number(pending.planMonths);
+            if (pending.paymentMethod) payMethod = pending.paymentMethod === 'pix' ? 'pix' : 'cartao_mensal';
             if (pending.donorEmail) donorEmail = pending.donorEmail;
             if (pending.donorName) donorName = pending.donorName;
             if (pending.sponsorUserId) sponsorUserId = pending.sponsorUserId;
@@ -349,7 +353,8 @@ export function MobileDonorChildren() {
               donorEmail,
               donorPhone: user?.phone || '',
               quotasCount: quotas,
-              paymentMethod: 'cartao_mensal',
+              paymentMethod: payMethod,
+              planMonths,
               sponsorUserId
             });
 

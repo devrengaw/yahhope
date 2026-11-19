@@ -323,11 +323,11 @@ export function MonthlyDonor() {
           : `Mantenedor Mensal (R$ ${currentAmount}/mês)`
       }).catch(() => {});
 
-      // REGRA: Crianças em múltiplos inteiros de R$ 90 mensais.
-      // Em pacote PIX de 3, 6 ou 12 meses, usa quotasCount diretamente para não multiplicar as crianças pelos meses!
+      // REGRA: Crianças em múltiplos inteiros de R$ 90 mensais (apenas para Cartão).
+      // Em pacote PIX de 3, 6 ou 12 meses, usa quotasCount diretamente e NÃO entra na regra dos R$ 90,00!
       const calculatedQuotas = donationType === 'sponsorship'
         ? quotasCount
-        : Math.floor(currentAmount / 90);
+        : (paymentMethod === 'pix' ? 0 : Math.floor(currentAmount / 90));
 
       const isStripeCheckout = paymentMethod !== 'pix' && Boolean(import.meta.env.VITE_SUPABASE_URL);
 
@@ -370,7 +370,8 @@ export function MonthlyDonor() {
 
       // Se for Mantenedor Geral via PIX ou sem Stripe
       if (donationType !== 'sponsorship' && !isStripeCheckout) {
-        if (currentAmount >= 90) {
+        // Doações via PIX não entram na regra dos R$ 90,00
+        if (paymentMethod !== 'pix' && currentAmount >= 90) {
           try {
             const numChildren = Math.floor(currentAmount / 90);
             const assignRes = await sponsorshipService.assignChildrenToSponsor({
@@ -1166,7 +1167,7 @@ export function MonthlyDonor() {
                           ? (paymentMethod === 'pix'
                             ? tr(`${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Pacote ${pixPackageMonths} Meses`, `${quotasCount} Sponsored ${quotasCount === 1 ? 'Child' : 'Children'} • ${pixPackageMonths}-Month Package`)
                             : tr(`${quotasCount} ${quotasCount === 1 ? 'Criança Apadrinhada' : 'Crianças Apadrinhadas'} • Mensal`, `${quotasCount} Sponsored ${quotasCount === 1 ? 'Child' : 'Children'} • Monthly`))
-                          : Math.floor(currentAmount / 90) >= 1 
+                          : (paymentMethod !== 'pix' && Math.floor(currentAmount / 90) >= 1)
                             ? tr(`Mantenedor • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Criança Acolhida' : 'Crianças Acolhidas'}`, `Supporter • ${Math.floor(currentAmount / 90)} ${Math.floor(currentAmount / 90) === 1 ? 'Child Supported' : 'Children Supported'}`) 
                             : tr('Total Mensal (Fundo Geral):', 'Monthly Total (General Fund):')}
                       </span>
@@ -1176,7 +1177,7 @@ export function MonthlyDonor() {
                           {tr(`Equivale a R$ ${sponsorshipMonthlyTotal}/mês • Pacote de ${pixPackageMonths} meses`, `Equals R$ ${sponsorshipMonthlyTotal}/mo • ${pixPackageMonths}-month package`)}
                         </span>
                       )}
-                      {donationType !== 'sponsorship' && currentAmount >= 90 && currentAmount % 90 !== 0 && (
+                      {donationType !== 'sponsorship' && paymentMethod !== 'pix' && currentAmount >= 90 && currentAmount % 90 !== 0 && (
                         <span className="text-[10px] text-amber-700 font-gotham-bold flex items-center gap-1 mt-0.5">
                           <Sparkles size={10} className="text-[#F49853]" />
                           {tr(

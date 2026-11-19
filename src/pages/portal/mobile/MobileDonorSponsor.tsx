@@ -117,23 +117,25 @@ export function MobileDonorSponsor() {
     const donorPhone = user?.phone || '';
     const effectivePlanMonths = paymentMethod === 'pix' ? pixPackageMonths : 1;
 
-    // Salva intenção de apadrinhamento para reconciliação imediata
-    try {
-      localStorage.setItem('yah_pending_sponsorship', JSON.stringify({
-        donorName,
-        donorEmail,
-        donorPhone,
-        quotasCount,
-        amountPerQuota: quotaCost,
-        totalAmount,
-        paymentMethod,
-        planMonths: effectivePlanMonths,
-        renewChildId,
-        sponsorUserId: user?.id,
-        timestamp: Date.now()
-      }));
-    } catch (e) {
-      console.warn('Erro ao gravar yah_pending_sponsorship:', e);
+    // Salva intenção de apadrinhamento apenas quando redireciona para Checkout externo (Cartão)
+    if (paymentMethod === 'card') {
+      try {
+        localStorage.setItem('yah_pending_sponsorship', JSON.stringify({
+          donorName,
+          donorEmail,
+          donorPhone,
+          quotasCount,
+          amountPerQuota: quotaCost,
+          totalAmount,
+          paymentMethod,
+          planMonths: effectivePlanMonths,
+          renewChildId,
+          sponsorUserId: user?.id,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('Erro ao gravar yah_pending_sponsorship:', e);
+      }
     }
 
     const successReturnUrl = `${window.location.origin}/portal/sponsorship?status=success&quotas=${quotasCount}&months=${effectivePlanMonths}&amount=${totalAmount}&email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`;

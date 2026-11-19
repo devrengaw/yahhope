@@ -207,7 +207,8 @@ export function HomeDonationCard({
         return false;
       }
     } else if (!isSingleDonation) {
-      if (finalVal >= 90) {
+      // Doações via PIX fora da aba de Apadrinhamento não entram na regra dos R$ 90,00
+      if (payMethod !== 'pix' && finalVal >= 90) {
         try {
           const numChildren = Math.floor(finalVal / 90);
           const assignRes = await sponsorshipService.assignChildrenToSponsor({

@@ -572,30 +572,65 @@ export const sponsorshipService = {
     const maxSponsors = metrics.maxSponsorsPerChild;
 
     // REGRA DE OURO:
-    // - Se for Cartão Mensal (planMonths = 1): R$ 90 = 1 criança, R$ 180 = 2 crianças...
-    // - Se for Pacote PIX (planMonths = 3, 6 ou 12): o valor pago é (cotas * R$ 90 * planMonths).
-    //   Portanto, o equivalente mensal é (totalSupplied / planMonths), evitando alocar 3/6/12 crianças
-    //   quando a pessoa está pagando 3/6/12 meses de 1 criança!
+    // - Se for Cartão Mensal (planMonths = 1 e !isPix): R$ 90 = 1 criança, R$ 180 = 2 crianças...
+    // - Se for PIX (pacote de meses): a pessoa escolhe explicitamente a quantidade de crianças (quotasCount)
+    //   e a quantidade de meses (planMonths). O valor pago é (crianças * R$ 90 * meses).
+    //   Nesse caso, NÃO entra na regra dos R$ 90,00: aloca APENAS a quantidade de crianças escolhida!
     const totalSupplied = payload.amount || (payload.amountPerQuota && payload.amountPerQuota >= 90 ? payload.amountPerQuota * planMonths : 0);
     const monthlyEquivalent = planMonths > 1 && totalSupplied >= 90 * planMonths
       ? totalSupplied / planMonths
       : totalSupplied;
 
-    let effectiveQuotas = quotasCount || 1;
-    if (quotasCount && quotasCount >= 1) {
-      effectiveQuotas = quotasCount;
-    } else if (monthlyEquivalent >= 90) {
+    let effectiveQuotas = Math.max(1, Number(quotasCount) || 1);
+    if (!isPix && planMonths === 1 && (!quotasCount || quotasCount < 1) && monthlyEquivalent >= 90) {
       effectiveQuotas = Math.max(1, Math.floor(monthlyEquivalent / 90));
     }
 
-    // 1. Filtra crianças elegíveis (respeitando rigorosamente o teto maxSponsors, exceto renovação da própria criança)
-    const availableChildren = metrics.children.filter(c => c.sponsorsCount < maxSponsors || c.id === renewChildId);
+    const cleanEmail = donorEmail.toLowerCase().trim();
+    const nowIso = new Date().toISOString();
+    let finalExpiresAt: string | null = planMonths > 1 || isPix
+      ? calculatePackageExpirationDate(planMonths)
+      : null;
 
-    // 2. Ordena priorizando a criança em renovação (se houver) e depois menor número de padrinhos ativos (Least-Sponsored)
+    // Busca vínculos existentes do padrinho para evitar duplicar crianças ou ultrapassar a quantidade escolhida no PIX
+    let existingSponsorRows: any[] = [];
+    try {
+      let queryExistingAll = supabase
+        .from('sponsorships')
+        .select('*');
+      if (sponsorUserId && cleanEmail) {
+        queryExistingAll = queryExistingAll.or(`sponsor_id.eq.${sponsorUserId},donor_email.ilike.${cleanEmail}`);
+      } else if (sponsorUserId) {
+        queryExistingAll = queryExistingAll.eq('sponsor_id', sponsorUserId);
+      } else if (cleanEmail) {
+        queryExistingAll = queryExistingAll.ilike('donor_email', cleanEmail);
+      }
+      const { data: existingAllData } = await queryExistingAll;
+      existingSponsorRows = (existingAllData || []).filter((r: any) => {
+        const st = String(r.status || 'active').toLowerCase().trim();
+        return st !== 'canceled' && st !== 'cancelled' && st !== 'replaced' && st !== 'graduated' && st !== 'discharged';
+      });
+    } catch {}
+
+    const existingChildIdsForSponsor = new Set<string>(
+      existingSponsorRows.map((r: any) => r.child_id).filter(Boolean)
+    );
+
+    // 1. Filtra crianças elegíveis (respeitando rigorosamente o teto maxSponsors, exceto renovação/reuso da própria criança)
+    const availableChildren = metrics.children.filter(
+      c => c.sponsorsCount < maxSponsors || c.id === renewChildId || existingChildIdsForSponsor.has(c.id)
+    );
+
+    // 2. Ordena priorizando a criança em renovação, depois crianças já vinculadas a este padrinho (em PIX/reuso) e depois menor número de padrinhos ativos (Least-Sponsored)
     availableChildren.sort((a, b) => {
       if (renewChildId) {
         if (a.id === renewChildId) return -1;
         if (b.id === renewChildId) return 1;
+      }
+      if (isPix) {
+        const aOwned = existingChildIdsForSponsor.has(a.id) ? 0 : 1;
+        const bOwned = existingChildIdsForSponsor.has(b.id) ? 0 : 1;
+        if (aOwned !== bOwned) return aOwned - bOwned;
       }
       if (a.sponsorsCount !== b.sponsorsCount) {
         return a.sponsorsCount - b.sponsorsCount;
@@ -603,18 +638,12 @@ export const sponsorshipService = {
       return a.name.localeCompare(b.name);
     });
 
-    // 3. Seleciona as N crianças disponíveis (se não houver crianças livres, as cotas restantes ficam como "Aguardando vínculo")
+    // 3. Seleciona EXATAMENTE as N crianças escolhidas (se não houver crianças livres, as cotas restantes ficam como "Aguardando vínculo")
     const countToAssign = Math.min(effectiveQuotas, availableChildren.length);
     const pendingAssignmentCount = Math.max(0, effectiveQuotas - countToAssign);
     const selectedChildren = availableChildren.slice(0, countToAssign);
     const totalAmount = totalSupplied > 0 ? totalSupplied : effectiveQuotas * quotaCost * planMonths;
     const perChildPackageAmount = quotaCost * planMonths;
-
-    const cleanEmail = donorEmail.toLowerCase().trim();
-    const nowIso = new Date().toISOString();
-    let finalExpiresAt: string | null = planMonths > 1 || isPix
-      ? calculatePackageExpirationDate(planMonths)
-      : null;
 
     try {
       // 4. Cria ou atualiza os registros em 'sponsorships'
@@ -1587,15 +1616,28 @@ export const sponsorshipService = {
       });
 
       // Calcula a quantidade de cotas que o apoiador tem direito:
-      // REGRA: Se o valor for > R$ 90,00, a pessoa DEVE receber mais de uma criança!
-      const amounts = combinedSp.map(r => Number(r.monthly_amount || 0));
-      const maxMonthlyAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
-      const totalMonthlyAmount = amounts.reduce((acc, v) => acc + v, 0);
-      const effectiveAmount = Math.max(maxMonthlyAmount, totalMonthlyAmount);
+      // - Pacotes/doações PIX NÃO entram na regra dos R$ 90,00: cada registro PIX mantém apenas a quantidade de crianças escolhida pelo padrinho!
+      // - Apenas assinaturas mensais recorrentes (Cartão) seguem a regra dos múltiplos inteiros de R$ 90,00 (90 = 1, 180 = 2, 270 = 3...).
+      const isPixRow = (r: any) => {
+        const pm = String(r?.payment_method || '').toLowerCase();
+        const localMeta = getLocalPixPackageMeta(cleanEmail, r?.child_id);
+        return pm.includes('pix') || Number(r?.plan_months || 0) > 1 || Number(r?.package_amount || 0) > 0 || Number(localMeta?.planMonths || 0) > 1;
+      };
 
-      // REGRA: Criança acompanhada a cada múltiplo inteiro de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
-      // Valores excedentes (ex: 95 -> 90 cota + 5 fundo geral) apoiam o projeto como um todo.
-      const targetQuotaCount = Math.floor(effectiveAmount / 90);
+      const pixRows = combinedSp.filter(r => isPixRow(r));
+      const nonPixRows = combinedSp.filter(r => !isPixRow(r));
+
+      const pixTargetQuotas = pixRows.reduce((acc, r) => {
+        return acc + (r.child_id ? 1 : Math.max(1, Number(r.quotas_count) || 1));
+      }, 0);
+
+      const nonPixAmounts = nonPixRows.map(r => Number(r.monthly_amount || 0));
+      const maxNonPixMonthly = nonPixAmounts.length > 0 ? Math.max(...nonPixAmounts) : 0;
+      const totalNonPixMonthly = nonPixAmounts.reduce((acc, v) => acc + v, 0);
+      const effectiveNonPixAmount = Math.max(maxNonPixMonthly, totalNonPixMonthly);
+      const nonPixTargetQuotas = Math.floor(effectiveNonPixAmount / 90);
+
+      const targetQuotaCount = pixTargetQuotas + nonPixTargetQuotas;
 
       const alreadyAssignedRows = combinedSp.filter(r => r.child_id);
       
@@ -1855,13 +1897,31 @@ export const sponsorshipService = {
 
     let result = Array.from(mergedMap.values());
 
-    // REGRA: Criança acompanhada a cada múltiplo de R$ 90 (90 = 1, 180 = 2, 270 = 3...):
-    const amounts = combinedData.map(item => Number(item.monthly_amount || 0));
-    const effectiveAmount = amounts.length > 0 ? Math.max(...amounts, amounts.reduce((a, b) => a + b, 0)) : 0;
-    const expectedChildrenCount = Math.floor(effectiveAmount / 90);
+    // REGRA:
+    // - Pacotes PIX NÃO entram na regra dos R$ 90,00: mantém apenas a quantidade de crianças escolhida pelo padrinho!
+    // - Apenas assinaturas mensais (Cartão) seguem a regra dos múltiplos de R$ 90 (90 = 1, 180 = 2, 270 = 3...).
+    const activeNonGraduated = combinedData.filter(item => !item._isGraduated);
+    const isPixItem = (item: any) => {
+      const pm = String(item?.payment_method || '').toLowerCase();
+      return pm.includes('pix') || Number(item?.plan_months || 0) > 1 || Number(item?.package_amount || 0) > 0 || Number(item?._validity?.planMonths || 0) > 1;
+    };
 
-    // Auto-atribui se o usuário tiver cotas pendentes ou se tiver doação > 90 e ainda não tiver recebido todas as crianças:
-    if ((hasUnassignedRow || (expectedChildrenCount > result.length && expectedChildrenCount > 0))) {
+    const pixExpectedCount = activeNonGraduated
+      .filter(item => isPixItem(item))
+      .reduce((acc, item) => acc + (item.child_id ? 1 : Math.max(1, Number(item.quotas_count) || 1)), 0);
+
+    const nonPixItems = activeNonGraduated.filter(item => !isPixItem(item));
+    const nonPixAmounts = nonPixItems.map(item => Number(item.monthly_amount || 0));
+    const effectiveNonPixAmount = nonPixAmounts.length > 0
+      ? Math.max(...nonPixAmounts, nonPixAmounts.reduce((a, b) => a + b, 0))
+      : 0;
+    const nonPixExpectedCount = Math.floor(effectiveNonPixAmount / 90);
+
+    const expectedChildrenCount = pixExpectedCount + nonPixExpectedCount;
+    const activeResultCount = result.filter(c => !c.isGraduated).length;
+
+    // Auto-atribui se o usuário tiver cotas pendentes ou se tiver assinatura mensal > 90 sem todas as crianças:
+    if ((hasUnassignedRow || (expectedChildrenCount > activeResultCount && expectedChildrenCount > 0))) {
       try {
         const reconciled = await this.autoReconcilePaidSponsor(userId, cleanEmail, userName, false);
         if (reconciled && reconciled.length > 0) {

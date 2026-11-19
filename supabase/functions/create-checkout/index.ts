@@ -28,6 +28,7 @@ serve(async (req) => {
       cancelUrl,
       paymentMethod,
       quotasCount,
+      planMonths,
       type
     } = await req.json()
 
@@ -94,7 +95,8 @@ serve(async (req) => {
         paymentMethod: isPix ? 'pix' : (isSubscription ? 'card_subscription' : 'card'),
         amount: amount.toString(),
         type: type || 'donation',
-        quotasCount: (quotasCount || 1).toString()
+        quotasCount: (quotasCount || 1).toString(),
+        planMonths: (planMonths || 1).toString()
       }
     };
 

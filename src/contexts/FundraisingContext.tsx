@@ -402,6 +402,9 @@ export function FundraisingProvider({ children }: { children: React.ReactNode })
             if (isSameEmail) {
               if (d.is_sponsorship) return true;
               if (isSameAmount && (!spMonth || !dMonth || dMonth === spMonth)) return true;
+              const isPixSp = String(sp.payment_method || '').toLowerCase().includes('pix') || Number(sp.plan_months || 0) > 1;
+              const isPixDon = String(d.payment_method || '').toLowerCase().includes('pix');
+              if (isPixSp && isPixDon && d.amount >= spAmount && (!spMonth || !dMonth || dMonth === spMonth)) return true;
               if (d.stripe_payment_id && (sp.stripe_subscription_id || sp.stripe_customer_id)) return true;
             }
             return false;

@@ -29,6 +29,7 @@ async function syncMaintainerProfile(data: {
   isMonthly?: boolean;
   amount?: number;
   quotasCount?: number;
+  planMonths?: number;
   paymentMethod?: string;
   subscriptionId?: string;
   customerId?: string;
@@ -45,6 +46,8 @@ async function syncMaintainerProfile(data: {
   const timestamp = data.lastSponsoredAt || new Date().toISOString();
 
   const isMonthly = Boolean(data.isMonthly);
+  const isPix = String(paymentMethod).toLowerCase().includes('pix');
+  const planMonths = Number(data.planMonths) > 0 ? Number(data.planMonths) : (isPix ? 3 : 1);
   const monthlyAmount = Number(data.amount || 0);
 
   // Busca parâmetros dinâmicos da área de Finanças (valor da cota e teto de padrinhos por criança)
@@ -58,13 +61,20 @@ async function syncMaintainerProfile(data: {
   const maxSponsorsPerChild = Math.max(1, Number(orgSettings?.max_sponsors_per_child) || 2);
 
   // REGRA DE OURO:
-  // - Apenas doadores MENSAIS com valor >= quotaCost (padrão R$ 90,00) podem apadrinhar crianças.
-  // - Crianças atribuídas a cada múltiplo inteiro de quotaCost.
-  // - Excedentes (ex: 95) apadrinham 1 criança e o excedente apoia o projeto como um todo.
+  // - Em pagamentos via PIX: o padrinho escolhe explicitamente o número de crianças (quotasCount) e meses (planMonths).
+  //   O valor pago é (crianças * R$ 90 * meses), portanto NÃO entra na regra dos R$ 90,00 (não divide o valor pago por 90).
+  // - Em assinaturas mensais no Cartão: crianças atribuídas a cada múltiplo inteiro de quotaCost (padrão R$ 90,00).
   // - Quem doa R$ 50,00 (ou qualquer valor < quotaCost) é Mantenedor Mensal de Apoio Geral (child_id = NULL).
   // - Doações avulsas/pontuais não entram na tabela 'sponsorships'.
-  const canSponsorChild = isMonthly && monthlyAmount >= quotaCost && data.isSponsor !== false;
-  const quotasCount = canSponsorChild ? Math.floor(monthlyAmount / quotaCost) : 0;
+  const isPixSponsorship = isPix && data.isSponsor === true;
+  const canSponsorChild = isPix
+    ? isPixSponsorship
+    : (isMonthly && monthlyAmount >= quotaCost && data.isSponsor !== false);
+  const quotasCount = canSponsorChild
+    ? (isPix
+        ? Math.max(1, Number(data.quotasCount) || 1)
+        : Math.floor(monthlyAmount / quotaCost))
+    : 0;
 
   // 1. Atualiza ou insere o perfil na tabela 'users'
   const { data: existingUser } = await supabase
@@ -105,8 +115,8 @@ async function syncMaintainerProfile(data: {
     }
   }
 
-  // 2. Se for assinatura mensal ativa, atualiza ou insere na tabela 'sponsorships'
-  if (isMonthly && monthlyAmount > 0) {
+  // 2. Se for assinatura mensal ativa ou pacote PIX de apadrinhamento, atualiza ou insere na tabela 'sponsorships'
+  if ((isMonthly || isPixSponsorship) && monthlyAmount > 0) {
     let spQuery = supabase
       .from('sponsorships')
       .select('id, child_id')
@@ -122,10 +132,12 @@ async function syncMaintainerProfile(data: {
 
     if (existingSp && existingSp.length > 0) {
       const targetQuotas = canSponsorChild ? Math.max(quotasCount, existingSp.length) : existingSp.length;
-      // REGRA DE OURO: Cada cota de apadrinhamento tem valor mínimo de quotaCost (padrão R$ 90,00)
-      const perQuotaAmount = Math.max(quotaCost, targetQuotas > 1 && monthlyAmount >= targetQuotas * quotaCost
-        ? Number((monthlyAmount / targetQuotas).toFixed(2))
-        : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost));
+      // REGRA DE OURO: Em PIX cada cota de criança tem valor mensal equivalente a quotaCost (R$ 90,00), não o valor total do pacote!
+      const perQuotaAmount = isPix
+        ? quotaCost
+        : Math.max(quotaCost, targetQuotas > 1 && monthlyAmount >= targetQuotas * quotaCost
+            ? Number((monthlyAmount / targetQuotas).toFixed(2))
+            : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost));
 
       const existingChildIds = new Set(existingSp.map((sp: any) => sp.child_id).filter(Boolean));
       const missingCount = canSponsorChild ? Math.max(0, quotasCount - existingSp.length) : 0;
@@ -221,6 +233,10 @@ async function syncMaintainerProfile(data: {
         }
       }
 
+      const perChildInsertAmount = isPix
+        ? quotaCost
+        : Math.max(quotaCost, quotasCount > 1 && monthlyAmount >= quotasCount * quotaCost ? monthlyAmount / quotasCount : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost));
+
       for (const chId of assignedChildIds) {
         await supabase.from('sponsorships').insert({
           child_id: chId, // NULL para doadores de R$ 50 (Apoio Geral)
@@ -228,7 +244,7 @@ async function syncMaintainerProfile(data: {
           donor_name: donorName,
           donor_email: cleanEmail,
           donor_phone: donorPhone,
-          monthly_amount: Math.max(quotaCost, quotasCount > 1 && monthlyAmount >= quotasCount * quotaCost ? monthlyAmount / quotasCount : (monthlyAmount >= quotaCost ? monthlyAmount : quotaCost)),
+          monthly_amount: perChildInsertAmount,
           quotas_count: 1,
           status: 'active',
           payment_method: paymentMethod,
@@ -809,6 +825,7 @@ serve(async (req) => {
       const isSponsorship = session.metadata?.type === 'sponsorship' || session.mode === 'subscription'
       const isMonthly = session.metadata?.isMonthly === 'true' || session.mode === 'subscription'
       const quotasCount = Number(session.metadata?.quotasCount) || 1
+      const planMonths = Number(session.metadata?.planMonths) || 1
       const isPix = session.metadata?.paymentMethod === 'pix' || session.payment_method_types?.includes('pix')
       const paymentMethod = isPix ? 'pix' : 'credit_card'
 
@@ -845,10 +862,11 @@ serve(async (req) => {
         email: donorEmail,
         name: donorName,
         phone: donorPhone,
-        isSponsor: isSponsorship || isMonthly,
+        isSponsor: isPix ? session.metadata?.type === 'sponsorship' : (isSponsorship || isMonthly),
         isMonthly,
         amount,
         quotasCount,
+        planMonths,
         paymentMethod,
         subscriptionId: session.subscription as string,
         customerId: session.customer as string
