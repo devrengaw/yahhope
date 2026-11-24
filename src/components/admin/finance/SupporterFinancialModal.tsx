@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   User, 
@@ -14,9 +14,14 @@ import {
   FileText,
   Download,
   Trash2,
-  Loader2
+  Loader2,
+  Copy,
+  Check,
+  Link2,
+  MessageCircle
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { sponsorshipService } from '../../../services/sponsorshipService';
 
 export interface SupporterDonation {
   id: string;
@@ -68,8 +73,66 @@ interface SupporterFinancialModalProps {
 
 export function SupporterFinancialModal({ isOpen, onClose, supporter, onDeleteDonation }: SupporterFinancialModalProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [inviteData, setInviteData] = useState<{ text: string; link: string; whatsappUrl: string } | null>(null);
+  const [loadingInvite, setLoadingInvite] = useState(false);
+  const [copiedMode, setCopiedMode] = useState<'text' | 'link' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isOpen || !supporter || supporter.role !== 'Padrinho' || !supporter.email) {
+      setInviteData(null);
+      return;
+    }
+
+    setLoadingInvite(true);
+    const fallbackChildrenNames = supporter.sponsoredChildren && supporter.sponsoredChildren.length > 0
+      ? supporter.sponsoredChildren.map(c => c.name).filter(Boolean)
+      : (supporter.sponsoredChildName && supporter.sponsoredChildName !== 'Aguardando vínculo' ? [supporter.sponsoredChildName] : []);
+
+    sponsorshipService
+      .buildSponsorInviteMessage(supporter.email, supporter.name, {
+        phone: supporter.phone,
+        fallbackChildrenNames
+      })
+      .then(res => {
+        if (!cancelled) {
+          setInviteData({ text: res.text, link: res.link, whatsappUrl: res.whatsappUrl });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInviteData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInvite(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, supporter?.id, supporter?.email, supporter?.role]);
 
   if (!isOpen || !supporter) return null;
+
+  const copyValue = async (value: string, mode: 'text' | 'link') => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedMode(mode);
+      setTimeout(() => setCopiedMode(prev => (prev === mode ? null : prev)), 2500);
+    } catch {
+      // ignore
+    }
+  };
 
   const paidDonations = supporter.donations.filter(d => d.status === 'paid');
   const pendingDonations = supporter.donations.filter(d => d.status === 'pending');
@@ -235,6 +298,83 @@ export function SupporterFinancialModal({ isOpen, onClose, supporter, onDeleteDo
               </span>
             </div>
           ) : null}
+
+          {/* Convite de Acesso do Padrinho para WhatsApp */}
+          {supporter.role === 'Padrinho' && supporter.email && (
+            <div className="p-5 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm">
+                    <MessageCircle size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-900">
+                      Convite do Padrinho para WhatsApp
+                    </p>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      Copie o texto e link do e-mail convite ou abra diretamente no WhatsApp.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!inviteData || loadingInvite}
+                    onClick={() => inviteData && copyValue(inviteData.text, 'text')}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 disabled:opacity-50 cursor-pointer",
+                      copiedMode === 'text'
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white hover:bg-slate-900 hover:text-white text-slate-700 border-emerald-200"
+                    )}
+                  >
+                    {copiedMode === 'text' ? <Check size={13} /> : <Copy size={13} />}
+                    {copiedMode === 'text' ? 'Copiado!' : 'Copiar Texto + Link'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!inviteData || loadingInvite}
+                    onClick={() => inviteData && copyValue(inviteData.link, 'link')}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 disabled:opacity-50 cursor-pointer",
+                      copiedMode === 'link'
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white hover:bg-slate-900 hover:text-white text-slate-700 border-emerald-200"
+                    )}
+                  >
+                    {copiedMode === 'link' ? <Check size={13} /> : <Link2 size={13} />}
+                    {copiedMode === 'link' ? 'Link Copiado!' : 'Copiar Link'}
+                  </button>
+                  <a
+                    href={inviteData?.whatsappUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (!inviteData || loadingInvite) e.preventDefault();
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all active:scale-95",
+                      (!inviteData || loadingInvite) && "opacity-50 pointer-events-none"
+                    )}
+                  >
+                    <MessageCircle size={13} />
+                    Enviar pelo WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              {loadingInvite ? (
+                <div className="flex items-center gap-2 text-xs text-emerald-700 py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Preparando texto e link do convite...
+                </div>
+              ) : inviteData ? (
+                <div className="bg-white/90 border border-emerald-200/70 rounded-xl p-3.5 text-xs text-slate-700 whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed font-medium">
+                  {inviteData.text}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {/* Cards de Resumo Financeiro do Apoiador */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

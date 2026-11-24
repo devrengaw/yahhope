@@ -166,57 +166,41 @@ export function MobileDonorDonate() {
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      if (supabaseUrl) {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            campaignId: selectedCampaignId || null,
-            amount: currentAmount,
-            isMonthly: frequency === 'monthly' && paymentMethod !== 'pix',
-            paymentMethod,
-            donorName: user?.name || 'Mantenedor YAH Hope',
-            donorEmail: user?.email || 'mantenedor@yahhope.com',
-            successUrl: `${window.location.origin}/portal/donations?status=success&amount=${currentAmount}`,
-            cancelUrl: `${window.location.origin}/portal/donations?status=cancel`
-          })
-        });
-
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
+      if (!supabaseUrl) {
+        alert(tr('Serviço de pagamento indisponível no momento. Tente novamente em instantes.', 'Payment service unavailable at the moment. Please try again shortly.'));
+        return;
       }
 
-      // Se for doação mensal, atualiza e substitui o valor do apoio geral ativo
-      if (frequency === 'monthly') {
-        await sponsorshipService.updateGeneralMonthlySupport(
-          user?.id,
-          user?.email || 'mantenedor@yahhope.org',
-          currentAmount,
+      const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          campaignId: selectedCampaignId || null,
+          amount: currentAmount,
+          isMonthly: frequency === 'monthly' && paymentMethod !== 'pix',
           paymentMethod,
-          user?.name || 'Mantenedor YAH Hope'
-        );
-        fetchCommitments();
+          donorName: user?.name || 'Mantenedor YAH Hope',
+          donorEmail: user?.email || 'mantenedor@yahhope.com',
+          successUrl: `${window.location.origin}/portal/donations?status=success&method=${paymentMethod}&amount=${currentAmount}`,
+          cancelUrl: `${window.location.origin}/portal/donations?status=cancel`
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+        return;
       }
 
-      // Registro da doação Pix
-      await createDonation({
-        donor_name: user?.name || 'Mantenedor YAH Hope',
-        donor_email: user?.email || 'mantenedor@yahhope.com',
-        amount: currentAmount,
-        payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao',
-        campaign_id: selectedCampaignId || undefined
-      });
-      setPixGenerated(true);
+      console.error('Erro ao criar checkout de doação:', data);
+      alert(tr('Não foi possível iniciar o checkout de pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Could not start the payment checkout. No amount was charged — please try again shortly.'));
     } catch (e) {
       console.error(e);
-      setPixGenerated(true);
+      alert(tr('Erro de conexão ao iniciar o pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Connection error while starting payment. No amount was charged — please try again shortly.'));
     } finally {
       setIsSubmitting(false);
     }

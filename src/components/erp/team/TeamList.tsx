@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamMember, TeamMemberRole, TeamMemberStatus } from '../../../lib/mockData';
 import { supabase } from '../../../lib/supabase';
-import { Mail, Phone, Edit2, Trash2, Send } from 'lucide-react';
+import { Mail, Phone, Edit2, Trash2, Send, CheckCircle2, Clock, UserCheck } from 'lucide-react';
 
 interface TeamListProps {
   members: TeamMember[];
@@ -65,6 +65,51 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite, onQuickRol
     }
   };
 
+  const getSiteAccessBadge = (member: TeamMember) => {
+    const isSupporterRole = ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(member.role || '').toUpperCase());
+    if (member.siteAccessStatus === 'accessed') {
+      const formattedDate = member.lastAccessAt
+        ? new Date(member.lastAccessAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : null;
+      return (
+        <div className="flex flex-col items-start gap-0.5 mt-1">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-teal-50 text-teal-700 border border-teal-200"
+            title={formattedDate ? `Cadastrado e acessou o site em ${formattedDate}` : 'Cadastrado e acessou o site'}
+          >
+            <CheckCircle2 size={11} />
+            Cadastrado • Acessou o site
+          </span>
+          {formattedDate && (
+            <span className="text-[10px] text-slate-400 pl-1">
+              Último acesso: {formattedDate}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (member.siteAccessStatus === 'registered_only') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 text-[10px] font-bold rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+          <UserCheck size={11} />
+          Cadastrado • Sem acesso
+        </span>
+      );
+    }
+
+    if (isSupporterRole) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 text-[10px] font-semibold rounded-full bg-amber-50/70 text-amber-700 border border-amber-200/80">
+          <Clock size={11} />
+          Aguardando cadastro
+        </span>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -83,7 +128,7 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite, onQuickRol
           <tbody className="divide-y divide-slate-100">
             {members.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-500">
+                <td colSpan={7} className="p-8 text-center text-slate-500">
                   Nenhum membro encontrado.
                 </td>
               </tr>
@@ -121,7 +166,7 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite, onQuickRol
                         <Phone size={14} className="text-slate-400" />
                         {member.phone && member.phone !== '-' ? (
                           <a 
-                            href={`https://wa.me/${member.phone.replace(/\\D/g, '')}`} 
+                            href={`https://wa.me/${member.phone.replace(/\D/g, '')}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="hover:text-emerald-600 hover:underline transition-colors"
@@ -157,32 +202,35 @@ export function TeamList({ members, onEdit, onDelete, onResendInvite, onQuickRol
                     <td className="p-4 text-slate-600 text-sm">
                       {new Date(member.join_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="p-4 pr-6">
-                      <div className="flex items-center justify-between gap-4">
+                    <td className="p-4">
+                      <div className="flex flex-col items-start">
                         {getStatusBadge(member.status)}
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => onResendInvite?.(member)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-95"
-                            title="Reenviar E-mail de Convite"
-                          >
-                            <Send size={16} />
-                          </button>
-                          <button 
-                            onClick={() => onEdit?.(member)}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all active:scale-95"
-                            title="Editar Usuário"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => onDelete?.(member.id)}
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all active:scale-95"
-                            title="Excluir Usuário"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        {getSiteAccessBadge(member)}
+                      </div>
+                    </td>
+                    <td className="p-4 pr-6 text-right">
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => onResendInvite?.(member)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-95"
+                          title="Reenviar E-mail de Convite"
+                        >
+                          <Send size={16} />
+                        </button>
+                        <button 
+                          onClick={() => onEdit?.(member)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all active:scale-95"
+                          title="Editar Usuário"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => onDelete?.(member.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all active:scale-95"
+                          title="Excluir Usuário"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>

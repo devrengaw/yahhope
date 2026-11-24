@@ -316,63 +316,15 @@ export function MobileDonorChildren() {
     refreshChildren();
   }, [user?.id, user?.email, user?.name]);
 
-  // Reconciliação imediata pós-retorno de pagamento (Stripe / Checkout)
+  // Atualização pós-retorno do Checkout Stripe (sem ativar ou disparar e-mail antes do webhook confirmar o pagamento)
   useEffect(() => {
     const status = searchParams.get('status');
     if (status === 'success') {
-      const reconcile = async () => {
-        setIsLoadingChildren(true);
-
-        const pendingRaw = localStorage.getItem('yah_pending_sponsorship');
-        let quotas = Number(searchParams.get('quotas')) || 1;
-        let planMonths = Number(searchParams.get('months')) || 1;
-        let payMethod = planMonths > 1 ? 'pix' : 'cartao_mensal';
-        let donorEmail = searchParams.get('email') || user?.email || '';
-        let donorName = searchParams.get('name') || user?.name || 'Padrinho YAH Hope';
-        let sponsorUserId = user?.id;
-
-        if (pendingRaw) {
-          try {
-            const pending = JSON.parse(pendingRaw);
-            if (pending.quotasCount) quotas = Number(pending.quotasCount);
-            if (pending.planMonths) planMonths = Number(pending.planMonths);
-            if (pending.paymentMethod) payMethod = pending.paymentMethod === 'pix' ? 'pix' : 'cartao_mensal';
-            if (pending.donorEmail) donorEmail = pending.donorEmail;
-            if (pending.donorName) donorName = pending.donorName;
-            if (pending.sponsorUserId) sponsorUserId = pending.sponsorUserId;
-          } catch (e) {
-            console.warn('Aviso ao ler pending sponsorship:', e);
-          }
-          localStorage.removeItem('yah_pending_sponsorship');
-        }
-
-        if (donorEmail) {
-          try {
-            const result = await sponsorshipService.assignChildrenToSponsor({
-              donorName,
-              donorEmail,
-              donorPhone: user?.phone || '',
-              quotasCount: quotas,
-              paymentMethod: payMethod,
-              planMonths,
-              sponsorUserId
-            });
-
-            if (result.success && result.assignedChildren.length > 0) {
-              setCelebrationChildren(result.assignedChildren);
-              setShowCelebration(true);
-            }
-          } catch (err) {
-            console.error('Erro ao reconciliar apadrinhamento pós-pagamento:', err);
-          }
-        }
-
-        // Limpa a URL para evitar re-execução em F5
-        window.history.replaceState({}, '', window.location.pathname);
-        refreshChildren();
-      };
-
-      reconcile();
+      localStorage.removeItem('yah_pending_sponsorship');
+      // Limpa a URL para evitar re-execução em F5
+      window.history.replaceState({}, '', window.location.pathname);
+      // Recarrega apenas o que já foi efetivamente confirmado e gravado pelo stripe-webhook
+      refreshChildren();
     }
   }, [searchParams, user]);
 

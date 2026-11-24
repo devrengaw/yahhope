@@ -20,6 +20,49 @@ serve(async (req) => {
     const bodyPayload = await req.json()
     const { action, id, email, name, role, permissions, phone, department, status, category_id } = bodyPayload
 
+    // Action para listar status real de cadastro e último acesso no Supabase Auth (para Área de Usuários)
+    if (action === 'list_auth_status') {
+      const authUsers: Array<{
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        created_at: string | null;
+        email_confirmed_at: string | null;
+        last_sign_in_at: string | null;
+      }> = [];
+
+      let page = 1;
+      const perPage = 1000;
+      while (page <= 10) {
+        const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+        if (listError) throw new Error(`Erro ao listar usuários do Auth: ${listError.message}`);
+        const batch = listData?.users || [];
+        for (const u of batch) {
+          if (!u.email) continue;
+          authUsers.push({
+            id: u.id,
+            email: u.email.trim().toLowerCase(),
+            name: (u.user_metadata?.full_name || u.user_metadata?.name || u.email.split('@')[0] || '').trim(),
+            role: String(u.user_metadata?.role || 'SPONSOR'),
+            created_at: u.created_at || null,
+            email_confirmed_at: u.email_confirmed_at || null,
+            last_sign_in_at: u.last_sign_in_at || null,
+          });
+        }
+        if (batch.length < perPage) break;
+        page += 1;
+      }
+
+      return new Response(JSON.stringify({ success: true, users: authUsers }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     // Action para atualizar permissões/dados de usuário com Service Role (ignora RLS e sincroniza Auth Metadata)
     if (action === 'update_user') {
       const cleanEmail = (email || '').trim().toLowerCase()

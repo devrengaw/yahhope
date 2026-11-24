@@ -86,6 +86,7 @@ export function Settings() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userFilter, setUserFilter] = useState<'all' | 'supporters' | 'team'>('all');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'site_accessed' | 'registered_only' | 'not_registered' | 'active' | 'inactive'>('all');
   const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
@@ -100,48 +101,170 @@ export function Settings() {
       // Remove silenciosamente do banco eventuais registros falsos/bots
       purgeSpamUsersFromDatabase();
 
-      const [{ data, error }, overridesMap] = await Promise.all([
+      const [
+        usersRes,
+        overridesMap,
+        siteAccessRes,
+        sponsorshipsRes,
+        authStatusRes
+      ] = await Promise.all([
         supabase.from('users').select('*'),
-        fetchUserAccessOverrides()
+        fetchUserAccessOverrides(),
+        supabase.from('site_settings').select('value').eq('key', 'user_site_access_v1').maybeSingle(),
+        supabase.from('sponsorships').select('donor_email, donor_name, child_id, monthly_amount, status, sponsor_id'),
+        supabase.functions.invoke('invite-user', { body: { action: 'list_auth_status' } }).catch(() => ({ data: null, error: true }))
       ]);
-      if (error) throw error;
-      if (data) {
-        const validUsers = data.filter(u => !isSpamOrMockUser(u));
-        const mappedMembers = validUsers.map(u => {
-          const savedOverride = findUserAccessOverride(overridesMap, { id: u.id, email: u.email });
-          const rawRole = savedOverride?.role || u.role || 'USER';
-          const upperRole = String(rawRole).trim().toUpperCase();
-          let normalizedRole: TeamMember['role'] = 'USER';
-          if (upperRole === 'SPONSOR' || upperRole === 'PADRINHO') normalizedRole = 'SPONSOR';
-          else if (upperRole === 'MANTENEDOR') normalizedRole = 'MANTENEDOR';
-          else if (upperRole === 'USER') normalizedRole = 'USER';
-          else if (upperRole === 'MASTER') normalizedRole = 'admin';
-          else if (upperRole === 'COORDENADOR') normalizedRole = 'coordinator';
-          else if (upperRole === 'VOLUNTARIO') normalizedRole = 'volunteer';
-          else normalizedRole = String(rawRole).toLowerCase() as TeamMember['role'];
 
-          const isSiteAccount = ['SPONSOR', 'MANTENEDOR', 'USER'].includes(normalizedRole);
+      if (usersRes.error) throw usersRes.error;
+      const data = usersRes.data || [];
 
-          const resolvedPerms = Array.isArray(savedOverride?.permissions) && savedOverride!.permissions!.length > 0
-            ? savedOverride!.permissions!
-            : (Array.isArray(u.permissions) ? u.permissions : []);
+      const siteAccessMap: Record<string, any> =
+        siteAccessRes?.data?.value && typeof siteAccessRes.data.value === 'object'
+          ? (siteAccessRes.data.value as Record<string, any>)
+          : {};
 
-          return {
-            id: u.id,
-            name: savedOverride?.name || u.name || 'Sem Nome',
-            email: u.email || '',
-            role: normalizedRole,
-            phone: savedOverride?.phone || u.phone || '-', 
-            department: savedOverride?.department || u.department || (isSiteAccount ? 'Cadastro pelo Site' : '-'),
-            join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            status: (savedOverride?.status as TeamMember['status']) || u.status || 'active',
-            category_id: savedOverride?.category_id || u.category_id || undefined,
-            permissions: resolvedPerms
-          } as TeamMember;
-        });
-        
-        setMembers(mappedMembers.sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime()));
+      const authByEmail = new Map<string, any>();
+      const authList = Array.isArray((authStatusRes as any)?.data?.users) ? (authStatusRes as any).data.users : [];
+      for (const au of authList) {
+        const em = String(au?.email || '').trim().toLowerCase();
+        if (em) authByEmail.set(em, au);
       }
+
+      const spRoleByEmail = new Map<string, { role: 'SPONSOR' | 'MANTENEDOR'; name?: string }>();
+      for (const sp of (sponsorshipsRes?.data || [])) {
+        const em = String(sp?.donor_email || '').trim().toLowerCase();
+        if (!em) continue;
+        const isSponsor = sp.child_id !== null || Number(sp.monthly_amount || 0) >= 90;
+        const existing = spRoleByEmail.get(em);
+        if (!existing || (isSponsor && existing.role !== 'SPONSOR')) {
+          spRoleByEmail.set(em, {
+            role: isSponsor ? 'SPONSOR' : 'MANTENEDOR',
+            name: sp.donor_name || existing?.name
+          });
+        }
+      }
+
+      const normalizeRoleValue = (raw: any, emailLower: string): TeamMember['role'] => {
+        const upperRole = String(raw || 'USER').trim().toUpperCase();
+        if (upperRole === 'SPONSOR' || upperRole === 'PADRINHO') return 'SPONSOR';
+        if (upperRole === 'MANTENEDOR') return 'MANTENEDOR';
+        if (upperRole === 'USER') {
+          const spInfo = spRoleByEmail.get(emailLower);
+          return spInfo ? spInfo.role : 'USER';
+        }
+        if (upperRole === 'MASTER') return 'admin';
+        if (upperRole === 'COORDENADOR') return 'coordinator';
+        if (upperRole === 'VOLUNTARIO') return 'volunteer';
+        return String(raw || 'USER').toLowerCase() as TeamMember['role'];
+      };
+
+      const computeSiteAccess = (emailLower: string, dbUser?: any): {
+        siteAccessStatus: 'accessed' | 'registered_only' | 'not_registered';
+        lastAccessAt: string | null;
+        isRegisteredInAuth: boolean;
+      } => {
+        const authInfo = authByEmail.get(emailLower);
+        const accessLog = siteAccessMap[emailLower];
+        const authLastSignIn = authInfo?.last_sign_in_at || null;
+        const logLastAccess = accessLog?.last_access_at || null;
+
+        let lastAccessAt: string | null = null;
+        if (authLastSignIn && logLastAccess) {
+          lastAccessAt = new Date(authLastSignIn).getTime() >= new Date(logLastAccess).getTime()
+            ? authLastSignIn
+            : logLastAccess;
+        } else {
+          lastAccessAt = authLastSignIn || logLastAccess || null;
+        }
+
+        const isRegisteredInAuth = Boolean(authInfo || accessLog || dbUser?.consent_date);
+
+        if (lastAccessAt) {
+          return { siteAccessStatus: 'accessed', lastAccessAt, isRegisteredInAuth: true };
+        }
+        if (isRegisteredInAuth) {
+          return { siteAccessStatus: 'registered_only', lastAccessAt: null, isRegisteredInAuth: true };
+        }
+        return { siteAccessStatus: 'not_registered', lastAccessAt: null, isRegisteredInAuth: false };
+      };
+
+      const seenEmails = new Set<string>();
+      const validUsers = data.filter(u => !isSpamOrMockUser(u));
+      const mappedMembers: TeamMember[] = validUsers.map(u => {
+        const cleanEmail = String(u.email || '').trim().toLowerCase();
+        if (cleanEmail) seenEmails.add(cleanEmail);
+
+        const savedOverride = findUserAccessOverride(overridesMap, { id: u.id, email: u.email });
+        const rawRole = savedOverride?.role || u.role || 'USER';
+        const normalizedRole = normalizeRoleValue(rawRole, cleanEmail);
+
+        const isSiteAccount = ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(normalizedRole).toUpperCase());
+
+        const resolvedPerms = Array.isArray(savedOverride?.permissions) && savedOverride!.permissions!.length > 0
+          ? savedOverride!.permissions!
+          : (Array.isArray(u.permissions) ? u.permissions : []);
+
+        const accessState = computeSiteAccess(cleanEmail, u);
+
+        return {
+          id: u.id,
+          name: savedOverride?.name || u.name || spRoleByEmail.get(cleanEmail)?.name || 'Sem Nome',
+          email: u.email || '',
+          role: normalizedRole,
+          phone: savedOverride?.phone || u.phone || siteAccessMap[cleanEmail]?.phone || '-',
+          department: savedOverride?.department || u.department || (isSiteAccount ? 'Cadastro pelo Site' : '-'),
+          join_date: u.created_at ? u.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          status: (savedOverride?.status as TeamMember['status']) || u.status || 'active',
+          category_id: savedOverride?.category_id || u.category_id || undefined,
+          permissions: resolvedPerms,
+          siteAccessStatus: accessState.siteAccessStatus,
+          lastAccessAt: accessState.lastAccessAt,
+          isRegisteredInAuth: accessState.isRegisteredInAuth
+        } as TeamMember;
+      });
+
+      // Garante que Padrinhos e Mantenedores que já se cadastraram e acessaram o site
+      // (via Supabase Auth ou log de acesso do site) também apareçam na Área de Usuários
+      const extraEmails = new Set<string>([
+        ...Array.from(authByEmail.keys()),
+        ...Object.keys(siteAccessMap).map(k => k.trim().toLowerCase())
+      ]);
+
+      for (const em of extraEmails) {
+        if (!em || seenEmails.has(em)) continue;
+        const authInfo = authByEmail.get(em);
+        const accessLog = siteAccessMap[em];
+        const spInfo = spRoleByEmail.get(em);
+        const candidateName = authInfo?.name || accessLog?.name || spInfo?.name || em.split('@')[0];
+        const rawRole = spInfo?.role || authInfo?.role || accessLog?.role || 'SPONSOR';
+        if (isSpamOrMockUser({ name: candidateName, email: em, role: rawRole })) continue;
+
+        const normalizedRole = normalizeRoleValue(rawRole, em);
+        const accessState = computeSiteAccess(em);
+        const createdIso = authInfo?.created_at || accessLog?.registered_at || accessLog?.last_access_at || new Date().toISOString();
+
+        seenEmails.add(em);
+        mappedMembers.push({
+          id: authInfo?.id || accessLog?.id || `site_${em}`,
+          name: candidateName,
+          email: em,
+          role: normalizedRole,
+          phone: accessLog?.phone || '-',
+          department: 'Cadastro pelo Site',
+          join_date: String(createdIso).split('T')[0],
+          status: 'active',
+          permissions: ['portal'],
+          siteAccessStatus: accessState.siteAccessStatus,
+          lastAccessAt: accessState.lastAccessAt,
+          isRegisteredInAuth: accessState.isRegisteredInAuth
+        });
+      }
+
+      setMembers(mappedMembers.sort((a, b) => {
+        const aTime = a.lastAccessAt ? new Date(a.lastAccessAt).getTime() : new Date(a.join_date).getTime();
+        const bTime = b.lastAccessAt ? new Date(b.lastAccessAt).getTime() : new Date(b.join_date).getTime();
+        return bTime - aTime;
+      }));
     } catch (e) {
       console.error('Error fetching users:', e);
     }
@@ -408,13 +531,24 @@ export function Settings() {
           {activeTab === 'users' && (() => {
             const supporterMembers = members.filter(m => ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(m.role).toUpperCase()));
             const internalMembers = members.filter(m => isInternalTeamUser({ role: m.role }));
+            const accessedSupportersCount = supporterMembers.filter(m => m.siteAccessStatus === 'accessed').length;
+            const accessedAllCount = members.filter(m => m.siteAccessStatus === 'accessed').length;
+            const registeredOnlyCount = members.filter(m => m.siteAccessStatus === 'registered_only').length;
+            const notRegisteredCount = members.filter(m => m.siteAccessStatus === 'not_registered').length;
+
             const filteredMembers = members.filter(m => {
               const matchesSearch = !userSearch.trim() ||
                 m.name.toLowerCase().includes(userSearch.toLowerCase()) ||
                 m.email.toLowerCase().includes(userSearch.toLowerCase());
               if (!matchesSearch) return false;
-              if (userFilter === 'supporters') return ['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(m.role).toUpperCase());
-              if (userFilter === 'team') return isInternalTeamUser({ role: m.role });
+              if (userFilter === 'supporters' && !['SPONSOR', 'MANTENEDOR', 'USER'].includes(String(m.role).toUpperCase())) return false;
+              if (userFilter === 'team' && !isInternalTeamUser({ role: m.role })) return false;
+
+              if (userStatusFilter === 'site_accessed') return m.siteAccessStatus === 'accessed';
+              if (userStatusFilter === 'registered_only') return m.siteAccessStatus === 'registered_only';
+              if (userStatusFilter === 'not_registered') return m.siteAccessStatus === 'not_registered';
+              if (userStatusFilter === 'active') return m.status === 'active';
+              if (userStatusFilter === 'inactive') return m.status === 'inactive' || m.status === 'on_leave';
               return true;
             });
 
@@ -422,42 +556,91 @@ export function Settings() {
             <div className="space-y-8">
               <TeamSummary members={members} />
               <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl shadow-slate-200/50">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter text-left">Diretório Global de Usuários</h2>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="relative">
-                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={userSearch}
-                        onChange={(e) => setUserSearch(e.target.value)}
-                        placeholder="Buscar por nome ou e-mail..."
-                        className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-400 w-full sm:w-64"
-                      />
+                <div className="flex flex-col gap-4 mb-8">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter text-left">Diretório Global de Usuários</h2>
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {accessedSupportersCount} {accessedSupportersCount === 1 ? 'padrinho/mantenedor já se cadastrou e acessou' : 'padrinhos e mantenedores já se cadastraram e acessaram'} o site.
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setUserFilter('all')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Todos ({members.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUserFilter('supporters')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'supporters' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Padrinhos & Mantenedores ({supporterMembers.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUserFilter('team')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'team' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Equipe ({internalMembers.length})
-                      </button>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative">
+                        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
+                          placeholder="Buscar por nome ou e-mail..."
+                          className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-slate-400 w-full sm:w-64"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setUserFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                        >
+                          Todos ({members.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserFilter('supporters')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'supporters' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                        >
+                          Padrinhos & Mantenedores ({supporterMembers.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserFilter('team')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userFilter === 'team' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                        >
+                          Equipe ({internalMembers.length})
+                        </button>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Filtro pela Área de Status (Cadastro e Acesso ao Site) */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-1">
+                      Filtrar por Status:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setUserStatusFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${userStatusFilter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                    >
+                      Todos Status
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserStatusFilter('site_accessed')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${userStatusFilter === 'site_accessed' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}
+                    >
+                      Cadastrados e Acessaram o Site ({accessedAllCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserStatusFilter('registered_only')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${userStatusFilter === 'registered_only' ? 'bg-sky-600 text-white border-sky-600' : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'}`}
+                    >
+                      Cadastrados (Sem Acesso) ({registeredOnlyCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserStatusFilter('not_registered')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${userStatusFilter === 'not_registered' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
+                    >
+                      Aguardando Cadastro ({notRegisteredCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserStatusFilter('inactive')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${userStatusFilter === 'inactive' ? 'bg-rose-600 text-white border-rose-600' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}`}
+                    >
+                      Inativos / Licença
+                    </button>
                   </div>
                 </div>
                 <TeamList 

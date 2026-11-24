@@ -22,7 +22,10 @@ import {
   Repeat,
   Edit2,
   X,
-  Save
+  Save,
+  Copy,
+  Check,
+  MessageCircle
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -49,6 +52,9 @@ export function SupportersList() {
   const [childrenList, setChildrenList] = useState<{ id: string; name: string; address?: string }[]>([]);
   const [childModalSupporter, setChildModalSupporter] = useState<SupporterData | null>(null);
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+  const [copyingInviteFor, setCopyingInviteFor] = useState<string | null>(null);
+  const [copiedInviteFor, setCopiedInviteFor] = useState<string | null>(null);
+  const [openingWhatsAppFor, setOpeningWhatsAppFor] = useState<string | null>(null);
   const [unsubscribedEmails, setUnsubscribedEmails] = useState<Set<string>>(new Set());
   const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [isSavingChild, setIsSavingChild] = useState(false);
@@ -864,6 +870,104 @@ export function SupportersList() {
     }
   };
 
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback abaixo
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const getFallbackChildrenNames = (supporter: SupporterData): string[] => {
+    if (supporter.sponsoredChildren && supporter.sponsoredChildren.length > 0) {
+      return supporter.sponsoredChildren.map(c => c.name).filter(Boolean);
+    }
+    if (supporter.sponsoredChildName && supporter.sponsoredChildName !== 'Aguardando vínculo') {
+      return [supporter.sponsoredChildName];
+    }
+    return [];
+  };
+
+  const handleCopySponsorInvite = async (supporter: SupporterData) => {
+    if (!supporter.email) return;
+    setCopyingInviteFor(supporter.email);
+    try {
+      const invite = await sponsorshipService.buildSponsorInviteMessage(
+        supporter.email,
+        supporter.name,
+        {
+          phone: supporter.phone,
+          fallbackChildrenNames: getFallbackChildrenNames(supporter)
+        }
+      );
+      const copied = await copyTextToClipboard(invite.text);
+      if (copied) {
+        setCopiedInviteFor(supporter.email);
+        setSyncFeedback({
+          type: 'success',
+          message: `Texto e link do convite de ${supporter.name} copiados! Cole no WhatsApp para enviar.`
+        });
+        setTimeout(() => setCopiedInviteFor(prev => (prev === supporter.email ? null : prev)), 2500);
+      } else {
+        setSyncFeedback({
+          type: 'error',
+          message: 'Não foi possível copiar automaticamente. Abra o Extrato para copiar o texto.'
+        });
+      }
+      setTimeout(() => setSyncFeedback(null), 6000);
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: err?.message || 'Erro ao gerar o texto do convite.'
+      });
+      setTimeout(() => setSyncFeedback(null), 6000);
+    } finally {
+      setCopyingInviteFor(null);
+    }
+  };
+
+  const handleSendSponsorWhatsApp = async (supporter: SupporterData) => {
+    if (!supporter.email) return;
+    setOpeningWhatsAppFor(supporter.email);
+    try {
+      const invite = await sponsorshipService.buildSponsorInviteMessage(
+        supporter.email,
+        supporter.name,
+        {
+          phone: supporter.phone,
+          fallbackChildrenNames: getFallbackChildrenNames(supporter)
+        }
+      );
+      window.open(invite.whatsappUrl, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: err?.message || 'Erro ao preparar mensagem do WhatsApp.'
+      });
+      setTimeout(() => setSyncFeedback(null), 6000);
+    } finally {
+      setOpeningWhatsAppFor(null);
+    }
+  };
+
   // Excluir doação duplicada ou registro indevido diretamente do banco
   const handleDeleteDonation = async (donationId: string) => {
     try {
@@ -1464,21 +1568,46 @@ export function SupportersList() {
 
                 {/* Ações */}
                 <td className="px-6 py-5 text-center">
-                  <div className="inline-flex items-center justify-center gap-2">
+                  <div className="inline-flex flex-wrap items-center justify-center gap-1.5">
                     {s.role === 'Padrinho' && s.email && (
-                      <button
-                        onClick={() => handleSendManualSponsorEmail(s)}
-                        disabled={sendingEmailFor === s.email}
-                        title="Enviar manualmente o e-mail de padrinho com a(s) criança(s) vinculada(s)"
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-700 border border-amber-200/80 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        <Mail size={13} className={sendingEmailFor === s.email ? 'animate-pulse' : ''} />
-                        {sendingEmailFor === s.email ? 'Enviando...' : 'Enviar E-mail'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleSendManualSponsorEmail(s)}
+                          disabled={sendingEmailFor === s.email}
+                          title="Enviar manualmente o e-mail de padrinho com a(s) criança(s) vinculada(s)"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-2 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-700 border border-amber-200/80 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <Mail size={13} className={sendingEmailFor === s.email ? 'animate-pulse' : ''} />
+                          {sendingEmailFor === s.email ? 'Enviando...' : 'Enviar E-mail'}
+                        </button>
+                        <button
+                          onClick={() => handleCopySponsorInvite(s)}
+                          disabled={copyingInviteFor === s.email}
+                          title="Copiar texto e link do e-mail convite para enviar pelo WhatsApp"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-2 border text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer",
+                            copiedInviteFor === s.email
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : "bg-slate-50 hover:bg-slate-800 hover:text-white text-slate-700 border-slate-200"
+                          )}
+                        >
+                          {copiedInviteFor === s.email ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedInviteFor === s.email ? 'Copiado!' : copyingInviteFor === s.email ? 'Copiando...' : 'Copiar Convite'}
+                        </button>
+                        <button
+                          onClick={() => handleSendSponsorWhatsApp(s)}
+                          disabled={openingWhatsAppFor === s.email}
+                          title={s.phone ? `Abrir WhatsApp (${s.phone}) com texto e link do convite` : 'Abrir WhatsApp com texto e link do convite'}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-2 bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200/80 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          <MessageCircle size={13} className={openingWhatsAppFor === s.email ? 'animate-pulse' : ''} />
+                          {openingWhatsAppFor === s.email ? 'Abrindo...' : 'WhatsApp'}
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => setSelectedSupporter(s)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 group/btn cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 group/btn cursor-pointer"
                     >
                       <FileText size={13} className="text-slate-400 group-hover/btn:text-white" />
                       Ver Extrato

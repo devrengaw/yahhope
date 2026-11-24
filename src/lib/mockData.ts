@@ -245,6 +245,9 @@ export interface TeamMember {
   department?: string;
   category_id?: string;
   permissions?: string[];
+  siteAccessStatus?: 'accessed' | 'registered_only' | 'not_registered';
+  lastAccessAt?: string | null;
+  isRegisteredInAuth?: boolean;
 }
 
 export interface UserCategory {

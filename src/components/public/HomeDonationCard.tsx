@@ -128,6 +128,7 @@ export function HomeDonationCard({
       const urlAmt = parseFloat(params.get('amount') || '0');
       const urlMode = params.get('mode') === 'general' ? 'general' : 'sponsorship';
       const urlMonths = parseInt(params.get('months') || '1', 10) || 1;
+      const urlMethod = params.get('method') === 'pix' ? 'pix' : 'card';
       const urlName = params.get('name') || '';
       const urlEmail = params.get('email') || '';
       if (urlName && !donorName) setDonorName(urlName);
@@ -135,7 +136,7 @@ export function HomeDonationCard({
       setConfirmedAmount(urlAmt || currentTotalAmount);
       setConfirmedMode(urlMode);
       setConfirmedMonths(urlMonths);
-      setConfirmedPayMethod('card');
+      setConfirmedPayMethod(urlMethod);
       setIsConfirmedSuccess(true);
       setTimeout(() => {
         const el = document.getElementById('participar');
@@ -339,19 +340,13 @@ export function HomeDonationCard({
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       if (!supabaseUrl) {
-        await completeInlineConfirmation(
-          finalVal,
-          finalDonorName,
-          finalDonorEmail,
-          finalDonorWhatsapp,
-          activePayMethod,
-          effectivePlanMonths
-        );
+        setDonorFormError(tr('Serviço de pagamento indisponível no momento. Tente novamente em instantes.', 'Payment service unavailable at the moment. Please try again shortly.'));
         return;
       }
 
       const currentPageUrl = `${window.location.origin}${window.location.pathname}`;
       const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const payMethodParam = isPixPayment ? 'pix' : 'card';
       const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
         method: 'POST',
         headers: {
@@ -361,7 +356,7 @@ export function HomeDonationCard({
         body: JSON.stringify({
           amount: finalVal,
           isMonthly,
-          paymentMethod: isPixPayment ? 'pix' : 'card',
+          paymentMethod: payMethodParam,
           planMonths: effectivePlanMonths,
           type: headerTab === 'sponsorship' ? 'sponsorship' : 'donation',
           quotasCount: sponsorshipQuotas,
@@ -370,40 +365,35 @@ export function HomeDonationCard({
           donorPhone: finalDonorWhatsapp,
           donorWhatsapp: finalDonorWhatsapp,
           successUrl: isHotsiteRoute()
-            ? `${currentPageUrl}?status=success&mode=${headerTab}&months=${effectivePlanMonths}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
+            ? `${currentPageUrl}?status=success&mode=${headerTab}&method=${payMethodParam}&months=${effectivePlanMonths}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
             : headerTab === 'sponsorship' || isMonthly
-              ? `${window.location.origin}/mantenedor?status=success&mode=${headerTab}&months=${effectivePlanMonths}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
-              : `${window.location.origin}/campanha?status=success&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`,
+              ? `${window.location.origin}/mantenedor?status=success&mode=${headerTab}&method=${payMethodParam}&months=${effectivePlanMonths}&quotas=${sponsorshipQuotas}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`
+              : `${window.location.origin}/campanha?status=success&method=${payMethodParam}&amount=${finalVal}&name=${encodeURIComponent(finalDonorName)}&email=${encodeURIComponent(finalDonorEmail)}`,
           cancelUrl: `${currentPageUrl}?status=cancel`
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.url) {
+      if (response.ok && data.url) {
         if (onClose) onClose();
         window.location.href = data.url;
       } else {
-        await completeInlineConfirmation(
-          finalVal,
-          finalDonorName,
-          finalDonorEmail,
-          finalDonorWhatsapp,
-          activePayMethod,
-          effectivePlanMonths
+        console.error('Checkout creation failed:', data);
+        setDonorFormError(
+          tr(
+            'Não foi possível iniciar o checkout de pagamento. Verifique seus dados e tente novamente.',
+            'Could not start the payment checkout. Please check your details and try again.'
+          )
         );
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      const activePayMethod = headerTab === 'sponsorship' ? sponsorshipPayMethod : generalPayMethod;
-      const isSponsorshipPix = headerTab === 'sponsorship' && activePayMethod === 'pix';
-      await completeInlineConfirmation(
-        finalVal,
-        finalDonorName,
-        finalDonorEmail,
-        finalDonorWhatsapp,
-        activePayMethod,
-        isSponsorshipPix ? sponsorshipPixMonths : 1
+      setDonorFormError(
+        tr(
+          'Erro de conexão ao iniciar o pagamento. Nenhum valor foi cobrado — tente novamente em instantes.',
+          'Connection error while starting payment. No amount was charged — please try again shortly.'
+        )
       );
     } finally {
       setIsCheckingOut(false);
@@ -459,9 +449,9 @@ export function HomeDonationCard({
             <p className="text-xs text-slate-600 leading-relaxed mt-1.5 font-gotham-regular">
               {confirmedMode === 'sponsorship' && confirmedPayMethod === 'pix' ? (
                 <>
-                  {tr('Seu pacote de apadrinhamento de ', 'Your sponsorship package of ')}
+                  {tr('Recebemos seu pedido de apadrinhamento de ', 'We received your sponsorship request of ')}
                   <strong>{confirmedMonths} {tr('meses', 'months')} (R$ {confirmedAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>
-                  {tr(' foi registrado! Conclua o PIX abaixo para ativar seu acompanhamento.', ' is registered! Complete the PIX below to activate your sponsorship.')}
+                  {tr('. Assim que o pagamento PIX for confirmado pelo banco, vincularemos sua criança e enviaremos o e-mail de boas-vindas com o perfil completo!', '. As soon as your PIX payment is confirmed by the bank, we will assign your child and send the welcome email with their full profile!')}
                 </>
               ) : isSingleDonation ? (
                 <>
@@ -479,60 +469,22 @@ export function HomeDonationCard({
             </p>
           </div>
 
-          {/* QR Code e Chave PIX Direto na Tela da Campanha */}
+          {/* Aviso de confirmação automática do PIX Stripe */}
           {confirmedPayMethod === 'pix' && (
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-left space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-gotham-bold text-xs text-slate-800">
-                  {tr('Concluir seu PIX', 'Complete your PIX')} {confirmedMode === 'sponsorship' ? `(${confirmedMonths} ${tr('Meses', 'Months')})` : ''}
+                <span className="font-gotham-bold text-xs text-amber-900">
+                  {tr('Confirmação automática do PIX', 'Automatic PIX confirmation')} {confirmedMode === 'sponsorship' ? `(${confirmedMonths} ${tr('Meses', 'Months')})` : ''}
                 </span>
-                <span className="text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-gotham-bold">
-                  Total: R$ {confirmedAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
+                <span className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-gotham-bold">
+                  R$ {confirmedAmount.toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-
-              <div className="flex flex-col items-center gap-3 bg-white p-3.5 rounded-xl border border-slate-200">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pixCopyPaste)}`}
-                  alt="QR Code PIX"
-                  className="w-32 h-32 rounded-xl border border-slate-100 p-1.5 shrink-0"
-                />
-                <div className="w-full space-y-2 text-center">
-                  <p className="text-[11px] text-slate-500 leading-snug">
-                    {tr('Escaneie o QR Code no app do seu banco ou copie o código PIX Copia e Cola:', 'Scan the QR Code in your banking app or copy the PIX Copy & Paste code:')}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleCopyPixCode}
-                    className="w-full py-2 px-3 bg-[#F49853] hover:bg-[#e0853d] text-white text-xs font-gotham-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    {pixCodeCopied ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{pixCodeCopied ? tr('Código PIX Copiado!', 'PIX Code Copied!') : tr('Copiar PIX Copia e Cola', 'Copy PIX Code')}</span>
-                  </button>
-                  <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
-                    <span className="text-xs font-mono text-slate-700 font-bold truncate mr-2">{pixKey}</span>
-                    <button
-                      type="button"
-                      onClick={handleCopyPix}
-                      className="text-xs font-gotham-bold text-[#F49853] hover:text-[#e0853d] flex items-center gap-1 shrink-0 cursor-pointer"
-                    >
-                      {pixCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                      <span>{pixCopied ? tr('Copiada!', 'Copied!') : tr('Copiar Chave', 'Copy Key')}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-slate-500 leading-snug">
-                {confirmedMode === 'sponsorship'
-                  ? tr(
-                      `Seu apadrinhamento fica ativo durante todos os ${confirmedMonths} meses contratados. Ao final do período, você poderá renovar ou manter acesso às novidades gerais do projeto.`,
-                      `Your sponsorship remains active for all ${confirmedMonths} months. At the end of the period, you can renew or keep access to general project updates.`
-                    )
-                  : tr(
-                      'Dica: No aplicativo do seu banco, você pode ativar o Agendamento Mensal para repetir este PIX automaticamente todo mês.',
-                      'Tip: In your banking app, you can enable Monthly Scheduling to repeat this PIX automatically each month.'
-                    )}
+              <p className="text-[11px] text-amber-900/90 leading-snug">
+                {tr(
+                  'Se você já concluiu o pagamento do QR Code PIX na tela da Stripe, aguarde alguns instantes: assim que o banco confirmar, você receberá o e-mail oficial de confirmação.',
+                  'If you already paid the PIX QR Code on the Stripe checkout screen, please wait a few moments: as soon as the bank confirms, you will receive the official confirmation email.'
+                )}
               </p>
             </div>
           )}

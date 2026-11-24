@@ -236,6 +236,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(contextUser);
+
+      // 4. Registra silenciosamente o acesso autenticado ao site em site_settings (user_site_access_v1)
+      // para que a Área de Usuários exiba padrinhos e mantenedores que já se cadastraram e acessaram o site.
+      if (contextUser.email) {
+        const cleanAccessEmail = contextUser.email.toLowerCase().trim();
+        const sessionTrackKey = `yahhope_site_access_logged_${cleanAccessEmail}`;
+        if (!sessionStorage.getItem(sessionTrackKey)) {
+          sessionStorage.setItem(sessionTrackKey, '1');
+          const nowIso = new Date().toISOString();
+          (async () => {
+            try {
+              const { data: existingRow } = await supabase
+                .from('site_settings')
+                .select('value')
+                .eq('key', 'user_site_access_v1')
+                .maybeSingle();
+
+              const currentMap = (existingRow?.value && typeof existingRow.value === 'object')
+                ? { ...(existingRow.value as Record<string, any>) }
+                : {};
+
+              const prevEntry = currentMap[cleanAccessEmail] || {};
+              currentMap[cleanAccessEmail] = {
+                id: contextUser.id,
+                email: cleanAccessEmail,
+                name: contextUser.name,
+                role: contextUser.role,
+                phone: contextUser.phone || prevEntry.phone || undefined,
+                registered_at: prevEntry.registered_at || authUser.created_at || nowIso,
+                last_access_at: authUser.last_sign_in_at || nowIso,
+                access_count: (Number(prevEntry.access_count) || 0) + 1
+              };
+
+              await supabase.from('site_settings').upsert(
+                {
+                  key: 'user_site_access_v1',
+                  value: currentMap,
+                  updated_at: nowIso
+                },
+                { onConflict: 'key' }
+              );
+            } catch {
+              // Silencioso: nunca bloqueia o login
+            }
+          })();
+        }
+      }
     } catch (err) {
       console.error("Error handling session user:", err);
       alert('Erro interno ao carregar perfil do usuário.');

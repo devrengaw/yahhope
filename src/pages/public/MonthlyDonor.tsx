@@ -337,109 +337,12 @@ export function MonthlyDonor() {
         ? quotasCount
         : (paymentMethod === 'pix' ? 0 : Math.floor(currentAmount / 90));
 
-      // Tanto Cartão quanto PIX passam pelo Checkout oficial da Stripe (QR Code PIX oficial com confirmação automática via webhook)
-      const isStripeCheckout = Boolean(import.meta.env.VITE_SUPABASE_URL);
-
-      // 1. Caso seja Apadrinhamento de Criança via PIX (Pacotes 3, 6 ou 12 meses) ou ambiente sem Stripe
-      if (donationType === 'sponsorship' && !isStripeCheckout) {
-        const result = await sponsorshipService.assignChildrenToSponsor({
-          donorName: finalName,
-          donorEmail: finalEmail,
-          donorPhone: finalPhone,
-          quotasCount: calculatedQuotas,
-          amountPerQuota: quotaCost,
-          amount: currentAmount,
-          paymentMethod,
-          planMonths: effectivePlanMonths,
-          renewChildId: urlRenewChildId,
-          sponsorUserId: user?.id
-        });
-
-        if (result.success) {
-          setAssignedChildren(result.assignedChildren);
-          setConfirmedExpiresAt(result.expiresAt || null);
-          if (createDonation && currentCampaign) {
-            createDonation({
-              campaign_id: currentCampaign.id,
-              donor_name: finalName,
-              donor_email: finalEmail,
-              amount: result.totalAmount || currentAmount,
-              payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-            });
-          }
-          setIsLoading(false);
-          setIsSuccess(true);
-          return;
-        } else {
-          alert(result.message || result.error || tr('Erro ao processar apadrinhamento', 'Error processing sponsorship'));
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Se for Mantenedor Geral via PIX ou sem Stripe
-      if (donationType !== 'sponsorship' && !isStripeCheckout) {
-        // Doações via PIX não entram na regra dos R$ 90,00
-        if (paymentMethod !== 'pix' && currentAmount >= 90) {
-          try {
-            const numChildren = Math.floor(currentAmount / 90);
-            const assignRes = await sponsorshipService.assignChildrenToSponsor({
-              donorName: finalName,
-              donorEmail: finalEmail,
-              donorPhone: finalPhone,
-              quotasCount: numChildren,
-              amountPerQuota: 90,
-              amount: currentAmount,
-              paymentMethod,
-              sponsorUserId: user?.id
-            });
-            if (assignRes.success && assignRes.assignedChildren.length > 0) {
-              setAssignedChildren(assignRes.assignedChildren);
-            }
-          } catch (e) {
-            console.warn('Aviso ao atribuir crianças da doação de mantenedor:', e);
-          }
-        } else {
-          // Apoio Geral (< R$ 90) via PIX: envia o e-mail de acesso ao Portal do Mantenedor
-          await sponsorshipService.sendMaintainerAccessEmail(
-            finalEmail,
-            finalName,
-            currentAmount,
-            paymentMethod
-          );
-        }
-
-        if (createDonation && currentCampaign) {
-          createDonation({
-            campaign_id: currentCampaign.id,
-            donor_name: finalName,
-            donor_email: finalEmail,
-            amount: currentAmount,
-            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-          });
-        }
-        setIsLoading(false);
-        setIsSuccess(true);
-        return;
-      }
-
-      // 2. Caso seja Mantenedor Geral do Projeto
+      // Tanto Cartão quanto PIX passam obrigatoriamente pelo Checkout oficial da Stripe
+      // (confirmação automática via webhook somente após pagamento efetivamente liquidado)
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      
       if (!supabaseUrl) {
-        setTimeout(() => {
-          if (createDonation && currentCampaign) {
-            createDonation({
-              campaign_id: currentCampaign.id,
-              donor_name: finalName,
-              donor_email: finalEmail,
-              amount: currentAmount,
-              payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-            });
-          }
-          setIsLoading(false);
-          setIsSuccess(true);
-        }, 1200);
+        alert(tr('Serviço de pagamento indisponível no momento. Tente novamente em instantes.', 'Payment service unavailable at the moment. Please try again shortly.'));
+        setIsLoading(false);
         return;
       }
 
@@ -466,26 +369,18 @@ export function MonthlyDonor() {
         })
       });
 
-      const data = await response.json();
-      if (data.url) {
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        if (createDonation && currentCampaign) {
-          createDonation({
-            campaign_id: currentCampaign.id,
-            donor_name: finalName,
-            donor_email: finalEmail,
-            amount: currentAmount,
-            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-          });
-        }
+        console.error('Erro ao criar sessão de checkout Stripe:', data);
+        alert(tr('Não foi possível iniciar o checkout de pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Could not start the payment checkout. No amount was charged — please try again shortly.'));
         setIsLoading(false);
-        setIsSuccess(true);
       }
     } catch (err) {
       console.error('Erro ao processar adesão de mantenedor:', err);
+      alert(tr('Erro de conexão ao iniciar o pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Connection error while starting payment. No amount was charged — please try again shortly.'));
       setIsLoading(false);
-      setIsSuccess(true);
     }
   };
 
@@ -715,7 +610,7 @@ export function MonthlyDonor() {
               <p className="text-slate-600 text-base leading-relaxed mb-6 font-gotham-light">
                 {donationType === 'sponsorship' && paymentMethod === 'pix' ? (
                   <>
-                    {tr('O seu pacote de apadrinhamento de ', 'Your sponsorship package of ')}<strong>{pixPackageMonths} {tr('meses', 'months')} (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>{tr(' já está registrado! Você acompanhará a criança durante todos os ', ' is now registered! You will follow your child’s progress for all ')}{pixPackageMonths}{tr(' meses.', ' months.')}
+                    {tr('Recebemos seu pedido de apadrinhamento de ', 'We received your sponsorship package request of ')}<strong>{pixPackageMonths} {tr('meses', 'months')} (R$ {(urlAmount ? parseFloat(urlAmount) : currentAmount).toLocaleString(isEn ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2 })})</strong>{tr('. Assim que o pagamento PIX for confirmado pelo banco, ativaremos automaticamente o apadrinhamento e enviaremos o e-mail de boas-vindas com o perfil da sua criança!', '. As soon as your PIX payment is confirmed by the bank, your sponsorship will be automatically activated and we will send the welcome email with your child’s profile!')}
                   </>
                 ) : (
                   <>

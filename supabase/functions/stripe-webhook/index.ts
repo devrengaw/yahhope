@@ -837,13 +837,34 @@ serve(async (req) => {
     // 1. EVENTO: CHECKOUT SESSION COMPLETED / ASYNC PAYMENT SUCCEEDED (inclui PIX pago)
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object as any
-      // Para PIX pendente (pagamento assíncrono ainda não liquidado), aguarda async_payment_succeeded
-      if (event.type === 'checkout.session.completed' && session.payment_status && session.payment_status !== 'paid') {
-        console.log(`Checkout session ${session.id} ainda com status '${session.payment_status}' (aguardando confirmação do PIX).`)
+      // Somente processa apadrinhamento/doação/e-mail se o pagamento estiver efetivamente PAGO ('paid').
+      // Para PIX pendente (pagamento assíncrono ainda não liquidado), aguarda checkout.session.async_payment_succeeded.
+      if (session.payment_status !== 'paid') {
+        console.log(`Checkout session ${session.id} (${event.type}) ainda com status '${session.payment_status}' (aguardando confirmação do pagamento).`)
         return new Response(JSON.stringify({ received: true, pending_payment: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         })
+      }
+
+      // Idempotência: evita duplicar apadrinhamento, lançamento financeiro ou e-mail caso a Stripe reenvie o evento
+      const sessionPaymentKey = (typeof session.payment_intent === 'string' && session.payment_intent)
+        ? session.payment_intent
+        : session.id
+      if (sessionPaymentKey) {
+        const lookupKeys = sessionPaymentKey !== session.id ? [sessionPaymentKey, session.id] : [sessionPaymentKey]
+        const { data: alreadyProcessed } = await supabase
+          .from('donations')
+          .select('id')
+          .in('stripe_payment_id', lookupKeys)
+          .limit(1)
+        if (alreadyProcessed && alreadyProcessed.length > 0) {
+          console.log(`Checkout session ${session.id} (${sessionPaymentKey}) já foi processada anteriormente — ignorando duplicata.`)
+          return new Response(JSON.stringify({ received: true, already_processed: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          })
+        }
       }
       
       let customer: any = null

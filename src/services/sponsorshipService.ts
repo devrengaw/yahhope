@@ -1545,6 +1545,148 @@ export const sponsorshipService = {
   },
 
   /**
+   * Monta o texto formatado + link do e-mail convite de Padrinho para copiar ou enviar via WhatsApp.
+   * Usa o mesmo template `new_sponsor` configurado em Comunicação > E-mails.
+   */
+  async buildSponsorInviteMessage(
+    email: string,
+    name: string,
+    options?: { phone?: string; fallbackChildrenNames?: string[] }
+  ): Promise<{
+    text: string;
+    link: string;
+    ctaText: string;
+    childrenNames: string[];
+    isRegistered: boolean;
+    whatsappUrl: string;
+  }> {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    const displayName = (name || cleanEmail.split('@')[0] || 'Amigo(a)').trim();
+
+    const originRaw = typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://yahhope.com';
+    const appOrigin = /localhost|127\.0\.0\.1/i.test(originRaw) ? 'https://yahhope.com' : originRaw;
+
+    // 1. Verifica crianças vinculadas ativas e template do e-mail em paralelo
+    const [spRes, tplRes, isRegistered] = await Promise.all([
+      cleanEmail
+        ? supabase
+            .from('sponsorships')
+            .select('child_id, status, children(id, name)')
+            .ilike('donor_email', cleanEmail)
+            .not('child_id', 'is', null)
+        : Promise.resolve({ data: [] as any[] }),
+      supabase
+        .from('email_templates')
+        .select('*')
+        .eq('name', 'new_sponsor')
+        .maybeSingle(),
+      cleanEmail ? this.isUserRegistered(cleanEmail) : Promise.resolve(false)
+    ]);
+
+    const seenNames = new Set<string>();
+    const childrenNames: string[] = [];
+
+    ((spRes as any)?.data || []).forEach((row: any) => {
+      const st = String(row.status || 'active').toLowerCase().trim();
+      if (st === 'canceled' || st === 'cancelled' || st === 'inactive' || st === 'replaced') return;
+      const childName = row?.children?.name;
+      if (childName && !seenNames.has(childName)) {
+        seenNames.add(childName);
+        childrenNames.push(childName);
+      }
+    });
+
+    if (childrenNames.length === 0 && Array.isArray(options?.fallbackChildrenNames)) {
+      options!.fallbackChildrenNames.forEach(cn => {
+        const trimmed = (cn || '').trim();
+        if (trimmed && trimmed !== 'Aguardando vínculo' && !seenNames.has(trimmed)) {
+          seenNames.add(trimmed);
+          childrenNames.push(trimmed);
+        }
+      });
+    }
+
+    const templateData: any = (tplRes as any)?.data || null;
+    const childrenNamesJoined = childrenNames.join(', ');
+
+    const defaultBody = `<p>Olá <strong>{{nome_doador}}</strong>,</p><p><br></p><p>Estamos muito felizes em receber você como mantenedor e apadrinhador! Seu apoio será fundamental para garantir alimentação, desenvolvimento e cuidado diário para as crianças.</p><p><br></p><p>Para acompanhar as fotos da criança atendida, novidades e relatórios de transparência, finalize o seu cadastro no portal criando sua senha:</p><p><br></p><p>Com profunda gratidão,<br>Equipe YAH Hope</p>`;
+
+    const rawHtml = (templateData?.body || defaultBody)
+      .replace(/{{nome_doador}}/gi, displayName)
+      .replace(/{{nome}}/gi, displayName)
+      .replace(/{{email}}/gi, cleanEmail)
+      .replace(/{{nome_crianca}}/gi, childrenNamesJoined || 'sua criança apadrinhada');
+
+    // Converte HTML do template para texto formatado compatível com WhatsApp
+    const htmlToWhatsApp = (html: string): string => {
+      return html
+        .replace(/<\s*br\s*\/?>/gi, '\n')
+        .replace(/<\/\s*(p|div|h[1-6]|li|tr)\s*>/gi, '\n\n')
+        .replace(/<\s*li[^>]*>/gi, '• ')
+        .replace(/<\s*(strong|b)[^>]*>([\s\S]*?)<\/\s*(strong|b)\s*>/gi, (_, _tag, inner) => {
+          const clean = String(inner).replace(/<[^>]+>/g, '').trim();
+          return clean ? `*${clean}*` : '';
+        })
+        .replace(/<\s*(em|i)[^>]*>([\s\S]*?)<\/\s*(em|i)\s*>/gi, (_, _tag, inner) => {
+          const clean = String(inner).replace(/<[^>]+>/g, '').trim();
+          return clean ? `_${clean}_` : '';
+        })
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    };
+
+    const bodyText = htmlToWhatsApp(rawHtml);
+
+    const ctaText = isRegistered
+      ? (templateData?.cta_text || 'Acessar Minhas Crianças no Portal')
+      : (templateData?.cta_text || 'Finalizar Cadastro de Padrinho');
+
+    const baseCtaUrl = isRegistered
+      ? `${appOrigin}/portal/sponsorship`
+      : (templateData?.cta_url || `${appOrigin}/finalizar-cadastro`);
+    const sep = baseCtaUrl.includes('?') ? '&' : '?';
+    const link = (baseCtaUrl.includes('cadastro') || baseCtaUrl.includes('finalizar') || baseCtaUrl.includes('portal') || baseCtaUrl.includes('set-password'))
+      ? `${baseCtaUrl}${sep}email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(displayName)}`
+      : baseCtaUrl;
+
+    const alreadyMentionsChild = childrenNames.length > 0 && childrenNames.some(cn => bodyText.toLowerCase().includes(cn.toLowerCase()));
+    const childLine = childrenNames.length > 0 && !alreadyMentionsChild
+      ? `\n\n💛 *${childrenNames.length === 1 ? 'Criança apadrinhada' : 'Crianças apadrinhadas'}:* ${childrenNamesJoined}`
+      : '';
+
+    const fullText = `${bodyText}${childLine}\n\n🔗 *${ctaText}:*\n${link}`;
+
+    const rawDigits = (options?.phone || '').replace(/\D/g, '');
+    let waPhone = '';
+    if (rawDigits.length >= 10) {
+      waPhone = (rawDigits.length === 10 || rawDigits.length === 11) ? `55${rawDigits}` : rawDigits;
+    }
+
+    const whatsappUrl = waPhone
+      ? `https://wa.me/${waPhone}?text=${encodeURIComponent(fullText)}`
+      : `https://wa.me/?text=${encodeURIComponent(fullText)}`;
+
+    return {
+      text: fullText,
+      link,
+      ctaText,
+      childrenNames,
+      isRegistered,
+      whatsappUrl
+    };
+  },
+
+  /**
    * Reconciliação e Auto-Atribuição de Criança para Padrinhos com Cota Pendente de Vínculo:
    * 1. Verifica se há apadrinhamentos na tabela 'sponsorships' de valor >= R$ 90 SEM child_id atribuída.
    * 2. Se o padrinho JÁ POSSUI criança atribuída, NUNCA altera ou sobrescreve a criança existente.

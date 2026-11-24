@@ -144,81 +144,50 @@ export function MobileDonorSponsor() {
       console.warn('Erro ao gravar yah_pending_sponsorship:', e);
     }
 
-    const successReturnUrl = `${window.location.origin}/portal/sponsorship?status=success&quotas=${quotasCount}&months=${effectivePlanMonths}&amount=${totalAmount}&email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`;
+    const successReturnUrl = `${window.location.origin}/portal/sponsorship?status=success&method=${paymentMethod}&quotas=${quotasCount}&months=${effectivePlanMonths}&amount=${totalAmount}&email=${encodeURIComponent(donorEmail)}&name=${encodeURIComponent(donorName)}`;
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      // Checkout oficial Stripe tanto para Cartão de Crédito quanto para PIX (QR Code oficial Stripe com confirmação automática)
-      if (supabaseUrl) {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            campaignId: currentCampaign?.id || '1',
-            amount: totalAmount,
-            isMonthly: paymentMethod !== 'pix',
-            paymentMethod,
-            planMonths: effectivePlanMonths,
-            donorName,
-            donorEmail,
-            donorPhone,
-            quotasCount,
-            type: 'sponsorship',
-            successUrl: successReturnUrl,
-            cancelUrl: `${window.location.origin}/portal/apadrinhar?status=cancel`
-          })
-        });
-
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
+      if (!supabaseUrl) {
+        alert(tr('Serviço de pagamento indisponível no momento. Tente novamente em instantes.', 'Payment service unavailable at the moment. Please try again shortly.'));
+        return;
       }
 
-      // Executa a atribuição ou renovação (Pacote PIX 3, 6 ou 12 meses ou fallback Cartão)
-      const result = await sponsorshipService.assignChildrenToSponsor({
-        donorName,
-        donorEmail,
-        donorPhone,
-        quotasCount,
-        amountPerQuota: quotaCost,
-        amount: totalAmount,
-        paymentMethod: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal',
-        planMonths: effectivePlanMonths,
-        renewChildId,
-        sponsorUserId: user?.id
+      // Checkout oficial Stripe tanto para Cartão de Crédito quanto para PIX (QR Code oficial Stripe com confirmação automática via webhook)
+      const baseUrl = supabaseUrl.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/functions/v1/create-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          campaignId: currentCampaign?.id || '1',
+          amount: totalAmount,
+          isMonthly: paymentMethod !== 'pix',
+          paymentMethod,
+          planMonths: effectivePlanMonths,
+          donorName,
+          donorEmail,
+          donorPhone,
+          quotasCount,
+          type: 'sponsorship',
+          successUrl: successReturnUrl,
+          cancelUrl: `${window.location.origin}/portal/apadrinhar?status=cancel`
+        })
       });
 
-      if (result.success) {
-        setAssignedResult({
-          success: true,
-          assignedChildren: result.assignedChildren,
-          totalAmount: result.totalAmount,
-          planMonths: effectivePlanMonths,
-          expiresAt: result.expiresAt,
-          paymentMethod
-        });
-
-        if (createDonation && currentCampaign) {
-          createDonation({
-            campaign_id: currentCampaign.id,
-            donor_name: user?.name || 'Padrinho YAH Hope',
-            donor_email: user?.email || 'padrinho@yahhope.org',
-            amount: result.totalAmount,
-            payment_method: paymentMethod === 'pix' ? 'pix' : 'cartao_mensal'
-          });
-        }
-      } else {
-        alert(result.message || tr('Todas as crianças já estão apadrinhadas ou ocorreu um erro.', 'All children are already sponsored or an error occurred.'));
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+        return;
       }
+
+      console.error('Erro ao criar checkout de apadrinhamento:', data);
+      alert(tr('Não foi possível iniciar o checkout de pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Could not start the payment checkout. No amount was charged — please try again shortly.'));
     } catch (e: any) {
       console.error(e);
-      alert(tr('Ocorreu um erro ao processar o apadrinhamento.', 'An error occurred while processing the sponsorship.'));
+      alert(tr('Erro de conexão ao iniciar o pagamento. Nenhum valor foi cobrado — tente novamente em instantes.', 'Connection error while starting payment. No amount was charged — please try again shortly.'));
     } finally {
       setIsSubmitting(false);
     }
